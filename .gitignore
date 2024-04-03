@@ -1,0 +1,179 @@
+######################
+# Visual Studio Code #
+######################
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+######################
+# Python             #
+######################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Sphinx documentation
+docs/_build/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+################################
+# Jupyter Notebooks            #
+# website: http://jupyter.org/ #
+################################
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+
+################################
+# Environments                 #
+################################
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+environment/
+
+######################
+# Notepad++ backups  #
+######################
+*.bak
+
+################################
+# Windows files                #
+################################
+# Windows thumbnail cache files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+# Dump file
+*.stackdump
+# Windows Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+#############################################
+# Microsoft Office Temporary and Lock Files #
+#############################################
+#
+
+#Legacy tmp files
+*.tmp
+#Word temporary files
+~$*.do*
+#Excel temporary files
+~$*.xls*
+#PowerPoint temporary files
+~$*.ppt*
+#Microsoft Publisher temporary files
+~$*.ppt*
+#Visio autosave temporary files
+*.~vsd*
+#Access lock files
+*.laccdb
+
+######################################
+# Microsoft Office Auto Backup Files #
+######################################
+
+# Legacy Word document backup files
+*.wbk
+#Excel Backup Files
+*.xlk
+#Word Auto Backup Files
+Backup of *.do*
+#
+
+################################
+# Personal additions           #
+################################
+.spyproject
+.mypy_cache/
+__pycache__/
+_Test Results/
+reference/
+Test Data/

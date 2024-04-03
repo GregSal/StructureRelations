@@ -1,0 +1,120 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.envFile": "${workspaceFolder}/.env",
+		"python.defaultInterpreterPath": "D:/.conda/envs/StructureRelations/python.exe",
+		"python.autoComplete.extraPaths": [
+			"src",
+			"examples",
+			"Tests"
+		],
+		"python.analysis.include": [
+			"src",
+			"Tests",
+			"examples"
+		],
+		"python.analysis.extraPaths": [
+			"src",
+			"examples",
+			"Tests"
+		],
+		"python.analysis.inlayHints.functionReturnTypes": true,
+		"python.analysis.inlayHints.variableTypes": false,
+		"python.analysis.autoImportCompletions": true,
+		"python.analysis.completeFunctionParens": true,
+		"python.analysis.diagnosticMode": "workspace",
+		"python.analysis.autoSearchPaths": true,
+		"terminal.integrated.env.windows": {
+			"PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/Tests;${workspaceFolder}/examples;${env:PYTHONPATH}"
+		},
+		"terminal.integrated.profiles.windows": {
+			"Conda": {
+				"path": "C:/WINDOWS/System32/cmd.exe",
+				"args": [
+					"/K",
+					"D:/anaconda3/Scripts/activate.bat D:/anaconda3"
+				],
+				"icon": "terminal-bash",
+				"color": "terminal.ansiCyan",
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/Tests;${workspaceFolder}/examples;${env:PYTHONPATH}"
+				}
+			},
+			"CondaPS": {
+				"source": "PowerShell",
+				"args": [
+					"-ExecutionPolicy",
+					"ByPass",
+					"-NoExit",
+					"-Command",
+					"& 'D:/anaconda3/shell/condabin/conda-hook.ps1' ; conda activate 'D:/anaconda3"
+				],
+				"icon": "terminal-powershell",
+				"color": "terminal.ansiCyan",
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/Tests;${workspaceFolder}/examples;${env:PYTHONPATH}"
+				}
+			},
+			"PythonShell": {
+				"path": "D:/.conda/envs/sectionaryDev/python.exe",
+				"args": [],
+				"icon": "terminal-bash",
+				"color": "terminal.ansiCyan",
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/Tests;${workspaceFolder}/examples;${env:PYTHONPATH}"
+				}
+			},
+		},
+		"python.terminal.activateEnvInCurrentTerminal": true,
+		"cSpell.words": [
+			"DICOM",
+			"levelname",
+			"unstarted"
+		],
+		"testExplorer.addToEditorContextMenu": true,
+		"testExplorer.mergeSuites": true,
+		"testExplorer.sort": "byLabelWithSuitesFirst",
+		"testExplorer.useNativeTesting": false,
+		"python.testing.unittestArgs": [
+			"-v",
+			"-s",
+			"./Tests",
+			"-p",
+			"*test*.py"
+		],
+		"python.testing.pytestEnabled": false,
+		"python.testing.unittestEnabled": true,
+		"pythonIndent.trimLinesWithOnlyWhitespace": true,
+		"autoDocstring.quoteStyle": "'''",
+		"esbonio.sphinx.confDir": "",
+		"notebook.diff.ignoreMetadata": true,
+		"notebook.diff.ignoreOutputs": true,
+		"jupyter.notebookFileRoot": "${workspaceFolder}",
+		"jupyter.showVariableViewWhenDebugging": true,
+		"python.terminal.launchArgs": [],
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Python: Current File",
+				"type": "python",
+				"request": "launch",
+				"program": "${file}",
+				"console": "integratedTerminal",
+				"justMyCode": true,
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/Tests;${workspaceFolder}/examples;${env:PYTHONPATH}"
+				}
+			}
+		]
+	},
+}
