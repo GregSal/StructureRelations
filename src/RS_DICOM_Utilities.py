@@ -65,7 +65,6 @@ def get_structure_file_info(struct_file: Path)->Dict[str, Any]:
 
 
 # %% DICOM Extraction Functions
-
 def get_names_nums(struct_dataset: pydicom.Dataset)->pd.Series:
     '''Build lookup table of ROI number and ROI ID.
 
@@ -141,6 +140,7 @@ def get_roi_labels(struct_dataset: pydicom.Dataset)->pd.DataFrame:
         contour_labels = pd.DataFrame()
     return contour_labels
 
+
 # %% Contour Classes
 class ContourSlice():
     '''Contours related to a specific structure at a specific slice.
@@ -163,6 +163,7 @@ class ContourSlice():
     default_thickness = 0.2  # Default slice thickness in cm
     # This is assigned to ContourSlice rather than to ContourSet because the
     # slice thickness may vary between slices.
+    precision = PRECISION  # The number of digits to use for measurement values.
 
     def __init__(self, contour_points: np.array):
         '''Create a new contour slice.
@@ -187,7 +188,7 @@ class ContourSlice():
         # Normalize orders the polygon coordinates in a standard way to simplify
         # comparisons.
         self.contour = shp.normalize()
-        self.axial_position = round(contour_points[0,2], PRECISION)
+        self.axial_position = round(contour_points[0,2], self.precision)
         self.thickness = self.default_thickness
         self.region_count = 1
         self.is_solid = True
@@ -199,41 +200,122 @@ class ContourSlice():
         Returns:
             float: The area of the composite polygon(s)
         '''
-        # TODO add a property that returns a list of areas if self.region_count > 1
-        return round(self.contour.area, PRECISION)
+        return round(self.contour.area, self.precision)
+
+    @property
+    def areas(self) -> list:
+        '''The areas of each polygon in the slice.
+
+        Returns:
+            List[float]: A list of the areas of each polygon in the slice.
+        '''
+        area_list = []
+        if self.contour.geometryType() == 'Polygon':
+            area = round(self.contour.area, self.precision)
+            area_list.append(area)
+        else:
+            for contour in self.contour.geoms:
+                area = round(contour.area, self.precision)
+                area_list.append(area)
+        return area_list
 
     @property
     def radius(self) -> float:
         '''The "circular" radius of the polygon
 
-        _extended_summary_
+        The circular radius calculation is only correct if the ContourSlice
+        contains a single polygon.  If not use radii instead to obtain a list
+        of radii for each polygon in the slice.
 
         Returns:
-            float: _description_
+            (float, None): The "circular" radius of the polygon if the
+                ContourSlice contains only one contour (polygon), otherwise
+                returns None.
         '''
-        # FIXME The radius calculation is incorrect if the ContourSlice contains multiple polygons.
-        # if self.region_count > 1, then iterate through the polygons, returning a tuple of radius.
-        return round(sqrt(self.contour.area / pi), PRECISION)
+        if self.contour.geometryType() == 'Polygon':
+            return round(sqrt(self.contour.area / pi), self.precision)
+        return None
 
     @property
-    def perimeter(self):
-        # FIXME The perimeter calculation is incorrect if the ContourSlice contains multiple polygons.
-        # if self.region_count > 1, then iterate through the polygons, returning a tuple of perimeters.
-        return round(self.contour.length, PRECISION)
+    def radii(self):
+        '''A list of the "circular" radii of each polygon in the ContourSlice.
+
+        Returns:
+            List[float]: A list of the "circular" radii of each polygon in the
+                ContourSlice.
+        '''
+        radius_list = []
+        if self.contour.geometryType() == 'Polygon':
+            radius = round(sqrt(self.contour.area / pi), self.precision)
+            radius_list.append(radius)
+        else:
+            for contour in self.contour.geoms:
+                radius = round(sqrt(contour.area / pi), self.precision)
+                radius_list.append(radius)
+        return radius_list
 
     @property
-    def centre_of_mass(self):
-        # TODO add a property that returns a list of individual COMs for each polygon
-        com =  [round(num, PRECISION)
+    def centre_of_mass(self)->Tuple[float]:
+        '''The geometric center of the composite polygon(s).
+
+        Returns:
+            Tuple[float]: The area of the composite polygon(s)
+        '''
+        com =  [round(num, self.precision)
                 for num in list(self.contour.centroid.coords[0])]
         com.append(self.axial_position)
         return tuple(com)
 
+    def centers(self):
+        '''A list of the geometric centers of each polygon in the ContourSlice.
+
+        Returns:
+            List[Tuple[float]]: A list of the geometric centers of each polygon
+            in the ContourSlice.
+        '''
+        centre_list = []
+        if self.contour.geometryType() == 'Polygon':
+            coord = list(self.contour.centroid.coords[0])
+            coord.append(self.axial_position)
+            centre_list.append(tuple(round(c, self.precision) for c in coord))
+        else:
+            for contour in self.contour.geoms:
+                coord = list(contour.centroid.coords[0])
+                coord.append(self.axial_position)
+                centre_list.append(tuple(round(c, self.precision) for c in coord))
+        return centre_list
+
     @property
-    def resolution(self):
+    def perimeter(self)->float:
+        '''The combined perimeters of the polygon(s) in the ContourSlice.
+
+        Returns:
+            float: The combined perimeters of the polygon(s) in the ContourSlice.
+        '''
+        return round(self.contour.length, self.precision)
+
+    @property
+    def perimeters(self) -> list:
+        '''The perimeters of each polygon in the slice.
+
+        Returns:
+            List[float]: A list of the perimeters of each polygon in the slice.
+        '''
+        perimeter_list = []
+        if self.contour.geometryType() == 'Polygon':
+            perimeter = round(self.contour.length, self.precision)
+            perimeter_list.append(perimeter)
+        else:
+            for contour in self.contour.geoms:
+                perimeter = round(contour.length, self.precision)
+                perimeter_list.append(perimeter)
+        return perimeter_list
+
+    @property
+    def resolution(self)->float:
         '''Average number of points per contour length.'''
         res_list = []
-        if self.contour.type == 'MultiPolygon':
+        if self.contour.geom_type == 'MultiPolygon':
             for poly in self.contour.geoms:
                 length = poly.exterior.length
                 num_points = len(poly.exterior.coords) - 1
@@ -255,21 +337,7 @@ class ContourSlice():
                 res = num_points / length
                 res_list.append(res)
         mean_res = mean(res_list)
-        return round(mean_res, PRECISION)
-
-    @property
-    def center(self):
-        centre_list = []
-        if self.contour.geometryType() == 'Polygon':
-            coord = list(self.contour.centroid.coords[0])
-            coord.append(self.axial_position)
-            centre_list.append(tuple(round(c, PRECISION) for c in coord))
-        else:
-            for contour in self.contour.geoms:
-                coord = list(contour.centroid.coords[0])
-                coord.append(self.axial_position)
-                centre_list.append(tuple(round(c, PRECISION) for c in coord))
-        return centre_list
+        return round(mean_res, self.precision)
 
     def combine(self, other: "ContourSlice"):
         if not other.axial_position == self.axial_position:
@@ -279,7 +347,7 @@ class ContourSlice():
         if self.contour.relate_pattern(other_contour,'F*******2'):
             # non-overlapping structures
             self.contour = self.contour.union(other_contour)
-            self.region_count += 1  # Increment the number of separate regions.
+            self.region_count += 1  # Increment the number of separate regions.  #Question Is this needed, or can it be obtains from shapley?
         elif self.contour.relate_pattern(other_contour,'212***FF2'):
             # self contains other
             self.contour = self.contour.difference(other_contour)
@@ -287,15 +355,22 @@ class ContourSlice():
         elif self.contour.relate_pattern(other_contour,'2FF***212'):
             # other contains self
             self.contour = other_contour.difference(self.contour)
-            if self.form == 'Simple':
-                self.form = 'Rind'  # 'Multi' form beats 'Rind' form'
+            self.is_solid = False
         else:
             raise ValueError('Cannot merge overlapping contours.')
 
     def __repr__(self) -> str:
+        if self.is_solid:
+            form = 'Solid'
+        else:
+            form = 'Hollow'
+        if self.region_count > 1:
+            quantity = 'Multi'
+        else:
+            quantity = 'Single'
         desc = ''.join([
-            f'{self.form} ContourSlice, at slice {self.axial_position}, ',
-            f'containing {(self.contour.type)}'
+            f'{quantity} {form} ContourSlice, at slice {self.axial_position}, ',
+            f'containing {(self.contour.geom_type)}'
             ])
         return desc
 
@@ -481,26 +556,12 @@ def build_contour_table(ds: pydicom.Dataset,
             diam = contour_set.spherical_radius * 2
         else:
             diam = None
-        # Calculate cylindrical radius
-        appropriate_structure = structure_id in [
-            'BODY',
-            'BrainStem', 'PRV5 BrainStem',
-            'SpinalCanal', 'PRV5 SpinalCanal', 'PRV8 SpinalCanal',
-            'Esophagus', 'Larynx', 'opt Larynx', 'Trachea',
-            'Aorta', 'Rectum', 'opt Rectum', 'PRV4 Rectum'
-            ]
-        has_volume = contour_set.volume is not None
-        has_length = contour_set.length is not None
-        if appropriate_structure & has_volume & has_length:
-            cyl_rad = sqrt(contour_set.volume / (contour_set.length * pi))
-        else:
-            cyl_rad = None
+
         # Build table
         structure_dict = {
             'StructureID': structure_id,
             'Volume': contour_set.volume,
             'Eq Sp Diam': diam,
-            'Radius': cyl_rad,
             'Thickness': None,
             'Length': contour_set.length,
             'Sup Slice': contour_set.sup_slice,
@@ -520,268 +581,22 @@ def build_contour_table(ds: pydicom.Dataset,
     return contour_data
 
 
-# %% Structure query functions
-def get_structure_info(connection, selection, sql_path):
-    query_file = sql_path / 'StructureLookup.sql'
-    structure_lookup = vq.run_query(connection, query_file, selection)
-    structure_lookup.set_index('StructureID', inplace=True)
-    return structure_lookup
+def drop_exclusions(structure_table):
+    x_structs = structure_table.StructureID.str.lower().str.startswith('x')
+    z_structs = structure_table.StructureID.str.lower().str.startswith('z')
+    structure_ignore = x_structs | z_structs
+    pruned_structure_table = structure_table.loc[~structure_ignore,:].copy()
+    pruned_structure_table.dropna(subset=['Volume'], inplace=True)
+    return pruned_structure_table
 
 
-# %% Excel Table functions
-def text_color(color_rgb: Tuple[int])->Tuple[int]:
-    '''Determine the appropriate text color for a given background color.
-
-    Text color is either Black (0, 0, 0) or white (255, 255, 255)
-    the cutoff between black and white is given by:
-        brightness > 274.3 and green > 69
-        (brightness is the length of the color vector $sqrt{R^2+G^2+B62}$
-
-    Args:
-        color_rgb (Tuple[int]): The 3-integer RGB tuple of the background color.
-
-    Returns:
-        Tuple[int]: The text color as an RGB tuple.
-            One of (0, 0, 0) or (255, 255, 255).
-    '''
-    red, green, blue = color_rgb
-    brightness = sqrt(red**2 + green**2 + blue**2)
-    if brightness > 274.3:
-        if green > 69:
-            color = (0, 0, 0)
-        else:
-            color = (255, 255, 255)
-    elif green > 181:
-        color = (0, 0, 0)
-    else:
-        color = (255, 255, 255)
-    return color
-
-
-def color_format(sheet: xw.Sheet, color_info: pd.Series = None,
-                 starting_cell='A1'):
-    '''Apply background and text color for a given
-
-    For each continuously filled cell in the column, starting with
-    *starting_cell* A color and text color are obtained and applied.
-
-    The color tuple is extracted from *color_info*, using the cell text as the
-    row index.  If the search fails, the background color is
-    white (255, 255, 255) and the text is black (0, 0, 0).
-
-    If *color_info* is not supplied, then it tries to extract a color tuple
-    from the cell text.  Again, if it fails, the background color is white
-    (255, 255, 255) and the text is black (0, 0, 0).
-
-    Args:
-        sheet (xw.Sheet): The Excel worksheet to use
-        structures_info (pd.Series, optional): A color lookup table.  The
-            index must match the text in the Excel column.  If None, then the
-            text in the Excel column is assumed to be RGB color tuples as a
-            string. The format should be like: "(#, #, #)", where `#` is an
-            integer between 0 and 255.   Defaults to None.
-        starting_cell (str, optional): _description_. The top starting cell in
-            the column to be colored. Defaults to 'A1'.
-    '''
-    def extract_color(rgb: str)->Tuple[int]:
-        '''Convert RGB string to tuple.'''
-        try:
-            color_rgb = tuple(int(num) for num in rgb[1:-1].split(', '))
-        except (ValueError, AttributeError, TypeError):
-            color_rgb = (255,255,255)
-        return color_rgb
-
-    if color_info is None:
-        text_as_color = True
-    else:
-        text_as_color = False
-
-    start_range = sheet.range(starting_cell)
-    end_range = start_range.end('down')
-    num_rows = xw.Range(start_range, end_range).size
-    for idx in range(num_rows):
-        cell = start_range.offset(idx,0)
-        color_index = cell.value.strip()
-        if color_index:
-            if text_as_color:
-                color_rgb = extract_color(color_index)
-            else:
-                try:
-                    rgb = color_info.at[color_index]
-                except KeyError:
-                    color_rgb = (255,255,255)
-                else:
-                    color_rgb = extract_color(rgb)
-            text_rgb = text_color(color_rgb)
-            cell.color = color_rgb
-            cell.font.color = text_rgb
-
-
-def add_fill(text: str, start='', end='', default='',
-             drop_white_space=True)->str:
-    '''Add spaces or other fillers around text.
-
-    Add start to the beginning of the text if it is not already present.
-    Add end to the ending of the text if it is not already present.
-    If text is blank, return default.
-
-    Args:
-        text (str): The primary text.
-        start (str, optional): If supplied, look for *start* at the beginning of
-            *text*. If not present add *start* to the beginning of the text.
-            Defaults to ''.
-        end (str, optional): If supplied, look for *end* at the end of *text*.
-            If not present add *end* after the text. Defaults to ''.
-        default (str, optional): String to return if *text* is empty.
-            Defaults to ''.
-        drop_white_space (bool, optional): If True, strip whitespace from *text*
-            before applying other tests. Defaults to True.
-
-    Returns:
-        str: _description_
-    '''
-    # Remove starting and trailing whitespace if requested.
-    if drop_white_space:
-        text = text.strip()
-    # Use default if text is empty.  This comes after *drop_white_space* so that
-    # text which is all whitespace will be treated as empty.
-    if not text:
-        return default
-    # Set beginning if required.
-    if start:
-        if text.startswith(start):
-            beginning = ''
-        else:
-            beginning = start
-    else:
-        beginning = ''
-    # Set ending if required.
-    if end:
-        if text.endswith(end):
-            ending = ''
-        else:
-            ending = end
-    else:
-        ending = ''
-    # Combine text parts.
-    full_text = ''.join([beginning, text, ending])
-    return full_text
-
-
-def set_file_name(selection: Dict[str, str] = None, extension='.pkl', prefix='',
-                  folder: Path = None)->Path:
-    '''Construct a custom file name.
-
-    If supplied the file name will begin with prefix. Middle sections of the
-    file name are obtained from the 'PatientLastName', 'CR_Number', 'Plan_Id',
-    and 'Structure_Set' items in selection. If selection does not contain
-    'CR_Number', add 'data' to the end of the file name in its place. If
-    selection does not contain 'Plan_Id' check for 'Structure_Set'.
-    Extension defaults to '.pkl'.
-    # The final file name will have the form:
-    '{prefix} {Plan_Id|Structure_Set} {PatientLastName} {CR_Number}.{extension}'.
-    For missing name components, the surrounding spaces are also dropped.
-
-    Args:
-        selection (Dict[str, str], optional): Plan specific references.
-            Defaults to None.  If supplied must contain the following items:
-                'PatientLastName', 'CR_Number', 'Plan_Id'
-        extension (str, optional): File extension to use (including '.').
-            Defaults to '.pkl'.
-        prefix (str, optional): Initial part of the file name. Defaults to ''.
-        folder (Path, optional): Folder where the file is (to be) located.
-            If None, Path.cwd() is used. Defaults to None.
-
-    Returns:
-        Path: Full path with the custom file name.
-    '''
-    # Get name parts from selection
-    if selection:
-        plan_id = selection.get('Plan_Id', '')
-        if not plan_id:
-            structure_set = selection.get('Structure_Set', '')
-        else:
-            structure_set = ''
-        last_name = selection.get('PatientLastName', '')
-        pt_id = selection.get('CR_Number', '')
-    else:
-        plan_id = ''
-        last_name = ''
-        pt_id = ''
-    # Add required spaces etc. for name parts.
-    name_parts = {
-        'prefix': add_fill(prefix, end=' '),
-        'extension': add_fill(extension, start='.', default='.pkl'),
-        'plan_id': add_fill(plan_id, end=' '),
-        'structure_set': add_fill(structure_set, end=' '),
-        'last_name': add_fill(last_name, end=' '),
-        'pt_id': add_fill(pt_id, default='data')
-        }
-    # Build the name
-    template = '{prefix}{plan_id}{structure_set}{last_name}{pt_id}{extension}'
-    data_file_name = template.format(**name_parts)
-    # Build the full path
-    if not folder:
-        folder = Path.cwd()
-    save_file =  folder / data_file_name
-    return save_file
-
-
-def save_data(contour_tables, contour_formatting, selection, data_path):
-    workbook = xw.books.active
-    struct_sheet = workbook.sheets['Contouring']
-    dimensions_table = contour_tables['Dimensions']
-    dim_range = struct_sheet.range('A3')
-    dim_range.options(index=False, header=False).value = dimensions_table
-    color_format(struct_sheet, contour_formatting, starting_cell='A3')
-
-    settings_table = contour_tables['Settings']
-    s_range = struct_sheet.range('K3')
-    s_range.options(index=False, header=False).value = settings_table
-    color_format(struct_sheet, contour_formatting, starting_cell='K3')
-
-    info_sheet = workbook.sheets['Structure Ref']
-    settings_table = contour_tables['Structure Ref']
-    s_range = info_sheet.range('A1')
-    s_range.options(index=False, header=True).value = settings_table
-    color_format(info_sheet, contour_formatting, starting_cell='A2')
-
-    save_file = set_file_name(selection, folder=data_path, extension='.xlsx',
-                              prefix='Structures')
-    new_book = xw.Book()
-    for name, table in contour_tables.items():
-        new_sheet = new_book.sheets.add(name)
-        xw.view(table, sheet=new_sheet)
-        color_format(new_sheet, contour_formatting, starting_cell='B2')
-    new_book.save(save_file)
-    update_pickle_data(contour_tables, data_path, selection,
-                       prefix='plan_check_data')
-
-
-def extract_structure_data(structure_set_info, sql_path, data_path):
-    connection = vq.connect(DBSERVER)
-    selection = {
-        'CR_Number': structure_set_info['PatientID'],
-        'StructureSet_ID': structure_set_info['StructureSet'],
-        'PatientLastName': structure_set_info['PatientLastName'],
-        }
+def extract_structure_data(structure_set_info, data_path):
     dataset = pydicom.dcmread(structure_set_info['File'])
     contour_sets = read_contours(dataset)
     contour_data = build_contour_table(dataset, contour_sets)
 
-    structure_lookup = get_structure_info(connection, selection, sql_path)
-    structure_table = contour_data.join(structure_lookup)
-
-    structure_table.reset_index(inplace=True)
-    structure_table = drop_exclusions(structure_table)
-
-
-    struc_idx = structure_table.set_index('StructureID', drop=False)
-    struc_idx = struc_idx.StructureID.copy()
-    structure_parts = build_sort_index(struc_idx)
-    structure_table = structure_table.join(structure_parts.SortOrder,
-                                            on='StructureID')
-    structure_table.sort_values('SortOrder', inplace=True)
+    structure_table = contour_data.reset_index()
+    #structure_table = drop_exclusions(structure_table)
 
     dimensions_columns = ['StructureID', 'Volume', 'Eq Sp Diam', 'Radius',
                             'Thickness', 'Length', 'Sup Slice', 'Inf Slice',
@@ -798,49 +613,9 @@ def extract_structure_data(structure_set_info, sql_path, data_path):
     settings_table = structure_table[settings_columns]
     structure_ref = structure_table[ref_columns]
 
-    contour_formatting = structure_table.set_index('StructureID').Colour
-    structure_parts.reset_index(inplace=True)
     contour_tables = {
         'Dimensions': dimensions_table,
         'Settings': settings_table,
         'Structures': structure_table,
-        'Structure Parts': structure_parts,
         'Structure Ref': structure_ref
         }
-
-    save_data(contour_tables, contour_formatting, selection, data_path)
-def drop_exclusions(structure_table):
-    x_structs = structure_table.StructureID.str.lower().str.startswith('x')
-    z_structs = structure_table.StructureID.str.lower().str.startswith('z')
-    structure_ignore = x_structs | z_structs
-    pruned_structure_table = structure_table.loc[~structure_ignore,:].copy()
-    pruned_structure_table.dropna(subset=['Volume'], inplace=True)
-    return pruned_structure_table
-
-
-# %% Main
-def main():
-    '''Main'''
-    base_path = Path.cwd()
-    base_path = base_path.resolve()
-    data_path = Path(r'C:\Plan Checking Temp')
-    dicom_folder = data_path / '_DICOM'
-    sql_path = base_path / 'SQL'
-
-
-
-
-    struct_files = list(dicom_folder.glob('**/RS*.dcm'))
-    structure_set_info = select_structure_file(struct_files)
-
-    #struct_file = dicom_folder / r'0338104\RS.0338104.BRAI.dcm'
-    #structure_set_info = get_structure_file_info(struct_file)
-
-    if structure_set_info:
-        extract_structure_data(structure_set_info, sql_path, data_path)
-
-
-
-
-if __name__ == '__main__':
-    main()
