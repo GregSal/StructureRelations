@@ -150,11 +150,16 @@ class ContourSlice():
             to any structure containing only one slice.
 
     Attributes:
+        axial_position (float): The offset of the ContourSlice in the axial
+            (Z) direction to the DICOM origin.
         thickness (float): The distance in cm to the next ContourSlice.
             to any structure containing only one slice. If the composite
             structure contains only one slice, default_thickness is used.
-        axial_position (float): The offset of the ContourSlice in the axial
-            (Z) direction to the DICOM origin.
+        contour (Polygon, MultiPolygon): The shapley polygon(s) defining the
+            structure on the slice.
+        exterior (Polygon): The solid shapley polygon covering the
+            structure on the slice.  If the structure is solid, this will be
+            identical to the contour.
         region_count (int): The number of distinct regions on the same slice.
         is_solid (bool): If False, one of the polygons completely surrounds a
             region which is not included as part of that polygon. i.g the
@@ -192,6 +197,7 @@ class ContourSlice():
         self.thickness = self.default_thickness
         self.region_count = 1
         self.is_solid = True
+        self.exterior = self.contour  # A single contour is always its exterior.
 
     @property
     def area(self)->float:
@@ -340,20 +346,38 @@ class ContourSlice():
         return round(mean_res, self.precision)
 
     def combine(self, other: "ContourSlice"):
+        '''Add an additional contour for the same structure on the same slice.
+
+        If on contour is inside the other, the interior contour is treated as a
+        hole.  If the contours do not overlap at all they are treated as
+        separate regions of the same structure.
+
+        If the new contour surrounds the original contour(s), define the new
+        contour as the exterior and the original contour(s) as holes.
+
+        Args:
+            other (ContourSlice): The additional contour.
+
+        Raises:
+            ValueError: If the additional contour is for a different slice.
+                Or if the two contours overlap, but one is not contained within
+                the other.
+        '''
         if not other.axial_position == self.axial_position:
             raise ValueError("Can't combine contours from different slices")
         other_contour = other.contour
         # Check for non-overlapping structures
-        if self.contour.relate_pattern(other_contour,'F*******2'):
+        if self.contour.disjoint(other_contour):
             # non-overlapping structures
             self.contour = self.contour.union(other_contour)
-            self.region_count += 1  # Increment the number of separate regions.  #Question Is this needed, or can it be obtains from shapley?
-        elif self.contour.relate_pattern(other_contour,'212***FF2'):
+            self.region_count += 1  # Increment the number of separate regions.
+        elif self.contour.contains(other_contour):
             # self contains other
             self.contour = self.contour.difference(other_contour)
             self.is_solid = False
-        elif self.contour.relate_pattern(other_contour,'2FF***212'):
+        elif self.contour.within(other_contour):
             # other contains self
+            self.exterior = other_contour # The exterior contour contains everything else
             self.contour = other_contour.difference(self.contour)
             self.is_solid = False
         else:
@@ -496,13 +520,16 @@ class ContourSet():
 def read_contours(struct_dataset: pydicom.Dataset)->Dict[int, ContourSet]:
     '''Load contours for each structure in the RS DICOM file.
 
-    _extended_summary_
+    Extracts the structure data from an RS_DICOM dataset, building a dictionary
+    of the structures for analysis.  They keys of the dictionary are the
+    structure's ROI number.  The values are ContourSets
 
     Args:
         struct_dataset (pydicom.Dataset): The full dataset for an RS DICOM file.
 
     Returns:
-        Dict[int, ContourSet]: _description_
+        Dict[int, ContourSet]: A dictionary of structure data with the
+            structure's ROI number as the key.
     '''
     roi_id = get_names_nums(struct_dataset)
     contour_sets = {}
@@ -526,6 +553,36 @@ def read_contours(struct_dataset: pydicom.Dataset)->Dict[int, ContourSet]:
         contour_set.color = tuple(roi.ROIDisplayColor)
         contour_sets[structure_num] = contour_set
     return contour_sets
+
+
+def build_contour_index(contour_sets: Dict[int, ContourSet])->pd.DataFrame:
+    '''Build an index of structures in a contour set.
+
+    The table columns contain the structure names, the ROI number, and the
+    slice positions where the contours for that structure are located.  There
+    is one row for each slice and structure on that slice.  Multiple contours
+    for a single structure on a given slice, have only one row in teh contour
+    index
+
+    Args:
+        contour_sets (Dict[int, RS_DICOM_Utilities.ContourSet]): A dictionary
+            of structure data.
+
+    Returns:
+        pd.DataFrame: An index of structures in a contour set indication which
+            slices contains contours for each structure.
+    '''
+    slice_ref = {}
+    name_ref = {}
+    for structure in contour_sets.values():
+        slice_ref[structure.roi_num] = list(structure.contours.keys())
+        name_ref[structure.roi_num] = structure.structure_id
+    slice_seq = pd.Series(slice_ref).explode()
+    slice_seq.name = 'Slice'
+    name_lookup = pd.Series(name_ref)
+    name_lookup.name = 'StructureID'
+    slice_lookup = pd.DataFrame(name_lookup).join(slice_seq, how='outer')
+    return slice_lookup
 
 
 def build_contour_table(ds: pydicom.Dataset,
