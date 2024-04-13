@@ -22,6 +22,25 @@ from shapely.geometry import Polygon
 # Global Settings
 PRECISION = 3
 
+#%% Tuples to Strings
+def colour_text(roi_colour):
+    colour_fmt = ''.join([
+        f'({roi_colour[0]:0d}, ',
+        f'{roi_colour[1]:0d}, ',
+        f'{roi_colour[2]:0d})'
+        ])
+    return colour_fmt
+
+
+def com_text(com):
+    com_fmt = ''.join([
+        f'({com[0]:-5.2f}, ',
+        f'{com[1]:-5.2f}, ',
+        f'{com[2]:-5.2f})'
+        ])
+    return com_fmt
+
+
 # %% File Selection Functions
 def get_structure_file_info(struct_file: Path)->Dict[str, Any]:
     '''Get top-level info about a RS DICOM file.
@@ -420,6 +439,23 @@ class ContourSet():
         self.inf_slice: float = None
         self.length: float = None
 
+    @property
+    def info(self):
+        contour_info = {
+            'ROI Num': self.roi_num,
+            'StructureID': self.structure_id,
+            'Sup Slice': self.sup_slice,
+            'Inf Slice': self.inf_slice,
+            'Length': self.length,
+            'Thickness': round(self.length / len(self.contours), PRECISION),
+            'Volume': self.volume,
+            'Eq Sp Diam': self.spherical_radius * 2,
+            'Center of Mass': self.center_of_mass,
+            'Resolution': self.resolution,
+            'Colour': self.color
+            }
+        return contour_info
+
     def finalize(self):
         if not self.empty:
             self.sort_slices()
@@ -514,6 +550,7 @@ class ContourSet():
                 self.resolution_type = 'High'
             else:
                 self.resolution = 'Normal'
+
 
 
 # %% read_contour data
@@ -645,34 +682,3 @@ def drop_exclusions(structure_table):
     pruned_structure_table = structure_table.loc[~structure_ignore,:].copy()
     pruned_structure_table.dropna(subset=['Volume'], inplace=True)
     return pruned_structure_table
-
-
-def extract_structure_data(structure_set_info, data_path):
-    dataset = pydicom.dcmread(structure_set_info['File'])
-    contour_sets = read_contours(dataset)
-    contour_data = build_contour_table(dataset, contour_sets)
-
-    structure_table = contour_data.reset_index()
-    #structure_table = drop_exclusions(structure_table)
-
-    dimensions_columns = ['StructureID', 'Volume', 'Eq Sp Diam', 'Radius',
-                            'Thickness', 'Length', 'Sup Slice', 'Inf Slice',
-                            'Center of Mass']
-    settings_columns = ['StructureID', 'ROINumber', 'StructureName',
-                        'CodeMeaning', 'CodeScheme', 'VolumeType',
-                        'DICOM_Type', 'Status', 'GenerationAlgorithm',
-                        'Resolution', 'MaterialCTValue']
-    ref_columns = ['StructureID', 'CodeMeaning', 'VolumeName', 'VolumeType',
-                    'GenerationAlgorithm', 'Resolution', 'Colour',
-                    'SortOrder', 'ROINumber', 'MaterialCTValue',
-                    'Status', 'ColorName']
-    dimensions_table = structure_table[dimensions_columns]
-    settings_table = structure_table[settings_columns]
-    structure_ref = structure_table[ref_columns]
-
-    contour_tables = {
-        'Dimensions': dimensions_table,
-        'Settings': settings_table,
-        'Structures': structure_table,
-        'Structure Ref': structure_ref
-        }
