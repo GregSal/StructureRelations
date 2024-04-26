@@ -456,12 +456,6 @@ class ContourSet():
             }
         return contour_info
 
-    def finalize(self):
-        if not self.empty:
-            self.sort_slices()
-            self.calculate_volume()
-            self.calculate_resolution()
-
     def add_contour(self, contour: ContourSlice):
         slice_position = contour.axial_position
         if slice_position in self.contours:
@@ -472,8 +466,8 @@ class ContourSet():
             self.contours[slice_position] = contour
         self.empty = False
 
-    def sort_slices(self):
-        if not self.empty:
+    def finalize(self):
+        def sort_slices():
             slices = list(self.contours.keys())
             if len(slices) > 1:
                 slices.sort()
@@ -491,8 +485,7 @@ class ContourSet():
             self.inf_slice = min(slices)
             self.length = self.sup_slice - self.inf_slice
 
-    def calculate_volume(self):
-        if not self.empty:
+        def calculate_volume():
             slices = list(self.contours.keys())
             slices.sort()
             volume = 0
@@ -542,15 +535,39 @@ class ContourSet():
             self.center_of_mass = tuple(round(num, PRECISION)
                                         for num in list(total_com))
 
-    def calculate_resolution(self):
-        if not self.empty:
+        def calculate_resolution():
             res_list = [slice.resolution for slice in self.contours.values()]
             self.resolution = round(mean(res_list), PRECISION)
             if self.resolution > 15:
                 self.resolution_type = 'High'
             else:
-                self.resolution = 'Normal'
+                self.resolution_type = 'Normal'
 
+        if not self.empty:
+            sort_slices()
+            calculate_volume()
+            calculate_resolution()
+
+    @property
+    def neighbours(self):
+        slices = pd.Series(self.contours.keys())
+        inf1 = slices.shift(-1)
+        inf2 = slices.shift(-2)
+        sup1 = slices.shift(1)
+        sup2 = slices.shift(2)
+        neighbours = pd.concat([slices, inf1, inf2, sup1, sup2], axis='columns')
+        neighbours.columns = ['slice', 'inf1', 'inf2', 'sup1', 'sup2']
+        neighbours.set_index('slice', drop=False, inplace=True)
+        return neighbours
+
+    @property
+    def gaps(self):
+        slices = pd.Series(self.contours.keys())
+        gap = slices.shift(-1) - slices
+        gaps = pd.concat([slices, gap], axis='columns')
+        gaps.columns = ['slice', 'gap']
+        gaps.set_index('slice', inplace=True)
+        return gaps
 
 
 # %% read_contour data
@@ -592,6 +609,8 @@ def read_contours(struct_dataset: pydicom.Dataset)->Dict[int, ContourSet]:
     return contour_sets
 
 
+# %% Make a table to CT slice indexes and the contours on that slice
+# TODO Some of these index functions should be converted to ContourSet methods
 def build_contour_index(contour_sets: Dict[int, ContourSet])->pd.DataFrame:
     '''Build an index of structures in a contour set.
 
@@ -622,6 +641,96 @@ def build_contour_index(contour_sets: Dict[int, ContourSet])->pd.DataFrame:
     return slice_lookup
 
 
+# %% Find distance between slices with contours
+def slice_spacing(contour):
+    # Index is the slice position of all slices in the image set
+    # Columns are structure IDs
+    # Values are the distance (INF) to the next contour
+    inf = contour.dropna().index.min()
+    sup = contour.dropna().index.max()
+    contour_range = (contour.index <= sup) & (contour.index >= inf)
+    slices = contour.loc[contour_range].dropna().index.to_series()
+    gaps = slices.shift(-1) - slices
+    return gaps
+
+
+
+def build_slice_table(contour_sets)->pd.DataFrame:
+    def form_table(slice_index):
+        slice_index.reset_index(inplace=True)
+        slice_index.sort_values('Slice', inplace=True)
+        slice_index.set_index(['Slice','StructureID'], inplace=True)
+        slice_table = slice_index.unstack()
+        slice_table.columns = slice_table.columns.droplevel()
+        return slice_table
+
+    slice_index = build_contour_index(contour_sets)
+    slice_table = form_table(slice_index)
+    contour_slices = slice_table.apply(slice_spacing)
+    return contour_slices
+
+
+# %% Identify contours with gaps
+def has_gaps(structure_id, contour_slices) -> bool:
+    inf = contour_slices[structure_id].dropna().index.min()
+    sup = contour_slices[structure_id].dropna().index.max()
+
+    contour_range = (contour_slices.index <= sup) & (contour_slices.index >= inf)
+    missing_slices = contour_slices.loc[contour_range, structure_id].isna()
+    return any(missing_slices)
+
+
+# %% find contours surrounding missing conto0urs for interpolation
+def neighbouring_slice(slice_index, missing_slices=None, shift_direction=1,
+                       shift_start=0):
+    shift_size = shift_start
+    if missing_slices:
+        ref = slice_index[missing_slices].copy()
+        ref_missing = list(missing_slices)
+        while ref_missing:
+            shift_size += shift_direction
+            shift_slice = slice_index.shift(shift_size)[missing_slices]
+            ref_idx = ref.isin(ref_missing)
+            ref[ref_idx] = shift_slice[ref_idx]
+            ref_missing = list(set(ref) & set(missing_slices))
+            ref_missing.sort()
+    else:
+        shift_size += shift_direction
+        ref = slice_index.shift(shift_size).copy()
+        ref.dropna(inplace=True)
+    return ref
+
+
+def next_slice(slice_index, missing_slices, previous,
+               direction=1, shift_size=1):
+    ref = neighbouring_slice(slice_index, missing_slices,
+                             shift_direction=direction, shift_start=shift_size)
+    used = (previous == ref)
+
+    while any(used):
+        shift_size += direction
+        next_shift = neighbouring_slice(slice_index, missing_slices,
+                                        shift_direction=direction,
+                                        shift_start=shift_size)
+        ref[used] = next_shift[used]
+        used = (previous == ref)
+    return ref
+
+
+def find_neighbouring_slice(slice_index, missing_slices):
+    inf1 = neighbouring_slice(slice_index, missing_slices, shift_direction=-1)
+    inf2 = next_slice(slice_index, missing_slices, inf1, direction=-1,
+                    shift_size=-1)
+    sup1 = neighbouring_slice(slice_index, missing_slices, shift_direction=1)
+    sup2 = next_slice(slice_index, missing_slices, sup1, direction=1,
+                    shift_size=1)
+
+    ref = pd.concat([inf1, inf2, sup1, sup2], axis='columns')
+    ref.columns = ['inf1', 'inf2', 'sup1', 'sup2']
+    return ref
+
+
+# %% Old Functions
 def build_contour_table(ds: pydicom.Dataset,
                         contour_sets: Dict[int, ContourSet])->pd.DataFrame:
     roi_gen = get_gen_alg(ds)
