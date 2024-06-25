@@ -107,20 +107,18 @@ class StructureInfo:
     structure_density: float = None
 
 
-
 @dataclass
 class StructureParameters:
-    sup_slice: SliceIndex
-    inf_slice: SliceIndex
-    length: float
-    volume: float
-    surface_area: float
-    sphericity: float
-    resolution: float
+    sup_slice: SliceIndex = None
+    inf_slice: SliceIndex = None
+    length: float = None
+    volume: float = None
+    surface_area: float = None
+    sphericity: float = None
+    resolution: float = None
     resolution_type: ResolutionType = ResolutionType.Normal
     thickness: float = None
     center_of_mass: Tuple[float, float, float] = None
-
 
 
 class Structure:
@@ -129,27 +127,23 @@ class Structure:
         self.name = name
         self.info = StructureInfo(roi, structure_name=name)
         self.parameters = StructureParameters()
+        self.info_display_parameters = {}
+        self.diagram_display_parameters = {}
+
+
+    def __setattribute__(self, **kwargs):
         for key, val in kwargs:
             if hasattr(self.info, key):
-                self.info.__setattribute__(key, val)
+                self.info.__setattr__(key, val)
+            if hasattr(self.parameters, key):
+                self.parameters.__setattr__(key, val)
 
-
-
-	Attributes :
-		Name: str
-		Type: StructureCategory
-		StructureInfo: Dict[str,Any]
-
-		Info Display Parameters
-			Formatting strings
-			HTML Commands
-				Font, layout css classes
-		Diagram Display Parameters
-			Shape / image
-			Links?
-			Location?
-	Methods:
-Add to display
+    def __getattribute__(self, atr_name:str):
+        if hasattr(self.info, atr_name):
+            return self.info.__getattribute__(atr_name)
+        if hasattr(self.parameters, atr_name):
+            return self.parameters.__getattribute__(atr_name)
+        return None
 
 
 # Global Settings
