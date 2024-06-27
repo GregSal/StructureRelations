@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 # Standard Libraries
 from pathlib import Path
+from abc import ABC, abstractmethod
+from collections import defaultdict
 from math import sqrt, pi
 from statistics import mean
 from itertools import zip_longest
@@ -33,15 +35,38 @@ Contour = shapely.Polygon
 StructureSlice = shapely.MultiPolygon
 StructurePair =  Tuple[ROI_Num, ROI_Num]
 
+
+# Global Settings
+PRECISION = 3
+
+
 class ResolutionType(Enum):
     Normal = 1
     High = 2
+
 
 class StructureCategory(Enum):
     Target = auto()
     OAR = auto()
     External = auto()
     Other = auto()
+
+
+class MetricType(Enum):
+    Margin = auto()
+    Distance = auto()
+    OverlapArea = auto()
+    OverlapSurface = auto()
+
+
+class ValueFormat(defaultdict):
+    '''String formatting templates for individual name, value pairs.
+    The default value gives a string like:
+        MetricName: 2.36%
+    '''
+    def __missing__(self, key: str) -> str:
+        format_part = ''.join([key, ':\t{', key, 'f2.0%}'])
+        return format_part
 
 
 @dataclass
@@ -146,8 +171,52 @@ class Structure:
         return None
 
 
-# Global Settings
-PRECISION = 3
+class Metric(ABC):
+    # Overwrite these class variables for all subclasses.
+    metric_type: MetricType
+    default_format = ValueFormat()
+    default_format_template = ''
+
+    def __init__(self, structures: StructurePair):
+        self.structures = structures
+        self.metric = {}
+        self.calculate_metric()
+        self.format_dict = {}
+        self.format_template = self.default_format_template
+        self.set_formats()
+
+    def set_formats(self):
+        '''Set the default text formatting for displaying metrics.
+
+        Generic self.default_format has a default value of:
+            <MetricName>:\t{<MetricValue>f2.0%}])
+        creates a string format with a line with the default_format for each
+        metric in self.metric.
+
+        Primarily modified by removing entries to exclude metric values from
+        being displayed. To restore a metric the relevant display key value
+        air is added from default_format.
+
+        Overwrite for subclasses as necessary.
+        '''
+        for key in self.metric.keys():
+            self.format_dict[key] = self.default_format[key]
+        if not self.format_template:
+            self.format_template = '\n'.join(self.format_dict.values())
+
+    @abstractmethod
+    def format_metric(self)-> str:
+        # Overwritten in some subclasses
+        # Returns str: Formatted metrics for report and display
+        # Default is for single '%' formatted metric value:
+        params = {value_name: value for value_name, value in self.metric}
+        display_metric = self.format_template.format(**params)
+        return display_metric
+
+    @abstractmethod
+    def calculate_metric(self)-> str:
+        pass
+
 
 #%% Tuples to Strings
 def colour_text(roi_colour):
