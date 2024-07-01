@@ -107,8 +107,6 @@ class StructureInfo:
     roi_number: ROI_Num
     structure_id: str
     structure_name: str = ''
-    structure_category: StructureCategory = field(
-        default=StructureCategory.UNKNOWN, init=False)
     structure_type: str = 'None'  # DICOM Structure Type
     color: Tuple[int,int,int] = (255,255,255)  # Default color is white
     structure_code: str = ''
@@ -198,6 +196,7 @@ class Structure():
         'BOLUS': StructureCategory.EXTERNAL,
         'FIXATION': StructureCategory.EXTERNAL
         }
+
     str_template = '\n'.join([
         'ID: {structure_id}',
         'ROI: {roi_number}\n',
@@ -210,19 +209,20 @@ class Structure():
         'Range: ({sup_slice}cm, {inf_slice}cm)'
         ])
 
-
-    def __init__(self, roi: ROI_Num, struct_id: str, *, category=None, **kwargs) -> None:
+    def __init__(self, roi: ROI_Num, struct_id: str, **kwargs) -> None:
         super().__setattr__('roi_num', roi)
         super().__setattr__('id', struct_id)
         super().__setattr__('info', StructureInfo(roi, structure_id=struct_id))
         # Set the Structure category, required for graphs.
-        if category:
-             self.info.structure_category = StructureCategory[category]
-        elif 'structure_type' in kwargs:
-            self.info.structure_category = self.type_to_category.get(
-                kwargs['structure_type'], StructureCategory.UNKNOWN)
+        if 'structure_type' in kwargs:
+            super().__setattr__(
+                'structure_category',
+                self.type_to_category.get(kwargs['structure_type'],
+                                          StructureCategory.UNKNOWN)
+            )
         else:
-            self.info.structure_category = StructureCategory.UNKNOWN
+            super().__setattr__('structure_category',
+                                StructureCategory.UNKNOWN)
         super().__setattr__('parameters', StructureParameters())
         self.set(**kwargs)
 
@@ -249,6 +249,7 @@ class Structure():
         data_dict = asdict(self.info)
         data_dict.update(asdict(self.parameters))
         return self.str_template.format(**data_dict)
+
 
 # %% Metric Classes
 class ValueFormat(defaultdict):
@@ -378,14 +379,15 @@ class MarginMetric(Metric):
 # %% Relationship class
 class RelationshipType(Enum):
     DISJOINT = auto()
-    OVERLAPS = auto()
-    BORDERS = auto()
-    EQUALS = auto()
-    SHELTERS = auto()
     SURROUNDS = auto()
-    CONTAINS = auto()
+    SHELTERS = auto()
+    BORDERS = auto()
+    CONFINES = auto()
+    OVERLAPS = auto()
     INCORPORATES = auto()
-    INTERIOR_BORDERS = auto()
+    CONTAINS = auto()
+    EQUALS = auto()
+    LOGICAL = auto()
     UNKNOWN = 999  # Used for initialization
 
 
@@ -407,7 +409,7 @@ class Relationship():
     metric_match = {
         RelationshipType.DISJOINT: DistanceMetric,
         RelationshipType.BORDERS: OverlapSurfaceMetric,
-        RelationshipType.INTERIOR_BORDERS: OverlapSurfaceMetric,
+        RelationshipType.CONFINES: OverlapSurfaceMetric,
         RelationshipType.OVERLAPS: OverlapAreaMetric,
         RelationshipType.INCORPORATES: OverlapAreaMetric,
         RelationshipType.SHELTERS: MarginMetric,
@@ -418,12 +420,15 @@ class Relationship():
         }
 
 
-    def __init__(self, structures: StructurePair) -> None:
+    def __init__(self, structures: StructurePair, relationship: str = None) -> None:
         self.relationship_type = RelationshipType.UNKNOWN
         self.structures = None
         # Order the structures with the largest first.
         self.set_structures(structures)
-        self.identify_relationship()
+        if not relationship:
+            self.identify_relationship()
+        else:
+            self.relationship_type = RelationshipType[relationship]
         # Select the appropriate metric for the identified relationship.
         metric_class = self.metric_match[self.relationship_type]
         self.metric = metric_class(structures)
@@ -637,6 +642,31 @@ class StructureDiagram:
         'BOLUS': {'shape': 'oval', 'style': 'bold', 'penwidth': 3},
         'FIXATION': {'shape': 'diamond', 'style': 'bold', 'penwidth': 3},
         }
+    edge_type_formatting = {
+        RelationshipType.DISJOINT: {'label': 'Disjoint', 'style': 'invis'},
+        RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
+                                    'dir': 'both', 'penwidth': 6,
+                                    'color': 'green'},
+        RelationshipType.BORDERS: {'label': 'Borders', 'style': 'dashed',
+                                   'dir': 'both', 'penwidth': 3,
+                                   'color': 'green'},
+        RelationshipType.EQUALS: {'label': 'Equals', 'style': 'both',
+                                  'dir': 'both', 'penwidth': 5, 'color': 'red'},
+        RelationshipType.SHELTERS: {'label': 'Shelter', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 3, 'color': 'blue'},
+        RelationshipType.CONTAINS: {'label': 'Expansions', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 6,
+                                    'color': 'cyan'},
+        RelationshipType.INCORPORATES: {'label': 'Group', 'style': 'tapered',
+                                        'dir': 'forward', 'penwidth': 6,
+                                        'color': 'white'},
+        RelationshipType.CONFINES: {'label': 'Cut-out', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 3,
+                                    'color': 'magenta'},
+        RelationshipType.SURROUNDS: {'label': 'Island', 'style': 'tapered',
+                                     'dir': 'forward', 'penwidth': 3,
+                                     'color': 'blue'},
+        }
     def __init__(self, name=r'Structure Relations') -> None:
         self.title = name
         self.display_graph = pgv.AGraph(label=name, **self.graph_defaults)
@@ -644,6 +674,7 @@ class StructureDiagram:
         self.display_graph.edge_attr.update(self.edge_defaults)
 
     def add_structure_nodes(self, structures: List[Structure]):
+        structure_groups = defaultdict(list)
         for structure in structures:
             st_type = structure.structure_type
             st_color = rgb_to_hex(structure.color)
@@ -654,4 +685,8 @@ class StructureDiagram:
             st_formatting['color'] = st_color
             st_formatting['fontcolor'] = st_text
             st_formatting['tooltip'] = structure.summary()
+            group = structure.structure_category
+            structure_groups[group].append(st_label)
             self.display_graph.add_node(st_label, **st_formatting)
+        for name, group_list in structure_groups.items():
+            self.display_graph.add_subgraph(group_list, name=name, cluster=True)
