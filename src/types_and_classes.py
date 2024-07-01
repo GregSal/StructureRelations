@@ -5,9 +5,10 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import Any, Dict, Tuple
+
+from typing import Any, Dict, List, Tuple
 from enum import Enum, auto
-from dataclasses import dataclass
+from dataclasses import dataclass, field, asdict
 
 # Standard Libraries
 from pathlib import Path
@@ -24,6 +25,8 @@ import xlwings as xw
 import PySimpleGUI as sg
 import pydicom
 import shapely
+import pygraphviz as pgv
+import networkx as nx
 
 
 # %%| Type definitions and Globals
@@ -38,64 +41,75 @@ StructurePair =  Tuple[ROI_Num, ROI_Num]
 PRECISION = 3
 
 
-# %% Enumeration Types
+#%% Structure Class
+class StructureCategory(Enum):
+    '''Defines basic structure categories for sorting and display.
+    Elements Are:
+        TARGET
+        ORGAN
+        EXTERNAL
+        PLANNING
+        DOSE
+        OTHER
+        UNKNOWN (Used for initialization.)
+    '''
+    TARGET = auto()
+    ORGAN = auto()
+    EXTERNAL = auto()
+    PLANNING = auto()
+    DOSE = auto()
+    OTHER = auto()
+    UNKNOWN = 999  # Used for initialization
+
+
 class ResolutionType(Enum):
+    '''Defines Eclipse Structure Resolution categories.
+    Elements Are:
+        NORMAL
+        HIGH
+        UNKNOWN (Used for initialization.)
+    '''
     NORMAL = 1
     HIGH = 2
     UNKNOWN = 999  # Used for initialization
 
 
-class StructureCategory(Enum):
-    TARGET = auto()
-    OAR = auto()
-    EXTERNAL = auto()
-    OTHER = auto()
-    UNKNOWN = 999  # Used for initialization
-
-
-class RelationshipType(Enum):
-    DISJOINT = auto()
-    OVERLAPS = auto()
-    BORDERS = auto()
-    EQUALS = auto()
-    SHELTERS = auto()
-    SURROUNDS = auto()
-    CONTAINS = auto()
-    INCORPORATES = auto()
-    INTERIOR_BORDERS = auto()
-    UNKNOWN = 999  # Used for initialization
-
-
-class MetricType(Enum):
-    MARGIN = auto()
-    DISTANCE = auto()
-    OVERLAP_AREA = auto()
-    OVERLAP_SURFACE = auto()
-    UNKNOWN = 999  # Used for initialization
-
-
-# %% Dataclass Types
-@dataclass
-class StructureSetInfo:
-    structure_set_name: str = ''
-    patient_id: str = ''
-    patient_name: str = ''
-    patient_lastname: str = ''
-    study_id: str = ''
-    study_description: str = ''
-    series_number: int = None
-    series_description: str = ''
-    orientation: str = 'HFS'
-    file: Path = None
-
-
 @dataclass
 class StructureInfo:
+    '''Structure information obtained from the DICOM Structure file.
+    Attributes Are:
+        roi_number (ROI_Num): The unique indexing reference to the structure.
+        structure_id (str): The unique label for the structure.
+        structure_name (str, optional): A short description of the structure.
+            Default is an empty string.
+        structure_type (str, optional): DICOM Structure Type. Default is 'None'.
+        structure_category (StructureCategory): Structure category determined
+            from the name and DICOM Structure Type.
+        color (Tuple[int,int,int], optional): The structure color. Default
+            color is white (255,255,255).
+        structure_code (str, optional): The Eclipse Structure Dictionary code
+            assigned to the structure. Default is an empty string.
+        structure_code_scheme (str, optional): The scheme references by the
+            structure_code. Default is an empty string.
+        structure_code_meaning (str, optional): The description of the
+            Structure Dictionary item references by the structure_code. Default
+            is an empty string.
+        structure_density (float, optional): Assigned Hounsfield units for the
+            structure. Default is np.nan
+        structure_generation_algorithm (str, optional): The type of algorithm
+            used to generate the structure.  Default is an empty string.
+            Possible values are:
+                'AUTOMATIC': Calculated ROI (auto contour)
+                'SEMIAUTOMATIC': ROI calculated with user assistance. (e.g.
+                    isodose line as structure).
+                '': Algorithm is not known.
+    '''
     roi_number: ROI_Num
     structure_id: str
     structure_name: str = ''
-    structure_category = StructureCategory.UNKNOWN
-    structure_type: str = ''  # DICOM Structure Type
+    structure_category: StructureCategory = field(
+        default=StructureCategory.UNKNOWN, init=False)
+    structure_type: str = 'None'  # DICOM Structure Type
     color: Tuple[int,int,int] = (255,255,255)  # Default color is white
     structure_code: str = ''
     structure_code_scheme: str = ''
@@ -106,6 +120,53 @@ class StructureInfo:
 
 @dataclass
 class StructureParameters:
+    '''Structure parameters calculated from structure's contour points.
+    Attributes Are:
+        sup_slice (SliceIndex, optional): The SUP-most CT slice offset
+            containing contour point for the structure. Default is np.nan:
+        inf_slice (SliceIndex, optional): The INF-most CT slice offset
+            containing contour point for the structure. Default is np.nan:
+        length (float, optional): The distance between the SUP-most and INF-most
+            CT slices.  It assumes a continuous structure. Default is np.nan:
+        volume (float, optional): The volume enclosed by the structure's contour
+            points. Default is np.nan:
+        surface_area (float, optional): The surface area defined by the
+            structure's contour points. Default is np.nan:
+        thickness (float, optional): If the structure is hollow, the average
+            thickness of the structure wall. Default is np.nan:
+        sphericity (float, optional): A measure of the roundness of the
+            structure relative to a sphere. The value range from 0 to 1, where
+            a value of 1 indicates a perfect sphere.
+        resolution (ResolutionType, optional): The Eclipse Structure Resolution
+            estimated from the resolution value. Default is
+            ResolutionType.NORMAL
+        center_of_mass (Tuple[int,int,int], optional): The geometric centre of
+            the structure (density is not taken into account. Default is tuple().
+        structure_id (str): The unique label for the structure.
+        structure_name (str, optional): A short description of the structure.
+            Default is an empty string.
+        structure_type (str, optional): DICOM Structure Type. Default is 'None'.
+        structure_category (StructureCategory): Structure category determined
+            from the name and DICOM Structure Type.
+        color (Tuple[int,int,int], optional): The structure color. Default
+            color is white (255,255,255).
+        structure_code (str, optional): The Eclipse Structure Dictionary code
+            assigned to the structure. Default is an empty string.
+        structure_code_scheme (str, optional): The scheme references by the
+            structure_code. Default is an empty string.
+        structure_code_meaning (str, optional): The description of the
+            Structure Dictionary item references by the structure_code. Default
+            is an empty string.
+        structure_density (float, optional): Assigned Hounsfield units for the
+            structure. Default is np.nan
+        structure_generation_algorithm (str, optional): The type of algorithm
+            used to generate the structure.  Default is an empty string.
+            Possible values are:
+                'AUTOMATIC': Calculated ROI (auto contour)
+                'SEMIAUTOMATIC': ROI calculated with user assistance. (e.g.
+                    isodose line as structure).
+                '': Algorithm is not known.
+    '''
     sup_slice: SliceIndex = np.nan
     inf_slice: SliceIndex = np.nan
     length: float = np.nan
@@ -118,7 +179,78 @@ class StructureParameters:
     center_of_mass: Tuple[float, float, float] = tuple()
 
 
-# %% class definitions
+class Structure():
+    type_to_category = {
+        'GTV': StructureCategory.TARGET,
+        'CTV': StructureCategory.TARGET,
+        'PTV': StructureCategory.TARGET,
+        'EXTERNAL': StructureCategory.EXTERNAL,
+        'ORGAN': StructureCategory.ORGAN,
+        'NONE': StructureCategory.ORGAN,
+        'AVOIDANCE': StructureCategory.PLANNING,
+        'CONTROL': StructureCategory.PLANNING,
+        'TREATED_VOLUME': StructureCategory.PLANNING,
+        'IRRAD_VOLUME': StructureCategory.PLANNING,
+        'DOSE_REGION': StructureCategory.DOSE,
+        'CONTRAST_AGENT': StructureCategory.OTHER,
+        'CAVITY': StructureCategory.OTHER,
+        'SUPPORT': StructureCategory.EXTERNAL,
+        'BOLUS': StructureCategory.EXTERNAL,
+        'FIXATION': StructureCategory.EXTERNAL
+        }
+    str_template = '\n'.join([
+        'ID: {structure_id}',
+        'ROI: {roi_number}\n',
+        'DICOM Type {structure_type}',
+        'Code: {structure_code}',
+        'Label: {structure_code_meaning}',
+        'Scheme: {structure_code_scheme}',
+        'Volume: {volume} cc',
+        'Length: {length} cm',
+        'Range: ({sup_slice}cm, {inf_slice}cm)'
+        ])
+
+
+    def __init__(self, roi: ROI_Num, struct_id: str, *, category=None, **kwargs) -> None:
+        super().__setattr__('roi_num', roi)
+        super().__setattr__('id', struct_id)
+        super().__setattr__('info', StructureInfo(roi, structure_id=struct_id))
+        # Set the Structure category, required for graphs.
+        if category:
+             self.info.structure_category = StructureCategory[category]
+        elif 'structure_type' in kwargs:
+            self.info.structure_category = self.type_to_category.get(
+                kwargs['structure_type'], StructureCategory.UNKNOWN)
+        else:
+            self.info.structure_category = StructureCategory.UNKNOWN
+        super().__setattr__('parameters', StructureParameters())
+        self.set(**kwargs)
+
+    def set(self, **kwargs):
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+
+    def __setattr__(self, attr: str, value: Any):
+        if hasattr(self.info, attr):
+            self.info.__setattr__(attr, value)
+        elif hasattr(self.parameters, attr):
+            self.parameters.__setattr__(attr, value)
+        else:
+            super().__setattr__(attr, value)
+
+    def __getattr__(self, atr_name:str):
+        if hasattr(self.info, atr_name):
+            return self.info.__getattribute__(atr_name)
+        if hasattr(self.parameters, atr_name):
+            return self.parameters.__getattribute__(atr_name)
+        super().__getattr__(atr_name)   # pylint: disable=[no-member]
+
+    def summary(self):
+        data_dict = asdict(self.info)
+        data_dict.update(asdict(self.parameters))
+        return self.str_template.format(**data_dict)
+
+# %% Metric Classes
 class ValueFormat(defaultdict):
     '''String formatting templates for individual name, value pairs.
     The default value gives a string like:
@@ -127,6 +259,14 @@ class ValueFormat(defaultdict):
     def __missing__(self, key: str) -> str:
         format_part = ''.join([key, ':\t{', key, 'f2.0%}'])
         return format_part
+
+
+class MetricType(Enum):
+    MARGIN = auto()
+    DISTANCE = auto()
+    OVERLAP_AREA = auto()
+    OVERLAP_SURFACE = auto()
+    UNKNOWN = 999  # Used for initialization
 
 
 class Metric(ABC):
@@ -235,6 +375,19 @@ class MarginMetric(Metric):
                        'MinimumDistance': 1.0,
                        'MaximumDistance': 1.0}
 
+# %% Relationship class
+class RelationshipType(Enum):
+    DISJOINT = auto()
+    OVERLAPS = auto()
+    BORDERS = auto()
+    EQUALS = auto()
+    SHELTERS = auto()
+    SURROUNDS = auto()
+    CONTAINS = auto()
+    INCORPORATES = auto()
+    INTERIOR_BORDERS = auto()
+    UNKNOWN = 999  # Used for initialization
+
 
 class Relationship():
     symmetric_relations = [
@@ -293,35 +446,19 @@ class Relationship():
         # Re-order structures as necessary for for Surrounds and Shelters
         self.relationship_type = RelationshipType.UNKNOWN
 
-
-class Structure():
-    def __init__(self, roi: ROI_Num, name: str, **kwargs) -> None:
-        super().__setattr__('roi_num', roi)
-        super().__setattr__('id', name)
-        super().__setattr__('info', StructureInfo(roi, structure_id=name))
-        super().__setattr__('parameters', StructureParameters())
-        super().__setattr__('info_display_parameters', {})
-        super().__setattr__('diagram_display_parameters', {})
-        self.set(**kwargs)
-
-    def set(self, **kwargs):
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-
-    def __setattr__(self, attr: str, value: Any):
-        if hasattr(self.info, attr):
-            self.info.__setattr__(attr, value)
-        elif hasattr(self.parameters, attr):
-            self.parameters.__setattr__(attr, value)
-        else:
-            super().__setattr__(attr, value)
-
-    def __getattr__(self, atr_name:str):
-        if hasattr(self.info, atr_name):
-            return self.info.__getattribute__(atr_name)
-        if hasattr(self.parameters, atr_name):
-            return self.parameters.__getattribute__(atr_name)
-        super().__getattr__(atr_name)
+# %% Structure Set class
+@dataclass
+class StructureSetInfo:
+    structure_set_name: str = ''
+    patient_id: str = ''
+    patient_name: str = ''
+    patient_lastname: str = ''
+    study_id: str = ''
+    study_description: str = ''
+    series_number: int = None
+    series_description: str = ''
+    orientation: str = 'HFS'
+    file: Path = None
 
 
 class StructureSet():
@@ -378,7 +515,8 @@ class StructureSet():
         self.info.series_description = str(dataset.get('SeriesDescription',''))
 
 
-#%% Tuples to Strings
+# %% StructureDiagram class
+# Tuples to Strings
 def colour_text(roi_colour):
     colour_fmt = ''.join([
         f'({roi_colour[0]:0d}, ',
@@ -395,3 +533,125 @@ def com_text(com):
         f'{com[2]:-5.2f})'
         ])
     return com_fmt
+
+
+def rgb_to_hex(rgb_tuple: Tuple[int,int,int]) -> str:
+    '''Convert an RGB tuple to a hex string value.
+
+    Args:
+        rgb_tuple (Tuple[int,int,int]): A length-3 tuple of integers from 0 to
+            255 corresponding to the RED, GREEN and BLUE color channels.
+
+    Returns:
+        str: The equivalent Hex color string.
+    '''
+    return '#{:02x}{:02x}{:02x}'.format(*rgb_tuple)
+
+
+def text_color(color_rgb: Tuple[int])->Tuple[int]:
+    '''Determine the appropriate text color for a given background color.
+
+    Text color is either Black (0, 0, 0) or white (255, 255, 255)
+    the cutoff between black and white is given by:
+        brightness > 274.3 and green > 69
+        (brightness is the length of the color vector $sqrt{R^2+G^2+B62}$
+
+    Args:
+        color_rgb (Tuple[int]): The 3-integer RGB tuple of the background color.
+
+    Returns:
+        Tuple[int]: The text color as an RGB tuple.
+            One of (0, 0, 0) or (255, 255, 255).
+    '''
+    red, green, blue = color_rgb
+    brightness = sqrt(red**2 + green**2 + blue**2)
+    if brightness > 274.3:
+        if green > 69:
+            text_color = '#000000'
+        else:
+            text_color = '#FFFFFF'
+    elif green > 181:
+        text_color = '#000000'
+    else:
+        text_color = '#FFFFFF'
+    return text_color
+
+
+class StructureDiagram:
+    graph_defaults = {
+        'labelloc': 't',
+        'clusterrank': 'none',
+        'bgcolor': '#555555',
+        'fontname': 'Helvetica,,Arial,sans-serif',
+        'fontsize': 16,
+        'fontcolor': 'white'
+        }
+    node_defaults = {
+        'fixedsize': 'shape',
+        'width': 1,
+        'height': 0.6,
+        'fontname': 'Helvetica-Bold',
+        'fontsize': 12,
+        'labelloc': 'c',
+        'penwidth': 3,
+        'style': 'filled',
+        'fontcolor': 'black'
+        }
+    edge_defaults = {
+        'color': '#e27dd6ff',
+        'penwidth': 3,
+        'style': 'solid',
+        'arrowhead': 'none',
+        'arrowtail': 'none',
+        'labelfloat': False,
+        'labelfontname': 'Times',
+        'fontcolor': '#55AAFF',
+        'fontsize': '10'
+        }
+    node_type_formatting = {
+        'GTV': {'shape': 'pentagon', 'style': 'filled', 'penwidth': 3},
+        'CTV': {'shape': 'hexagon', 'style': 'filled', 'penwidth': 3},
+        'PTV': {'shape': 'octagon', 'style': 'filled', 'penwidth': 3},
+        'EXTERNAL': {'shape': 'doublecircle', 'style': 'filled',
+                     'fillcolor': 'white','penwidth': 2},
+        'ORGAN': {'shape': 'rectangle', 'style': 'rounded, filled',
+                  'penwidth': 3},
+        'NONE': {'shape': 'trapezium', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'AVOIDANCE': {'shape': 'house', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'CONTROL': {'shape': 'invhouse', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'TREATED_VOLUME': {'shape': 'parallelogram', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'IRRAD_VOLUME': {'shape': 'parallelogram', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'DOSE_REGION': {'shape': 'diamond', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'CONTRAST_AGENT': {'shape': 'square', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'CAVITY': {'shape': 'square', 'style': 'rounded, filled',
+                 'penwidth': 3},
+        'SUPPORT': {'shape': 'triangle', 'style': 'rounded, bold',
+                 'penwidth': 3},
+        'BOLUS': {'shape': 'oval', 'style': 'bold', 'penwidth': 3},
+        'FIXATION': {'shape': 'diamond', 'style': 'bold', 'penwidth': 3},
+        }
+    def __init__(self, name=r'Structure Relations') -> None:
+        self.title = name
+        self.display_graph = pgv.AGraph(label=name, **self.graph_defaults)
+        self.display_graph.node_attr.update(self.node_defaults)
+        self.display_graph.edge_attr.update(self.edge_defaults)
+
+    def add_structure_nodes(self, structures: List[Structure]):
+        for structure in structures:
+            st_type = structure.structure_type
+            st_color = rgb_to_hex(structure.color)
+            st_label = structure.info.structure_id
+            st_formatting = self.node_type_formatting[st_type]
+            st_text = text_color(structure.color)
+            st_formatting['label'] = st_label
+            st_formatting['color'] = st_color
+            st_formatting['fontcolor'] = st_text
+            st_formatting['tooltip'] = structure.summary()
+            self.display_graph.add_node(st_label, **st_formatting)
