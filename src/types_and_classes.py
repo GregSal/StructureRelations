@@ -61,6 +61,12 @@ class StructureCategory(Enum):
     OTHER = auto()
     UNKNOWN = 999  # Used for initialization
 
+    def __str__(self)->str:
+        name = self.name
+        # Make into title case:
+        title_str = name[0].upper() + name[1:].lower()
+        return title_str
+
 
 class ResolutionType(Enum):
     '''Defines Eclipse Structure Resolution categories.
@@ -196,7 +202,6 @@ class Structure():
         'BOLUS': StructureCategory.EXTERNAL,
         'FIXATION': StructureCategory.EXTERNAL
         }
-
     str_template = '\n'.join([
         'ID: {structure_id}',
         'ROI: {roi_number}\n',
@@ -212,14 +217,13 @@ class Structure():
     def __init__(self, roi: ROI_Num, struct_id: str, **kwargs) -> None:
         super().__setattr__('roi_num', roi)
         super().__setattr__('id', struct_id)
+        super().__setattr__('show', True)
         super().__setattr__('info', StructureInfo(roi, structure_id=struct_id))
         # Set the Structure category, required for graphs.
         if 'structure_type' in kwargs:
-            super().__setattr__(
-                'structure_category',
-                self.type_to_category.get(kwargs['structure_type'],
-                                          StructureCategory.UNKNOWN)
-            )
+            category = self.type_to_category.get(kwargs['structure_type'],
+                                                 StructureCategory.UNKNOWN)
+            super().__setattr__('structure_category', category)
         else:
             super().__setattr__('structure_category',
                                 StructureCategory.UNKNOWN)
@@ -419,19 +423,31 @@ class Relationship():
         RelationshipType.UNKNOWN: NoMetric,
         }
 
-
-    def __init__(self, structures: StructurePair, relationship: str = None) -> None:
-        self.relationship_type = RelationshipType.UNKNOWN
-        self.structures = None
+    def __init__(self, structures: StructurePair, *,
+                 relationship: str = None, **kwargs) -> None:
+        self.is_logical = False
+        self.show = True
+        self.metric = None
+        # Sets the is_logical and metric attributes, if supplied.  Ignores any
+        # other items in kwargs.
+        self.set(**kwargs)
         # Order the structures with the largest first.
+        self.structures = None
         self.set_structures(structures)
-        if not relationship:
-            self.identify_relationship()
-        else:
+        # Determine the relationship type.  Either set it from a kwargs value
+        # or determine it by comparing the structures.
+        self.relationship_type = RelationshipType.UNKNOWN
+        if 'relationship' in kwargs:
             self.relationship_type = RelationshipType[relationship]
+        else:
+            self.identify_relationship()
+
+        self.get_metric()
+
+    def get_metric(self):
         # Select the appropriate metric for the identified relationship.
         metric_class = self.metric_match[self.relationship_type]
-        self.metric = metric_class(structures)
+        self.metric = metric_class(self.structures)
 
     @property
     def is_symmetric(self)-> bool:
@@ -450,6 +466,11 @@ class Relationship():
         # FIXME Stub method to be replaced with identify_relationship function.
         # Re-order structures as necessary for for Surrounds and Shelters
         self.relationship_type = RelationshipType.UNKNOWN
+
+    def set(self, **kwargs):
+        for key, val in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
 
 # %% Structure Set class
 @dataclass
@@ -641,32 +662,38 @@ class StructureDiagram:
                  'penwidth': 3},
         'BOLUS': {'shape': 'oval', 'style': 'bold', 'penwidth': 3},
         'FIXATION': {'shape': 'diamond', 'style': 'bold', 'penwidth': 3},
+        # The Formatting style for hidden structures
+        'HIDDEN': {'shape': 'point', 'style': 'invis'},
         }
     edge_type_formatting = {
         RelationshipType.DISJOINT: {'label': 'Disjoint', 'style': 'invis'},
-        RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
-                                    'dir': 'both', 'penwidth': 6,
-                                    'color': 'green'},
-        RelationshipType.BORDERS: {'label': 'Borders', 'style': 'dashed',
-                                   'dir': 'both', 'penwidth': 3,
-                                   'color': 'green'},
-        RelationshipType.EQUALS: {'label': 'Equals', 'style': 'both',
-                                  'dir': 'both', 'penwidth': 5, 'color': 'red'},
-        RelationshipType.SHELTERS: {'label': 'Shelter', 'style': 'tapered',
-                                    'dir': 'forward', 'penwidth': 3, 'color': 'blue'},
-        RelationshipType.CONTAINS: {'label': 'Expansions', 'style': 'tapered',
-                                    'dir': 'forward', 'penwidth': 6,
-                                    'color': 'cyan'},
-        RelationshipType.INCORPORATES: {'label': 'Group', 'style': 'tapered',
-                                        'dir': 'forward', 'penwidth': 6,
-                                        'color': 'white'},
-        RelationshipType.CONFINES: {'label': 'Cut-out', 'style': 'tapered',
-                                    'dir': 'forward', 'penwidth': 3,
-                                    'color': 'magenta'},
         RelationshipType.SURROUNDS: {'label': 'Island', 'style': 'tapered',
                                      'dir': 'forward', 'penwidth': 3,
                                      'color': 'blue'},
+        RelationshipType.SHELTERS: {'label': 'Shelter', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 3, 'color': 'blue'},
+        RelationshipType.BORDERS: {'label': 'Borders', 'style': 'dashed',
+                                   'dir': 'both', 'penwidth': 3,
+                                   'color': 'green'},
+        RelationshipType.CONFINES: {'label': 'Cut-out', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 3,
+                                    'color': 'magenta'},
+        RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
+                                    'dir': 'both', 'penwidth': 6,
+                                    'color': 'green'},
+        RelationshipType.INCORPORATES: {'label': 'Group', 'style': 'tapered',
+                                        'dir': 'forward', 'penwidth': 6,
+                                        'color': 'white'},
+        RelationshipType.CONTAINS: {'label': 'Contains', 'style': 'tapered',
+                                    'dir': 'forward', 'penwidth': 6,
+                                    'color': 'cyan'},
+        RelationshipType.EQUALS: {'label': 'Equals', 'style': 'both',
+                                  'dir': 'both', 'penwidth': 5, 'color': 'red'},
+        RelationshipType.LOGICAL: {'label': '', 'style': 'dotted',
+                                   'penwidth': 0.5, 'color': 'yellow'},
+        RelationshipType.UNKNOWN: {'label': '', 'style': 'invis'},
         }
+
     def __init__(self, name=r'Structure Relations') -> None:
         self.title = name
         self.display_graph = pgv.AGraph(label=name, **self.graph_defaults)
@@ -676,17 +703,34 @@ class StructureDiagram:
     def add_structure_nodes(self, structures: List[Structure]):
         structure_groups = defaultdict(list)
         for structure in structures:
-            st_type = structure.structure_type
-            st_color = rgb_to_hex(structure.color)
-            st_label = structure.info.structure_id
-            st_formatting = self.node_type_formatting[st_type]
-            st_text = text_color(structure.color)
-            st_formatting['label'] = st_label
-            st_formatting['color'] = st_color
-            st_formatting['fontcolor'] = st_text
-            st_formatting['tooltip'] = structure.summary()
+            node_type = structure.structure_type
+            node_id = structure.roi_num
+            if structure.show:
+                node_formatting = self.node_type_formatting[node_type]
+            else:
+                node_formatting = self.node_type_formatting['HIDDEN']
+            node_text_color = text_color(structure.color)
+            node_formatting['label'] = structure.info.structure_id
+            node_formatting['color'] = rgb_to_hex(structure.color)
+            node_formatting['fontcolor'] = node_text_color
+            node_formatting['tooltip'] = structure.summary()
+            self.display_graph.add_node(node_id, **node_formatting)
+            # Identify the subgroup that the node belongs to.
             group = structure.structure_category
-            structure_groups[group].append(st_label)
-            self.display_graph.add_node(st_label, **st_formatting)
+            structure_groups[group].append(structure.roi_num)
+        # Define the subgroups.
         for name, group_list in structure_groups.items():
-            self.display_graph.add_subgraph(group_list, name=name, cluster=True)
+            self.display_graph.add_subgraph(group_list, name=str(name),
+                                            cluster=True)
+
+    def add_structure_edges(self, relationships: List[Relationship]):
+        for relationship in relationships:
+            node1, node2 = relationship.structures
+            if not relationship.show:
+                edge_type = RelationshipType.UNKNOWN
+            elif relationship.is_logical:
+                edge_type = RelationshipType.LOGICAL
+            else:
+                edge_type = relationship.relationship_type
+            edge_formatting = self.edge_type_formatting[edge_type]
+            self.display_graph.add_edge(node1, node2, **edge_formatting)
