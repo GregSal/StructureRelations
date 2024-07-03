@@ -423,8 +423,7 @@ class Relationship():
         RelationshipType.UNKNOWN: NoMetric,
         }
 
-    def __init__(self, structures: StructurePair, *,
-                 relationship: str = None, **kwargs) -> None:
+    def __init__(self, structures: StructurePair, **kwargs) -> None:
         self.is_logical = False
         self.show = True
         self.metric = None
@@ -438,7 +437,7 @@ class Relationship():
         # or determine it by comparing the structures.
         self.relationship_type = RelationshipType.UNKNOWN
         if 'relationship' in kwargs:
-            self.relationship_type = RelationshipType[relationship]
+            self.relationship_type = RelationshipType[kwargs['relationship']]
         else:
             self.identify_relationship()
 
