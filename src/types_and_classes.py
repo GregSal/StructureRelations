@@ -541,67 +541,6 @@ class StructureSet():
 
 
 # %% StructureDiagram class
-# Tuples to Strings
-def colour_text(roi_colour):
-    colour_fmt = ''.join([
-        f'({roi_colour[0]:0d}, ',
-        f'{roi_colour[1]:0d}, ',
-        f'{roi_colour[2]:0d})'
-        ])
-    return colour_fmt
-
-
-def com_text(com):
-    com_fmt = ''.join([
-        f'({com[0]:-5.2f}, ',
-        f'{com[1]:-5.2f}, ',
-        f'{com[2]:-5.2f})'
-        ])
-    return com_fmt
-
-
-def rgb_to_hex(rgb_tuple: Tuple[int,int,int]) -> str:
-    '''Convert an RGB tuple to a hex string value.
-
-    Args:
-        rgb_tuple (Tuple[int,int,int]): A length-3 tuple of integers from 0 to
-            255 corresponding to the RED, GREEN and BLUE color channels.
-
-    Returns:
-        str: The equivalent Hex color string.
-    '''
-    return '#{:02x}{:02x}{:02x}'.format(*rgb_tuple)
-
-
-def text_color(color_rgb: Tuple[int])->Tuple[int]:
-    '''Determine the appropriate text color for a given background color.
-
-    Text color is either Black (0, 0, 0) or white (255, 255, 255)
-    the cutoff between black and white is given by:
-        brightness > 274.3 and green > 69
-        (brightness is the length of the color vector $sqrt{R^2+G^2+B62}$
-
-    Args:
-        color_rgb (Tuple[int]): The 3-integer RGB tuple of the background color.
-
-    Returns:
-        Tuple[int]: The text color as an RGB tuple.
-            One of (0, 0, 0) or (255, 255, 255).
-    '''
-    red, green, blue = color_rgb
-    brightness = sqrt(red**2 + green**2 + blue**2)
-    if brightness > 274.3:
-        if green > 69:
-            text_color = '#000000'
-        else:
-            text_color = '#FFFFFF'
-    elif green > 181:
-        text_color = '#000000'
-    else:
-        text_color = '#FFFFFF'
-    return text_color
-
-
 class StructureDiagram:
     graph_defaults = {
         'labelloc': 't',
@@ -612,26 +551,27 @@ class StructureDiagram:
         'fontcolor': 'white'
         }
     node_defaults = {
-        'fixedsize': 'shape',
+        'style': 'filled',
         'width': 1,
         'height': 0.6,
+        'fixedsize': 'shape',
         'fontname': 'Helvetica-Bold',
         'fontsize': 12,
+        'fontcolor': 'black',
         'labelloc': 'c',
+        'nojustify': True,
         'penwidth': 3,
-        'style': 'filled',
-        'fontcolor': 'black'
         }
     edge_defaults = {
-        'color': '#e27dd6ff',
-        'penwidth': 3,
         'style': 'solid',
+        'penwidth': 3,
+        'color': '#e27dd6ff',
         'arrowhead': 'none',
         'arrowtail': 'none',
         'labelfloat': False,
-        'labelfontname': 'Times',
+        'labelfontname': 'Cambria',
+        'fontsize': '10',
         'fontcolor': '#55AAFF',
-        'fontsize': '10'
         }
     node_type_formatting = {
         'GTV': {'shape': 'pentagon', 'style': 'filled', 'penwidth': 3},
@@ -661,8 +601,6 @@ class StructureDiagram:
                  'penwidth': 3},
         'BOLUS': {'shape': 'oval', 'style': 'bold', 'penwidth': 3},
         'FIXATION': {'shape': 'diamond', 'style': 'bold', 'penwidth': 3},
-        # The Formatting style for hidden structures
-        'HIDDEN': {'shape': 'point', 'style': 'invis'},
         }
     edge_type_formatting = {
         RelationshipType.DISJOINT: {'label': 'Disjoint', 'style': 'invis'},
@@ -693,26 +631,73 @@ class StructureDiagram:
         RelationshipType.UNKNOWN: {'label': '', 'style': 'invis'},
         }
 
+    # The Formatting style for hidden structures and relationships
+    hidden_node_format = {'shape': 'point', 'style': 'invis'}
+    hidden_edge_format = {'style': 'invis'}
+    logical_edge_format = {'style': 'dotted', 'penwidth': 0.5,
+                           'color': 'yellow'}
+
     def __init__(self, name=r'Structure Relations') -> None:
         self.title = name
         self.display_graph = pgv.AGraph(label=name, **self.graph_defaults)
         self.display_graph.node_attr.update(self.node_defaults)
         self.display_graph.edge_attr.update(self.edge_defaults)
 
+    @staticmethod
+    def rgb_to_hex(rgb_tuple: Tuple[int,int,int]) -> str:
+        '''Convert an RGB tuple to a hex string value.
+
+        Args:
+            rgb_tuple (Tuple[int,int,int]): A length-3 tuple of integers from 0 to
+                255 corresponding to the RED, GREEN and BLUE color channels.
+
+        Returns:
+            str: The equivalent Hex color string.
+        '''
+        return '#{:02x}{:02x}{:02x}'.format(*rgb_tuple)
+
+    @staticmethod
+    def text_color(color_rgb: Tuple[int])->Tuple[int]:
+        '''Determine the appropriate text color for a given background color.
+
+        Text color is either Black (0, 0, 0) or white (255, 255, 255)
+        the cutoff between black and white is given by:
+            brightness > 274.3 and green > 69
+            (brightness is the length of the color vector $sqrt{R^2+G^2+B62}$
+
+        Args:
+            color_rgb (Tuple[int]): The 3-integer RGB tuple of the background color.
+
+        Returns:
+            Tuple[int]: The text color as an RGB tuple.
+                One of (0, 0, 0) or (255, 255, 255).
+        '''
+        red, green, blue = color_rgb
+        brightness = sqrt(red**2 + green**2 + blue**2)
+        if brightness > 274.3:
+            if green > 69:
+                text_color = '#000000'
+            else:
+                text_color = '#FFFFFF'
+        elif green > 181:
+            text_color = '#000000'
+        else:
+            text_color = '#FFFFFF'
+        return text_color
+
     def add_structure_nodes(self, structures: List[Structure]):
         structure_groups = defaultdict(list)
         for structure in structures:
             node_type = structure.structure_type
             node_id = structure.roi_num
-            if structure.show:
-                node_formatting = self.node_type_formatting[node_type]
-            else:
-                node_formatting = self.node_type_formatting['HIDDEN']
-            node_text_color = text_color(structure.color)
+            node_formatting = self.node_type_formatting[node_type].copy()
+            node_text_color = self.text_color(structure.color)
             node_formatting['label'] = structure.info.structure_id
-            node_formatting['color'] = rgb_to_hex(structure.color)
+            node_formatting['color'] = self.rgb_to_hex(structure.color)
             node_formatting['fontcolor'] = node_text_color
             node_formatting['tooltip'] = structure.summary()
+            if not structure.show:
+                node_formatting.update(self.hidden_node_format)
             self.display_graph.add_node(node_id, **node_formatting)
             # Identify the subgroup that the node belongs to.
             group = structure.structure_category
@@ -725,11 +710,40 @@ class StructureDiagram:
     def add_structure_edges(self, relationships: List[Relationship]):
         for relationship in relationships:
             node1, node2 = relationship.structures
-            if not relationship.show:
-                edge_type = RelationshipType.UNKNOWN
+            edge_type = relationship.relationship_type
+            edge_formatting = self.edge_type_formatting[edge_type].copy()
+            # Override formatting
+            hide_edge = any(self.is_hidden(node)
+                            for node in relationship.structures)
+            if (not relationship.show) | hide_edge:
+                edge_formatting.update(self.hidden_edge_format)
             elif relationship.is_logical:
-                edge_type = RelationshipType.LOGICAL
-            else:
-                edge_type = relationship.relationship_type
-            edge_formatting = self.edge_type_formatting[edge_type]
+                edge_formatting.update(self.logical_edge_format)
             self.display_graph.add_edge(node1, node2, **edge_formatting)
+
+    def node_attr(self, node_id: int)->Dict[str, any]:
+        return self.display_graph.get_node(node_id).attr
+
+    def is_hidden(self, node_id: int)->bool:
+        node_attributes = self.node_attr(node_id)
+        node_style = node_attributes.get('style', '')
+        return 'invis' in node_style
+
+# %% Future functions
+# Tuples to Strings
+def colour_text(roi_colour):
+    colour_fmt = ''.join([
+        f'({roi_colour[0]:0d}, ',
+        f'{roi_colour[1]:0d}, ',
+        f'{roi_colour[2]:0d})'
+        ])
+    return colour_fmt
+
+
+def com_text(com):
+    com_fmt = ''.join([
+        f'({com[0]:-5.2f}, ',
+        f'{com[1]:-5.2f}, ',
+        f'{com[2]:-5.2f})'
+        ])
+    return com_fmt
