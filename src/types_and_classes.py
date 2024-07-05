@@ -256,16 +256,6 @@ class Structure():
 
 
 # %% Metric Classes
-class ValueFormat(defaultdict):
-    '''String formatting templates for individual name, value pairs.
-    The default value gives a string like:
-        MetricName: 2.36%
-    '''
-    def __missing__(self, key: str) -> str:
-        format_part = ''.join([key, ':\t{', key, 'f2.0%}'])
-        return format_part
-
-
 class MetricType(Enum):
     MARGIN = auto()
     DISTANCE = auto()
@@ -277,41 +267,23 @@ class MetricType(Enum):
 class Metric(ABC):
     # Overwrite these class variables for all subclasses.
     metric_type: MetricType
-    default_format = ValueFormat()
-    default_format_template = ''
+    default_format_template: str
 
     def __init__(self, structures: StructurePair):
         self.structures = structures
         self.metric = {}
         self.calculate_metric()
-        self.format_dict = self.default_format.copy()
         self.format_template = self.default_format_template
-        self.set_formats()
 
-    def set_formats(self):
-        '''Set the default text formatting for displaying metrics.
-
-        Generic self.default_format has a default value of:
-            <MetricName>:\t{<MetricValue>f2.0%}])
-        creates a string format with a line with the default_format for each
-        metric in self.metric.
-
-        Primarily modified by removing entries to exclude metric values from
-        being displayed. To restore a metric the relevant display key value
-        air is added from default_format.
-
-        Overwrite for subclasses as necessary.
-        '''
-        for key in self.metric:
-            self.format_dict[key] = self.default_format[key]
-        if not self.format_template:
-            self.format_template = '\n'.join(self.format_dict.values())
+    def reset_formats(self):
+        self.format_template = self.default_format_template
 
     def format_metric(self)-> str:
         # Overwritten in some subclasses
         # Returns str: Formatted metrics for report and display
         # Default is for single '%' formatted metric value:
-        params = {value_name: value for value_name, value in self.metric}
+        params = {value_name: value
+                  for value_name, value in self.metric.items()}
         display_metric = self.format_template.format(**params)
         return display_metric
 
@@ -323,7 +295,6 @@ class Metric(ABC):
 class NoMetric(Metric):
     '''A relevant metric does not exist'''
     metric_type = MetricType.UNKNOWN
-    default_format = ValueFormat()
     default_format_template = 'No Metric'
 
     def calculate_metric(self)-> str:
@@ -333,52 +304,141 @@ class NoMetric(Metric):
 class DistanceMetric(Metric):
     '''Distance metric for testing.'''
     metric_type = MetricType.DISTANCE
-    default_format = ValueFormat()
-    default_format_template = ''
+    default_format_template = 'Distance:\t{Distance:5.2f}'
 
     def calculate_metric(self)-> str:
         # FIXME replace this stub with the distance metric function.
-        self.metric = {'Distance': 1.0}
+        self.metric = {'Distance': 2.6}
 
 
 class OverlapSurfaceMetric(Metric):
     '''OverlapSurface metric for testing.'''
     metric_type = MetricType.OVERLAP_SURFACE
-    default_format = ValueFormat()
-    default_format_template = ''
+    default_format_template = 'Percentage Overlap:\t{OverlapSurfaceRatio:2.0%}'
 
     def calculate_metric(self)-> str:
         # FIXME replace this stub with the OverlapSurface metric function.
-        self.metric = {'OverlapSurfaceRatio': 1.0}
+        self.metric = {'OverlapSurfaceRatio': 0.23}
 
 
 class OverlapAreaMetric(Metric):
     '''OverlapArea metric for testing.'''
     metric_type = MetricType.OVERLAP_AREA
-    default_format = ValueFormat()
-    default_format_template = ''
+    default_format_template = 'Percentage Overlap:\t{OverlapAreaRatio:2.0%}'
 
     def calculate_metric(self)-> str:
         # FIXME replace this stub with the OverlapArea metric function.
-        self.metric = {'OverlapAreaRatio': 1.0}
+        self.metric = {'OverlapAreaRatio': 0.15}
+
+
+
+class ValueFormat(defaultdict):
+    '''String formatting templates for individual name, value pairs.
+    The default value gives a string like:
+        MetricName: 2.36%
+    '''
+    def __missing__(self, key: str) -> str:
+        format_part = ''.join([key, ':\t{', key, ':2.0%}'])
+        return format_part
 
 
 class MarginMetric(Metric):
     '''Margin metric for testing.'''
     metric_type = MetricType.MARGIN
-    default_format = ValueFormat()
     default_format_template = ''
+    orthogonal_format_template = '\n'.join([
+        '        {ANT}   {SUP}  ',
+        '        ANT  SUP       ',
+        '         | /           ',
+        '         |/            ',
+        '{RT} RT--- ---LT {LT}  ',
+        '        /|             ',
+        '       / |             ',
+        '   INF  POST           ',
+        '  {INF}   {POST}       ',
+        ])
+    range_format_template = '{MIN}   {MAX}'
+    default_format_dict = {
+        'SUP':  '{sup_margin:3.1f}',
+        'INF':  '{inf_margin:3.1f}',
+        'RT':   '{rt_margin:3.1f}',
+        'LT':   '{lt_margin:3.1f}',
+        'ANT':  '{ant_margin:3.1f}',
+        'POST': '{post_margin:3.1f}',
+        'MIN':  'Min: {min_margin:3.1f}',
+        'MAX':  'Max: {max_margin:3.1f}'
+        }
+
+    def __init__(self, structures: StructurePair):
+        super().__init__(structures)
+        self.format_dict = self.default_format_dict.copy()
+        self.display_orthogonal_margins = True
+        self.display_margin_range = True
+        self.update_formats()
+
+    def reset_formats(self):
+        '''Return the metric display back to its default.
+        Default formatting looks like this:
+
+                1.2   0.8
+                ANT  SUP
+                 | /
+                 |/
+        1.1 RT--- ---LT 2.1
+                /|
+               / |
+           INF  POST
+          0.6   1.2
+
+        MIN: 2.1   MAX: 1.2
+        '''
+        self.format_dict = self.default_format_dict.copy()
+        self.display_orthogonal_margins = True
+        self.display_margin_range = True
+
+    def update_formats(self):
+        '''Updates the a Formatted metrics string for display.
+
+        This is called to update the complete display template when
+        changes ar made to parts of the template.
+
+        Individual margins can be removed by replacing the appropriate value in
+        format_dict with an empty string.  Adding the margin back into the
+        display is done by copying the appropriate value from
+        default_format_dict into format_dict.
+
+        The entire orthogonal display can be removed by setting
+        display_orthogonal_margins to False.  Likewise, removing the entire
+        margin range text and be done by setting display_margin_range to False.
+        '''
+        display_parts = []
+        if self.display_orthogonal_margins:
+            display_parts.append(self.orthogonal_format_template)
+        if self.display_margin_range:
+            display_parts.append(self.range_format_template)
+        self.format_template = '\n\n'.join(display_parts)
+
+    def format_metric(self)-> str:
+        # Returns str: Formatted metrics for report and display
+        format_params = {}
+        for label, fmt_str in self.format_dict.items():
+            format_params[label] = fmt_str.format(**self.metric)
+        display_text = self.format_template.format(**format_params)
+        return display_text
 
     def calculate_metric(self)-> str:
-        # FIXME replace this stub with the OverlapArea metric function.
-        self.metric = {'PerpendicularMargin': {'SUP':  1.0,
-                                               'INF':  1.0,
-                                               'RT':   1.0,
-                                               'LT':   1.0,
-                                               'ANT':  1.0,
-                                               'POST': 1.0},
-                       'MinimumDistance': 1.0,
-                       'MaximumDistance': 1.0}
+        # FIXME replace this stub with
+        # the margin metric function.
+        self.metric = {
+            'sup_margin':  2.0,
+            'inf_margin':  2.0,
+            'rt_margin':   1.5,
+            'lt_margin':   1.5,
+            'ant_margin':  1.5,
+            'post_margin': 1.0,
+            'min_margin': 2.1,
+            'max_margin': 0.9}
+
 
 # %% Relationship class
 class RelationshipType(Enum):
