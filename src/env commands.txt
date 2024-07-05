@@ -1,0 +1,3 @@
+########## Install on active command ############
+conda config --append channels conda-forge
+conda install python=3.11 networkx shapely pygraphviz pandas matplotlib numpy pyodbc pydicom pysimplegui xlwings pylint jupyterlab ipympl mypy
