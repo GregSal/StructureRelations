@@ -22,7 +22,6 @@ from itertools import zip_longest
 import numpy as np
 import pandas as pd
 import xlwings as xw
-import PySimpleGUI as sg
 import pydicom
 import shapely
 import pygraphviz as pgv
