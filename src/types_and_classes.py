@@ -771,6 +771,7 @@ class StructureDiagram:
             node1, node2 = relationship.structures
             edge_type = relationship.relationship_type
             edge_formatting = self.edge_type_formatting[edge_type].copy()
+            edge_formatting['tooltip'] = relationship.metric.format_metric()
             # Override formatting
             hide_edge = any(self.is_hidden(node)
                             for node in relationship.structures)

@@ -1,0 +1,55 @@
+@namespace svg url(http://www.w3.org/2000/svg);
+html,
+body,
+svg {
+  height: 100%;
+}
+
+/* As SVG does not provide a default visual style for links,
+   it's considered best practice to add some */
+
+@namespace svg url(http://www.w3.org/2000/svg);
+/* Necessary to select only SVG <a> elements, and not also HTML's.
+   See warning below */
+
+svg|a:link,
+svg|a:visited {
+  cursor: pointer;
+}
+
+svg|a text,
+text svg|a {
+  fill: blue; /* Even for text, SVG uses fill over color */
+  text-decoration: underline;font-family: 'Courier New', Courier, monospace;
+}
+
+svg|a:hover,
+svg|a:active {
+  outline: dotted 1px blue;
+}
+
+
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
