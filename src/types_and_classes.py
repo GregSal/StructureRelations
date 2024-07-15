@@ -39,14 +39,67 @@ StructurePair =  Tuple[ROI_Num, ROI_Num]
 PRECISION = 3
 
 # %% StructureSlice Class
-class StructureSlice:
-    def __init__(self, contours: List[Contour]):
+class StructureSlice():
+    '''Assemble a shapely.MultiPolygon.
+
+    Iteratively create a shapely MultiPolygon from a list of shapely Polygons.
+    polygons that are contained within the already formed MultiPolygon are
+    treated as holes and subtracted from the MultiPolygon.  Polygons
+    overlapping with the already formed MultiPolygon are rejected. Polygons that
+    are disjoint with the already formed MultiPolygon are combined with a union.
+
+    Two custom properties exterior and hull are defined. Exterior returns the
+    equivalent with all holes filled in.  Hull returns a MultiPolygon that is
+    the convex hull surrounding the entire MultiPolygon.
+
+    Args:
+        contours (List[shapely.Polygon]): A list of polygons to be merged
+        into a single MultiPolygon.
+
+    Attributes:
+        contour (shapely.MultiPolygon): The MultiPolygon created by combining
+            the supplied list of polygons.
+        exterior (shapely.MultiPolygon): The contour MultiPolygon with all
+            holes filled in.
+        hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
+            surrounding the contour MultiPolygon.
+    '''
+    def __init__(self, contours: List[shapely.Polygon]) -> None:
+        '''Iteratively create a shapely MultiPolygon from a list of shapely
+        Polygons.
+
+        Polygons that are contained within the already formed MultiPolygon are
+        treated as holes and subtracted from the MultiPolygon.  Polygons
+        overlapping with the already formed MultiPolygon are rejected. Polygons
+        that are disjoint with the already formed MultiPolygon are combined.
+
+        Args:
+            contours (List[shapely.Polygon]): A list of polygons to be merged
+            into a single MultiPolygon.
+        '''
         self.contour = shapely.MultiPolygon()
         for contour in contours:
             self.add_contour(contour)
 
-    def add_contour(self, contour):
-    # Check for non-overlapping structures
+    def add_contour(self, contour: shapely.Polygon) -> None:
+        '''Add a shapely Polygon to the current MultiPolygon from a list of shapely
+        Polygons.
+
+        Polygons that are contained within the already formed MultiPolygon are
+        treated as holes and subtracted from the MultiPolygon.  Polygons
+        overlapping with the already formed MultiPolygon are rejected. Polygons
+        that are disjoint with the already formed MultiPolygon are combined.
+
+        Args:
+            contour (shapely.Polygon): The shapely Polygon to be added.
+                The shapely Polygon must either be contained in or be disjoint
+                with the existing MultiPolygon.
+
+        Raises:
+            ValueError: When the supplied shapely Polygon overlaps with the
+                existing MultiPolygon.
+        '''
+        # Check for non-overlapping structures
         if self.contour.disjoint(contour):
             # Combine non-overlapping structures
             new_contours = self.contour.union(contour)
@@ -64,14 +117,29 @@ class StructureSlice:
 
     @property
     def exterior(self)-> shapely.MultiPolygon:
+        '''The solid exterior contour MultiPolygon.
+
+        Returns:
+            shapely.MultiPolygon: The contour MultiPolygon with all holes
+                filled in.
+        '''
         solid = [shapely.Polygon(shapely.get_exterior_ring(poly))
                  for poly in self.contour.geoms]
         return shapely.MultiPolygon(solid)
 
     @property
     def hull(self)-> shapely.MultiPolygon:
-        hulls = [shapely.convex_hull(poly) for poly in self.contour.geoms]
-        return shapely.MultiPolygon(hulls)
+        '''A bounding contour generated from the entire contour MultiPolygon.
+
+        A convex hull can be pictures as an elastic band stretched around the
+        external contour.
+
+        Returns:
+            shapely.MultiPolygon: The bounding contour for the entire contour
+                MultiPolygon.
+        '''
+        hull = shapely.convex_hull(self.contour)
+        return shapely.MultiPolygon([hull])
 
 
 #%% Structure Class
@@ -492,7 +560,66 @@ class MarginMetric(Metric):
 
 
 # %% Relationship class
+def compare(mpoly1: shapely.MultiPolygon,
+            mpoly2: shapely.MultiPolygon)->str:
+    '''Get the DE-9IM relationship string for two contours
+
+    The relationship string is converted to binary format, where 'F'
+    is '0' and '1' or '2' is '1'.
+
+    Args:
+        mpoly1 (shapely.MultiPolygon): All contours for a structure on
+            a single slice.
+        mpoly2 (shapely.MultiPolygon): All contours for a second
+            structure on the same slice.
+
+    Returns:
+        str: A length 9 string '1's and '0's reflecting the DE-9IM
+            relationship between the supplied contours.
+    '''
+    relation_str = shapely.relate(mpoly1, mpoly2)
+    # Convert relationship string in the form '212FF1FF2' into a
+    # boolean string.
+    relation_bool = relation_str.replace('F','0').replace('2','1')
+    return relation_bool
+
+
+def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
+    '''Get the 27 bit relationship integer for two polygons,
+
+    When written in binary, the 27 bit relationship contains 3 9-bit
+    parts corresponding to DE-9IM relationships. The left-most 9 bits
+    are the relationship between the second structure's contour and the
+    first structure's convex hull polygon. The middle 9 bits are the
+    relationship between the second structure's contour and the first
+    structure's exterior polygon (i.e. with any holes filled). The
+    right-most 9 bits are the relationship between the second
+    structure's contour and the first structure's contour.
+
+    Args:
+        slice_structures (pd.DataFrame): A table of structures, where
+            the values are the contours with type StructureSlice. The
+            column index contains the roi numbers for the structures.
+            The row index contains the slice index distances.
+
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the struct1 convex hull, exterior and
+            contour.
+    '''
+    primary_relation = compare(contour1.contour, contour2.contour)
+    external_relation = compare(contour1.exterior, contour2.contour)
+    convex_hull_relation = compare(contour1.hull, contour2.contour)
+    full_relation = ''.join([convex_hull_relation,
+                                external_relation,
+                                primary_relation])
+    binary_relation = int(full_relation, base=2)
+    return binary_relation
+
+
 class RelationshipType(Enum):
+    '''The names for defines relationship types.'''
     DISJOINT = auto()
     SURROUNDS = auto()
     SHELTERS = auto()
@@ -504,6 +631,11 @@ class RelationshipType(Enum):
     EQUALS = auto()
     LOGICAL = auto()
     UNKNOWN = 999  # Used for initialization
+
+    def __bool__(self):
+        if self == self.UNKNOWN:
+            return False
+        return True
 
 
 @dataclass()
@@ -558,6 +690,16 @@ class RelationshipTest:
         return rep_str
 
     def test(self, relation: int)->RelationshipType:
+        '''Apply the defined test to the supplied relation binary.
+
+        Args:
+            relation (int): The number corresponding to a 27-bit binary of
+                relationship values.
+
+        Returns:
+            RelationshipType: The RelationshipType if the test passes,
+                otherwise None.
+        '''
         masked_relation = relation & self.mask
         if masked_relation == self.value:
             return self.relation_type
@@ -581,11 +723,14 @@ def identify_type(relation_binary) -> RelationshipType:
         Overlaps          TTTT*TTT*
 
     Args:
-        relation_binary (int): An integer generated from DE-9IM tests.
+        relation_binary (int): An integer generated from the combined DE-9IM
+            tests.
 
     Returns:
-        RelationshipType: _description_
+        RelationshipType: The identified RelationshipType if one of the tests
+            passes, otherwise RelationshipType.UNKNOWN.
     '''
+    # Relationship Test Definitions
     test_binaries = [
         RelationshipTest(RelationshipType.OVERLAPS,
             0b000000000000000000111101110,
@@ -620,75 +765,6 @@ def identify_type(relation_binary) -> RelationshipType:
         if result:
             return result
     return RelationshipType.UNKNOWN
-
-
-def compare(mpoly1: shapely.MultiPolygon,
-            mpoly2: shapely.MultiPolygon)->str:
-    '''Get the DE-9IM relationship string for two contours
-
-    The relationship string is converted to binary format, where 'F'
-    is '0' and '1' or '2' is '1'.
-
-    Args:
-        mpoly1 (shapely.MultiPolygon): All contours for a structure on
-            a single slice.
-        mpoly2 (shapely.MultiPolygon): All contours for a second
-            structure on the same slice.
-
-    Returns:
-        str: A length 9 string '1's and '0's reflecting the DE-9IM
-            relationship between the supplied contours.
-    '''
-    relation_str = shapely.relate(mpoly1, mpoly2)
-    # Convert relationship string in the form '212FF1FF2' into a
-    # boolean string.
-    relation_bool = relation_str.replace('F','0').replace('2','1')
-    return relation_bool
-
-
-def relate(slice_structures: pd.DataFrame, structures: StructurePair)->int:
-    '''Get the 27 bit relationship integer for two polygons,
-
-    When written in binary, the 27 bit relationship contains 3 9-bit
-    parts corresponding to DE-9IM relationships. The left-most 9 bits
-    are the relationship between the second structure's contour and the
-    first structure's convex hull polygon. The middle 9 bits are the
-    relationship between the second structure's contour and the first
-    structure's exterior polygon (i.e. with any holes filled). The
-    right-most 9 bits are the relationship between the second
-    structure's contour and the first structure's contour.
-
-    Args:
-        slice_structures (pd.DataFrame): A table of structures, where
-            the values are the contours with type StructureSlice. The
-            column index contains the roi numbers for the structures.
-            The row index contains the slice index distances.
-
-    Returns:
-        int: An integer corresponding to a 27 bit binary value
-            reflecting the combined DE-9IM relationship between the
-            second contour and the struct1 convex hull, exterior and
-            contour.
-    '''
-    structure = slice_structures[structures[0]]
-    other_contour = slice_structures[structures[1]].contour
-    if not structure.contour:
-        # There is no second contour on this slice, therefore part
-        # of the first structure is outside of the second structure.
-        full_relation = '000000111' * 3
-    elif not other_contour:
-        # There is no first contour (struct1) on this slice, therefore
-        # part of the second structure is outside of the first structure.
-        full_relation = '001001001' * 3
-    else:
-        primary_relation = compare(structure.contour, other_contour)
-        external_relation = compare(structure.exterior, other_contour)
-        convex_hull_relation = compare(structure.hull, other_contour)
-        full_relation = ''.join([convex_hull_relation,
-                                external_relation,
-                                primary_relation])
-    binary_relation = int(full_relation, base=2)
-    return binary_relation
 
 
 def merge_rel(relation_seq: pd.Series)->int:
