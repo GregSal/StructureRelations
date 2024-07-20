@@ -1,0 +1,68 @@
+* {border-collapse: collapse;
+    background-color: white;
+}
+
+thead th {
+    font-style: italic; 
+    font-weight: bold;
+    border: 2px solid black;
+}
+
+td {border: 1px solid black; 
+    padding: 10px;
+    font-weight: normal;
+} 
+
+img {width: 96px; height: 96px;}
+
+table.f td, table.f th {
+    border: 2px solid black; 
+    padding-bottom: 10px;
+}    
+
+/* Styles for the label header of the table*/
+tr.l th:first-child {
+    font-weight: 900;
+    font-size: 150%;
+    border-right-style: hidden;
+    border-bottom-style: hidden;
+}
+tr.l th:last-child {
+    font-weight: 300; 
+    font-size: 80%;
+    text-align: right;
+    border-left-style: hidden;
+    border-bottom-style: hidden;
+}
+.d {
+    border-top-style: hidden;
+    border-bottom-style: solid;
+}
+
+/* The a and b classes are used to color references to a sn b shapes*/
+.a {font-weight: bold; color: blue;}   
+.b {font-weight: bold; color: green;}
+
+.na {font-size: 1.5em;}
+
+/* The matrix class style create square brackets around a relationship matrix. */
+.matrix {
+    position: relative; 
+    padding: 0px 15px;
+}
+.matrix:before, .matrix:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    border: 3px solid #000;
+    width: 10px;
+    height: 100%;
+}
+.matrix:before {left: -6px; border-right: 0;}
+.matrix:after {right: -6px; border-left: 0;}
+
+table.matrix td, table.matrix tr{
+    border-style: hidden; 
+    margin: 20px;
+}
+
