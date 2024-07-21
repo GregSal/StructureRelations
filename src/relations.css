@@ -43,12 +43,12 @@ tr.l th:last-child {
 .a {font-weight: bold; color: blue;}   
 .b {font-weight: bold; color: green;}
 
-.na {font-size: 1.5em;}
+.na {font-size: 1.5em; font-weight: bold;}
 
 /* The matrix class style create square brackets around a relationship matrix. */
 .matrix {
     position: relative; 
-    padding: 0px 15px;
+    padding: 0px 0px;
 }
 .matrix:before, .matrix:after {
     content: "";
@@ -63,6 +63,12 @@ tr.l th:last-child {
 
 table.matrix td, table.matrix tr{
     border-style: hidden; 
-    margin: 20px;
+    margin: 0px;
+    font-weight: bold;
 }
-
+/* Relationship Binaries */
+tr.bin span {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: lightgray;
+    font-weight: bold;
+}

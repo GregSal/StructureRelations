@@ -24,6 +24,7 @@ import pandas as pd
 import xlwings as xw
 import pydicom
 import shapely
+from shapely.plotting import plot_polygon, plot_points
 import pygraphviz as pgv
 import networkx as nx
 
@@ -1200,3 +1201,59 @@ def com_text(com):
         f'{com[2]:-5.2f})'
         ])
     return com_fmt
+
+
+def bin_format(bin_val: int):
+    bin_str = bin(bin_val)
+    if len(bin_str) < 29:
+        zero_pad = 29 - len(bin_str)
+        bin_str = bin_str[0:2] + '0' * zero_pad + bin_str[2:]
+    bin_fmt = '{bin1:^11s} | {bin2:^11s} | {bin3:^11s}'
+    bin_dict = {
+        'bin1': bin_str[2:11],
+        'bin2': bin_str[11:20],
+        'bin3': bin_str[20:29]
+        }
+    return bin_fmt.format(**bin_dict)
+
+
+def plot_ab(*, poly_a=None, poly_b=None, poly_c=None):
+    fig = plt.figure(1, figsize=(2,1))
+    ax = fig.add_subplot(121)
+    ax.set_axis_off()
+    ax.axis('equal')
+    if poly_a:
+        p = plot_polygon(poly_a, ax=ax, add_points=False, color='blue', facecolor='blue')
+    if poly_b:
+        p = plot_polygon(poly_b, ax=ax, add_points=False, color='green', facecolor='green')
+    if poly_c:
+        p = plot_polygon(poly_c, ax=ax, add_points=False, color='orange', facecolor='orange')
+
+
+def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
+                  num_points: int = 16, precision=3)->list[tuple[float, float]]:
+    deg_step = radians(360/num_points)
+    degree_points = np.arange(stop=radians(360), step=deg_step)
+    x_coord = np.array([round(radius*sin(d), precision) for d in degree_points])
+    y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
+
+    x_coord = x_coord + offset_x
+    y_coord = y_coord + offset_y
+    coords = [(x,y) for x,y in zip(x_coord,y_coord)]
+    return coords
+
+
+def box_points(width:float, height: float = None, offset_x: float = 0,
+               offset_y: float = 0) -> list[tuple[float, float]]:
+    x1_unit = width / 2
+    if not height:
+        y1_unit = x1_unit
+    else:
+        y1_unit = height / 2
+    coords = [
+        ( x1_unit + offset_x,  y1_unit + offset_y),
+        ( x1_unit + offset_x, -y1_unit + offset_y),
+        (-x1_unit + offset_x, -y1_unit + offset_y),
+        (-x1_unit + offset_x,  y1_unit + offset_y)
+        ]
+    return coords
