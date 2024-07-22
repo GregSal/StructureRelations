@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from math import sqrt, pi
+from math import sqrt, pi, sin, cos, tan, radians
 from statistics import mean
 from itertools import zip_longest
 
@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import xlwings as xw
 import pydicom
+import matplotlib.pyplot as plt
 import shapely
 from shapely.plotting import plot_polygon, plot_points
 import pygraphviz as pgv
@@ -124,9 +125,14 @@ class StructureSlice():
             shapely.MultiPolygon: The contour MultiPolygon with all holes
                 filled in.
         '''
-        solid = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                 for poly in self.contour.geoms]
-        return shapely.MultiPolygon(solid)
+        solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                  for poly in self.contour.geoms]
+        solid = shapely.unary_union(solids)
+        if isinstance(solid, shapely.MultiPolygon):
+            ext_poly = shapely.MultiPolygon(solid)
+        else:
+            ext_poly = shapely.MultiPolygon([solid])
+        return ext_poly
 
     @property
     def hull(self)-> shapely.MultiPolygon:
@@ -1183,7 +1189,9 @@ class StructureDiagram:
         node_style = node_attributes.get('style', '')
         return 'invis' in node_style
 
-# %% Future functions
+# %% Utility functions
+# Eventually move these functions to their own module
+
 # Tuples to Strings
 def colour_text(roi_colour):
     colour_fmt = ''.join([
@@ -1202,7 +1210,7 @@ def com_text(com):
         ])
     return com_fmt
 
-
+# Debugging display functions
 def bin_format(bin_val: int):
     bin_str = bin(bin_val)
     if len(bin_str) < 29:
@@ -1230,6 +1238,18 @@ def plot_ab(*, poly_a=None, poly_b=None, poly_c=None):
         p = plot_polygon(poly_c, ax=ax, add_points=False, color='orange', facecolor='orange')
 
 
+def relation_example(a, b, relation_test, fig=None, ax_num=1):
+    r = relate(a,b)
+    print('Relation Binary', bin_format(r))
+    print('Relationship', relation_test.test(relate(a,b)))
+    #if not fig:
+    #    fig = plt.figure(1, figsize=(2,1))
+    #ax = fig.add_subplot(121)
+    a = plot_ab(poly_a=a.contour, poly_b=b.contour)
+    #return fig
+
+
+# Contour Creation Functions
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
