@@ -24,6 +24,7 @@ import pandas as pd
 import xlwings as xw
 import pydicom
 import shapely
+from shapely.plotting import plot_polygon, plot_points
 import pygraphviz as pgv
 import networkx as nx
 
@@ -32,12 +33,114 @@ import networkx as nx
 ROI_Num = int  # Index to structures defined in Structure RT DICOM file
 SliceIndex = float
 Contour = shapely.Polygon
-StructureSlice = shapely.MultiPolygon
 StructurePair =  Tuple[ROI_Num, ROI_Num]
 
 
 # Global Settings
 PRECISION = 3
+
+# %% StructureSlice Class
+class StructureSlice():
+    '''Assemble a shapely.MultiPolygon.
+
+    Iteratively create a shapely MultiPolygon from a list of shapely Polygons.
+    polygons that are contained within the already formed MultiPolygon are
+    treated as holes and subtracted from the MultiPolygon.  Polygons
+    overlapping with the already formed MultiPolygon are rejected. Polygons that
+    are disjoint with the already formed MultiPolygon are combined with a union.
+
+    Two custom properties exterior and hull are defined. Exterior returns the
+    equivalent with all holes filled in.  Hull returns a MultiPolygon that is
+    the convex hull surrounding the entire MultiPolygon.
+
+    Args:
+        contours (List[shapely.Polygon]): A list of polygons to be merged
+        into a single MultiPolygon.
+
+    Attributes:
+        contour (shapely.MultiPolygon): The MultiPolygon created by combining
+            the supplied list of polygons.
+        exterior (shapely.MultiPolygon): The contour MultiPolygon with all
+            holes filled in.
+        hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
+            surrounding the contour MultiPolygon.
+    '''
+    def __init__(self, contours: List[shapely.Polygon]) -> None:
+        '''Iteratively create a shapely MultiPolygon from a list of shapely
+        Polygons.
+
+        Polygons that are contained within the already formed MultiPolygon are
+        treated as holes and subtracted from the MultiPolygon.  Polygons
+        overlapping with the already formed MultiPolygon are rejected. Polygons
+        that are disjoint with the already formed MultiPolygon are combined.
+
+        Args:
+            contours (List[shapely.Polygon]): A list of polygons to be merged
+            into a single MultiPolygon.
+        '''
+        self.contour = shapely.MultiPolygon()
+        for contour in contours:
+            self.add_contour(contour)
+
+    def add_contour(self, contour: shapely.Polygon) -> None:
+        '''Add a shapely Polygon to the current MultiPolygon from a list of shapely
+        Polygons.
+
+        Polygons that are contained within the already formed MultiPolygon are
+        treated as holes and subtracted from the MultiPolygon.  Polygons
+        overlapping with the already formed MultiPolygon are rejected. Polygons
+        that are disjoint with the already formed MultiPolygon are combined.
+
+        Args:
+            contour (shapely.Polygon): The shapely Polygon to be added.
+                The shapely Polygon must either be contained in or be disjoint
+                with the existing MultiPolygon.
+
+        Raises:
+            ValueError: When the supplied shapely Polygon overlaps with the
+                existing MultiPolygon.
+        '''
+        # Check for non-overlapping structures
+        if self.contour.disjoint(contour):
+            # Combine non-overlapping structures
+            new_contours = self.contour.union(contour)
+        # Check for hole contour
+        elif self.contour.contains(contour):
+            # Subtract hole contour
+            new_contours = self.contour.difference(contour)
+        else:
+            raise ValueError('Cannot merge overlapping contours.')
+        # Enforce the MultiPolygon type for self.contour
+        if isinstance(new_contours, shapely.MultiPolygon):
+            self.contour = new_contours
+        else:
+            self.contour = shapely.MultiPolygon([new_contours])
+
+    @property
+    def exterior(self)-> shapely.MultiPolygon:
+        '''The solid exterior contour MultiPolygon.
+
+        Returns:
+            shapely.MultiPolygon: The contour MultiPolygon with all holes
+                filled in.
+        '''
+        solid = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                 for poly in self.contour.geoms]
+        return shapely.MultiPolygon(solid)
+
+    @property
+    def hull(self)-> shapely.MultiPolygon:
+        '''A bounding contour generated from the entire contour MultiPolygon.
+
+        A convex hull can be pictures as an elastic band stretched around the
+        external contour.
+
+        Returns:
+            shapely.MultiPolygon: The bounding contour for the entire contour
+                MultiPolygon.
+        '''
+        hull = shapely.convex_hull(self.contour)
+        return shapely.MultiPolygon([hull])
 
 
 #%% Structure Class
@@ -124,7 +227,7 @@ class StructureInfo:
         '''Get label information for a structure from the RS DICOM file.
 
         Args:
-            code_seq (pydicom.Dataset): An item from the RT ROI Observations Sequence 
+            code_seq (pydicom.Dataset): An item from the RT ROI Observations Sequence
                 in the dataset of an RS DICOM file.
         '''
         code_seq = roi_obs.get('RTROIIdentificationCodeSequence')
@@ -458,7 +561,66 @@ class MarginMetric(Metric):
 
 
 # %% Relationship class
+def compare(mpoly1: shapely.MultiPolygon,
+            mpoly2: shapely.MultiPolygon)->str:
+    '''Get the DE-9IM relationship string for two contours
+
+    The relationship string is converted to binary format, where 'F'
+    is '0' and '1' or '2' is '1'.
+
+    Args:
+        mpoly1 (shapely.MultiPolygon): All contours for a structure on
+            a single slice.
+        mpoly2 (shapely.MultiPolygon): All contours for a second
+            structure on the same slice.
+
+    Returns:
+        str: A length 9 string '1's and '0's reflecting the DE-9IM
+            relationship between the supplied contours.
+    '''
+    relation_str = shapely.relate(mpoly1, mpoly2)
+    # Convert relationship string in the form '212FF1FF2' into a
+    # boolean string.
+    relation_bool = relation_str.replace('F','0').replace('2','1')
+    return relation_bool
+
+
+def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
+    '''Get the 27 bit relationship integer for two polygons,
+
+    When written in binary, the 27 bit relationship contains 3 9-bit
+    parts corresponding to DE-9IM relationships. The left-most 9 bits
+    are the relationship between the second structure's contour and the
+    first structure's convex hull polygon. The middle 9 bits are the
+    relationship between the second structure's contour and the first
+    structure's exterior polygon (i.e. with any holes filled). The
+    right-most 9 bits are the relationship between the second
+    structure's contour and the first structure's contour.
+
+    Args:
+        slice_structures (pd.DataFrame): A table of structures, where
+            the values are the contours with type StructureSlice. The
+            column index contains the roi numbers for the structures.
+            The row index contains the slice index distances.
+
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the struct1 convex hull, exterior and
+            contour.
+    '''
+    primary_relation = compare(contour1.contour, contour2.contour)
+    external_relation = compare(contour1.exterior, contour2.contour)
+    convex_hull_relation = compare(contour1.hull, contour2.contour)
+    full_relation = ''.join([convex_hull_relation,
+                                external_relation,
+                                primary_relation])
+    binary_relation = int(full_relation, base=2)
+    return binary_relation
+
+
 class RelationshipType(Enum):
+    '''The names for defines relationship types.'''
     DISJOINT = auto()
     SURROUNDS = auto()
     SHELTERS = auto()
@@ -470,6 +632,160 @@ class RelationshipType(Enum):
     EQUALS = auto()
     LOGICAL = auto()
     UNKNOWN = 999  # Used for initialization
+
+    def __bool__(self):
+        if self == self.UNKNOWN:
+            return False
+        return True
+
+
+@dataclass()
+class RelationshipTest:
+    '''The test binaries used to identify a relationship type.
+
+    Each test definitions consists of 2 27-bit binaries, a mask and a value.
+    Each of the 27-bit binaries contain 3 9-bit parts associated with DE-9IM
+    relationships. The left-most 9 bits are associated with the relationship
+    between one structure's convex hull and another structure's contour. The
+    middle 9 bits are associated with the relationship between the first
+    structure's exterior polygon (i.e. with any holes filled) and the second
+    structure's contour. The right-most 9 bits are associated with the
+    relationship between first structure's contour and the second structure's
+    contour.
+
+    Named relationships are identified by logical patterns such as: T*T*F*FF*
+        The 'T' indicates the bit must be True.
+        The 'F' indicates the bit must be False.
+        The '*' indicates the bit can be either True or False.
+    Ane example of a complete relationship logic is:
+    Surrounds (One structure resides completely within a hole in another
+               structure):
+        Region Test =   FF*FF****  - The contours of the two structures have no
+                                     regions in common.
+        Exterior Test = T***F*F**  - With holes filled, one structure is within
+                                     the other.
+        Hull Test =     *********  - Together, the Region and Exterior Tests
+                                     sufficiently identifies the relationship,
+                                     so the Hull Test is not necessary.
+    The mask binary is a sequence of 0s and 1s with every '*' as a '0' and every
+    'T' or 'F' bit as a '1'.  The operation: relationship_integer & mask will
+    set all of the bit that are allowed to be either True or False to 0.
+
+    The value binary is a sequence of 0s and 1s with every 'T' as a '1' and
+    every '*' or 'F' bit as a '0'. The relationship is identified when value
+    binary is equal to the result of the `relationship_integer & mask`
+    operation.
+    '''
+    relation_type: RelationshipType = RelationshipType.UNKNOWN
+    mask: int = 0b000000000000000000000000000
+    value: int = 0b000000000000000000000000000
+
+    def __repr__(self) -> str:
+        rep_str = ''.join([
+            f'RelationshipTest({self.relation_type}\n',
+            ' ' * 4,
+            f'mask =  0b{self.mask:0>27b}\n',
+            ' ' * 4,
+            f'value = 0b{self.value:0>27b}'
+            ])
+        return rep_str
+
+    def test(self, relation: int)->RelationshipType:
+        '''Apply the defined test to the supplied relation binary.
+
+        Args:
+            relation (int): The number corresponding to a 27-bit binary of
+                relationship values.
+
+        Returns:
+            RelationshipType: The RelationshipType if the test passes,
+                otherwise None.
+        '''
+        masked_relation = relation & self.mask
+        if masked_relation == self.value:
+            return self.relation_type
+        return None
+
+
+def identify_type(relation_binary) -> RelationshipType:
+    '''Applies a collection of definitions for named relationships to a supplied
+    relationship binary.
+
+    The defined relationships are:
+        Relationship      Region Test   Exterior Test   Hull Test
+        Disjoint          FF*FF****     FF*FF****       FF*FF****
+        Shelters          FF*FF****     FF*FF****       T***F*F**
+        Surrounds         FF*FF****     T***F*F**
+        Confines          FF*FT****     T***T****
+        Borders           FF*FT****     FF*FT****
+        Contains	      T*T*F*FF*
+        Incorporates	  T*T*T*FF*
+        Equals	          T*F**FFF*
+        Overlaps          TTTT*TTT*
+
+    Args:
+        relation_binary (int): An integer generated from the combined DE-9IM
+            tests.
+
+    Returns:
+        RelationshipType: The identified RelationshipType if one of the tests
+            passes, otherwise RelationshipType.UNKNOWN.
+    '''
+    # Relationship Test Definitions
+    test_binaries = [
+        RelationshipTest(RelationshipType.OVERLAPS,
+            0b000000000000000000111101110,
+            0b000000000000000000111101110),
+        RelationshipTest(RelationshipType.EQUALS,
+            0b000000000000000000101001110,
+            0b000000000000000000100000000),
+        RelationshipTest(RelationshipType.INCORPORATES,
+            0b000000000000000000101010110,
+            0b000000000000000000101010000),
+        RelationshipTest(RelationshipType.CONTAINS,
+            0b000000000000000000101010110,
+            0b000000000000000000101000000),
+        RelationshipTest(RelationshipType.CONFINES,
+            0b000000000101010110110110000,
+            0b000000000101000000000010000),
+        RelationshipTest(RelationshipType.BORDERS,
+            0b000000000110110000110110000,
+            0b000000000000010000000010000),
+        RelationshipTest(RelationshipType.SHELTERS,
+            0b100010100110110000110110000,
+            0b000000000000000000100000000),
+        RelationshipTest(RelationshipType.SURROUNDS,
+            0b000000000100010110110110000,
+            0b000000000100000000000000000),
+        RelationshipTest(RelationshipType.DISJOINT,
+            0b110110000110110000110110000,
+            0b000000000000000000000000000)
+        ]
+    for rel_def in test_binaries:
+        result = rel_def.test(relation_binary)
+        if result:
+            return result
+    return RelationshipType.UNKNOWN
+
+
+def merge_rel(relation_seq: pd.Series)->int:
+    '''Aggregate all the relationship values from each slice to obtain
+        one relationship value for the two structures.
+
+    Args:
+        relation_seq (pd.Series): The relationship values between the
+        contours from each slice.
+
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between struct2
+            and the struct1 convex hulls, exteriors and contours.
+    '''
+    relation_seq.drop_duplicates(inplace=True)
+    merged_rel = 0
+    for rel in list(relation_seq):
+        merged_rel = merged_rel | rel
+    return merged_rel
 
 
 class Relationship():
@@ -500,7 +816,8 @@ class Relationship():
         RelationshipType.UNKNOWN: NoMetric,
         }
 
-    def __init__(self, structures: StructurePair, **kwargs) -> None:
+    def __init__(self, slice_table: pd.DataFrame, structures: StructurePair,
+                 **kwargs) -> None:
         self.is_logical = False
         self.show = True
         self.metric = None
@@ -516,9 +833,14 @@ class Relationship():
         if 'relationship' in kwargs:
             self.relationship_type = RelationshipType[kwargs['relationship']]
         else:
-            self.identify_relationship()
+            self.identify_relationship(slice_table)
 
         self.get_metric()
+
+    def set(self, **kwargs):
+        for key, val in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
 
     def get_metric(self):
         # Select the appropriate metric for the identified relationship.
@@ -538,15 +860,43 @@ class Relationship():
         # Order the structures with the larger one first
         self.structures = structures
 
-    def identify_relationship(self) -> None:
-        # FIXME Stub method to be replaced with identify_relationship function.
-        # Re-order structures as necessary for for Surrounds and Shelters
-        self.relationship_type = RelationshipType.UNKNOWN
+    def identify_relationship(self, slice_table: pd.DataFrame) -> None:
+        '''Get the 27 bit relationship integer for two structures,
 
-    def set(self, **kwargs):
-        for key, val in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, val)
+            When written in binary, the 27 bit relationship contains 3 9 bit
+            parts corresponding to DE-9IM relationships. The left-most 9 bits
+            are the relationship between the second structure's contour and the
+            first structure's convex hull.  The middle 9 bits are the
+            relationship between the second structure's contour and the first
+            structure's exterior. (The first structure's contour with any holes
+            filled). The right-most 9 bits are the relationship between the
+            second structure's contour and the first structure's actual contour.
+
+            Note: The order of structures matters. For correct comparison, the
+            first structure should always be the larger of the two structures.
+
+            Args:
+                slice_structures (pd.DataFrame): A table of structures, where the
+                    values are the contours with type StructureSlice. The column
+                    index contains the roi numbers for the structures.  The row
+                    index contains the slice index distances.
+        '''
+        slice_structures = slice_table.loc[:, [self.structures[0],
+                                               self.structures[1]]]
+        # Remove Slices that have neither structure.
+        slice_structures.dropna(how='all', inplace=True)
+        # For slices that have only one of the two structures, replace the nan
+        # values with empty polygons for duck typing.
+        slice_structures.fillna(StructureSlice([]), inplace=True)
+        # Get the relationships between the two structures for all slices.
+        relation_seq = slice_structures.agg(relate, structures=self.structures,
+                                            axis='columns')
+        # Get the overall relationship for the two structures by merging the
+        # relationships for the individual slices.
+        relation_binary = merge_rel(relation_seq)
+        self.relationship_type = identify_type(relation_binary)
+        return relation_binary
+
 
 # %% Structure Set class
 @dataclass
@@ -564,40 +914,44 @@ class StructureSetInfo:
 
 
 class StructureSet():
-    '''
-    ContourData: Table
-	Index: AutoInteger
-	Columns: 
-		ROI_Num, 
-		SliceIndex,
-		Area,
-		Contour
-Generated by: Read Contour Data
+    str_template = '\n'.join([
+        'ID: {structure_set_name}',
+        'Patient: {patient_name} ({patient_id}}\n',
+        'Image Study: {study_id}\t{study_description}\n',
+        'Image Series: {series_number}, {series_description}\n',
+        'Image Orientation: {orientation}\n',
+        'Data taken from: {file.name}'
+        ])
 
-StructureData: Series:
-	Index: ROI_Num, SliceIndex
-	Values: StructureSlice
-Generated by: Build StructureSet
-    '''
     def __init__(self, **kwargs) -> None:
-        self.info = StructureSetInfo()
+        super().__setattr__('info', StructureSetInfo())
+        super().__setattr__('structure_data', pd.DataFrame())
         self.set(**kwargs)
 
     # Attribute Utility methods
     def set(self, **kwargs):
-        for key, val in kwargs:
+        for key, val in kwargs.items():
             setattr(self, key, val)
 
     def __setattr__(self, attr: str, value: Any):
         if hasattr(self.info, attr):
             self.info.__setattr__(attr, value)
+        elif hasattr(self.parameters, attr):
+            self.parameters.__setattr__(attr, value)
         else:
             super().__setattr__(attr, value)
 
     def __getattr__(self, atr_name:str):
         if hasattr(self.info, atr_name):
             return self.info.__getattribute__(atr_name)
-        getattr(self, atr_name)
+        if hasattr(self.parameters, atr_name):
+            return self.parameters.__getattribute__(atr_name)
+        super().__getattr__(atr_name)   # pylint: disable=[no-member]
+
+    def summary(self):
+        data_dict = asdict(self.info)
+        data_dict.update(asdict(self.parameters))
+        return self.str_template.format(**data_dict)
 
     # DICOM read methods
     def read_structure_set_info(self, dataset: pydicom.Dataset) -> None:
@@ -624,6 +978,11 @@ Generated by: Build StructureSet
         self.info.patient_id = str(dataset.get('PatientID',''))
         self.info.patient_name = str(dataset.get('PatientName',''))
         self.info.patient_lastname = self.patient_name.split('^')[0]
+        # FIXME This appears to be getting the study and series for the
+        # structure set, not the image.
+        # TODO Add method to get the orientation from the image or plan file.
+        # TODO consider adding method to find the plan ID
+
         self.info.study_id = str(dataset.get('StudyID',''))
         self.info.study_description = str(dataset.get('StudyDescription',''))
         try:
@@ -842,3 +1201,59 @@ def com_text(com):
         f'{com[2]:-5.2f})'
         ])
     return com_fmt
+
+
+def bin_format(bin_val: int):
+    bin_str = bin(bin_val)
+    if len(bin_str) < 29:
+        zero_pad = 29 - len(bin_str)
+        bin_str = bin_str[0:2] + '0' * zero_pad + bin_str[2:]
+    bin_fmt = '{bin1:^11s} | {bin2:^11s} | {bin3:^11s}'
+    bin_dict = {
+        'bin1': bin_str[2:11],
+        'bin2': bin_str[11:20],
+        'bin3': bin_str[20:29]
+        }
+    return bin_fmt.format(**bin_dict)
+
+
+def plot_ab(*, poly_a=None, poly_b=None, poly_c=None):
+    fig = plt.figure(1, figsize=(2,1))
+    ax = fig.add_subplot(121)
+    ax.set_axis_off()
+    ax.axis('equal')
+    if poly_a:
+        p = plot_polygon(poly_a, ax=ax, add_points=False, color='blue', facecolor='blue')
+    if poly_b:
+        p = plot_polygon(poly_b, ax=ax, add_points=False, color='green', facecolor='green')
+    if poly_c:
+        p = plot_polygon(poly_c, ax=ax, add_points=False, color='orange', facecolor='orange')
+
+
+def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
+                  num_points: int = 16, precision=3)->list[tuple[float, float]]:
+    deg_step = radians(360/num_points)
+    degree_points = np.arange(stop=radians(360), step=deg_step)
+    x_coord = np.array([round(radius*sin(d), precision) for d in degree_points])
+    y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
+
+    x_coord = x_coord + offset_x
+    y_coord = y_coord + offset_y
+    coords = [(x,y) for x,y in zip(x_coord,y_coord)]
+    return coords
+
+
+def box_points(width:float, height: float = None, offset_x: float = 0,
+               offset_y: float = 0) -> list[tuple[float, float]]:
+    x1_unit = width / 2
+    if not height:
+        y1_unit = x1_unit
+    else:
+        y1_unit = height / 2
+    coords = [
+        ( x1_unit + offset_x,  y1_unit + offset_y),
+        ( x1_unit + offset_x, -y1_unit + offset_y),
+        (-x1_unit + offset_x, -y1_unit + offset_y),
+        (-x1_unit + offset_x,  y1_unit + offset_y)
+        ]
+    return coords
