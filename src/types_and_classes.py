@@ -25,7 +25,7 @@ import xlwings as xw
 import pydicom
 import matplotlib.pyplot as plt
 import shapely
-from shapely.plotting import plot_polygon, plot_points
+from shapely.plotting import plot_polygon, plot_line
 import pygraphviz as pgv
 import networkx as nx
 
@@ -1225,28 +1225,36 @@ def bin_format(bin_val: int):
     return bin_fmt.format(**bin_dict)
 
 
-def plot_ab(*, poly_a=None, poly_b=None, poly_c=None):
+def plot_ab(poly_a, poly_b):
+    def plot_geom(ax, geom, color='black'):
+        if isinstance(geom, (shapely.Polygon, shapely.MultiPolygon)):
+            plot_polygon(geom, ax=ax, add_points=False, color=color, facecolor=color)
+        elif isinstance(geom, (shapely.LineString, shapely.MultiLineString, 
+                               shapely.LinearRing, shapely.LinearRing)):
+            plot_line(geom, ax=ax, add_points=False, color=color)
+        elif isinstance(geom, shapely.GeometryCollection):
+            # plot each of the geometry objects in the collection
+            for g in geom.geoms:
+                plot_geom(ax, g, color)
+        
     fig = plt.figure(1, figsize=(2,1))
     ax = fig.add_subplot(121)
     ax.set_axis_off()
     ax.axis('equal')
-    if poly_a:
-        p = plot_polygon(poly_a, ax=ax, add_points=False, color='blue', facecolor='blue')
-    if poly_b:
-        p = plot_polygon(poly_b, ax=ax, add_points=False, color='green', facecolor='green')
-    if poly_c:
-        p = plot_polygon(poly_c, ax=ax, add_points=False, color='orange', facecolor='orange')
+
+    only_a = shapely.difference(poly_a, poly_b)
+    plot_geom(ax, only_a, color='blue')
+    only_b = shapely.difference(poly_b, poly_a)
+    plot_geom(ax, only_b, color='green')
+    both_ab = shapely.intersection(poly_a, poly_b)
+    plot_geom(ax, both_ab, color='orange')
 
 
-def relation_example(a, b, relation_test, fig=None, ax_num=1):
+def relation_example(a, b, relation_test):
     r = relate(a,b)
     print('Relation Binary', bin_format(r))
     print('Relationship', relation_test.test(relate(a,b)))
-    #if not fig:
-    #    fig = plt.figure(1, figsize=(2,1))
-    #ax = fig.add_subplot(121)
-    a = plot_ab(poly_a=a.contour, poly_b=b.contour)
-    #return fig
+    a = plot_ab(a.contour, b.contour)
 
 
 # Contour Creation Functions
