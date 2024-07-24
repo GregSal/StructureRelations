@@ -735,7 +735,7 @@ class RelationshipTest:
         return None
 
 
-def identify_type(relation_binary) -> RelationshipType:
+def identify_relation(relation_binary) -> RelationshipType:
     '''Applies a collection of definitions for named relationships to a supplied
     relationship binary.
 
@@ -761,33 +761,15 @@ def identify_type(relation_binary) -> RelationshipType:
     '''
     # Relationship Test Definitions
     test_binaries = [
-        RelationshipTest(RelationshipType.OVERLAPS,
-            0b000000000000000000111101110,
-            0b000000000000000000111101110),
-        RelationshipTest(RelationshipType.EQUALS,
-            0b000000000000000000101001110,
-            0b000000000000000000100000000),
-        RelationshipTest(RelationshipType.PARTITION,
-            0b000000000000000000101010110,
-            0b000000000000000000101010000),
-        RelationshipTest(RelationshipType.CONTAINS,
-            0b000000000000000000101010110,
-            0b000000000000000000101000000),
-        RelationshipTest(RelationshipType.CONFINES,
-            0b000000000101010110110110000,
-            0b000000000101000000000010000),
-        RelationshipTest(RelationshipType.BORDERS,
-            0b000000000110110000110110000,
-            0b000000000000010000000010000),
-        RelationshipTest(RelationshipType.SHELTERS,
-            0b100010100110110000110110000,
-            0b000000000000000000100000000),
-        RelationshipTest(RelationshipType.SURROUNDS,
-            0b000000000100010110110110000,
-            0b000000000100000000000000000),
-        RelationshipTest(RelationshipType.DISJOINT,
-            0b110110000110110000110110000,
-            0b000000000000000000000000000)
+        RelationshipTest(RelationshipType.SURROUNDS, 0b000000000100010110110110000, 0b000000000100000000000000000),
+        RelationshipTest(RelationshipType.SHELTERS,  0b111000100110110000110110000, 0b111000000000000000000000000),
+        RelationshipTest(RelationshipType.DISJOINT,  0b110110000110110000110110000, 0b000000000000000000000000000),
+        RelationshipTest(RelationshipType.BORDERS,   0b000000000110110000110110000, 0b000000000000010000000010000),
+        RelationshipTest(RelationshipType.CONFINES,  0b000000000101010110110110000, 0b000000000101000000000010000),
+        RelationshipTest(RelationshipType.OVERLAPS,  0b000000000000000000101000100, 0b000000000000000000101000100),
+        RelationshipTest(RelationshipType.PARTITION, 0b000000000000000000101010110, 0b000000000000000000101010000),
+        RelationshipTest(RelationshipType.CONTAINS,  0b000000000000000000101010110, 0b000000000000000000101000000),
+        RelationshipTest(RelationshipType.EQUALS,    0b000000000000000000101001110, 0b000000000000000000100000000)
         ]
     for rel_def in test_binaries:
         result = rel_def.test(relation_binary)
