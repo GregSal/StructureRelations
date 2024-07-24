@@ -6,7 +6,7 @@ Types, Classes and utility function definitions.
 # %% Imports
 # Type imports
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from enum import Enum, auto
 from dataclasses import dataclass, field, asdict
 
@@ -39,6 +39,26 @@ StructurePair =  Tuple[ROI_Num, ROI_Num]
 
 # Global Settings
 PRECISION = 3
+
+
+# %% Utility functions
+def poly_round(polygon: shapely.Polygon, precision: int = 2)->shapely.Polygon:
+    '''Round the coordinates of a polygon to the specified precision.
+
+    Args:
+        polygon (shapely.Polygon): The polygon to clean.
+    
+        precision (int): The number of decimal points to round to.
+
+    Returns:
+        shapely.Polygon: The supplied polygon with all coordinate points 
+            rounded to the supplied precision.
+    '''
+    polygon_points = [(round(x,precision), round(y,precision)) 
+                      for x,y in shapely.get_coordinates(polygon)]
+    clean_poly = shapely.Polygon(polygon_points)
+    return clean_poly
+
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -101,14 +121,16 @@ class StructureSlice():
             ValueError: When the supplied shapely Polygon overlaps with the
                 existing MultiPolygon.
         '''
+        # Apply requisite rounding to polygon
+        contour_round = poly_round(contour, PRECISION)
         # Check for non-overlapping structures
-        if self.contour.disjoint(contour):
+        if self.contour.disjoint(contour_round):
             # Combine non-overlapping structures
-            new_contours = self.contour.union(contour)
+            new_contours = self.contour.union(contour_round)
         # Check for hole contour
-        elif self.contour.contains(contour):
+        elif self.contour.contains(contour_round):
             # Subtract hole contour
-            new_contours = self.contour.difference(contour)
+            new_contours = self.contour.difference(contour_round)
         else:
             raise ValueError('Cannot merge overlapping contours.')
         # Enforce the MultiPolygon type for self.contour
@@ -633,7 +655,7 @@ class RelationshipType(Enum):
     BORDERS = auto()
     CONFINES = auto()
     OVERLAPS = auto()
-    INCORPORATES = auto()
+    PARTITION = auto()
     CONTAINS = auto()
     EQUALS = auto()
     LOGICAL = auto()
@@ -745,7 +767,7 @@ def identify_type(relation_binary) -> RelationshipType:
         RelationshipTest(RelationshipType.EQUALS,
             0b000000000000000000101001110,
             0b000000000000000000100000000),
-        RelationshipTest(RelationshipType.INCORPORATES,
+        RelationshipTest(RelationshipType.PARTITION,
             0b000000000000000000101010110,
             0b000000000000000000101010000),
         RelationshipTest(RelationshipType.CONTAINS,
@@ -807,14 +829,13 @@ class Relationship():
         RelationshipType.SHELTERS,
         RelationshipType.SURROUNDS,
         RelationshipType.CONTAINS,
-        RelationshipType.INCORPORATES,
         ]
     metric_match = {
         RelationshipType.DISJOINT: DistanceMetric,
         RelationshipType.BORDERS: OverlapSurfaceMetric,
         RelationshipType.CONFINES: OverlapSurfaceMetric,
         RelationshipType.OVERLAPS: OverlapAreaMetric,
-        RelationshipType.INCORPORATES: OverlapAreaMetric,
+        RelationshipType.PARTITION: OverlapAreaMetric,
         RelationshipType.SHELTERS: MarginMetric,
         RelationshipType.SURROUNDS: MarginMetric,
         RelationshipType.CONTAINS: MarginMetric,
@@ -1077,7 +1098,7 @@ class StructureDiagram:
         RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
                                     'dir': 'both', 'penwidth': 6,
                                     'color': 'green'},
-        RelationshipType.INCORPORATES: {'label': 'Group', 'style': 'tapered',
+        RelationshipType.PARTITION: {'label': 'Group', 'style': 'tapered',
                                         'dir': 'forward', 'penwidth': 6,
                                         'color': 'white'},
         RelationshipType.CONTAINS: {'label': 'Contains', 'style': 'tapered',
@@ -1189,7 +1210,7 @@ class StructureDiagram:
         node_style = node_attributes.get('style', '')
         return 'invis' in node_style
 
-# %% Utility functions
+# %% Debugging Display functions
 # Eventually move these functions to their own module
 
 # Tuples to Strings
