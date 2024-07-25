@@ -647,6 +647,46 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
     return binary_relation
 
 
+def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)->int:
+    '''Get the 27 bit relationship integer for two structures on a given slice.
+    
+    Args:
+        slice_structures (pd.DataFrame): A table of structures, where
+            the values are the contours with type StructureSlice. The
+            column index contains the roi numbers for the structures.
+            The row index contains the slice index distances.
+
+        structures (StructurePair): A tuple of ROI numbers which index 
+            columns in slice_structures.
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the struct1 convex hull, exterior and
+            contour.
+    '''
+    structure = slice_structures[structures[0]]
+    other_contour = slice_structures[structures[1]]
+    binary_relation = relate(structure, other_contour)
+    return binary_relation
+
+
+def relate_structs(slice_table: pd.DataFrame, structures: StructurePair) -> int:
+    slice_structures = slice_table.loc[:, [structures[0],
+                                           structures[1]]]
+    # Remove Slices that have neither structure.
+    slice_structures.dropna(how='all', inplace=True)
+    # For slices that have only one of the two structures, replace the nan
+    # values with empty polygons for duck typing.
+    slice_structures.fillna(StructureSlice([]), inplace=True)
+    # Get the relationships between the two structures for all slices.
+    relation_seq = slice_structures.agg(relate_structures, structures=structures,
+                                        axis='columns')
+     # Get the overall relationship for the two structures by merging the
+    # relationships for the individual slices.
+    relation_binary = merge_rel(relation_seq)
+    return relation_binary
+
+
 class RelationshipType(Enum):
     '''The names for defines relationship types.'''
     DISJOINT = auto()
@@ -898,12 +938,12 @@ class Relationship():
         # values with empty polygons for duck typing.
         slice_structures.fillna(StructureSlice([]), inplace=True)
         # Get the relationships between the two structures for all slices.
-        relation_seq = slice_structures.agg(relate, structures=self.structures,
+        relation_seq = slice_structures.agg(relate_structures, structures=self.structures,
                                             axis='columns')
         # Get the overall relationship for the two structures by merging the
         # relationships for the individual slices.
         relation_binary = merge_rel(relation_seq)
-        self.relationship_type = identify_type(relation_binary)
+        self.relationship_type = identify_relation(relation_binary)
         return relation_binary
 
 
@@ -1251,6 +1291,7 @@ def plot_ab(poly_a, poly_b):
     plot_geom(ax, only_b, color='green')
     both_ab = shapely.intersection(poly_a, poly_b)
     plot_geom(ax, both_ab, color='orange')
+    plt.show()
 
 
 def relation_example(a, b, relation_test):
@@ -1309,3 +1350,73 @@ def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
     slice_data = pd.DataFrame(data_list)
     slice_data.set_index(['ROI Num', 'Slice Index'], inplace=True)
     return slice_data
+# %% Deleted Functions 
+
+def x_compare(mpoly1: shapely.MultiPolygon,
+            mpoly2: shapely.MultiPolygon)->str:
+    '''Get the DE-9IM relationship string for two contours
+
+    The relationship string is converted to binary format, where 'F'
+    is '0' and '1' or '2' is '1'.
+
+    Args:
+        mpoly1 (shapely.MultiPolygon): All contours for a structure on
+            a single slice.
+        mpoly2 (shapely.MultiPolygon): All contours for a second
+            structure on the same slice.
+
+    Returns:
+        str: A length 9 string '1's and '0's reflecting the DE-9IM
+            relationship between the supplied contours.
+    '''
+    relation_str = shapely.relate(mpoly1, mpoly2)
+    # Convert relationship string in the form '212FF1FF2' into a
+    # boolean string.
+    relation_bool = relation_str.replace('F','0').replace('2','1')
+    return relation_bool
+
+
+def x_relate(slice_structures: pd.DataFrame, structures: StructurePair)->int:
+    '''Get the 27 bit relationship integer for two polygons,
+
+    When written in binary, the 27 bit relationship contains 3 9-bit
+    parts corresponding to DE-9IM relationships. The left-most 9 bits
+    are the relationship between the second structure's contour and the
+    first structure's convex hull polygon. The middle 9 bits are the
+    relationship between the second structure's contour and the first
+    structure's exterior polygon (i.e. with any holes filled). The
+    right-most 9 bits are the relationship between the second
+    structure's contour and the first structure's contour.
+
+    Args:
+        slice_structures (pd.DataFrame): A table of structures, where
+            the values are the contours with type StructureSlice. The
+            column index contains the roi numbers for the structures.
+            The row index contains the slice index distances.
+
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the struct1 convex hull, exterior and
+            contour.
+    '''
+    structure = slice_structures[structures[0]]
+    other_contour = slice_structures[structures[1]].contour
+    if not structure.contour:
+        # There is no second contour on this slice, therefore part
+        # of the first structure is outside of the second structure.
+        full_relation = '000000111' * 3
+    elif not other_contour:
+        # There is no first contour (struct1) on this slice, therefore
+        # part of the second structure is outside of the first structure.
+        full_relation = '001001001' * 3
+    else:
+        primary_relation = compare(structure.contour, other_contour)
+        external_relation = compare(structure.exterior, other_contour)
+        convex_hull_relation = compare(structure.hull, other_contour)
+        full_relation = ''.join([convex_hull_relation,
+                                external_relation,
+                                primary_relation])
+    binary_relation = int(full_relation, base=2)
+    return binary_relation
+
