@@ -1288,3 +1288,24 @@ def box_points(width:float, height: float = None, offset_x: float = 0,
         (-x1_unit + offset_x,  y1_unit + offset_y)
         ]
     return coords
+
+
+def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
+    slices = [round(SliceIndex(num*spacing + start), PRECISION)
+              for num in range(number)]
+    return slices
+
+
+def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
+                        contours: List[Contour]):
+    data_list = []
+    for slice_idx in slices:
+        data_item = {
+            'ROI Num': roi_num,
+            'Slice Index': SliceIndex(slice_idx),
+            'Structure Slice': StructureSlice(contours)
+            }
+        data_list.append(data_item)
+    slice_data = pd.DataFrame(data_list)
+    slice_data.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_data
