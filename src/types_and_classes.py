@@ -6,7 +6,7 @@ Types, Classes and utility function definitions.
 # %% Imports
 # Type imports
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from enum import Enum, auto
 from dataclasses import dataclass, field, asdict
 
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from math import sqrt, pi
+from math import sqrt, pi, sin, cos, tan, radians
 from statistics import mean
 from itertools import zip_longest
 
@@ -23,8 +23,9 @@ import numpy as np
 import pandas as pd
 import xlwings as xw
 import pydicom
+import matplotlib.pyplot as plt
 import shapely
-from shapely.plotting import plot_polygon, plot_points
+from shapely.plotting import plot_polygon, plot_line
 import pygraphviz as pgv
 import networkx as nx
 
@@ -38,6 +39,26 @@ StructurePair =  Tuple[ROI_Num, ROI_Num]
 
 # Global Settings
 PRECISION = 3
+
+
+# %% Utility functions
+def poly_round(polygon: shapely.Polygon, precision: int = 2)->shapely.Polygon:
+    '''Round the coordinates of a polygon to the specified precision.
+
+    Args:
+        polygon (shapely.Polygon): The polygon to clean.
+    
+        precision (int): The number of decimal points to round to.
+
+    Returns:
+        shapely.Polygon: The supplied polygon with all coordinate points 
+            rounded to the supplied precision.
+    '''
+    polygon_points = [(round(x,precision), round(y,precision)) 
+                      for x,y in shapely.get_coordinates(polygon)]
+    clean_poly = shapely.Polygon(polygon_points)
+    return clean_poly
+
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -100,14 +121,16 @@ class StructureSlice():
             ValueError: When the supplied shapely Polygon overlaps with the
                 existing MultiPolygon.
         '''
+        # Apply requisite rounding to polygon
+        contour_round = poly_round(contour, PRECISION)
         # Check for non-overlapping structures
-        if self.contour.disjoint(contour):
+        if self.contour.disjoint(contour_round):
             # Combine non-overlapping structures
-            new_contours = self.contour.union(contour)
+            new_contours = self.contour.union(contour_round)
         # Check for hole contour
-        elif self.contour.contains(contour):
+        elif self.contour.contains(contour_round):
             # Subtract hole contour
-            new_contours = self.contour.difference(contour)
+            new_contours = self.contour.difference(contour_round)
         else:
             raise ValueError('Cannot merge overlapping contours.')
         # Enforce the MultiPolygon type for self.contour
@@ -124,9 +147,14 @@ class StructureSlice():
             shapely.MultiPolygon: The contour MultiPolygon with all holes
                 filled in.
         '''
-        solid = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                 for poly in self.contour.geoms]
-        return shapely.MultiPolygon(solid)
+        solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                  for poly in self.contour.geoms]
+        solid = shapely.unary_union(solids)
+        if isinstance(solid, shapely.MultiPolygon):
+            ext_poly = shapely.MultiPolygon(solid)
+        else:
+            ext_poly = shapely.MultiPolygon([solid])
+        return ext_poly
 
     @property
     def hull(self)-> shapely.MultiPolygon:
@@ -619,6 +647,46 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
     return binary_relation
 
 
+def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)->int:
+    '''Get the 27 bit relationship integer for two structures on a given slice.
+    
+    Args:
+        slice_structures (pd.DataFrame): A table of structures, where
+            the values are the contours with type StructureSlice. The
+            column index contains the roi numbers for the structures.
+            The row index contains the slice index distances.
+
+        structures (StructurePair): A tuple of ROI numbers which index 
+            columns in slice_structures.
+    Returns:
+        int: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the struct1 convex hull, exterior and
+            contour.
+    '''
+    structure = slice_structures[structures[0]]
+    other_contour = slice_structures[structures[1]]
+    binary_relation = relate(structure, other_contour)
+    return binary_relation
+
+
+def relate_structs(slice_table: pd.DataFrame, structures: StructurePair) -> int:
+    slice_structures = slice_table.loc[:, [structures[0],
+                                           structures[1]]]
+    # Remove Slices that have neither structure.
+    slice_structures.dropna(how='all', inplace=True)
+    # For slices that have only one of the two structures, replace the nan
+    # values with empty polygons for duck typing.
+    slice_structures.fillna(StructureSlice([]), inplace=True)
+    # Get the relationships between the two structures for all slices.
+    relation_seq = slice_structures.agg(relate_structures, structures=structures,
+                                        axis='columns')
+     # Get the overall relationship for the two structures by merging the
+    # relationships for the individual slices.
+    relation_binary = merge_rel(relation_seq)
+    return relation_binary
+
+
 class RelationshipType(Enum):
     '''The names for defines relationship types.'''
     DISJOINT = auto()
@@ -627,7 +695,7 @@ class RelationshipType(Enum):
     BORDERS = auto()
     CONFINES = auto()
     OVERLAPS = auto()
-    INCORPORATES = auto()
+    PARTITION = auto()
     CONTAINS = auto()
     EQUALS = auto()
     LOGICAL = auto()
@@ -707,7 +775,7 @@ class RelationshipTest:
         return None
 
 
-def identify_type(relation_binary) -> RelationshipType:
+def identify_relation(relation_binary) -> RelationshipType:
     '''Applies a collection of definitions for named relationships to a supplied
     relationship binary.
 
@@ -733,33 +801,15 @@ def identify_type(relation_binary) -> RelationshipType:
     '''
     # Relationship Test Definitions
     test_binaries = [
-        RelationshipTest(RelationshipType.OVERLAPS,
-            0b000000000000000000111101110,
-            0b000000000000000000111101110),
-        RelationshipTest(RelationshipType.EQUALS,
-            0b000000000000000000101001110,
-            0b000000000000000000100000000),
-        RelationshipTest(RelationshipType.INCORPORATES,
-            0b000000000000000000101010110,
-            0b000000000000000000101010000),
-        RelationshipTest(RelationshipType.CONTAINS,
-            0b000000000000000000101010110,
-            0b000000000000000000101000000),
-        RelationshipTest(RelationshipType.CONFINES,
-            0b000000000101010110110110000,
-            0b000000000101000000000010000),
-        RelationshipTest(RelationshipType.BORDERS,
-            0b000000000110110000110110000,
-            0b000000000000010000000010000),
-        RelationshipTest(RelationshipType.SHELTERS,
-            0b100010100110110000110110000,
-            0b000000000000000000100000000),
-        RelationshipTest(RelationshipType.SURROUNDS,
-            0b000000000100010110110110000,
-            0b000000000100000000000000000),
-        RelationshipTest(RelationshipType.DISJOINT,
-            0b110110000110110000110110000,
-            0b000000000000000000000000000)
+        RelationshipTest(RelationshipType.SURROUNDS, 0b000000000100010110110110000, 0b000000000100000000000000000),
+        RelationshipTest(RelationshipType.SHELTERS,  0b111000100110110000110110000, 0b111000000000000000000000000),
+        RelationshipTest(RelationshipType.DISJOINT,  0b110110000110110000110110000, 0b000000000000000000000000000),
+        RelationshipTest(RelationshipType.BORDERS,   0b000000000001001110110110000, 0b000000000001001110000010000),
+        RelationshipTest(RelationshipType.CONFINES,  0b000000000101010110110110000, 0b000000000101000000000010000),
+        RelationshipTest(RelationshipType.OVERLAPS,  0b000000000000000000101000100, 0b000000000000000000101000100),
+        RelationshipTest(RelationshipType.PARTITION, 0b000000000000000000101010110, 0b000000000000000000101010000),
+        RelationshipTest(RelationshipType.CONTAINS,  0b000000000000000000101010110, 0b000000000000000000101000000),
+        RelationshipTest(RelationshipType.EQUALS,    0b000000000000000000101001110, 0b000000000000000000100000000)
         ]
     for rel_def in test_binaries:
         result = rel_def.test(relation_binary)
@@ -801,14 +851,13 @@ class Relationship():
         RelationshipType.SHELTERS,
         RelationshipType.SURROUNDS,
         RelationshipType.CONTAINS,
-        RelationshipType.INCORPORATES,
         ]
     metric_match = {
         RelationshipType.DISJOINT: DistanceMetric,
         RelationshipType.BORDERS: OverlapSurfaceMetric,
         RelationshipType.CONFINES: OverlapSurfaceMetric,
         RelationshipType.OVERLAPS: OverlapAreaMetric,
-        RelationshipType.INCORPORATES: OverlapAreaMetric,
+        RelationshipType.PARTITION: OverlapAreaMetric,
         RelationshipType.SHELTERS: MarginMetric,
         RelationshipType.SURROUNDS: MarginMetric,
         RelationshipType.CONTAINS: MarginMetric,
@@ -889,12 +938,12 @@ class Relationship():
         # values with empty polygons for duck typing.
         slice_structures.fillna(StructureSlice([]), inplace=True)
         # Get the relationships between the two structures for all slices.
-        relation_seq = slice_structures.agg(relate, structures=self.structures,
+        relation_seq = slice_structures.agg(relate_structures, structures=self.structures,
                                             axis='columns')
         # Get the overall relationship for the two structures by merging the
         # relationships for the individual slices.
         relation_binary = merge_rel(relation_seq)
-        self.relationship_type = identify_type(relation_binary)
+        self.relationship_type = identify_relation(relation_binary)
         return relation_binary
 
 
@@ -1071,7 +1120,7 @@ class StructureDiagram:
         RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
                                     'dir': 'both', 'penwidth': 6,
                                     'color': 'green'},
-        RelationshipType.INCORPORATES: {'label': 'Group', 'style': 'tapered',
+        RelationshipType.PARTITION: {'label': 'Group', 'style': 'tapered',
                                         'dir': 'forward', 'penwidth': 6,
                                         'color': 'white'},
         RelationshipType.CONTAINS: {'label': 'Contains', 'style': 'tapered',
@@ -1183,77 +1232,6 @@ class StructureDiagram:
         node_style = node_attributes.get('style', '')
         return 'invis' in node_style
 
-# %% Future functions
-# Tuples to Strings
-def colour_text(roi_colour):
-    colour_fmt = ''.join([
-        f'({roi_colour[0]:0d}, ',
-        f'{roi_colour[1]:0d}, ',
-        f'{roi_colour[2]:0d})'
-        ])
-    return colour_fmt
+# %% Debugging Display functions
+# Eventually move these functions to their own module
 
-
-def com_text(com):
-    com_fmt = ''.join([
-        f'({com[0]:-5.2f}, ',
-        f'{com[1]:-5.2f}, ',
-        f'{com[2]:-5.2f})'
-        ])
-    return com_fmt
-
-
-def bin_format(bin_val: int):
-    bin_str = bin(bin_val)
-    if len(bin_str) < 29:
-        zero_pad = 29 - len(bin_str)
-        bin_str = bin_str[0:2] + '0' * zero_pad + bin_str[2:]
-    bin_fmt = '{bin1:^11s} | {bin2:^11s} | {bin3:^11s}'
-    bin_dict = {
-        'bin1': bin_str[2:11],
-        'bin2': bin_str[11:20],
-        'bin3': bin_str[20:29]
-        }
-    return bin_fmt.format(**bin_dict)
-
-
-def plot_ab(*, poly_a=None, poly_b=None, poly_c=None):
-    fig = plt.figure(1, figsize=(2,1))
-    ax = fig.add_subplot(121)
-    ax.set_axis_off()
-    ax.axis('equal')
-    if poly_a:
-        p = plot_polygon(poly_a, ax=ax, add_points=False, color='blue', facecolor='blue')
-    if poly_b:
-        p = plot_polygon(poly_b, ax=ax, add_points=False, color='green', facecolor='green')
-    if poly_c:
-        p = plot_polygon(poly_c, ax=ax, add_points=False, color='orange', facecolor='orange')
-
-
-def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
-                  num_points: int = 16, precision=3)->list[tuple[float, float]]:
-    deg_step = radians(360/num_points)
-    degree_points = np.arange(stop=radians(360), step=deg_step)
-    x_coord = np.array([round(radius*sin(d), precision) for d in degree_points])
-    y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
-
-    x_coord = x_coord + offset_x
-    y_coord = y_coord + offset_y
-    coords = [(x,y) for x,y in zip(x_coord,y_coord)]
-    return coords
-
-
-def box_points(width:float, height: float = None, offset_x: float = 0,
-               offset_y: float = 0) -> list[tuple[float, float]]:
-    x1_unit = width / 2
-    if not height:
-        y1_unit = x1_unit
-    else:
-        y1_unit = height / 2
-    coords = [
-        ( x1_unit + offset_x,  y1_unit + offset_y),
-        ( x1_unit + offset_x, -y1_unit + offset_y),
-        (-x1_unit + offset_x, -y1_unit + offset_y),
-        (-x1_unit + offset_x,  y1_unit + offset_y)
-        ]
-    return coords
