@@ -68,14 +68,14 @@ def plot_ab(poly_a, poly_b):
     def plot_geom(ax, geom, color='black'):
         if isinstance(geom, (shapely.Polygon, shapely.MultiPolygon)):
             plot_polygon(geom, ax=ax, add_points=False, color=color, facecolor=color)
-        elif isinstance(geom, (shapely.LineString, shapely.MultiLineString, 
+        elif isinstance(geom, (shapely.LineString, shapely.MultiLineString,
                                shapely.LinearRing, shapely.LinearRing)):
             plot_line(geom, ax=ax, add_points=False, color=color)
         elif isinstance(geom, shapely.GeometryCollection):
             # plot each of the geometry objects in the collection
             for g in geom.geoms:
                 plot_geom(ax, g, color)
-        
+
     fig = plt.figure(1, figsize=(2,1))
     ax = fig.add_subplot(121)
     ax.set_axis_off()
@@ -94,7 +94,7 @@ def relation_example(a, b, relation_test):
     r = relate(a,b)
     print('Relation Binary', bin_format(r))
     print('Relationship', relation_test.test(relate(a,b)))
-    a = plot_ab(a.contour, b.contour)
+    plot_ab(a.contour, b.contour)
 
 
 # %% Contour Creation Functions
@@ -162,26 +162,26 @@ def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
 #        slice_table = slice_index.unstack()
 #        slice_table.columns = slice_table.columns.droplevel()
 #        return slice_table
-# 
+#
 #    slice_index = build_contour_index(contour_sets)
 #    slice_table = form_table(slice_index)
 #    contour_slices = slice_table.apply(slice_spacing)
 #    return contour_slices
-# 
-# 
+#
+#
 # def build_contour_index(contour_sets: Dict[int, ContourSet])->pd.DataFrame:
 #    '''Build an index of structures in a contour set.
-# 
+#
 #    The table columns contain the structure names, the ROI number, and the
 #    slice positions where the contours for that structure are located.  There
 #    is one row for each slice and structure on that slice.  Multiple contours
 #    for a single structure on a given slice, have only one row in teh contour
 #    index
-# 
+#
 #    Args:
 #        contour_sets (Dict[int, RS_DICOM_Utilities.ContourSet]): A dictionary
 #            of structure data.
-# 
+#
 #    Returns:
 #        pd.DataFrame: An index of structures in a contour set indication which
 #            slices contains contours for each structure.
@@ -197,4 +197,4 @@ def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
 #    name_lookup.name = 'StructureID'
 #    slice_lookup = pd.DataFrame(name_lookup).join(slice_seq, how='outer')
 #    return slice_lookup
-# 
+#

@@ -1,25 +1,26 @@
 * {border-collapse: collapse;
-    background-color: white;
+    /*background-color: white;*/
+    background-color: #193549
 }
 
 thead th {
-    font-style: italic; 
+    font-style: italic;
     font-weight: bold;
     border: 2px solid black;
 }
 
-td {border: 1px solid black; 
+td {border: 1px solid black;
     padding: 10px;
     font-weight: normal;
-} 
+}
 
 img {width: 96px; height: 96px;}
 
 table.f td, table.f th {
-    border: 2px solid black; 
+    border: 2px solid black;
     padding-bottom: 10px;
     text-align: center;
-}    
+}
 
 /* Styles for the label header of the table*/
 tr.l th:first-child {
@@ -29,7 +30,7 @@ tr.l th:first-child {
     border-bottom-style: hidden;
 }
 tr.l th:last-child {
-    font-weight: 300; 
+    font-weight: 300;
     font-size: 80%;
     text-align: right;
     border-left-style: hidden;
@@ -41,14 +42,14 @@ tr.l th:last-child {
 }
 
 /* The a and b classes are used to color references to a sn b shapes*/
-.a {font-weight: bold; color: blue;}   
+.a {font-weight: bold; color: blue;}
 .b {font-weight: bold; color: green;}
 
 .na {font-size: 1.5em; font-weight: bold;}
 
 /* The matrix class style create square brackets around a relationship matrix. */
 .matrix {
-    position: relative; 
+    position: relative;
     padding: 0px 0px;
     margin: 0px 0px 0px 10px;
 }
