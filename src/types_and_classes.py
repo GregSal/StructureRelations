@@ -17,6 +17,7 @@ from collections import defaultdict
 from math import sqrt, pi, sin, cos, tan, radians
 from statistics import mean
 from itertools import zip_longest
+from itertools import product
 
 # Shared Packages
 import numpy as np
@@ -38,26 +39,44 @@ StructurePair =  Tuple[ROI_Num, ROI_Num]
 
 
 # Global Settings
-PRECISION = 3
+PRECISION = 2
 
 
 # %% Utility functions
-def poly_round(polygon: shapely.Polygon, precision: int = 2)->shapely.Polygon:
+def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Polygon:
     '''Round the coordinates of a polygon to the specified precision.
 
     Args:
         polygon (shapely.Polygon): The polygon to clean.
-    
-        precision (int): The number of decimal points to round to.
+
+        precision (int, optional): The number of decimal points to round to.
+            Defaults to global PRECISION constant.
 
     Returns:
-        shapely.Polygon: The supplied polygon with all coordinate points 
+        shapely.Polygon: The supplied polygon with all coordinate points
             rounded to the supplied precision.
     '''
-    polygon_points = [(round(x,precision), round(y,precision)) 
+    polygon_points = [(round(x,precision), round(y,precision))
                       for x,y in shapely.get_coordinates(polygon)]
     clean_poly = shapely.Polygon(polygon_points)
     return clean_poly
+
+
+def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
+    '''Round the coordinates of a polygon to the specified precision.
+
+    Args:
+        point (shapely.Point): A shapely point.
+
+        precision (int, optional): The number of decimal points to round to.
+            Defaults to global PRECISION value.
+
+    Returns:
+        List[float]: A list of rounded point coordinates.
+    '''
+    x, y = shapely.get_coordinates(point)[0]
+    clean_coords = (round(x,precision), round(y,precision))
+    return clean_coords
 
 
 # %% StructureSlice Class
@@ -404,6 +423,107 @@ class Structure():
 
 
 # %% Metric Classes
+def broadcast_coords(center: np.array,
+                        limits: np.array) -> list[np.array]:
+    '''Create points at each of the 4 limits, aligned with center_coords.
+
+    Each limit value in limits is placed into an xy pair along with the
+    appropriate x or y values from center_coords.
+
+    Args:
+        center_coords (np.array): length 2 array of float with center
+            coordinates.
+
+    limits (np.array): length 4 array of float with x and y limits.
+
+    precision (int, optional): The number of decimal points to round to.
+        Defaults to global PRECISION constant.
+
+Returns:
+    list[np.array]: A list of xy coordinate pairs at the specified limits,
+        which can form orthogonal lines crossing through the center point.
+    '''
+    xy_pairs = [None] * 4
+    for i in range(2):
+        # Start with center coordinates as the xy pairs.
+        xy_pairs[i * 2] = center.copy()
+        xy_pairs[i * 2 + 1] = center.copy()
+        for j in range(2):
+            idx = i * 2 + j
+            # replace the appropriate x or y value with one of the limits.
+            xy_pairs[idx][j] = limits[i][j]
+    return xy_pairs
+
+
+def length_between(line: shapely.LineString,
+                    poly_a: Contour, poly_b: Contour)->float:
+    '''Calculate the length of the line between poly_a and poly_b.
+
+    Args:
+        line (shapely.LineString): A line passing through both poly_a and
+            poly_b.
+        poly_a (Contour): The outer polygon.
+        poly_b (Contour): A polygon contained within poly_a
+
+    Returns:
+        float: The length of the line segment that lies between the outside
+            of poly_b and the outside of poly_a
+    '''
+    # Remove the part of the line inside of poly_b
+    line_outside_b = shapely.difference(line, poly_b)
+    # Remove the part of the line outside of poly_a
+    line_between_ab = shapely.intersection(line_outside_b, poly_a)
+    return shapely.length(line_between_ab)
+
+
+def orthogonal_margins(poly_a: Contour, poly_b: Contour,
+                       precision: int = PRECISION)->Dict[str, float]:
+    '''Calculate the orthogonal margins between poly_a and poly_b.
+
+    The orthogonal margins are the distances between the exterior of poly_b and
+    the boundary of poly_a along lines that are parallel to the x and y axes and
+    cross the centre point of poly_b.
+
+    Args:
+        poly_a (Contour): The outer polygon.
+        poly_b (Contour): A polygon contained within poly_a
+        precision (int, optional): _description_. Defaults to PRECISION.
+
+    Returns:
+        Dict[str, float]: A dictionary containing the orthogonal margins in
+            each direction. The keys of the dictionary are:
+                ['x_min', 'y_min', 'x_max', 'y_max']
+    '''
+    # The maximum extent of polygon a in orthogonal directions.
+    a_limits = np.array(poly_a.bounds).reshape((2,-1))
+    # Coordinates of the centre of polygon b.
+    b_center = (shapely.centroid(poly_b))
+    center_coords = shapely.get_coordinates(b_center)[0]
+    # Points at the maximum extent of a in line with the centre of b.
+    end_points = broadcast_coords(center_coords, a_limits)
+    orthogonal_lengths = {}
+    labels = ['x_min', 'y_min', 'x_max', 'y_max']
+    for label, limit_point in zip(labels, end_points):
+        # Make a line between the center of b and the limit of a.
+        line = shapely.LineString([limit_point, center_coords])
+        # Get the length of that line between the edges of b and a.
+        length = length_between(line, a.contour, b.contour)
+        orthogonal_lengths[label] = round(length, precision)
+    return orthogonal_lengths
+
+
+# TODO This is probably the function to use as a class method
+def perpendicular_margins(poly_a: StructureSlice,
+                          poly_b: StructureSlice,
+                          precision: int = PRECISION)->List[Dict[str, float]]:
+    margins = []
+    for polygon_a, polygon_b in product(poly_a.contour.geoms,
+                                        poly_b.contour.geoms):
+        if polygon_a.contains(polygon_b):
+            margins.append(orthogonal_margins(polygon_a, polygon_b, precision))
+    return margins
+
+
 class MetricType(Enum):
     MARGIN = auto()
     DISTANCE = auto()
@@ -649,14 +769,14 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
 
 def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)->int:
     '''Get the 27 bit relationship integer for two structures on a given slice.
-    
+
     Args:
         slice_structures (pd.DataFrame): A table of structures, where
             the values are the contours with type StructureSlice. The
             column index contains the roi numbers for the structures.
             The row index contains the slice index distances.
 
-        structures (StructurePair): A tuple of ROI numbers which index 
+        structures (StructurePair): A tuple of ROI numbers which index
             columns in slice_structures.
     Returns:
         int: An integer corresponding to a 27 bit binary value
@@ -1234,4 +1354,3 @@ class StructureDiagram:
 
 # %% Debugging Display functions
 # Eventually move these functions to their own module
-
