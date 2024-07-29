@@ -26,6 +26,7 @@ table.f td, table.f th {
 tr.l th:first-child {
     font-weight: 900;
     font-size: 150%;
+    text-align: left;
     border-right-style: hidden;
     border-bottom-style: hidden;
 }
