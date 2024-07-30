@@ -712,7 +712,7 @@ class RelationshipType(Enum):
     SURROUNDS = auto()
     SHELTERS = auto()
     BORDERS = auto()
-    CONFINES = auto()
+    BORDERS_INTERIOR = auto()
     OVERLAPS = auto()
     PARTITION = auto()
     CONTAINS = auto()
@@ -806,7 +806,7 @@ def identify_relation(relation_binary) -> RelationshipType:
         Disjoint          FF*FF****     FF*FF****       FF*FF****
         Shelters          FF*FF****     FF*FF****       T***F*F**
         Surrounds         FF*FF****     T***F*F**
-        Confines          FF*FT****     T***T****
+        Borders_Interior  FF*FT****     T***T****
         Borders           FF*FT****     FF*FT****
         Contains	      T*T*F*FF*
         Incorporates	  T*T*T*FF*
@@ -823,15 +823,15 @@ def identify_relation(relation_binary) -> RelationshipType:
     '''
     # Relationship Test Definitions
     test_binaries = [
-        RelationshipTest(RelationshipType.SURROUNDS, 0b000000000100010110110110000, 0b000000000100000000000000000),
-        RelationshipTest(RelationshipType.SHELTERS,  0b111000100110110000110110000, 0b111000000000000000000000000),
-        RelationshipTest(RelationshipType.DISJOINT,  0b110110000110110000110110000, 0b000000000000000000000000000),
-        RelationshipTest(RelationshipType.BORDERS,   0b000000000001001110110110000, 0b000000000001001110000010000),
-        RelationshipTest(RelationshipType.CONFINES,  0b000000000101010110110110000, 0b000000000101000000000010000),
-        RelationshipTest(RelationshipType.OVERLAPS,  0b000000000000000000101000100, 0b000000000000000000101000100),
-        RelationshipTest(RelationshipType.PARTITION, 0b000000000000000000101010110, 0b000000000000000000101010000),
-        RelationshipTest(RelationshipType.CONTAINS,  0b000000000000000000101010110, 0b000000000000000000101000000),
-        RelationshipTest(RelationshipType.EQUALS,    0b000000000000000000101001110, 0b000000000000000000100000000)
+        RelationshipTest(RelationshipType.SURROUNDS,        0b000000000100010110110110000, 0b000000000100000000000000000),
+        RelationshipTest(RelationshipType.SHELTERS,         0b111000100110110000110110000, 0b111000000000000000000000000),
+        RelationshipTest(RelationshipType.DISJOINT,         0b110110000110110000110110000, 0b000000000000000000000000000),
+        RelationshipTest(RelationshipType.BORDERS,          0b000000000001001110110110000, 0b000000000001001110000010000),
+        RelationshipTest(RelationshipType.BORDERS_INTERIOR, 0b000000000101010110110110000, 0b000000000101000000000010000),
+        RelationshipTest(RelationshipType.OVERLAPS,         0b000000000000000000101000100, 0b000000000000000000101000100),
+        RelationshipTest(RelationshipType.PARTITION,        0b000000000000000000101010110, 0b000000000000000000101010000),
+        RelationshipTest(RelationshipType.CONTAINS,         0b000000000000000000101010110, 0b000000000000000000101000000),
+        RelationshipTest(RelationshipType.EQUALS,           0b000000000000000000101001110, 0b000000000000000000100000000)
         ]
     for rel_def in test_binaries:
         result = rel_def.test(relation_binary)
@@ -877,7 +877,7 @@ class Relationship():
     metric_match = {
         RelationshipType.DISJOINT: DistanceMetric,
         RelationshipType.BORDERS: OverlapSurfaceMetric,
-        RelationshipType.CONFINES: OverlapSurfaceMetric,
+        RelationshipType.BORDERS_INTERIOR: OverlapSurfaceMetric,
         RelationshipType.OVERLAPS: OverlapAreaMetric,
         RelationshipType.PARTITION: OverlapAreaMetric,
         RelationshipType.SHELTERS: MarginMetric,
@@ -887,11 +887,13 @@ class Relationship():
         RelationshipType.UNKNOWN: NoMetric,
         }
 
-    def __init__(self, slice_table: pd.DataFrame, structures: StructurePair,
-                 **kwargs) -> None:
+    def __init__(self, structures: StructurePair,
+                 slice_table: pd.DataFrame = None, **kwargs) -> None:
         self.is_logical = False
         self.show = True
         self.metric = None
+        if not slice_table:
+            slice_table = pd.DataFrame()
         # Sets the is_logical and metric attributes, if supplied.  Ignores any
         # other items in kwargs.
         self.set(**kwargs)
@@ -905,7 +907,6 @@ class Relationship():
             self.relationship_type = RelationshipType[kwargs['relationship']]
         else:
             self.identify_relationship(slice_table)
-
         self.get_metric()
 
     def set(self, **kwargs):
@@ -1136,7 +1137,7 @@ class StructureDiagram:
         RelationshipType.BORDERS: {'label': 'Borders', 'style': 'dashed',
                                    'dir': 'both', 'penwidth': 3,
                                    'color': 'green'},
-        RelationshipType.CONFINES: {'label': 'Cut-out', 'style': 'tapered',
+        RelationshipType.BORDERS_INTERIOR: {'label': 'Cut-out', 'style': 'tapered',
                                     'dir': 'forward', 'penwidth': 3,
                                     'color': 'magenta'},
         RelationshipType.OVERLAPS: {'label': 'Overlaps', 'style': 'tapered',
