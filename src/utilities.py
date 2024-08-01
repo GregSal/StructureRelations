@@ -111,7 +111,7 @@ def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
     return coords
 
 
-def box_points(width:float, height: float = None, offset_x: float = 0,
+def box_points(width: float, height: float = None, offset_x: float = 0,
                offset_y: float = 0) -> list[tuple[float, float]]:
     x1_unit = width / 2
     if not height:
