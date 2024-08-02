@@ -90,13 +90,6 @@ def plot_ab(poly_a, poly_b):
     plt.show()
 
 
-def relation_example(a, b, relation_test):
-    r = relate(a,b)
-    print('Relation Binary', bin_format(r))
-    print('Relationship', relation_test.test(relate(a,b)))
-    plot_ab(a.contour, b.contour)
-
-
 # %% Contour Creation Functions
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
