@@ -76,7 +76,7 @@ def plot_ab(poly_a, poly_b):
             for g in geom.geoms:
                 plot_geom(ax, g, color)
 
-    fig = plt.figure(1, figsize=(2,1))
+    fig = plt.figure(1, figsize=(4,2))
     ax = fig.add_subplot(121)
     ax.set_axis_off()
     ax.axis('equal')
