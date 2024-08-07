@@ -126,6 +126,21 @@ def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
     return slices
 
 
+def make_sphere():
+    pass
+
+
+def make_vertical_cylinder():
+    pass
+
+def make_horizontal_cylinder():
+    pass
+
+def make_box():
+    pass
+
+
+
 def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
                         contours: List[Contour]):
     data_list = []
@@ -141,7 +156,36 @@ def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
     return slice_data
 
 
-# %% Retired fucntions
+def make_slice_table(slice_data: pd.DataFrame)->pd.DataFrame:
+    slice_table = slice_data.unstack('ROI Num')
+    slice_table.columns = slice_table.columns.droplevel()
+    return slice_table
+
+
+def slice_spacing(contour):
+    # Index is the slice position of all slices in the image set
+    # Columns are structure IDs
+    # Values are the distance (INF) to the next contour
+    inf = contour.dropna().index.min()
+    sup = contour.dropna().index.max()
+    contour_range = (contour.index <= sup) & (contour.index >= inf)
+    slices = contour.loc[contour_range].dropna().index.to_series()
+    gaps = slices.shift(-1) - slices
+    return gaps
+
+
+def c_type(obj):
+    if isinstance(obj, StructureSlice):
+        n = str(type(obj.contour))
+        s = n.replace('shapely.geometry.', '')
+    else:
+        s = str(type(obj))
+    s = s.replace('<class ', '')
+    s = s.replace('>', '')
+    return s
+
+
+# %% Retired functions
 # slice_table = slice_data.index.to_frame()
 # slice_table = slice_table['Slice Index'].unstack('ROI Num')
 # contour_slices = slice_table.apply(slice_spacing)
