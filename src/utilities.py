@@ -2,10 +2,11 @@
 # %% Imports
 # Type imports
 
+from itertools import chain
 from typing import List, Tuple, Dict
 
 # Standard Libraries
-from math import sin, cos, radians
+from math import ceil, sin, cos, radians, sqrt
 
 
 # Shared Packages
@@ -90,7 +91,38 @@ def plot_ab(poly_a, poly_b):
     plt.show()
 
 
+def plot_roi(slice_table, roi_list: List[int]):
+    def make_array(slice_table, roi_num: List[int]):
+        all_points = []
+        for slice, structure_slice in slice_table[roi_num].dropna().items():
+            poly = structure_slice.contour
+            points = [tuple(p) for p in chain(shapely.get_coordinates(poly))]
+            xy = np.array(points)
+            num_points = np.size(xy, 0)
+            z = np.ones((num_points, 1)) * slice
+            xyz = np.concatenate([xy, z], axis=1)
+            all_points.append(xyz)
+        point_array = np.concatenate(all_points, axis=0)
+        return point_array
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.set_aspect('equal')
+    color_list = ['red', 'blue', 'green', 'yellow']
+    for i, roi in enumerate(roi_list):
+        data = make_array(slice_table, roi)
+        ax.plot(data[:,0], data[:,1], data[:,2], linestyle='none', marker='.',
+                color=color_list[i])
+    plt.show()
+
+
 # %% Contour Creation Functions
+def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
+    slices = [round(SliceIndex(num*spacing + start), PRECISION)
+              for num in range(number)]
+    return slices
+
+
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
@@ -101,6 +133,27 @@ def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
     x_coord = x_coord + offset_x
     y_coord = y_coord + offset_y
     coords = [(x,y) for x,y in zip(x_coord,y_coord)]
+    return coords
+
+
+def circle_x_points(radius: float, x_list: List[float],
+                    offset_x: float = 0, offset_y: float = 0,
+                    precision=3)->list[tuple[float, float]]:
+    coords_pos = []
+    coords_neg = []
+    for x in x_list:
+        x0 = x - offset_x
+        try:
+            y = sqrt(radius**2 - x0**2)
+        except ValueError:
+            y=np.nan
+        else:
+            y_pos = round(offset_y + y, precision)
+            y_neg = round(offset_y - y, precision)
+        coords_pos.append((x, y_pos))
+        coords_neg.append((x, y_neg))
+    coords_neg.reverse()
+    coords = coords_pos + coords_neg[1:]
     return coords
 
 
@@ -120,14 +173,41 @@ def box_points(width: float, height: float = None, offset_x: float = 0,
     return coords
 
 
-def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
-    slices = [round(SliceIndex(num*spacing + start), PRECISION)
-              for num in range(number)]
-    return slices
+def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
+                precision=3)->Dict[SliceIndex, tuple[float, float]]:
+    number_slices = ceil(radius * 2 / spacing) + 1
+    start_slice = - radius
+    z_coord = make_slice_list(number_slices, start_slice, spacing)
+    r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision+1)
+    # Generate circle for each slices
+    slice_data = {}
+    for slice_idx, radius in r_coord:
+        slice_points = circle_points(radius, offset_x, offset_y, num_points,
+                                      precision)
+        slice_data[SliceIndex(slice_idx)] = slice_points
+    return slice_data
 
 
-def make_sphere():
-    pass
+def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
+                precision=3, roi_num=0)->list[tuple[float, float]]:
+    slice_list = []
+    points_dict = sphere_points(radius, spacing, num_points,
+                                offset_x, offset_y, offset_z, precision)
+    for slice_idx, xy_points in points_dict.items():
+        slice_contour = shapely.Polygon(xy_points)
+        roi_slice = {'ROI Num': roi_num,
+                     'Slice Index': SliceIndex(slice_idx),
+                     'Structure Slice': StructureSlice([slice_contour])}
+        slice_list.append(roi_slice)
+    slice_contours = pd.DataFrame(slice_list)
+    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_contours
+# %%|
+
+
+
 
 
 def make_vertical_cylinder():
