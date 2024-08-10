@@ -123,6 +123,12 @@ def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
     return slices
 
 
+def make_slice_table(slice_data: pd.DataFrame)->pd.DataFrame:
+    slice_table = slice_data.unstack('ROI Num')
+    slice_table.columns = slice_table.columns.droplevel()
+    return slice_table
+
+
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
@@ -191,7 +197,7 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
 
 def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3, roi_num=0)->list[tuple[float, float]]:
+                precision=3, roi_num=0)->pd.DataFrame:
     slice_list = []
     points_dict = sphere_points(radius, spacing, num_points,
                                 offset_x, offset_y, offset_z, precision)
@@ -199,48 +205,38 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
         slice_contour = shapely.Polygon(xy_points)
         roi_slice = {'ROI Num': roi_num,
                      'Slice Index': SliceIndex(slice_idx),
-                     'Structure Slice': StructureSlice([slice_contour])}
+                     'Contour': slice_contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
     slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
     return slice_contours
+
+
+def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
+                           num_points: int = 16, offset_x: float = 0,
+                           offset_y: float = 0, offset_z: float = 0,
+                           precision=PRECISION, roi_num=0)->pd.DataFrame:
+    number_slices = ceil(length / spacing)
+    z_coord = make_slice_list(number_slices, offset_z, spacing)
+    xy_points = circle_points(radius, offset_x, offset_y, num_points, precision)
+    contour = shapely.Polygon(xy_points)
+    slice_list = []
+    for slice_idx in z_coord:
+        roi_slice = {'ROI Num': roi_num,
+                     'Slice Index': SliceIndex(slice_idx),
+                     'Contour': contour}
+        slice_list.append(roi_slice)
+    slice_contours = pd.DataFrame(slice_list)
+    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_contours
+
+
 # %%|
-
-
-
-
-
-def make_vertical_cylinder():
-    pass
-
 def make_horizontal_cylinder():
     pass
 
 def make_box():
     pass
-
-
-
-def make_contour_slices(roi_num: ROI_Num, slices: List[SliceIndex],
-                        contours: List[Contour]):
-    data_list = []
-    for slice_idx in slices:
-        data_item = {
-            'ROI Num': roi_num,
-            'Slice Index': SliceIndex(slice_idx),
-            'Structure Slice': StructureSlice(contours)
-            }
-        data_list.append(data_item)
-    slice_data = pd.DataFrame(data_list)
-    slice_data.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_data
-
-
-def make_slice_table(slice_data: pd.DataFrame)->pd.DataFrame:
-    slice_table = slice_data.unstack('ROI Num')
-    slice_table.columns = slice_table.columns.droplevel()
-    return slice_table
-
 
 def slice_spacing(contour):
     # Index is the slice position of all slices in the image set
@@ -263,6 +259,44 @@ def c_type(obj):
     s = s.replace('<class ', '')
     s = s.replace('>', '')
     return s
+
+
+
+# %% Test plot function not working
+
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
+#import numpy as np
+#from scipy.interpolate import griddata
+#
+#def plot_3d_surface(x, y, z):
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111, projection='3d')
+#
+#    # Convert lists to numpy arrays
+#    x = np.array(x)
+#    y = np.array(y)
+#    z = np.array(z)
+#
+#    # Create grid data for the surface plot
+#    xi = np.linspace(x.min(), x.max(), 100)
+#    yi = np.linspace(y.min(), y.max(), 100)
+#    xi, yi = np.meshgrid(xi, yi)
+#    zi = griddata((x, y), z, (xi, yi), method='cubic')
+#
+#    # Plot the surface
+#    surf = ax.plot_surface(xi, yi, zi, cmap='viridis')
+#
+#    ax.set_xlabel('X axis')
+#    ax.set_ylabel('Y axis')
+#    ax.set_zlabel('Z axis')
+#
+#    plt.show()
+
+
+
+
+
 
 
 # %% Retired functions
