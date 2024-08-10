@@ -261,6 +261,17 @@ def c_type(obj):
     return s
 
 
+def type_table(sr):
+    def f(ss):
+        if isinstance(ss, StructureSlice):
+            obj_str = c_type(ss.contour)
+            type_str = '\n'.join(c_type(poly) for poly in ss.contour.geoms)
+            return type_str
+        return c_type(ss)
+
+    type_str = sr.map(f)
+    lbl_dict = {idx: type_lbl for idx, type_lbl in type_str.items()}
+    return lbl_dict
 
 # %% Test plot function not working
 

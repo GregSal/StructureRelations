@@ -31,15 +31,19 @@ import pygraphviz as pgv
 import networkx as nx
 
 
-# %%| Type definitions and Globals
+# %% Type definitions and Globals
 ROI_Num = int  # Index to structures defined in Structure RT DICOM file
 SliceIndex = float
 Contour = shapely.Polygon
 StructurePair =  Tuple[ROI_Num, ROI_Num]
 
-
 # Global Settings
-PRECISION = 2
+PRECISION = 3
+
+# Exception Types
+class StructuresException(Exception): pass
+class InvalidContour(ValueError, StructuresException): pass
+class InvalidContourRelation(ValueError, StructuresException): pass
 
 
 # %% Utility functions
@@ -63,7 +67,7 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
 
 
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
-    '''Round the coordinates of a polygon to the specified precision.
+    '''Round the coordinates of a shapley point to the specified precision.
 
     Args:
         point (shapely.Point): A shapely point.
@@ -105,7 +109,7 @@ class StructureSlice():
         hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
             surrounding the contour MultiPolygon.
     '''
-    def __init__(self, contours: List[shapely.Polygon]) -> None:
+    def __init__(self, contours: List[shapely.Polygon], **kwargs) -> None:
         '''Iteratively create a shapely MultiPolygon from a list of shapely
         Polygons.
 
@@ -118,11 +122,19 @@ class StructureSlice():
             contours (List[shapely.Polygon]): A list of polygons to be merged
             into a single MultiPolygon.
         '''
+        if 'precision' in kwargs:
+            self.precision = kwargs['precision']
+        else:
+            self.precision = PRECISION
+        if 'ignore_errors' in kwargs:
+            ignore_errors = kwargs['ignore_errors']
+        else:
+            ignore_errors = False
         self.contour = shapely.MultiPolygon()
         for contour in contours:
-            self.add_contour(contour)
+            self.add_contour(contour, ignore_errors=ignore_errors)
 
-    def add_contour(self, contour: shapely.Polygon) -> None:
+    def add_contour(self, contour: shapely.Polygon, ignore_errors=False) -> None:
         '''Add a shapely Polygon to the current MultiPolygon from a list of shapely
         Polygons.
 
@@ -141,7 +153,15 @@ class StructureSlice():
                 existing MultiPolygon.
         '''
         # Apply requisite rounding to polygon
-        contour_round = poly_round(contour, PRECISION)
+        contour_round = poly_round(contour, self.precision)
+        # Check for valid contour
+        if not shapely.is_valid(contour_round):
+            if ignore_errors:
+                # TODO Add optional text stream / function to receive warning
+                # messages when contours are skipped.
+                return
+            error_str = shapely.is_valid_reason(contour_round)
+            raise InvalidContour(error_str)
         # Check for non-overlapping structures
         if self.contour.disjoint(contour_round):
             # Combine non-overlapping structures
@@ -151,7 +171,9 @@ class StructureSlice():
             # Subtract hole contour
             new_contours = self.contour.difference(contour_round)
         else:
-            raise ValueError('Cannot merge overlapping contours.')
+            if ignore_errors:
+                return
+            raise InvalidContourRelation('Cannot merge overlapping contours.')
         # Enforce the MultiPolygon type for self.contour
         if isinstance(new_contours, shapely.MultiPolygon):
             self.contour = new_contours
