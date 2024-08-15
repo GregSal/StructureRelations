@@ -7,13 +7,29 @@ vector = Tuple[float, float, float]
 import Part
 
 # %% Functions
-def make_sphere(doc: App.Document, part_name: str, radius: float, offset: vector)->Part.Feature:
-    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
-    sphere = Part.makeSphere(radius * 10, placement)
+def make_structure(doc: App.Document, shape: Part.Shape,
+                   part_name: str)->Part.Feature:
     struct = doc.addObject("Part::Feature", part_name)
     struct.Label = part_name
-    struct.Shape = sphere
+    struct.Shape = shape
     doc.recompute()
+    return struct
+
+
+def make_sphere(doc: App.Document, part_name: str, radius: float,
+                offset: vector)->Part.Feature:
+    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
+    sphere = Part.makeSphere(radius * 10, placement)
+    struct = make_structure(doc, sphere, part_name)
+    return struct
+
+
+def make_cylinder(doc: App.Document, part_name: str,
+                  radius: float, height: float,
+                  offset: vector, direction: vector)->Part.Feature:
+    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
+    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, direction)
+    struct = make_structure(doc, cylinder, part_name)
     return struct
 
 
@@ -56,6 +72,7 @@ def interactions(doc, struct_a, struct_b):
     b_only = find_exclusion(doc, struct_b, struct_a, b_color, b_label)
     both = find_overlapping(doc, struct_a, struct_b, both_color, both_label)
     return a_only, b_only, both
+
 
 # Cropped views
 def crop_dir(cropping_size, direction):
@@ -113,8 +130,6 @@ def crop_orth(a_only, b_only, both, direction):
     #Gui.ActiveDocument.ActiveView.setAxisCross(False)
 
 
-
-
 #crop_box.DrawStyle = u"Dotted"
 #crop_box.DisplayMode = u"Wireframe"
 #struct_1.ViewObject.Transparency = transparency
@@ -134,15 +149,27 @@ def crop_orth(a_only, b_only, both, direction):
 #file_path = save_path + "//" + file_name + ".FCStd"
 ##doc = App.getDocument(file_name)
 #App.activeDocument().saveAs(file_path)
+
+
 # %% Main
 Gui.activateWorkbench("PartWorkbench")
 doc = App.newDocument()
 
-# Make Structures
-struct_a = make_sphere(doc, 'A', 3, (0, 0, 0))
-struct_b = make_sphere(doc, 'B', 2, (0, 0, 0))
+# Make Test Structures
+cylinder6 = make_cylinder(doc, '1', 6.0, 10.0, (0, 0, 0), (0, 0, 1))
+cylinder4 = make_cylinder(doc, '2', 4.0, 10.0, (0, 0, 0), (0, 0, 1))
+sphere5 = make_sphere(doc, '3', 5, (0, 0, 0))
+sphere2 = make_sphere(doc, '4', 2, (0, 0, 0))
 
-# Color interatctions
+outer_sphere = Part.makeSphere(6 * 10)
+hole = Part.makeSphere(4 * 10)
+inner_sphere = Part.makeSphere(3 * 10)
+embeded_spheres_part = outer_sphere.cut(hole).union(inner_sphere)
+embeded_spheres = make_structure(doc, embeded_spheres_part, '5')
+
+
+# %% Crop Views
+# Color interactions
 a_only, b_only, both = interactions(doc, struct_a, struct_b)
 struct_a.Visibility = False
 struct_b.Visibility = False
