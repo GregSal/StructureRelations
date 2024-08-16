@@ -133,9 +133,10 @@ def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
     degree_points = np.arange(stop=radians(360), step=deg_step)
+    if radius == 0:
+        radius = 10**(-precision)
     x_coord = np.array([round(radius*sin(d), precision) for d in degree_points])
     y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
-
     x_coord = x_coord + offset_x
     y_coord = y_coord + offset_y
     coords = [(x,y) for x,y in zip(x_coord,y_coord)]
@@ -152,7 +153,7 @@ def circle_x_points(radius: float, x_list: List[float],
         try:
             y = sqrt(radius**2 - x0**2)
         except ValueError:
-            y=np.nan
+            y = 10**(-precision)
         else:
             y_pos = round(offset_y + y, precision)
             y_neg = round(offset_y - y, precision)
@@ -164,8 +165,10 @@ def circle_x_points(radius: float, x_list: List[float],
 
 
 def box_points(width: float, height: float = None, offset_x: float = 0,
-               offset_y: float = 0) -> list[tuple[float, float]]:
+               offset_y: float = 0, precision=3) -> list[tuple[float, float]]:
     x1_unit = width / 2
+    if x1_unit == 0:
+        x1_unit = 10**(-precision)
     if not height:
         y1_unit = x1_unit
     else:
@@ -183,7 +186,7 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
                 precision=3)->Dict[SliceIndex, tuple[float, float]]:
     number_slices = ceil(radius * 2 / spacing) + 1
-    start_slice = - radius
+    start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices, start_slice, spacing)
     r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision+1)
     # Generate circle for each slices
@@ -191,6 +194,21 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
     for slice_idx, radius in r_coord:
         slice_points = circle_points(radius, offset_x, offset_y, num_points,
                                       precision)
+        slice_data[SliceIndex(slice_idx)] = slice_points
+    return slice_data
+
+
+def cylinder_points(radius: float, length: float, spacing: float = 0.1,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
+                precision=3)->Dict[SliceIndex, tuple[float, float]]:
+    number_slices = ceil(radius * 2 / spacing) + 1
+    start_slice = offset_z - radius
+    z_coord = make_slice_list(number_slices, start_slice, spacing)
+    r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision)
+    # Generate circle for each slices
+    slice_data = {}
+    for slice_idx, r in r_coord:
+        slice_points = box_points(r, length, offset_x, offset_y, precision)
         slice_data[SliceIndex(slice_idx)] = slice_points
     return slice_data
 
@@ -231,10 +249,25 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
     return slice_contours
 
 
-# %%|
-def make_horizontal_cylinder():
-    pass
+def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
+                             offset_x: float = 0, offset_y: float = 0,
+                             offset_z: float = 0, precision=PRECISION,
+                             roi_num=0)->pd.DataFrame:
+    slice_list = []
+    points_dict = cylinder_points(radius, length, spacing,
+                                   offset_x, offset_y, offset_z, precision)
+    for slice_idx, xy_points in points_dict.items():
+        slice_contour = shapely.Polygon(xy_points)
+        roi_slice = {'ROI Num': roi_num,
+                     'Slice Index': SliceIndex(slice_idx),
+                     'Contour': slice_contour}
+        slice_list.append(roi_slice)
+    slice_contours = pd.DataFrame(slice_list)
+    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_contours
 
+
+# %%
 def make_box():
     pass
 

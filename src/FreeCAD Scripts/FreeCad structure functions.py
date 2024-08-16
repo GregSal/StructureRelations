@@ -6,6 +6,7 @@ from typing import Tuple
 vector = Tuple[float, float, float]
 import Part
 
+save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
 # %% Functions
 def make_structure(doc: App.Document, shape: Part.Shape,
                    part_name: str)->Part.Feature:
@@ -156,16 +157,63 @@ Gui.activateWorkbench("PartWorkbench")
 doc = App.newDocument()
 
 # Make Test Structures
-cylinder6 = make_cylinder(doc, '1', 6.0, 10.0, (0, 0, 0), (0, 0, 1))
-cylinder4 = make_cylinder(doc, '2', 4.0, 10.0, (0, 0, 0), (0, 0, 1))
+cylinder6 = make_cylinder(doc, '1', 6.0, 10.0,
+                          App.Vector(0, 0, 0), App.Vector(0, 0, 1))
+cylinder4 = make_cylinder(doc, '2', 4.0, 10.0,
+                          App.Vector(0, 0, 0), App.Vector(0, 0, 1))
 sphere5 = make_sphere(doc, '3', 5, (0, 0, 0))
 sphere2 = make_sphere(doc, '4', 2, (0, 0, 0))
 
 outer_sphere = Part.makeSphere(6 * 10)
 hole = Part.makeSphere(4 * 10)
 inner_sphere = Part.makeSphere(3 * 10)
-embeded_spheres_part = outer_sphere.cut(hole).union(inner_sphere)
+embeded_spheres_part = outer_sphere.cut(hole).fuse(inner_sphere)
 embeded_spheres = make_structure(doc, embeded_spheres_part, '5')
+
+cylinderH2 = make_cylinder(doc, '6', 6.0, 10.0,
+                          App.Vector(0, 0, 0), App.Vector(1, 0, 0))
+cylinderH1 = make_cylinder(doc, '7', 4.0, 10.0,
+                          App.Vector(0, 0, 0), App.Vector(1, 0, 0))
+
+# %% Structures 1 & 2
+a_only, b_only, both = interactions(doc, cylinder6, cylinder4)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.runCommand('Std_ViewCreate',0)
+crop_orth(a_only, b_only, both, 'X')
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(False)
+file_path = save_path + "//" + 'ConcentricCylinders' + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+
+
+# %% Structures 5 & 4
+a_only, b_only, both = interactions(doc, embeded_spheres, sphere2)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.runCommand('Std_ViewCreate',0)
+crop_orth(a_only, b_only, both, 'X')
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(False)
+
+file_path = save_path + "//" + 'EmbeddedSpheres' + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+
+
+# %% Structures 6 & 7
+a_only, b_only, both = interactions(doc, cylinderH6, cylinderH4)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.runCommand('Std_ViewCreate',0)
+crop_orth(a_only, b_only, both, 'Z')
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(False)
+
+file_path = save_path + "//" + 'HorizontalCylinders' + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
 
 
 # %% Crop Views
@@ -188,3 +236,15 @@ crop_orth(a_only, b_only, both, 'Y')
 # Z Axis Crop
 Gui.runCommand('Std_ViewCreate',0)
 crop_orth(a_only, b_only, both, 'Z')
+
+
+# %% Save
+file_path = save_path + "//" + file_name + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+
+#save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
+file_name = 'ContainsTests'
+file_path = save_path + "//" + file_name + ".FCStd"
+
+App.activeDocument().saveAs(file_path)
+##doc = App.getDocument(file_name)
