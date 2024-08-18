@@ -8,6 +8,18 @@ import Part
 
 save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
 # %% Functions
+def add_measurement(start, end, offset):
+    m1 = doc.addObject("App::MeasureDistance", 'm1')
+    m1.P1 = App.Vector(start[0] * 10, start[1] * 10, start[2] * 10)
+    m1.P2 = App.Vector(end[0] * 10, end[1] * 10, end[2] * 10)
+    m1.ViewObject.LineColor = (0,0,0)
+    m1.ViewObject.TextColor = (0,0,0)
+    m1.ViewObject.FontSize = 30
+    m1.ViewObject.DistFactor = offset
+    m1.Distance
+    return m1
+
+
 def make_structure(doc: App.Document, shape: Part.Shape,
                    part_name: str)->Part.Feature:
     struct = doc.addObject("Part::Feature", part_name)
@@ -145,15 +157,77 @@ def crop_orth(a_only, b_only, both, direction):
 #file_path = save_path + "//" + file_name + ".png"
 #Gui.ActiveDocument.ActiveView.saveImage(file_path)
 
-#save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
 #file_name = 'TestSpheres'
 #file_path = save_path + "//" + file_name + ".FCStd"
 ##doc = App.getDocument(file_name)
 #App.activeDocument().saveAs(file_path)
 
 
-# %% Main
+# %% Stacked Spheres1
 Gui.activateWorkbench("PartWorkbench")
+doc = App.newDocument()
+
+sup_placement = App.Vector(0, 0, 4.0 * 10)
+inf_placement = App.Vector(0, 0, -4.0 * 10)
+inf2_placement = App.Vector(0, 0, -12.0 * 10)
+sphere3_sup = Part.makeSphere(3.0 * 10, sup_placement)
+sphere3_inf = Part.makeSphere(3.0 * 10, inf_placement)
+sphere3_inf2 = Part.makeSphere(3.0 * 10, inf2_placement)
+stacked_spheres_part = sphere3_sup.fuse(sphere3_inf)
+stacked_spheres_part = stacked_spheres_part.fuse(sphere3_inf2)
+stacked_spheres = make_structure(doc, stacked_spheres_part, '0')
+
+sphere2_inf = make_sphere(doc, '1', 2, (0, 0, -4.0))
+#cylinder2 = make_cylinder(doc, '1', 2.0, 10.0, App.Vector(0, 0, 0), App.Vector(0, 0, 1))
+
+a_only, b_only, both = interactions(doc, stacked_spheres, sphere2_inf)
+doc.recompute()
+#Gui.runCommand('Std_ViewCreate',0)
+crop_orth(a_only, b_only, both, 'X')
+#Gui.ActiveDocument.ActiveView.setAxisCross(False)
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+file_name = 'StackedSpheres1'
+file_path = save_path + "//" + file_name + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+#
+file_path = save_path + "//" + file_name + ".FCStd"
+App.activeDocument().saveAs(file_path)
+# %% Stacked Spheres2
+Gui.activateWorkbench("PartWorkbench")
+doc = App.newDocument()
+
+sup_placement = App.Vector(0, 0, 4.0 * 10)
+inf_placement = App.Vector(0, 0, -4.0 * 10)
+inf2_placement = App.Vector(0, 0, -12.0 * 10)
+sphere3_sup = Part.makeSphere(3.0 * 10, sup_placement)
+sphere3_inf = Part.makeSphere(3.0 * 10, inf_placement)
+sphere3_inf2 = Part.makeSphere(3.0 * 10, inf2_placement)
+stacked_spheres_part = sphere3_sup.fuse(sphere3_inf)
+stacked_spheres_part = stacked_spheres_part.fuse(sphere3_inf2)
+stacked_spheres = make_structure(doc, stacked_spheres_part, '0')
+
+sphere2_inf = make_sphere(doc, '1', 2, (0, 0, -3.5))
+#cylinder2 = make_cylinder(doc, '1', 2.0, 10.0, App.Vector(0, 0, 0), App.Vector(0, 0, 1))
+
+a_only, b_only, both = interactions(doc, stacked_spheres, sphere2_inf)
+doc.recompute()
+#Gui.runCommand('Std_ViewCreate',0)
+crop_orth(a_only, b_only, both, 'X')
+#Gui.ActiveDocument.ActiveView.setAxisCross(False)
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+file_path = save_path + "//" + 'StackedSpheres2' + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+
+
+
+
+
+# %% Main
+ppGui.activateWorkbench("PartWorkbench")
 doc = App.newDocument()
 
 # Make Test Structures
