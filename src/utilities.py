@@ -16,18 +16,12 @@ import matplotlib.pyplot as plt
 import shapely
 from shapely.plotting import plot_polygon, plot_line
 
+from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_round
+from types_and_classes import InvalidContour
+
 from types_and_classes import StructureSlice, relate
 
-
-
-# %%| Type definitions and Globals
-ROI_Num = int  # Index to structures defined in Structure RT DICOM file
-SliceIndex = float
-Contour = shapely.Polygon
-StructurePair =  Tuple[ROI_Num, ROI_Num]
-
-
-# Global Settings
+# Global Default Settings
 PRECISION = 3
 
 
@@ -116,19 +110,118 @@ def plot_roi(slice_table, roi_list: List[int]):
     plt.show()
 
 
-# %% Contour Creation Functions
-def make_slice_list(number: int, start: float = 0.0, spacing: float = 0.1):
-    slices = [round(SliceIndex(num*spacing + start), PRECISION)
-              for num in range(number)]
+def c_type(obj):
+    if isinstance(obj, StructureSlice):
+        n = str(type(obj.contour))
+        s = n.replace('shapely.geometry.', '')
+    else:
+        s = str(type(obj))
+    s = s.replace('<class ', '')
+    s = s.replace('>', '')
+    return s
+
+
+def type_table(sr):
+    def f(ss):
+        if isinstance(ss, StructureSlice):
+            obj_str = c_type(ss.contour)
+            type_str = '\n'.join(c_type(poly) for poly in ss.contour.geoms)
+            return type_str
+        return c_type(ss)
+
+    type_str = sr.map(f)
+    lbl_dict = {idx: type_lbl for idx, type_lbl in type_str.items()}
+    return lbl_dict
+
+
+# %% Slice related functions
+def make_slice_list(height: float = None, number_slices: int = None,
+                    start: float = 0.0, spacing: float = 0.1,
+                    precision=PRECISION):
+    if height:
+        if number_slices:
+            spacing = height / number_slices
+        else:
+            number_slices = ceil(height / spacing)
+    elif not number_slices:
+        msg = 'At least one of height or number_slices must be specified.'
+        raise ValueError(msg)
+    slices = [round(SliceIndex(num*spacing + start), precision)
+              for num in range(number_slices)]
     return slices
 
 
-def make_slice_table(slice_data: pd.DataFrame)->pd.DataFrame:
-    slice_table = slice_data.unstack('ROI Num')
-    slice_table.columns = slice_table.columns.droplevel()
+def slice_spacing(contour):
+    # Index is the slice position of all slices in the image set
+    # Columns are structure IDs
+    # Values are the distance (INF) to the next contour
+    inf = contour.dropna().index.min()
+    sup = contour.dropna().index.max()
+    contour_range = (contour.index <= sup) & (contour.index >= inf)
+    slices = contour.loc[contour_range].dropna().index.to_series()
+    gaps = slices.shift(-1) - slices
+    return gaps
+
+
+def make_slice_table(slice_data: pd.DataFrame, ignore_errors=False)->pd.DataFrame:
+    def merge_contours(slice_contours: pd.DataFrame, ignore_errors=False):
+        ranked_contours = slice_contours.sort_values('Area', ascending=False)
+        try:
+            structure_slice = StructureSlice(list(ranked_contours.Contour),
+                                             ignore_errors=ignore_errors)
+        except InvalidContour as err:
+            msg = err.__str__()
+            roi_num = ranked_contours.index[0][0]
+            slice_idx = ranked_contours.index[0][1]
+            print(f'{msg}\t for ROI: {roi_num} on slice: {slice_idx}')
+            structure_slice = None
+        return structure_slice
+
+    sorted_data = slice_data.sort_index(level=['Slice Index', 'ROI Num']).copy()
+    sorted_data['Area'] = sorted_data.map(lambda x: x.area)
+    structure_group = sorted_data.groupby(level=['Slice Index', 'ROI Num'])
+    structure_data = structure_group.apply(merge_contours,
+                                           ignore_errors=ignore_errors)
+    slice_table = structure_data.unstack('ROI Num')
     return slice_table
 
 
+def build_slice_spacing_table(slice_table)->pd.DataFrame:
+    # Find distance between slices with contours
+    def get_slices(structure: pd.Series):
+        used_slices = structure.dropna().index.to_series()
+        return used_slices
+
+    contour_slices = slice_table.apply(get_slices)
+    slice_spacing_data = contour_slices.apply(slice_spacing)
+    return slice_spacing_data
+
+
+def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
+                       shift_start=0):
+    ref = slice_index[missing_slices]
+    ref_missing = list(missing_slices)
+    shift_size = shift_start
+    while ref_missing:
+        shift_size += shift_direction
+        shift_slice = slice_index.shift(shift_size)[missing_slices]
+        ref_idx = ref.isin(ref_missing)
+        ref[ref_idx] = shift_slice[ref_idx]
+        ref_missing = list(set(ref) & set(missing_slices))
+        ref_missing.sort()
+    return ref
+
+def find_neighbouring_slice(structure_slices):
+    slice_index = structure_slices.index.to_series()
+    missing_slices = slice_index[structure_slices.isna()]
+    z_neg = neighbouring_slice(slice_index, missing_slices, shift_direction=-1)
+    z_pos = neighbouring_slice(slice_index, missing_slices, shift_direction=1)
+    ref = pd.concat([z_pos, z_neg], axis='columns')
+    ref.columns = ['z_pos', 'z_neg']
+    return ref
+
+
+# %% Contour Creation Functions
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
@@ -187,7 +280,8 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
                 precision=3)->Dict[SliceIndex, tuple[float, float]]:
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
-    z_coord = make_slice_list(number_slices, start_slice, spacing)
+    z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
+                              start=start_slice, precision=precision)
     r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision+1)
     # Generate circle for each slices
     slice_data = {}
@@ -203,7 +297,8 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
                 precision=3)->Dict[SliceIndex, tuple[float, float]]:
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
-    z_coord = make_slice_list(number_slices, start_slice, spacing)
+    z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
+                              start=start_slice, precision=precision)
     r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision)
     # Generate circle for each slices
     slice_data = {}
@@ -234,8 +329,8 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
                            num_points: int = 16, offset_x: float = 0,
                            offset_y: float = 0, offset_z: float = 0,
                            precision=PRECISION, roi_num=0)->pd.DataFrame:
-    number_slices = ceil(length / spacing)
-    z_coord = make_slice_list(number_slices, offset_z, spacing)
+    z_coord = make_slice_list(height=length, spacing=spacing, start=offset_z,
+                              precision=precision)
     xy_points = circle_points(radius, offset_x, offset_y, num_points, precision)
     contour = shapely.Polygon(xy_points)
     slice_list = []
@@ -267,129 +362,38 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
     return slice_contours
 
 
-# %%
-def make_box():
-    pass
-
-def slice_spacing(contour):
-    # Index is the slice position of all slices in the image set
-    # Columns are structure IDs
-    # Values are the distance (INF) to the next contour
-    inf = contour.dropna().index.min()
-    sup = contour.dropna().index.max()
-    contour_range = (contour.index <= sup) & (contour.index >= inf)
-    slices = contour.loc[contour_range].dropna().index.to_series()
-    gaps = slices.shift(-1) - slices
-    return gaps
-
-
-def c_type(obj):
-    if isinstance(obj, StructureSlice):
-        n = str(type(obj.contour))
-        s = n.replace('shapely.geometry.', '')
-    else:
-        s = str(type(obj))
-    s = s.replace('<class ', '')
-    s = s.replace('>', '')
-    return s
+def make_box(width: float, length: float, height: float, spacing: float = 0.1,
+             offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
+             precision=PRECISION, roi_num=0)->pd.DataFrame:
+    z_coord = make_slice_list(height=height, spacing=spacing, start=offset_z,
+                              precision=precision)
+    xy_points = box_points(width, length, offset_x, offset_y, precision)
+    contour = shapely.Polygon(xy_points)
+    slice_list = []
+    for slice_idx in z_coord:
+        roi_slice = {'ROI Num': roi_num,
+                     'Slice Index': SliceIndex(slice_idx),
+                     'Contour': contour}
+        slice_list.append(roi_slice)
+    slice_contours = pd.DataFrame(slice_list)
+    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_contours
 
 
-def type_table(sr):
-    def f(ss):
-        if isinstance(ss, StructureSlice):
-            obj_str = c_type(ss.contour)
-            type_str = '\n'.join(c_type(poly) for poly in ss.contour.geoms)
-            return type_str
-        return c_type(ss)
-
-    type_str = sr.map(f)
-    lbl_dict = {idx: type_lbl for idx, type_lbl in type_str.items()}
-    return lbl_dict
-
-# %% Test plot function not working
-
-#import matplotlib.pyplot as plt
-#from mpl_toolkits.mplot3d import Axes3D
-#import numpy as np
-#from scipy.interpolate import griddata
-#
-#def plot_3d_surface(x, y, z):
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111, projection='3d')
-#
-#    # Convert lists to numpy arrays
-#    x = np.array(x)
-#    y = np.array(y)
-#    z = np.array(z)
-#
-#    # Create grid data for the surface plot
-#    xi = np.linspace(x.min(), x.max(), 100)
-#    yi = np.linspace(y.min(), y.max(), 100)
-#    xi, yi = np.meshgrid(xi, yi)
-#    zi = griddata((x, y), z, (xi, yi), method='cubic')
-#
-#    # Plot the surface
-#    surf = ax.plot_surface(xi, yi, zi, cmap='viridis')
-#
-#    ax.set_xlabel('X axis')
-#    ax.set_ylabel('Y axis')
-#    ax.set_zlabel('Z axis')
-#
-#    plt.show()
-
-
-
-
-
-
-
-# %% Retired functions
-# slice_table = slice_data.index.to_frame()
-# slice_table = slice_table['Slice Index'].unstack('ROI Num')
-# contour_slices = slice_table.apply(slice_spacing)
-
-
-# def build_slice_table(contour_sets)->pd.DataFrame:
-#    def form_table(slice_index):
-#        slice_index.reset_index(inplace=True)
-#        slice_index.sort_values('Slice', inplace=True)
-#        slice_index.set_index(['Slice','StructureID'], inplace=True)
-#        slice_table = slice_index.unstack()
-#        slice_table.columns = slice_table.columns.droplevel()
-#        return slice_table
-#
-#    slice_index = build_contour_index(contour_sets)
-#    slice_table = form_table(slice_index)
-#    contour_slices = slice_table.apply(slice_spacing)
-#    return contour_slices
-#
-#
-# def build_contour_index(contour_sets: Dict[int, ContourSet])->pd.DataFrame:
-#    '''Build an index of structures in a contour set.
-#
-#    The table columns contain the structure names, the ROI number, and the
-#    slice positions where the contours for that structure are located.  There
-#    is one row for each slice and structure on that slice.  Multiple contours
-#    for a single structure on a given slice, have only one row in teh contour
-#    index
-#
-#    Args:
-#        contour_sets (Dict[int, RS_DICOM_Utilities.ContourSet]): A dictionary
-#            of structure data.
-#
-#    Returns:
-#        pd.DataFrame: An index of structures in a contour set indication which
-#            slices contains contours for each structure.
-#    '''
-#    slice_ref = {}
-#    name_ref = {}
-#    for structure in contour_sets.values():
-#        slice_ref[structure.roi_num] = list(structure.contours.keys())
-#        name_ref[structure.roi_num] = structure.structure_id
-#    slice_seq = pd.Series(slice_ref).explode()
-#    slice_seq.name = 'Slice'
-#    name_lookup = pd.Series(name_ref)
-#    name_lookup.name = 'StructureID'
-#    slice_lookup = pd.DataFrame(name_lookup).join(slice_seq, how='outer')
-#    return slice_lookup
-#
+def make_contour_slices(shape: shapely.Polygon, spacing: float = 0.1,
+                        height: float = None, number_slices: int = None,
+                        offset_z: float = 0, precision=PRECISION,
+                        roi_num=0)->pd.DataFrame:
+    z_coord = make_slice_list(height=height, number_slices=number_slices,
+                              spacing=spacing, start=offset_z,
+                              precision=precision)
+    contour = poly_round(shape, precision)
+    slice_list = []
+    for slice_idx in z_coord:
+        roi_slice = {'ROI Num': roi_num,
+                     'Slice Index': SliceIndex(slice_idx),
+                     'Contour': contour}
+        slice_list.append(roi_slice)
+    slice_contours = pd.DataFrame(slice_list)
+    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
+    return slice_contours
