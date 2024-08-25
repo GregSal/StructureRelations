@@ -24,12 +24,11 @@ import pydicom
 import matplotlib.pyplot as plt
 import shapely
 from shapely.plotting import plot_polygon, plot_line
-import pygraphviz as pgv
 import networkx as nx
 
-from types_and_classes import InvalidContourRelation, StructureSlice, relate
+from types_and_classes import InvalidContourRelation
 from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair
-from types_and_classes import RelationshipType
+from types_and_classes import StructureSlice, RelationshipType
 
 # Global Settings
 PRECISION = 3

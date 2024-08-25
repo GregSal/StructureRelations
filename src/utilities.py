@@ -19,8 +19,8 @@ from shapely.plotting import plot_polygon, plot_line
 from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_round
 from types_and_classes import InvalidContour
 
-from types_and_classes import StructureSlice, relate
-
+from types_and_classes import StructureSlice
+from relations import relate
 # Global Default Settings
 PRECISION = 3
 
@@ -222,6 +222,23 @@ def find_neighbouring_slice(structure_slices):
 
 
 # %% Contour Creation Functions
+def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
+    '''Round the coordinates of a shapley point to the specified precision.
+
+    Args:
+        point (shapely.Point): A shapely point.
+
+        precision (int, optional): The number of decimal points to round to.
+            Defaults to global PRECISION value.
+
+    Returns:
+        List[float]: A list of rounded point coordinates.
+    '''
+    x, y = shapely.get_coordinates(point)[0]
+    clean_coords = (round(x,precision), round(y,precision))
+    return clean_coords
+
+
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
                   num_points: int = 16, precision=3)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
