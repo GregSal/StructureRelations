@@ -194,6 +194,18 @@ class StructureSlice():
         hull = shapely.convex_hull(self.contour)
         return shapely.MultiPolygon([hull])
 
+    @property
+    def area(self)-> float:
+        '''The area encompassed by the convex hulls of each polygon on the
+        slice.
+
+        Returns:
+            float: _description_
+        '''
+        solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
+        solid = shapely.unary_union(solids)
+        return solid.area
+
 
 # %% Relationship Functions
 class RelationshipType(Enum):
@@ -215,5 +227,9 @@ class RelationshipType(Enum):
             return False
         return True
 
+    @property
+    def label(self):
+        return self.name.capitalize()
+
     def __str__(self):
-        return f'Relationship: {self.name.capitalize()}'
+        return f'Relationship: {self.label}'
