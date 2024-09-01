@@ -211,6 +211,7 @@ def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
         ref_missing.sort()
     return ref
 
+
 def find_neighbouring_slice(structure_slices):
     slice_index = structure_slices.index.to_series()
     missing_slices = slice_index[structure_slices.isna()]
@@ -219,6 +220,19 @@ def find_neighbouring_slice(structure_slices):
     ref = pd.concat([z_pos, z_neg], axis='columns')
     ref.columns = ['z_pos', 'z_neg']
     return ref
+
+
+def boundary_slices(structure_slices: pd.Series):
+    used_slices = ~structure_slices.isna()
+    start = used_slices & (used_slices ^ used_slices.shift(1))
+    end = used_slices & (used_slices ^ used_slices.shift(-1))
+    start_slices = pd.Series(structure_slices[start].index, name='Start')
+    end_slices = pd.Series(structure_slices[end].index, name='End')
+    boundaries = pd.concat([start_slices, end_slices], axis='columns')
+    boundaries['ROI Num'] = structure_slices.name
+    boundaries.set_index('ROI Num', inplace=True)
+    boundaries = boundaries.T
+    return boundaries
 
 
 # %% Contour Creation Functions
