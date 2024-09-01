@@ -339,10 +339,12 @@ class Relationship():
     def is_transitive(self)-> bool:
         return self.relationship_type in self.transitive_relations
 
-    def set_structures(self, structures: StructurePair) -> None:
+    def set_structures(self, structures: StructurePair,
+                       slice_table: pd.DataFrame = pd.DataFrame()) -> None:
         # FIXME Stub method to be replaced with set_structures function.
         # Order the structures with the larger one first
-        self.structures = structures
+        if slice_table.empty:
+            self.structures = structures
 
     def identify_relationship(self, slice_table: pd.DataFrame) -> None:
         '''Get the 27 bit relationship integer for two structures,
