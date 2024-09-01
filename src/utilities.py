@@ -222,16 +222,13 @@ def find_neighbouring_slice(structure_slices):
     return ref
 
 
-def boundary_slices(structure_slices: pd.Series):
+def find_boundary_slices(structure_slices: pd.Series):
     used_slices = ~structure_slices.isna()
     start = used_slices & (used_slices ^ used_slices.shift(1))
     end = used_slices & (used_slices ^ used_slices.shift(-1))
-    start_slices = pd.Series(structure_slices[start].index, name='Start')
-    end_slices = pd.Series(structure_slices[end].index, name='End')
-    boundaries = pd.concat([start_slices, end_slices], axis='columns')
-    boundaries['ROI Num'] = structure_slices.name
-    boundaries.set_index('ROI Num', inplace=True)
-    boundaries = boundaries.T
+    start_slices = list(structure_slices[start].index)
+    end_slices = list(structure_slices[end].index)
+    boundaries = start_slices + end_slices
     return boundaries
 
 
