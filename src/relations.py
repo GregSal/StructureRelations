@@ -27,23 +27,21 @@ from shapely.plotting import plot_polygon, plot_line
 import pygraphviz as pgv
 import networkx as nx
 
-from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_round
+from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair
+from types_and_classes import DE9IM_Value, DE27IM_Value
+from types_and_classes import poly_round
 from types_and_classes import InvalidContour
 from types_and_classes import StructureSlice, RelationshipType
 from metrics import MarginMetric, DistanceMetric, NoMetric
 from metrics import OverlapAreaMetric, OverlapSurfaceMetric
+from utilities import find_boundary_slices
 
-# %% Type definitions and Globals
-ROI_Num = int  # Index to structures defined in Structure RT DICOM file
-SliceIndex = float
-Contour = shapely.Polygon
-StructurePair =  Tuple[ROI_Num, ROI_Num]
 
 # Global Settings
 PRECISION = 3
 
 def compare(mpoly1: shapely.MultiPolygon,
-            mpoly2: shapely.MultiPolygon)->str:
+            mpoly2: shapely.MultiPolygon)->DE9IM_Value:
     '''Get the DE-9IM relationship string for two contours
 
     The relationship string is converted to binary format, where 'F'
@@ -56,7 +54,7 @@ def compare(mpoly1: shapely.MultiPolygon,
             structure on the same slice.
 
     Returns:
-        str: A length 9 string '1's and '0's reflecting the DE-9IM
+        DE9IM_Value: A length 9 string of '1's and '0's reflecting the DE-9IM
             relationship between the supplied contours.
     '''
     relation_str = shapely.relate(mpoly1, mpoly2)
@@ -66,7 +64,7 @@ def compare(mpoly1: shapely.MultiPolygon,
     return relation_bool
 
 
-def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
+def relate(contour1: StructureSlice, contour2: StructureSlice)->DE27IM_Value:
     '''Get the 27 bit relationship integer for two polygons,
 
     When written in binary, the 27 bit relationship contains 3 9-bit
@@ -85,10 +83,9 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
             The row index contains the slice index distances.
 
     Returns:
-        int: An integer corresponding to a 27 bit binary value
-            reflecting the combined DE-9IM relationship between the
-            second contour and the struct1 convex hull, exterior and
-            contour.
+        DE9IM_Value: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between contour2 and
+            contour1's convex hull, exterior and polygon.
     '''
     primary_relation = compare(contour1.contour, contour2.contour)
     external_relation = compare(contour1.exterior, contour2.contour)
@@ -100,7 +97,8 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->int:
     return binary_relation
 
 
-def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)->int:
+def relate_structures(slice_structures: pd.DataFrame,
+                      structures: StructurePair)->DE9IM_Value:
     '''Get the 27 bit relationship integer for two structures on a given slice.
 
     Args:
@@ -112,9 +110,9 @@ def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)
         structures (StructurePair): A tuple of ROI numbers which index
             columns in slice_structures.
     Returns:
-        int: An integer corresponding to a 27 bit binary value
+        DE9IM_Value: An integer corresponding to a 27 bit binary value
             reflecting the combined DE-9IM relationship between the
-            second contour and the struct1 convex hull, exterior and
+            second contour and the first contour convex hull, exterior and
             contour.
     '''
     structure = slice_structures[structures[0]]
@@ -123,17 +121,104 @@ def relate_structures(slice_structures: pd.DataFrame, structures: StructurePair)
     return binary_relation
 
 
-def relate_structs(slice_table: pd.DataFrame, structures: StructurePair) -> int:
+def adjust_slice_boundary_relations(relation_seq: pd.Series,
+                                    structures: StructurePair,
+                                    boundary_slices: pd.DataFrame)->pd.Series:
+    '''Adjust the DE-9IM relationship metric for the boundary slices of both
+    structures.
+
+    For the beginning and ending slices of a structure the entire contour must
+    be treated as a boundary.  The structure does not have an interior on these
+    slices. In this case the “Interior” relations become “Boundary” relations.
+    For the `b` structure the, first three values of the DE-9IM relationship
+    metric are shifted to become the second three.  For the `a` structure,
+    every third value of the DE-9IM relationship metric is shifted by 1.
+
+    Args:
+        relation_seq (pd.Series): A series with SliceIndex as the index and
+            DE-9IM relationship metrics as the values.
+        structures (StructurePair): A tuple of ROI numbers which index
+            columns in boundary_slices.
+        boundary_slices (pd.DataFrame): _description_
+
+    Returns:
+        pd.Series: The supplied relation_seq with adjusted DE-9IM relationship
+        metrics for the boundary slices of both structures.
+    '''
+    def shift_values(value: DE9IM_Value, mask: DE9IM_Value,
+                     shift: int)->DE9IM_Value:
+        # Select the DE-9IM relationship values related to the interior.
+        interior_relations = value & mask
+        # Select the DE-9IM relationship values related to the exterior.
+        # (Not interior and not Boundary.)
+        value_mask = (mask >> shift) + mask
+        other_relations = value & ~value_mask
+        # Convert the interior relations into corresponding boundary relations.
+        boundary_relations = interior_relations >> shift
+        # Combine the interior (zeros), boundary and exterior values to form
+        # the adjusted DE-9IM relationship metric.
+        relations_bin = boundary_relations + other_relations
+        return relations_bin
+
+    roi_a, roi_b = structures
+    # Boundaries of b
+    # Select the first three values of the DE-9IM relationship metric.
+    b_mask = 0b111000000111000000111000000
+    for boundary_slice in list(boundary_slices[roi_b]):
+        value = relation_seq[boundary_slice]
+        relations_bin = shift_values(value, b_mask, 3)
+        relation_seq[boundary_slice] = relations_bin
+    # Boundaries of a
+    a_mask = 0b100100100100100100100100100
+    for boundary_slice in list(boundary_slices[roi_a]):
+        value = relation_seq[boundary_slice]
+        relations_bin = shift_values(value, a_mask, 1)
+        relation_seq[boundary_slice] = relations_bin
+    return relation_seq
+
+
+def relate_structs(slice_table: pd.DataFrame,
+                   structures: StructurePair)->DE9IM_Value:
+    '''Calculate the overall 27 bit relationship integer for two structures.
+
+    When written in binary, the 27 bit relationship contains 3 9-bit
+    parts corresponding to DE-9IM relationships. The left-most 9 bits
+    are the relationship between the second structure's contour and the
+    first structure's convex hull polygon. The middle 9 bits are the
+    relationship between the second structure's contour and the first
+    structure's exterior polygon (i.e. with any holes filled). The
+    right-most 9 bits are the relationship between the second
+    structure's contour and the first structure's contour.
+
+    Args:
+        slice_table (pd.DataFrame): A table of with StructureSlice or na as the
+            values, SliceIndex as the index and ROI_Num as the Columns.
+
+        structures (StructurePair): A tuple of ROI numbers which index
+            columns in slice_table.
+
+    Returns:
+        DE9IM_Value: An integer corresponding to a 27 bit binary value
+            reflecting the combined DE-9IM relationship between the
+            second contour and the first contour convex hull, exterior and
+            contour.
+    '''
     slice_structures = slice_table.loc[:, [structures[0],
                                            structures[1]]]
     # Remove Slices that have neither structure.
     slice_structures.dropna(how='all', inplace=True)
+    boundary_slices = slice_table.apply(find_boundary_slices)
+
     # For slices that have only one of the two structures, replace the nan
     # values with empty polygons for duck typing.
     slice_structures.fillna(StructureSlice([]), inplace=True)
     # Get the relationships between the two structures for all slices.
-    relation_seq = slice_structures.agg(relate_structures, structures=structures,
+    relation_seq = slice_structures.agg(relate_structures,
+                                        structures=structures,
                                         axis='columns')
+    # Adjust the relationship metrics for the boundary slices of both structures.
+    relation_seq = adjust_slice_boundary_relations(relation_seq, structures,
+                                                   boundary_slices)
      # Get the overall relationship for the two structures by merging the
     # relationships for the individual slices.
     relation_binary = merge_rel(relation_seq)
@@ -371,12 +456,19 @@ class Relationship():
                                                self.structures[1]]]
         # Remove Slices that have neither structure.
         slice_structures.dropna(how='all', inplace=True)
+        boundary_slices = slice_table.apply(find_boundary_slices)
+
         # For slices that have only one of the two structures, replace the nan
         # values with empty polygons for duck typing.
         slice_structures.fillna(StructureSlice([]), inplace=True)
         # Get the relationships between the two structures for all slices.
         relation_seq = slice_structures.agg(relate_structures, structures=self.structures,
                                             axis='columns')
+        # Adjust the relationship metrics for the boundary slices of both structures.
+        relation_seq = adjust_slice_boundary_relations(relation_seq,
+                                                       self.structures,
+                                                       boundary_slices)
+
         # Get the overall relationship for the two structures by merging the
         # relationships for the individual slices.
         relation_binary = merge_rel(relation_seq)
