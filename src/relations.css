@@ -16,6 +16,8 @@ td {border: 1px solid black;
 
 img {width: 96px; height: 96px;}
 
+img.p {width: 310px; height: 185px;}
+
 table.f td, table.f th {
     border: 2px solid black;
     padding-bottom: 10px;
