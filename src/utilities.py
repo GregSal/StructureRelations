@@ -136,7 +136,32 @@ def type_table(sr):
 # %% Slice related functions
 def make_slice_list(height: float = None, number_slices: int = None,
                     start: float = 0.0, spacing: float = 0.1,
-                    precision=PRECISION):
+                    precision=PRECISION) -> List[SliceIndex]:
+    '''Generate a list of SliceIndex with the desired range and increment.
+
+
+    height or number_slices must be provided.
+    If height is supplied then then calculate the spacing from
+            height / number_slices
+        or calculate the number of slices from
+            height / spacing
+    Args:
+        height (float, optional): The distance in cm from start to end.
+            If None, number_slices is required. Defaults to None.
+        number_slices (int, optional): The number of slices to include in the
+            list. If None, height is required. Defaults to None.
+        start (float, optional): The lowest SliceIndex value. Defaults to 0.0.
+        spacing (float, optional): The gap between slices. Not used if both
+            height and number_slices are provided. Defaults to 0.1.
+        precision (int, optional): SliceIndex values are rounded to this number
+            of decimal places.precision. Defaults to PRECISION (3).
+
+    Raises:
+        ValueError: if neither height nor number_slices is provided.
+
+    Returns:
+        List[SliceIndex]: A list of SliceIndex for testing purposes.
+    '''
     if height:
         if number_slices:
             spacing = height / number_slices
@@ -150,20 +175,23 @@ def make_slice_list(height: float = None, number_slices: int = None,
     return slices
 
 
-def slice_spacing(contour):
-    # Index is the slice position of all slices in the image set
-    # Columns are structure IDs
-    # Values are the distance (INF) to the next contour
-    inf = contour.dropna().index.min()
-    sup = contour.dropna().index.max()
-    contour_range = (contour.index <= sup) & (contour.index >= inf)
-    slices = contour.loc[contour_range].dropna().index.to_series()
-    gaps = slices.shift(-1) - slices
-    return gaps
+def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
+    '''Merge contour data to build a table of StructureSlice data
 
+    The table index is SliceIndex, sorted from smallest to largest. The table
+    columns are ROI_Num.
+    Individual structure contours with the same ROI_Num and SliceIndex are
+    merged into a single StructureSlice instance
 
-def make_slice_table(slice_data: pd.DataFrame, ignore_errors=False)->pd.DataFrame:
-    def merge_contours(slice_contours: pd.DataFrame, ignore_errors=False):
+    Args:
+        slice_data (pd.Series): A series of individual structure contours.
+        ignore_errors (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: A table of StructureSlice data with an SliceIndex and
+            ROI_Num as the index and columns respectively.
+    '''
+    def merge_contours(slice_contours: pd.Series, ignore_errors=False):
         ranked_contours = slice_contours.sort_values('Area', ascending=False)
         try:
             structure_slice = StructureSlice(list(ranked_contours.Contour),
@@ -185,7 +213,17 @@ def make_slice_table(slice_data: pd.DataFrame, ignore_errors=False)->pd.DataFram
     return slice_table
 
 
-def build_slice_spacing_table(slice_table)->pd.DataFrame:
+def build_slice_spacing_table(slice_table, shift_direction=-1)->pd.DataFrame:
+    def slice_spacing(contour):
+        # Index is the slice position of all slices in the image set
+        # Columns are structure IDs
+        # Values are the distance (INF) to the next contour
+        inf = contour.dropna().index.min()
+        sup = contour.dropna().index.max()
+        contour_range = (contour.index <= sup) & (contour.index >= inf)
+        slices = contour.loc[contour_range].dropna().index.to_series()
+        gaps = slices.shift(shift_direction) - slices
+        return gaps
     # Find distance between slices with contours
     def get_slices(structure: pd.Series):
         used_slices = structure.dropna().index.to_series()
@@ -196,22 +234,22 @@ def build_slice_spacing_table(slice_table)->pd.DataFrame:
     return slice_spacing_data
 
 
-def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
-                       shift_start=0):
-    ref = slice_index[missing_slices]
-    ref_missing = list(missing_slices)
-    shift_size = shift_start
-    while ref_missing:
-        shift_size += shift_direction
-        shift_slice = slice_index.shift(shift_size)[missing_slices]
-        ref_idx = ref.isin(ref_missing)
-        ref[ref_idx] = shift_slice[ref_idx]
-        ref_missing = list(set(ref) & set(missing_slices))
-        ref_missing.sort()
-    return ref
-
 
 def find_neighbouring_slice(structure_slices):
+    def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
+                        shift_start=0):
+        ref = slice_index[missing_slices]
+        ref_missing = list(missing_slices)
+        shift_size = shift_start
+        while ref_missing:
+            shift_size += shift_direction
+            shift_slice = slice_index.shift(shift_size)[missing_slices]
+            ref_idx = ref.isin(ref_missing)
+            ref[ref_idx] = shift_slice[ref_idx]
+            ref_missing = list(set(ref) & set(missing_slices))
+            ref_missing.sort()
+        return ref
+
     slice_index = structure_slices.index.to_series()
     missing_slices = slice_index[structure_slices.isna()]
     z_neg = neighbouring_slice(slice_index, missing_slices, shift_direction=-1)
