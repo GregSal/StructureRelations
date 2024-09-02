@@ -289,8 +289,7 @@ def get_margins(structures, slice_table: pd.DataFrame,
 
 
 #%% Distance function
-def distances(poly_a: StructureSlice, poly_b: StructureSlice,
-              relation: RelationshipType,
+def distance(poly_a: StructureSlice, poly_b: StructureSlice,
               precision: int = PRECISION)->pd.DataFrame:
     distance_list = []
     # Compare all polygons on the same slice
@@ -300,13 +299,69 @@ def distances(poly_a: StructureSlice, poly_b: StructureSlice,
         boundary_b = polygon_b.exterior
         distance = boundary_a.distance(boundary_b)
         rounded_distance = round(distance, precision)
-        distance_dict = {'distance': rounded_distance}
-        distance_list.append(distance_dict)
+        distance_list.append(rounded_distance)
     if distance_list:
-        return pd.DataFrame(distance_list)
-    return pd.DataFrame()
+        return pd.Series(distance_list, name='Distance')
+    return pd.Series()
 
+def get_z_distance(structures, slice_table, precision=PRECISION):
+    def centred_in(poly: StructureSlice, point: shapely.Point)->bool:
+        return poly.contour.contains(point)
 
+    def has_area(poly: StructureSlice, precision)->bool:
+        area = poly.contour.area
+        #area = round(poly.contour.area, precision)
+        return area > 0
+
+    def get_one_z_distance(slice_structures, structures, precision):
+        roi_a, roi_b = structures
+        # identify the slices containing both structures.
+        slice_structures[[roi_a, roi_b]].isna().apply(all)
+        contour_b_slices = slice_structures[roi_b].dropna()
+        # Get the end contour of the second structure.
+        last_b_contour = contour_b_slices.iloc[0].contour
+        # Identify the edge slice of the second structure.
+        end_slice = contour_b_slices.index[0]
+
+        # Select only the slices containing the first structure.
+        contour_a_slices = slice_structures[roi_a].dropna()
+        # Identify the slices beyond the edge of the second structure.
+        ext = contour_a_slices.index <= end_slice
+        # Get the nearest contour of the first structure.
+        nearest_a_contour = contour_a_slices[ext].iloc[-1].contour
+        # Identify the edge slice of the second structure.
+        end_slice = contour_b_slices.index[0]
+
+        # Identify the slices where the first structure contours contain the centre
+        # point of the end contour of the second structure.
+        aligned = contour_a_slices.apply(centred_in, point=centre_point)
+        # Identify the slices where structure a is present
+        has_a = contour_a_slices.apply(has_area, precision=PRECISION)
+        # Identify the slices where there is a transition from aligned to not aligned.
+        aligned_edge = aligned & ~aligned.shift(1, fill_value=False)
+        struct_edge = has_a & ~has_a.shift(1, fill_value=False)
+        # Select the transition point closest to the edge of the second structure.
+        aligned_lim = aligned[ext][aligned_edge].index[-1]
+        struct_lim = has_a[ext][struct_edge].index[-1]
+        # The margin in the desired direction is the difference between the edge of
+        # the second structure and the corresponding edge of the first structure.
+        aligned_margin = end_slice - aligned_lim
+        struct_margin = end_slice - struct_lim
+        z_lim = {'aligned': round(aligned_margin, precision),
+                 'struct': round(struct_margin, precision)}
+        return z_lim
+
+    roi_a, roi_b = structures
+    slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
+
+    z_neg_margin = get_one_z_margin(slice_structures, structures, precision)
+
+    slice_structures_rev = slice_structures.copy()
+    slice_structures_rev.index = slice_structures_rev.index * -1
+    slice_structures_rev.sort_index(inplace=True)
+    z_pos_margin = get_one_z_margin(slice_structures_rev, structures, precision)
+    margins = {'z_neg': z_neg_margin, 'z_pos': z_pos_margin}
+    return pd.DataFrame(margins).T
 
 # %% Relative volume related functions
 def related_areas(poly_a: StructureSlice,
@@ -467,14 +522,45 @@ class NoMetric(Metric):
 
 
 class DistanceMetric(Metric):
-    '''Distance metric for testing.'''
+    r'''Distance between two structures.
+
+    The shortest distance between any point in a and any point in b.
+
+    **Used By:**
+      - Disjoint
+    '''
     metric_type = MetricType.DISTANCE
     default_format_template = 'Distance:\t{Distance:5.2f}'
 
-    def calculate_metric(self, **kwargs):
-        # FIXME replace this stub with the distance metric function.
-        self.metric = {'Distance': 2.6}
+    def calculate_metric(self, slice_table=pd.DataFrame(),
+                         precision=PRECISION, **kwargs):
+        def get_contour_distance(slice_structures: pd.Series,
+                                 precision=PRECISION):
+            margin_table = distance(slice_structures.iloc[0],
+                                    slice_structures.iloc[1], precision)
+            return margin_table
 
+        roi_a, roi_b = self.structures
+        slice_structures = slice_table.loc[:, [roi_a, roi_b]]
+        # Remove Slices that have neither structure.
+        slice_structures.dropna(how='all', inplace=True)
+        # For slices that have only one of the two structures, replace the nan
+        # values with empty polygons for duck typing.
+        slice_structures.fillna(StructureSlice([]), inplace=True)
+        # Get the relationships between the two structures for all slices.
+        metric_seq = slice_structures.apply(get_contour_margins, axis='columns',
+                                            result_type='expand',
+                                            relation=relation,
+                                            precision=precision)
+        contour_margins = agg_margins(metric_seq)
+        # Add the z margin components
+        z_margins = get_z_margins(self.structures, slice_table, precision)
+        max_margin = max([contour_margins['max'], max(z_margins['struct'])])
+        contour_margins['max'] = max_margin
+        min_margin = min([contour_margins['min'], min(z_margins['struct'])])
+        contour_margins['min'] = min_margin
+        contour_margins = pd.concat([contour_margins, z_margins['aligned']])
+        self.metric = contour_margins.to_dict()
 
 class OverlapSurfaceMetric(Metric):
     '''OverlapSurface metric for testing.'''
@@ -497,7 +583,26 @@ class OverlapAreaMetric(Metric):
 
 
 class MarginMetric(Metric):
-    '''Margin metric for testing.'''
+    r'''Margins Between Structures.
+
+        - $Margin_\perp = bounds(a) − bounds(b)$
+        - $Margin_{min} = distance(a,b)$
+        - $Margin_{max} = distance_{housdorff}(a,b)$
+
+    **Z direction metrics**
+    - Orthogonal:
+      - The distance between the last slice containing $a$ and the last slice
+            of $b$ where the last contour of $a$ overlaps with the contour of $b$
+    - Max:
+      - The larger of $\Delta Z$ or $d_{2D}$
+    - Min:
+      - The Smaller of $d_{min}^{2D}$ and $\Delta Z$,<br>
+
+    **Used By:**
+        - Contains
+        - Surrounds
+        - Shelters
+    '''
     metric_type = MetricType.MARGIN
     orthogonal_format_template = '\n'.join([
         '        {ANT}   {SUP}  ',
@@ -582,7 +687,7 @@ class MarginMetric(Metric):
 
     def calculate_metric(self, slice_table=pd.DataFrame(),
                          relation=RelationshipType.UNKNOWN,
-                         precision=PRECISION, **kwargs)-> str:
+                         precision=PRECISION, **kwargs):
         def get_contour_margins(slice_structures: pd.Series,
                                 relation: RelationshipType,
                                 precision=PRECISION):
@@ -590,6 +695,7 @@ class MarginMetric(Metric):
                                 slice_structures.iloc[1],
                                 relation, precision)
             return margin_table
+
         roi_a, roi_b = self.structures
         slice_structures = slice_table.loc[:, [roi_a, roi_b]]
         # Remove Slices that have neither structure.
