@@ -20,7 +20,6 @@ from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_
 from types_and_classes import InvalidContour
 
 from types_and_classes import StructureSlice
-from relations import relate
 # Global Default Settings
 PRECISION = 3
 
@@ -222,7 +221,20 @@ def find_neighbouring_slice(structure_slices):
     return ref
 
 
-def find_boundary_slices(structure_slices: pd.Series):
+def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndex]:
+    '''Identify the first and last slices of a structure.
+
+    Slices without the structure are identified by `isna()`.
+    In the future, add tests for zero area polygons.
+
+    Args:
+        structure_slices (pd.Series): A series with SliceIndex as the index and
+            StructureSlice or na as the values.
+
+    Returns:
+        List[SliceIndex]: A list of all slice indexes where the structure is
+            not present on a neighbouring slice.
+    '''
     used_slices = ~structure_slices.isna()
     start = used_slices & (used_slices ^ used_slices.shift(1))
     end = used_slices & (used_slices ^ used_slices.shift(-1))
