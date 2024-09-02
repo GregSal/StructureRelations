@@ -405,17 +405,17 @@ class Relationship():
             self.relationship_type = RelationshipType[kwargs['relationship']]
         else:
             self.identify_relationship(slice_table)
-        self.get_metric()
+        self.get_metric(slice_table=slice_table, **kwargs)
 
     def set(self, **kwargs):
         for key, val in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, val)
 
-    def get_metric(self):
+    def get_metric(self, slice_table=pd.DataFrame(), **kwargs):
         # Select the appropriate metric for the identified relationship.
         metric_class = self.metric_match[self.relationship_type]
-        self.metric = metric_class(self.structures)
+        self.metric = metric_class(self.structures, slice_table, **kwargs)
 
     @property
     def is_symmetric(self)-> bool:
