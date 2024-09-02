@@ -40,6 +40,7 @@ from utilities import find_boundary_slices
 # Global Settings
 PRECISION = 3
 
+# %% Functions
 def compare(mpoly1: shapely.MultiPolygon,
             mpoly2: shapely.MultiPolygon)->DE9IM_Value:
     '''Get the DE-9IM relationship string for two contours

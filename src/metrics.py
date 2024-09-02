@@ -88,7 +88,7 @@ def length_between(line: shapely.LineString,
     line_between_ab = shapely.intersection(line_outside_b, exterior_a)
     return shapely.length(line_between_ab)
 
-
+# %% Margin related functions
 def get_z_margins(structures, slice_table, precision=PRECISION):
     def centred_in(poly: StructureSlice, point: shapely.Point)->bool:
         return poly.contour.contains(point)
@@ -256,7 +256,8 @@ def margins(poly_a: StructureSlice, poly_b: StructureSlice,
     return pd.Series()
 
 
-def get_margins(structures, slice_table, relation: RelationshipType,
+def get_margins(structures, slice_table: pd.DataFrame,
+                relation: RelationshipType,
                 precision=PRECISION):
     def get_contour_margins(slice_structures: pd.Series,
                             relation: RelationshipType,
@@ -287,6 +288,7 @@ def get_margins(structures, slice_table, relation: RelationshipType,
     return contour_margins
 
 
+#%% Distance function
 def distances(poly_a: StructureSlice, poly_b: StructureSlice,
               relation: RelationshipType,
               precision: int = PRECISION)->pd.DataFrame:
@@ -306,6 +308,7 @@ def distances(poly_a: StructureSlice, poly_b: StructureSlice,
 
 
 
+# %% Relative volume related functions
 def related_areas(poly_a: StructureSlice,
                   poly_b: StructureSlice)->Dict[str, float]:
     # Total areas of the two Structure Slices
@@ -352,7 +355,7 @@ def volume_ratio(poly_a: StructureSlice, poly_b: StructureSlice,
         ratio = np.nan
     return ratio
 
-
+# %% Relative surface area related functions
 def related_lengths(poly_a: StructureSlice, poly_b: StructureSlice,
                     relation: RelationshipType)->List[shapely.LineString]:
     def get_perimeters(poly_a: StructureSlice, poly_b: StructureSlice):
@@ -418,8 +421,6 @@ class ValueFormat(defaultdict):
         return format_part
 
 
-
-# %% Metric Classes
 class MetricType(Enum):
     MARGIN = auto()
     DISTANCE = auto()
@@ -428,15 +429,16 @@ class MetricType(Enum):
     UNKNOWN = 999  # Used for initialization
 
 
+# %% Metric Classes
 class Metric(ABC):
     # Overwrite these class variables for all subclasses.
     metric_type: MetricType
     default_format_template: str
 
-    def __init__(self, structures: StructurePair):
+    def __init__(self, structures: StructurePair, **kwargs):
         self.structures = structures
         self.metric = {}
-        self.calculate_metric()
+        self.calculate_metric(**kwargs)
         self.format_template = self.default_format_template
 
     def reset_formats(self):
@@ -446,13 +448,12 @@ class Metric(ABC):
         # Overwritten in some subclasses
         # Returns str: Formatted metrics for report and display
         # Default is for single '%' formatted metric value:
-        params = {value_name: value
-                  for value_name, value in self.metric.items()}
+        params = self.metric.copy()
         display_metric = self.format_template.format(**params)
         return display_metric
 
     @abstractmethod
-    def calculate_metric(self)-> str:
+    def calculate_metric(self, **kwargs):
         pass
 
 
@@ -461,7 +462,7 @@ class NoMetric(Metric):
     metric_type = MetricType.UNKNOWN
     default_format_template = 'No Metric'
 
-    def calculate_metric(self)-> str:
+    def calculate_metric(self, **kwargs):
         self.metric = {}
 
 
@@ -470,7 +471,7 @@ class DistanceMetric(Metric):
     metric_type = MetricType.DISTANCE
     default_format_template = 'Distance:\t{Distance:5.2f}'
 
-    def calculate_metric(self)-> str:
+    def calculate_metric(self, **kwargs):
         # FIXME replace this stub with the distance metric function.
         self.metric = {'Distance': 2.6}
 
@@ -480,7 +481,7 @@ class OverlapSurfaceMetric(Metric):
     metric_type = MetricType.OVERLAP_SURFACE
     default_format_template = 'Percentage Overlap:\t{OverlapSurfaceRatio:2.0%}'
 
-    def calculate_metric(self)-> str:
+    def calculate_metric(self, **kwargs):
         # FIXME replace this stub with the OverlapSurface metric function.
         self.metric = {'OverlapSurfaceRatio': 0.23}
 
@@ -490,7 +491,7 @@ class OverlapAreaMetric(Metric):
     metric_type = MetricType.OVERLAP_AREA
     default_format_template = 'Percentage Overlap:\t{OverlapAreaRatio:2.0%}'
 
-    def calculate_metric(self)-> str:
+    def calculate_metric(self, **kwargs):
         # FIXME replace this stub with the OverlapArea metric function.
         self.metric = {'OverlapAreaRatio': 0.15}
 
@@ -498,7 +499,6 @@ class OverlapAreaMetric(Metric):
 class MarginMetric(Metric):
     '''Margin metric for testing.'''
     metric_type = MetricType.MARGIN
-    default_format_template = ''
     orthogonal_format_template = '\n'.join([
         '        {ANT}   {SUP}  ',
         '        ANT  SUP       ',
@@ -511,19 +511,20 @@ class MarginMetric(Metric):
         '  {INF}   {POST}       ',
         ])
     range_format_template = '{MIN}   {MAX}'
+    default_format_template = '\n'.join([orthogonal_format_template,
+                                         range_format_template])
     default_format_dict = {
-        'SUP':  '{sup_margin:3.1f}',
-        'INF':  '{inf_margin:3.1f}',
-        'RT':   '{rt_margin:3.1f}',
-        'LT':   '{lt_margin:3.1f}',
-        'ANT':  '{ant_margin:3.1f}',
-        'POST': '{post_margin:3.1f}',
-        'MIN':  'Min: {min_margin:3.1f}',
-        'MAX':  'Max: {max_margin:3.1f}'
+        'SUP':  '{z_neg:3.1f}',
+        'INF':  '{z_pos:3.1f}',
+        'RT':   '{x_neg:3.1f}',
+        'LT':   '{x_pos:3.1f}',
+        'ANT':  '{y_pos:3.1f}',
+        'POST': '{y_neg:3.1f}',
+        'MIN':  'Min: {min:3.1f}',
+        'MAX':  'Max: {max:3.1f}'
         }
-
-    def __init__(self, structures: StructurePair):
-        super().__init__(structures)
+    def __init__(self, structures: StructurePair, **kwargs):
+        super().__init__(structures, **kwargs)
         self.format_dict = self.default_format_dict.copy()
         self.display_orthogonal_margins = True
         self.display_margin_range = True
@@ -579,15 +580,34 @@ class MarginMetric(Metric):
         display_text = self.format_template.format(**format_params)
         return display_text
 
-    def calculate_metric(self)-> str:
-        # FIXME replace this stub with
-        # the margin metric function.
-        self.metric = {
-            'sup_margin':  2.0,
-            'inf_margin':  2.0,
-            'rt_margin':   1.5,
-            'lt_margin':   1.5,
-            'ant_margin':  1.5,
-            'post_margin': 1.0,
-            'min_margin': 2.1,
-            'max_margin': 0.9}
+    def calculate_metric(self, slice_table=pd.DataFrame(),
+                         relation=RelationshipType.UNKNOWN,
+                         precision=PRECISION, **kwargs)-> str:
+        def get_contour_margins(slice_structures: pd.Series,
+                                relation: RelationshipType,
+                                precision=PRECISION):
+            margin_table = margins(slice_structures.iloc[0],
+                                slice_structures.iloc[1],
+                                relation, precision)
+            return margin_table
+        roi_a, roi_b = self.structures
+        slice_structures = slice_table.loc[:, [roi_a, roi_b]]
+        # Remove Slices that have neither structure.
+        slice_structures.dropna(how='all', inplace=True)
+        # For slices that have only one of the two structures, replace the nan
+        # values with empty polygons for duck typing.
+        slice_structures.fillna(StructureSlice([]), inplace=True)
+        # Get the relationships between the two structures for all slices.
+        metric_seq = slice_structures.apply(get_contour_margins, axis='columns',
+                                            result_type='expand',
+                                            relation=relation,
+                                            precision=precision)
+        contour_margins = agg_margins(metric_seq)
+        # Add the z margin components
+        z_margins = get_z_margins(self.structures, slice_table, precision)
+        max_margin = max([contour_margins['max'], max(z_margins['struct'])])
+        contour_margins['max'] = max_margin
+        min_margin = min([contour_margins['min'], min(z_margins['struct'])])
+        contour_margins['min'] = min_margin
+        contour_margins = pd.concat([contour_margins, z_margins['aligned']])
+        self.metric = contour_margins.to_dict()
