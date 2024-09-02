@@ -32,10 +32,32 @@ import networkx as nx
 
 
 # %% Type definitions and Globals
-ROI_Num = int  # Index to structures defined in Structure RT DICOM file
+# Index to structures defined in Structure RT DICOM file
+ROI_Num = int
+
+# The offset in cm between a given image slice and the DICOm origin in the
+# `Z` direction.
 SliceIndex = float
+
+# An enclosed region representing either a structure area, or a hole within .
+# that structure.
 Contour = shapely.Polygon
+
+# The reference numbers for two different structures to be compared.
 StructurePair =  Tuple[ROI_Num, ROI_Num]
+
+# A length 9 string of '1's and '0's representing a DE-9IM relationship.
+DE9IM_Value = str
+
+# A 27 bit binary value composed of three DE9IM_Values concatenated.
+# The right-most 9 binary digits represent the DE-9IM relationship between
+#    polygon b and polygon a.
+# The middle 9 binary digits represent the DE-9IM relationship between
+#    polygon b and the *exterior* of polygon a.
+# The left 9 binary digits represent the DE-9IM relationship between
+#    polygon b and the *convex hull* of polygon a.
+DE27IM_Value = int
+
 
 # Global Settings
 PRECISION = 3
