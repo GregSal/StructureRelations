@@ -209,24 +209,58 @@ class StructureSlice():
         A convex hull can be pictures as an elastic band stretched around the
         external contour.
 
+        If contour contains more than one distinct region the hull will be the
+        combination of the convex_hulls for each distinct region.  It will not
+        contain the area between the regions.  in other words, the convex hull
+        will consist of multiple elastic bands stretched around each external
+        contour rather that one elastic band stretched around all external
+        contours.
+
         Returns:
             shapely.MultiPolygon: The bounding contour for the entire contour
                 MultiPolygon.
         '''
-        hull = shapely.convex_hull(self.contour)
+        solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
+        hull = shapely.unary_union(solids)
         return shapely.MultiPolygon([hull])
 
     @property
     def area(self)-> float:
+        '''The area encompassed by solid exterior contour MultiPolygon.
+
+        Returns:
+            float: The area encompassed by each polygon on the slice.
+        '''
+        area_p = sum(poly.area for poly in self.contour.geoms)
+        return area_p
+
+    @property
+    def external_area(self)-> float:
         '''The area encompassed by the convex hulls of each polygon on the
         slice.
 
         Returns:
-            float: _description_
+            float: The area encompassed by the convex hulls of each polygon on
+                the slice.
+        '''
+        solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                  for poly in self.contour.geoms]
+        solid = shapely.unary_union(solids)
+        return solid.area
+
+    @property
+    def hull_area(self)-> float:
+        '''The area encompassed by the convex hulls of each polygon on the
+        slice.
+
+        Returns:
+            float: The area encompassed by the convex hulls of each polygon on
+                the slice.
         '''
         solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
         solid = shapely.unary_union(solids)
         return solid.area
+
 
 
 # %% Relationship Functions
