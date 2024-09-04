@@ -415,7 +415,8 @@ class Relationship():
     def get_metric(self, slice_table=pd.DataFrame(), **kwargs):
         # Select the appropriate metric for the identified relationship.
         metric_class = self.metric_match[self.relationship_type]
-        self.metric = metric_class(self.structures, slice_table, **kwargs)
+        self.metric = metric_class(self.structures, slice_table=slice_table,
+                                   **kwargs)
 
     @property
     def is_symmetric(self)-> bool:

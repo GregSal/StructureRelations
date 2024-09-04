@@ -235,6 +235,42 @@ def build_slice_spacing_table(slice_table, shift_direction=-1)->pd.DataFrame:
 
 
 
+def structure_neighbours(slice_structures: pd.DataFrame,
+                         shift_direction=-1) -> pd.DataFrame:
+    '''Generate a table with the second of the two structure columns shifted by
+    shift_direction.
+
+    Take a DataFrame with two columns of StructureSlice.  Shift the second
+    column by the amount specified with shift_direction. Calculate the gap
+    between the the their Slice_index's (The DataFrame index).  Return a
+    DataFrame with columns labeled ['a', 'b', 'height'], where 'a' is the
+    original first column, 'b' is the shifted second column and 'height' is the
+    calculated SliceIndex gap.
+
+    Args:
+        slice_structures (pd.DataFrame): a DataFrame containing two columns of
+            StructureSlice with SliceIndex values as the index.
+        shift_direction (int, optional): The number of rows to shift the second
+            structure's slices. Defaults to -1.
+
+    Returns:
+        pd.DataFrame: a table with columns labeled ['a', 'b', 'height'], where
+            'a' is the original first column, 'b' is the shifted second column
+            and 'height' is the calculated SliceIndex gap.
+    '''
+    used_slices = slice_structures.copy()
+    used_slices.dropna(how='all', inplace=True)
+    used_slices.columns = ['a', 'b']
+    slices_index = used_slices.index.to_series()
+    slices_gaps = slices_index.shift(shift_direction) - slices_index
+    neighbour = used_slices['b'].shift(shift_direction)
+    slice_shift = pd.concat([used_slices['a'], neighbour, slices_gaps],
+                            axis='columns')
+    slice_shift.dropna(inplace=True)
+    slice_shift.columns = ['a', 'b', 'height']
+    return slice_shift
+
+
 def find_neighbouring_slice(structure_slices):
     def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
                         shift_start=0):
