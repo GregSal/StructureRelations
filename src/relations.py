@@ -33,7 +33,7 @@ from types_and_classes import poly_round
 from types_and_classes import InvalidContour
 from types_and_classes import StructureSlice, RelationshipType
 from metrics import MarginMetric, DistanceMetric, NoMetric
-from metrics import OverlapAreaMetric, OverlapSurfaceMetric
+from metrics import OverlapVolumeMetric, OverlapSurfaceMetric
 from utilities import find_boundary_slices
 
 
@@ -378,8 +378,8 @@ class Relationship():
         RelationshipType.DISJOINT: DistanceMetric,
         RelationshipType.BORDERS: OverlapSurfaceMetric,
         RelationshipType.BORDERS_INTERIOR: OverlapSurfaceMetric,
-        RelationshipType.OVERLAPS: OverlapAreaMetric,
-        RelationshipType.PARTITION: OverlapAreaMetric,
+        RelationshipType.OVERLAPS: OverlapVolumeMetric,
+        RelationshipType.PARTITION: OverlapVolumeMetric,
         RelationshipType.SHELTERS: MarginMetric,
         RelationshipType.SURROUNDS: MarginMetric,
         RelationshipType.CONTAINS: MarginMetric,
@@ -391,7 +391,7 @@ class Relationship():
                  slice_table: pd.DataFrame = pd.DataFrame(), **kwargs) -> None:
         self.is_logical = False
         self.show = True
-        self.metric = None
+        self.metric = {}
         # Sets the is_logical and metric attributes, if supplied.  Ignores any
         # other items in kwargs.
         self.set(**kwargs)
@@ -405,7 +405,7 @@ class Relationship():
             self.relationship_type = RelationshipType[kwargs['relationship']]
         else:
             self.identify_relationship(slice_table)
-        self.get_metric(slice_table=slice_table, **kwargs)
+            self.get_metric(slice_table=slice_table, **kwargs)
 
     def set(self, **kwargs):
         for key, val in kwargs.items():
@@ -454,12 +454,12 @@ class Relationship():
                     index contains the roi numbers for the structures.  The row
                     index contains the slice index distances.
         '''
+        # Select the identified structure from the full table
         slice_structures = slice_table.loc[:, [self.structures[0],
-                                               self.structures[1]]]
+                                                self.structures[1]]]
         # Remove Slices that have neither structure.
         slice_structures.dropna(how='all', inplace=True)
-        boundary_slices = slice_table.apply(find_boundary_slices)
-
+        boundary_slices = slice_structures.apply(find_boundary_slices)
         # For slices that have only one of the two structures, replace the nan
         # values with empty polygons for duck typing.
         slice_structures.fillna(StructureSlice([]), inplace=True)

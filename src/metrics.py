@@ -334,53 +334,45 @@ def distance(related_contours: pd.Series,
     return rounded_distance
 
 
-
 # %% Relative volume related functions
-def related_areas(poly_a: StructureSlice,
-                  poly_b: StructureSlice)->Dict[str, float]:
-    # Total areas of the two Structure Slices
-    area_a = sum(poly.area for poly in poly_a.contour.geoms)
-    area_b = sum(poly.area for poly in poly_b.contour.geoms)
-    # Calculate overlap by comparing all polygons in a with all polygons in b
-    overlap_area_list = []
-    for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                        poly_b.contour.geoms):
-        overlap_region = shapely.intersection(polygon_a, polygon_b)
-        overlap_area_list.append(overlap_region.area)
-    overlap_area = sum(overlap_area_list)
-    areas = {'area_a': area_a,
-             'area_b': area_b,
-             'overlap': overlap_area}
-    return areas
+def calculate_volume_ratio(related_contours: pd.Series,
+                           relation: RelationshipType,
+                           precision: int = PRECISION)->float:
 
+    def get_area(contour: StructureSlice):
+        if isinstance(contour, StructureSlice):
+            return contour.area
+        return np.nan
 
-# For full structure this will convert to a loop over all slices
-# results in list of dict -> DataFrame ->  sum columns
-def volume_ratio(related_contours: pd.Series,
-                 relation: RelationshipType,
-                 precision: int = PRECISION)->float:
+    def get_overlap_area(related_contours: pd.Series)->Dict:
+        poly_a = related_contours['a']
+        if not isinstance(poly_a, StructureSlice):
+            return 0.0
+        poly_b = related_contours['b']
+        if not isinstance(poly_b, StructureSlice):
+            return 0.0
+        overlap_area_list = []
+        for polygon_a, polygon_b in product(poly_a.contour.geoms,
+                                            poly_b.contour.geoms):
+            overlap_region = shapely.intersection(polygon_a, polygon_b)
+            overlap_area_list.append(overlap_region.area)
+        overlap_area = sum(overlap_area_list)
+        return overlap_area
 
-    def average_volume_ratio(areas: pd.DataFrame,
-                             precision: int = PRECISION)->pd.DataFrame:
-        average_volume = (areas['area_a'] + areas['area_b']) / 2.0
-        ratio = areas['overlap'] / average_volume
-        rounded_ratio = round(ratio, precision)
-        return rounded_ratio
-
-    def larger_area_ratio(areas: pd.DataFrame,
-                          precision: int = PRECISION)->pd.DataFrame:
-        ratio = areas['overlap'] / areas['area_a']
-        rounded_ratio = round(ratio, precision)
-        return rounded_ratio
-
-    areas = related_areas(related_contours['a'], related_contours['b'])
+    areas = related_contours.map(get_area)
+    overlap_area = related_contours.apply(get_overlap_area, axis='columns')
+    overlap_area.name = 'Overlap'
+    areas = pd.concat([areas, overlap_area], axis='columns')
+    total_areas = areas.sum()
     if relation == RelationshipType.OVERLAPS:
-        ratio = average_volume_ratio(areas, precision)
+        average_volume = (total_areas['a'] + total_areas['b']) / 2.0
+        ratio = total_areas['Overlap'] / average_volume
     elif relation == RelationshipType.PARTITION:
-        ratio = larger_area_ratio(areas, precision)
+        ratio = total_areas['Overlap'] / total_areas['a']
     else:
         ratio = np.nan
-    return ratio
+    rounded_ratio = round(ratio, precision)
+    return rounded_ratio
 
 # %% Relative surface area related functions
 def related_lengths(poly_a: StructureSlice, poly_b: StructureSlice,
@@ -522,42 +514,16 @@ class OverlapVolumeMetric(Metric):
     '''The percentage of the volume overlapping for 2 structures.'''
     metric_type = MetricType.OVERLAP_VOLUME
     default_format_template = 'Percentage Overlap:\t{OverlapVolumeRatio:2.0%}'
-
     def calculate_metric(self, slice_table=pd.DataFrame(),
                          relation=RelationshipType.UNKNOWN,
                          precision=PRECISION, **kwargs):
-
-        def average_volume_ratio(areas: pd.DataFrame,
-                                precision: int = PRECISION)->pd.DataFrame:
-            average_volume = (areas['area_a'] + areas['area_b']) / 2.0
-            ratio = areas['overlap'] / average_volume
-            rounded_ratio = round(ratio, precision)
-            return rounded_ratio
-
-        def larger_area_ratio(areas: pd.DataFrame,
-                            precision: int = PRECISION)->pd.DataFrame:
-            ratio = areas['overlap'] / areas['area_a']
-            rounded_ratio = round(ratio, precision)
-            return rounded_ratio
-
         roi_a, roi_b = self.structures
         slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
         slice_structures.columns = ['a', 'b']
-        areas = related_areas(slice_structures['a'], slice_structures['b'])
-        if relation == RelationshipType.OVERLAPS:
-            ratio = average_volume_ratio(areas, precision)
-        elif relation == RelationshipType.PARTITION:
-            ratio = larger_area_ratio(areas, precision)
-        else:
-            ratio = np.nan
-        return ratio
-
-
-        all_distances = slice_structures.apply(distance, axis='columns',
-                                         precision=precision)
-        min_distance = min(all_distances)
-        self.metric = {'Distance': min_distance}
-        self.metric = {'OverlapVolumeRatio': 0.15}
+        volume_ratio = calculate_volume_ratio(slice_structures,
+                                              relation=relation,
+                                              precision=precision)
+        self.metric = {'OverlapVolumeRatio': volume_ratio}
 
 
 class OverlapSurfaceMetric(Metric):
