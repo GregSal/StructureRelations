@@ -476,10 +476,17 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
     return slice_contours
 
 
-def make_box(width: float, length: float, height: float, spacing: float = 0.1,
+def make_box(width: float, length: float = None, height: float = None,
              offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-             precision=PRECISION, roi_num=0)->pd.DataFrame:
-    z_coord = make_slice_list(height=height, spacing=spacing, start=offset_z,
+             spacing: float = 0.1, precision=PRECISION,
+             roi_num=0)->pd.DataFrame:
+    if not height:
+        if height == 0:
+            height = 10**(-precision)
+        else:
+            height = width
+    starting_z = offset_z - height / 2
+    z_coord = make_slice_list(height=height, spacing=spacing, start=starting_z,
                               precision=precision)
     xy_points = box_points(width, length, offset_x, offset_y, precision)
     contour = shapely.Polygon(xy_points)
