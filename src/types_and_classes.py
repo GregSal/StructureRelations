@@ -221,8 +221,12 @@ class StructureSlice():
                 MultiPolygon.
         '''
         solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
-        hull = shapely.unary_union(solids)
-        return shapely.MultiPolygon([hull])
+        combined = shapely.unary_union(solids)
+        if isinstance(combined, shapely.MultiPolygon):
+            hull = combined
+        else:
+            hull = shapely.MultiPolygon([combined])
+        return hull
 
     @property
     def area(self)-> float:
@@ -260,7 +264,6 @@ class StructureSlice():
         solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
         solid = shapely.unary_union(solids)
         return solid.area
-
 
 
 # %% Relationship Functions
