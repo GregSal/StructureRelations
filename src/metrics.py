@@ -380,12 +380,11 @@ def related_lengths(poly_a: StructureSlice, poly_b: StructureSlice,
     def get_perimeters(poly_a: StructureSlice, poly_b: StructureSlice):
         # FIXME I think the polygon `poly_a.exterior()` should not be used here.
         # Instead the line object `poly_a.boundary`
-        exterior_a = poly_a.exterior
-        exterior_b = poly_b.exterior
-        overlap_region = shapely.shared_paths(exterior_a, exterior_b)
+
+        overlap_region = shapely.shared_paths(boundary_a, boundary_b)
         perimeter_dict = {'overlapping_perimeter': overlap_region,
-                          'perimeter_a': exterior_a,
-                          'perimeter_b': exterior_b}
+                          'perimeter_a': boundary_a,
+                          'perimeter_b': boundary_b}
         return perimeter_dict
 
     perimeter_list = []
@@ -393,6 +392,9 @@ def related_lengths(poly_a: StructureSlice, poly_b: StructureSlice,
     for polygon_a, polygon_b in product(poly_a.contour.geoms,
                                         poly_b.contour.geoms):
         if relation == RelationshipType.BORDERS:
+            boundary_a = poly_a.contour.boundary.normalize()
+            boundary_b = poly_b.contour.boundary.normalize()
+
             perimeter_dict = get_perimeters(polygon_a, polygon_b)
             perimeter_list.append(perimeter_dict)
         elif relation == RelationshipType.BORDERS_INTERIOR:
@@ -428,7 +430,13 @@ def length_ratio(poly_a: StructureSlice, poly_b: StructureSlice,
     rounded_ratio = round(ratio, precision)
     return rounded_ratio
 
-
+#        def get_contour_margins(slice_structures: pd.Series,
+#                                relation: RelationshipType,
+#                                precision=PRECISION):
+#            margin_table = margins(slice_structures.iloc[0],
+#                                slice_structures.iloc[1],
+#                                relation, precision)
+#            return margin_table
 # %% Helper classes
 class ValueFormat(defaultdict):
     '''String formatting templates for individual name, value pairs.
