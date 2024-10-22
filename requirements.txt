@@ -1,0 +1,13 @@
+python==3.11.10
+networkx==3.2.1
+shapely==2.0.5
+pygraphviz==1.9
+pandas==2.2.2
+matplotlib==3.9.2
+numpy==1.26.4
+pyodbc==5.1.0
+pydicom==3.0.1
+scipy==1.13.1
+jupyterlab==4.2.5
+ipympl==0.9.3
+pylint==3.2.7
