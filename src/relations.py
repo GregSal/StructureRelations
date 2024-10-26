@@ -124,7 +124,7 @@ def relate_structures(slice_structures: pd.DataFrame,
 
 def adjust_slice_boundary_relations(relation_seq: pd.Series,
                                     structures: StructurePair,
-                                    boundary_slices: pd.DataFrame)->pd.Series:
+                                    boundary_slices: pd.DataFrame=None)->pd.Series:
     '''Adjust the DE-9IM relationship metric for the boundary slices of both
     structures.
 
@@ -140,7 +140,10 @@ def adjust_slice_boundary_relations(relation_seq: pd.Series,
             DE-9IM relationship metrics as the values.
         structures (StructurePair): A tuple of ROI numbers which index
             columns in boundary_slices.
-        boundary_slices (pd.DataFrame): _description_
+        boundary_slices (pd.DataFrame, optional): Table with ROI_Num as columns
+            and SliceIndex as values. Every value in a given column indicates a
+            boundary slice for that ROI.  If not supplied, every row
+            in relation_seq is assumed to be a boundary slice for both ROIs.
 
     Returns:
         pd.Series: The supplied relation_seq with adjusted DE-9IM relationship
@@ -162,16 +165,22 @@ def adjust_slice_boundary_relations(relation_seq: pd.Series,
         return relations_bin
 
     roi_a, roi_b = structures
+    if boundary_slices is None:
+        b_boundary_slices = list(relation_seq.index)
+        a_boundary_slices = b_boundary_slices
+    else:
+        b_boundary_slices = list(boundary_slices[roi_b])
+        a_boundary_slices = list(boundary_slices[roi_a])
     # Boundaries of b
     # Select the first three values of the DE-9IM relationship metric.
     b_mask = 0b111000000111000000111000000
-    for boundary_slice in list(boundary_slices[roi_b]):
+    for boundary_slice in b_boundary_slices:
         value = relation_seq[boundary_slice]
         relations_bin = shift_values(value, b_mask, 3)
         relation_seq[boundary_slice] = relations_bin
     # Boundaries of a
     a_mask = 0b100100100100100100100100100
-    for boundary_slice in list(boundary_slices[roi_a]):
+    for boundary_slice in a_boundary_slices:
         value = relation_seq[boundary_slice]
         relations_bin = shift_values(value, a_mask, 1)
         relation_seq[boundary_slice] = relations_bin
@@ -305,8 +314,8 @@ def identify_relation(relation_binary) -> RelationshipType:
         Surrounds         FF*FF****     T***F*F**
         Borders_Interior  FF*FT****     T***T****
         Borders           FF*FT****     FF*FT****
-        Contains	      T*T*F*FF*
-        Incorporates	  T*T*T*FF*
+        Contains          T*T*F*FF*
+        Partition         T*T*T*FF*
         Equals	          T*F**FFF*
         Overlaps          TTTT*TTT*
 
@@ -343,7 +352,7 @@ def merge_rel(relation_seq: pd.Series)->int:
 
     Args:
         relation_seq (pd.Series): The relationship values between the
-        contours from each slice.
+            contours from each slice.
 
     Returns:
         int: An integer corresponding to a 27 bit binary value

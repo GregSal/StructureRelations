@@ -265,6 +265,15 @@ class StructureSlice():
         solid = shapely.unary_union(solids)
         return solid.area
 
+    @property
+    def is_empty(self)-> bool:
+        '''Check if the slice is empty.
+
+        Returns:
+            bool: True if the slice is empty, False otherwise.
+        '''
+        count = len(self.contour.geoms)
+        return count == 0
 
 # %% Relationship Functions
 class RelationshipType(Enum):

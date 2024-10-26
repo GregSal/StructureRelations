@@ -3,7 +3,7 @@
 # Type imports
 
 from itertools import chain
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
 # Standard Libraries
 from math import ceil, sin, cos, radians, sqrt
@@ -134,6 +134,25 @@ def type_table(sr):
 
 
 # %% Slice related functions
+def empty_structure(structure:  Union[StructureSlice, float]) -> bool:
+    '''Check if the structure is empty.
+
+    Tests whether structure is NaN or an empty StructureSlice.
+    If the structure is a StructureSlice, it is considered empty if it has
+    no contours.
+
+    Args:
+        structure (Union[StructureSlice, float]): A StructureSlice or NaN object.
+
+    Returns:
+        bool: False if the structure is type StructureSlice and is not empty.
+            Otherwise True.
+    '''
+    if isinstance(structure, StructureSlice):
+        return structure.is_empty
+    return True
+
+
 def make_slice_list(height: float = None, number_slices: int = None,
                     start: float = 0.0, spacing: float = 0.1,
                     precision=PRECISION) -> List[SliceIndex]:
@@ -234,7 +253,6 @@ def build_slice_spacing_table(slice_table, shift_direction=-1)->pd.DataFrame:
     return slice_spacing_data
 
 
-
 def structure_neighbours(slice_structures: pd.DataFrame,
                          shift_direction=-1) -> pd.DataFrame:
     '''Generate a table with the second of the two structure columns shifted by
@@ -296,9 +314,12 @@ def find_neighbouring_slice(structure_slices):
 
 
 def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndex]:
-    '''Identify the first and last slices of a structure.
+    '''Identify the first and last slices of a structure region.
 
     Slices without the structure are identified by `isna()`.
+    Any slice that contains the structure, but has a neighbouring slices that
+    does not contain the structure is considered a boundary slice.
+
     In the future, add tests for zero area polygons.
 
     Args:
@@ -316,6 +337,46 @@ def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndex]:
     end_slices = list(structure_slices[end].index)
     boundaries = start_slices + end_slices
     return boundaries
+
+
+def identify_boundary_slices(structure_slices: Union[pd.Series, pd.DataFrame],
+                             selected_roi: StructurePair = None) -> pd.Series:
+    '''Identify boundary slices for the given structure or structures.
+
+    Identifies the first and last slice that has a structure contour for the
+    given structure or structures. If a DataFrame is provided, the boundary
+    slices are identified for the structures specified in selected_roi.
+    If a Series is provided, the boundary slices are identified for the single
+    structure and the selected_roi is ignored.
+
+    Args:
+        structure_slices (Union[pd.Series, pd.DataFrame]): A Series or DataFrame
+            containing StructureSlice data.
+        selected_roi (List[ROI_Num], optional): A list of two ROI_Num to select
+            when structure_slices is a DataFrame. Defaults to None.
+
+    Returns:
+        pd.Series: A Series indicating whether each slice is a boundary slice.
+    '''
+    if isinstance(structure_slices, pd.Series):
+        boundary_slice_index = set(find_boundary_slices(structure_slices))
+    elif isinstance(structure_slices, pd.DataFrame):
+        try:
+            roi_a, roi_b = selected_roi
+        except ValueError as err:
+            raise ValueError('selected_roi must be a tuple of two integers when'
+                             ' structure_slices is a DataFrame.') from err
+        # Identify the slices that are boundary slices for either of the
+        # structures.
+        boundary_slice_index = set(find_boundary_slices(
+            structure_slices[roi_a]))
+        boundary_slice_index.update(find_boundary_slices(
+            structure_slices[roi_b]))
+    else:
+        raise ValueError('structure_slices must be either a Series or a '
+                         'DataFrame.')
+    is_boundary_slice = structure_slices.index.isin(boundary_slice_index)
+    return pd.Series(is_boundary_slice, index=structure_slices.index)
 
 
 # %% Contour Creation Functions
