@@ -34,7 +34,7 @@ from types_and_classes import InvalidContour
 from types_and_classes import StructureSlice, RelationshipType
 from metrics import MarginMetric, DistanceMetric, NoMetric
 from metrics import OverlapVolumeMetric, OverlapSurfaceMetric
-from utilities import find_boundary_slices
+from utilities import empty_structure, find_boundary_slices, identify_boundary_slices, select_slices
 
 
 # Global Settings
@@ -366,6 +366,230 @@ def merge_rel(relation_seq: pd.Series)->int:
     return merged_rel
 
 
+def non_boundary_relations(slice_table: pd.DataFrame,
+                           selected_roi: StructurePair) -> pd.Series:
+    '''Determine the DE-9IM relations for the slices that are not boundary slices.
+
+    DE-9IM relations are calculated for the slices that contain primary
+    contours and are not boundary slices of the primary structure.  Boundary
+    slices for the secondary structure are not considered unless they are also
+    boundary slices of the primary structure.
+
+    Args:
+        slice_table (pd.DataFrame): A table of StructureSlice data with
+            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            NaN as the values.
+        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+
+    Returns:
+        pd.Series: The relationship values between the contours from each
+            non-boundary slice, with SliceIndex as the index.
+    '''
+    # select the slices spanned by both structures
+    structure_slices = select_slices(slice_table, selected_roi)
+    roi_a, roi_b = selected_roi
+    # Select the slices that are not boundary slices of the primary structure.
+    is_boundary_slice = identify_boundary_slices(structure_slices[roi_a])
+    mid_slices = structure_slices.loc[~is_boundary_slice, :].copy()
+    # Select only the slices that have the primary structure
+    empty_primary_slices = mid_slices[roi_a].apply(empty_structure)
+    mid_slices = mid_slices[~empty_primary_slices]
+    # Replace the nan values with empty polygons for duck typing.
+    mid_slices.fillna(StructureSlice([]), inplace=True)
+    # Calculate the DE-9IM relations for these slices.
+    relation_seq = mid_slices.agg(relate_structures, structures=selected_roi,
+                                  axis=1)
+    relation_seq.name = 'DE9IM'
+    return relation_seq
+
+
+def find_matched_bdy_rel(slice_table: pd.DataFrame,
+                         selected_roi: StructurePair) -> pd.Series:
+    '''Find the DE-9IM relations for the boundary slices that are matched.
+
+    Matched boundary slices are those that are boundary slices of both
+    structures.  The DE-9IM relations are calculated for these slices.
+    If there are no matched boundary slices, an empty Series is returned.
+    The boundary slices are selected based on the following conditions:
+        1. The slice is at a boundary of the primary structure.
+        2. The slice has both a primary and secondary contour.
+        3. The one of the neighbouring slices has neither primary nor secondary
+            contour.
+    The relations are adjusted to account for the fact that these are boundary
+    slices of the 3D structure.
+
+    Args:
+        slice_table (pd.DataFrame): A table of StructureSlice data with
+            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            NaN as the values.
+        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+
+    Returns:
+        pd.Series: The relationship values between the contours from each
+            matched boundary slice, with SliceIndex as the index.  If there are
+            no matched boundary slices, an empty Series is returned.
+    '''
+    structure_slices = slice_table[selected_roi]
+    # Select rows where both columns contain non-empty StructureSlice objects
+    empty_rows = structure_slices.isna().any(axis=1)
+    # Check if neighboring rows are NaN or contain empty StructureSlice objects.
+    prev_row = structure_slices.shift(1)
+    next_row = structure_slices.shift(-1)
+    missing_neighbour = (
+        (prev_row.map(empty_structure).all(axis=1)) |
+        (next_row.map(empty_structure).all(axis=1))
+        )
+    # Select rows based on the condition
+    selected_rows = ~empty_rows & missing_neighbour
+    if not selected_rows.any():
+        return pd.Series(name='DE9IM')
+    boundary_slices = structure_slices[selected_rows].copy()
+    # Replace the nan values with empty polygons for duck typing.
+    boundary_slices.fillna(StructureSlice([]), inplace=True)
+    # Calculate the DE-9IM relations for these slices.
+    relation_seq = boundary_slices.agg(relate_structures,
+                                       structures=selected_roi, axis=1)
+    relation_seq.name = 'DE9IM'
+    # Adjust the DE-9IM relations to account for the fact that these are
+    # boundary slices of the 3D structure
+    relation_seq = adjust_slice_boundary_relations(relation_seq, selected_roi)
+    return relation_seq
+
+def find_offset_bdy_rel(slice_table: pd.DataFrame,
+                         selected_roi: StructurePair) -> pd.Series:
+    '''Find the DE-9IM relations for the boundary slices that are offset.
+
+    DE-9IM relations are calculated for boundary slices where the boundary of
+    a primary structure is a neighbour of the boundary of the secondary
+    structure. If there are no offset boundary slices, an empty Series is
+    returned.  The boundary slices are selected on the following basis:
+        1. The slice is at a boundary of the primary structure.
+        2. The slice does not have the secondary structure.
+        3. The one of the neighbouring slices has only the second structure.
+    Relations are calculated for the primary slice and the neighbouring
+    secondary slice and adjusted to account for the fact that these are boundary
+    slices of the 3D structure.
+
+    Args:
+        slice_table (pd.DataFrame): A table of StructureSlice data with
+            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            NaN as the values.
+        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+
+    Returns:
+        pd.Series: The relationship values between the contours from each
+            offset boundary slice, with SliceIndex as the index.  If there are
+            no offset boundary slices, an empty Series is returned.
+    '''
+    def select_boundary_slices(slice_table: pd.DataFrame,
+                               selected_roi: StructurePair)->pd.Series:
+        '''Select boundary slices where the boundaries of the two structures meet.
+
+        The boundary slices are selected based on the following conditions:
+            1. The slice is at a boundary of the primary structure.
+            2. The slice does not have the secondary structure.
+            3. The one of the neighbouring slices has only the second structure.
+
+        Args:
+            slice_table (pd.DataFrame): A table of StructureSlice data with
+                SliceIndex as the index, ROI_Num for columns and StructureSlice
+                or NaN as the values.
+            selected_roi (StructurePair): A tuple of two ROI_Num to select.
+
+        Returns:
+            pd.Series: A boolean series with SliceIndex as the index. Values
+            are True for slices where the boundaries of the two structures meet.
+        '''
+        # Select the slices spanned by both structures
+        structure_slices = select_slices(slice_table, selected_roi)
+        roi_a, roi_b = selected_roi
+        # Select the slices where roi_b is NaN or is an empty StructureSlice
+        # object.
+        empty_or_nan_roi_b = structure_slices[roi_b].apply(empty_structure)
+        # Select only the boundary slices of the primary structure.
+        boundary_slices = identify_boundary_slices(structure_slices[roi_a])
+        # Check if neighboring rows are NaN or contain empty StructureSlice
+        # objects.
+        prev_row = structure_slices.shift(1)
+        next_row = structure_slices.shift(-1)
+        neighbour_empty_or_nan = (
+            prev_row.map(empty_structure).any(axis=1) |
+            next_row.map(empty_structure).any(axis=1)
+        )
+        # Exclude rows where neighbouring rows are both empty.
+        neighbour_both_empty = (
+            prev_row.map(empty_structure).all(axis=1) |
+            next_row.map(empty_structure).all(axis=1)
+        )
+        # Select rows based on the above conditions.
+        selected_rows = (empty_or_nan_roi_b & boundary_slices &
+                         neighbour_empty_or_nan & ~neighbour_both_empty)
+        return selected_rows
+
+    def pair_neighbouring_slices(slice_table: pd.DataFrame,
+                                        selected_roi: StructurePair,
+                                        selected_rows: pd.Series)->pd.DataFrame:
+        '''Combine primary slices from the selected rows with neighbouring
+        secondary slices.
+
+        Join the primary slice with a neighbouring secondary slice. If a
+        primary slice has two neighbouring secondary slices, the one with the
+        lower SliceIndex is selected.
+
+        Args:
+            slice_table (pd.DataFrame): A table of StructureSlice data with
+                SliceIndex as the index, ROI_Num for columns and StructureSlice
+                or NaN as the values.
+            selected_roi (StructurePair): A tuple of two ROI_Num to select.
+            selected_rows (pd.Series): A boolean series with SliceIndex as the
+                index. Values are True for slices where the boundaries of the
+                two structures meet.
+
+        Returns:
+            pd.Series: A table of StructureSlice pairs with SliceIndex as
+                the index, ROI_Num for columns and StructureSlice as the values.
+                The table contains the StructureSlice for primary slice and the
+                neighbouring StructureSlice for the secondary slice.
+        '''
+        structure_slices = slice_table[selected_roi]
+        roi_a, roi_b = selected_roi
+        # Get neighbouring secondary slices
+        prev_row = structure_slices[roi_b].shift(1)
+        next_row = structure_slices[roi_b].shift(-1)
+        # Convert empty StructureSlice to NaN.
+        prev_row[prev_row.apply(empty_structure)] = np.NaN
+        next_row[next_row.apply(empty_structure)] = np.NaN
+        # Combine the neighbouring secondary slices
+        neighbouring_secondary = prev_row.combine_first(next_row)
+        # Include only rows where roi_a has a value
+        has_primary = structure_slices[roi_a].notna()
+        neighbouring_secondary = neighbouring_secondary[has_primary]
+        # Pair the neighbouring secondary slices with the primary slices from
+        # the selected rows
+        paired_slices = pd.DataFrame({
+            roi_a: structure_slices.loc[selected_rows, roi_a],
+            roi_b: neighbouring_secondary.loc[selected_rows]
+            }).dropna()
+        return paired_slices
+
+    # Select the boundary slices where the boundaries of the two structures meet.
+    boundary_slices = select_boundary_slices(slice_table, selected_roi)
+    if not boundary_slices.any():
+        return pd.Series(name='DE9IM')
+    # Pair the primary slices with neighbouring secondary slices.
+    paired_slices = pair_neighbouring_slices(slice_table, selected_roi,
+                                             boundary_slices)
+    # If there are no paired slices, return an empty DataFrame.
+    if paired_slices.empty:
+        return pd.Series(name='DE9IM')
+    # Calculate the DE-9IM relations for the slices that are not boundary slices.
+    relation_seq = paired_slices.agg(relate_structures, structures=selected_roi,
+                                     axis=1)
+    relation_seq.name = 'DE9IM'
+    # Adjust the DE-9IM relations to account for the fact that these are
+    # boundary slices of the 3D structure
+    relation_seq = adjust_slice_boundary_relations(relation_seq, selected_roi)
+    return relation_seq
 
 
 # %% Relationship class

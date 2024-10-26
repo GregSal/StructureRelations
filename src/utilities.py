@@ -87,12 +87,12 @@ def plot_ab(poly_a, poly_b):
 def plot_roi(slice_table, roi_list: List[int]):
     def make_array(slice_table, roi_num: List[int]):
         all_points = []
-        for slice, structure_slice in slice_table[roi_num].dropna().items():
+        for slice_idx, structure_slice in slice_table[roi_num].dropna().items():
             poly = structure_slice.contour
             points = [tuple(p) for p in chain(shapely.get_coordinates(poly))]
             xy = np.array(points)
             num_points = np.size(xy, 0)
-            z = np.ones((num_points, 1)) * slice
+            z = np.ones((num_points, 1)) * slice_idx
             xyz = np.concatenate([xy, z], axis=1)
             all_points.append(xyz)
         point_array = np.concatenate(all_points, axis=0)
@@ -230,6 +230,29 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
                                            ignore_errors=ignore_errors)
     slice_table = structure_data.unstack('ROI Num')
     return slice_table
+
+
+def select_slices(slice_table: pd.DataFrame,
+                  selected_roi: StructurePair) -> pd.DataFrame:
+    '''Select the slices that have either of the structures.
+
+    Select all slices that have either of the structures.
+
+    Args:
+        slice_table (pd.DataFrame): A table of StructureSlice data with
+            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            NaN as the values.
+        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+
+    Returns:
+        pd.DataFrame:  A subset of slice_table with the two selected_roi as the
+            columns and the range of slices hat have either of the structures as
+            the index.
+    '''
+    start = SliceIndex(slice_table[selected_roi].first_valid_index())
+    end = SliceIndex(slice_table[selected_roi].last_valid_index())
+    structure_slices = slice_table.loc[start:end, selected_roi]
+    return structure_slices
 
 
 def build_slice_spacing_table(slice_table, shift_direction=-1)->pd.DataFrame:
