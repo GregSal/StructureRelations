@@ -392,8 +392,8 @@ def non_boundary_relations(slice_table: pd.DataFrame,
     is_boundary_slice = identify_boundary_slices(structure_slices[roi_a])
     mid_slices = structure_slices.loc[~is_boundary_slice, :].copy()
     # Select only the slices that have the primary structure
-    empty_primary_slices = mid_slices[roi_a].apply(empty_structure)
-    mid_slices = mid_slices[~empty_primary_slices]
+    #empty_primary_slices = mid_slices[roi_a].apply(empty_structure)
+    #mid_slices = mid_slices[~empty_primary_slices]
     # Replace the nan values with empty polygons for duck typing.
     mid_slices.fillna(StructureSlice([]), inplace=True)
     # Calculate the DE-9IM relations for these slices.
@@ -501,17 +501,16 @@ def find_offset_bdy_rel(slice_table: pd.DataFrame,
             are True for slices where the boundaries of the two structures meet.
         '''
         # Select the slices spanned by both structures
-        structure_slices = select_slices(slice_table, selected_roi)
         roi_a, roi_b = selected_roi
         # Select the slices where roi_b is NaN or is an empty StructureSlice
         # object.
-        empty_or_nan_roi_b = structure_slices[roi_b].apply(empty_structure)
+        empty_or_nan_roi_b = slice_table[roi_b].apply(empty_structure)
         # Select only the boundary slices of the primary structure.
-        boundary_slices = identify_boundary_slices(structure_slices[roi_a])
+        boundary_slices = identify_boundary_slices(slice_table[roi_a])
         # Check if neighboring rows are NaN or contain empty StructureSlice
         # objects.
-        prev_row = structure_slices.shift(1)
-        next_row = structure_slices.shift(-1)
+        prev_row = slice_table.shift(1)
+        next_row = slice_table.shift(-1)
         neighbour_empty_or_nan = (
             prev_row.map(empty_structure).any(axis=1) |
             next_row.map(empty_structure).any(axis=1)
