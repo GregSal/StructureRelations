@@ -6,7 +6,7 @@ Types, Classes and utility function definitions.
 # %% Imports
 # Type imports
 
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, LiteralString, Tuple, Union
 from enum import Enum, auto
 from dataclasses import dataclass, field, asdict
 
@@ -277,7 +277,7 @@ class StructureSlice():
 
 # %% Relationship Functions
 class RelationshipType(Enum):
-    '''The names for defines relationship types.'''
+    '''The names for defined relationship types.'''
     DISJOINT = auto()
     SURROUNDS = auto()
     SHELTERS = auto()
@@ -296,8 +296,31 @@ class RelationshipType(Enum):
         return True
 
     @property
-    def label(self):
+    def is_symmetric(self) -> bool:
+        '''Check if the relationship is symmetric.'''
+        symmetric_relations = [
+            self.DISJOINT,
+            self.OVERLAPS,
+            self.BORDERS,
+            self.EQUALS,
+            self.UNKNOWN
+            ]
+        return self in symmetric_relations
+
+    @property
+    def is_transitive(self) -> bool:
+        '''Check if the relationship is transitive.'''
+        transitive_relations = [
+            self.EQUALS,
+            self.SHELTERS,
+            self.SURROUNDS,
+            self.CONTAINS,
+            ]
+        return self in transitive_relations
+
+    @property
+    def label(self) -> LiteralString:
         return self.name.capitalize()
 
-    def __str__(self):
+    def __str__(self) -> LiteralString:
         return f'Relationship: {self.label}'

@@ -41,31 +41,7 @@ from utilities import empty_structure, find_boundary_slices, identify_boundary_s
 PRECISION = 3
 
 # %% Functions
-def compare(mpoly1: shapely.MultiPolygon,
-            mpoly2: shapely.MultiPolygon)->DE9IM_Value:
-    '''Get the DE-9IM relationship string for two contours
-
-    The relationship string is converted to binary format, where 'F'
-    is '0' and '1' or '2' is '1'.
-
-    Args:
-        mpoly1 (shapely.MultiPolygon): All contours for a structure on
-            a single slice.
-        mpoly2 (shapely.MultiPolygon): All contours for a second
-            structure on the same slice.
-
-    Returns:
-        DE9IM_Value: A length 9 string of '1's and '0's reflecting the DE-9IM
-            relationship between the supplied contours.
-    '''
-    relation_str = shapely.relate(mpoly1, mpoly2)
-    # Convert relationship string in the form '212FF1FF2' into a
-    # boolean string.
-    relation_bool = relation_str.replace('F','0').replace('2','1')
-    return relation_bool
-
-
-def relate(contour1: StructureSlice, contour2: StructureSlice)->DE27IM_Value:
+def relate_contours(contour1: StructureSlice, contour2: StructureSlice)->DE27IM_Value:
     '''Get the 27 bit relationship integer for two polygons,
 
     When written in binary, the 27 bit relationship contains 3 9-bit
@@ -88,6 +64,29 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->DE27IM_Value:
             reflecting the combined DE-9IM relationship between contour2 and
             contour1's convex hull, exterior and polygon.
     '''
+    def compare(mpoly1: shapely.MultiPolygon,
+                mpoly2: shapely.MultiPolygon)->DE9IM_Value:
+        '''Get the DE-9IM relationship string for two contours
+
+        The relationship string is converted to binary format, where 'F'
+        is '0' and '1' or '2' is '1'.
+
+        Args:
+            mpoly1 (shapely.MultiPolygon): All contours for a structure on
+                a single slice.
+            mpoly2 (shapely.MultiPolygon): All contours for a second
+                structure on the same slice.
+
+        Returns:
+            DE9IM_Value: A length 9 string of '1's and '0's reflecting the DE-9IM
+                relationship between the supplied contours.
+        '''
+        relation_str = shapely.relate(mpoly1, mpoly2)
+        # Convert relationship string in the form '212FF1FF2' into a
+        # boolean string.
+        relation_bool = relation_str.replace('F','0').replace('2','1')
+        return relation_bool
+
     primary_relation = compare(contour1.contour, contour2.contour)
     external_relation = compare(contour1.exterior, contour2.contour)
     convex_hull_relation = compare(contour1.hull, contour2.contour)
@@ -101,6 +100,11 @@ def relate(contour1: StructureSlice, contour2: StructureSlice)->DE27IM_Value:
 def relate_structures(slice_structures: pd.DataFrame,
                       structures: StructurePair)->DE9IM_Value:
     '''Get the 27 bit relationship integer for two structures on a given slice.
+
+    This is a convenience function that allows the relate_contours function to
+    be used with a DataFrame.  The DataFrame should contain contours for both
+    structures on a single slice.  The contours are selected based on the
+    supplied ROI numbers.
 
     Args:
         slice_structures (pd.DataFrame): A table of structures, where
@@ -118,7 +122,7 @@ def relate_structures(slice_structures: pd.DataFrame,
     '''
     structure = slice_structures[structures[0]]
     other_contour = slice_structures[structures[1]]
-    binary_relation = relate(structure, other_contour)
+    binary_relation = relate_contours(structure, other_contour)
     return binary_relation
 
 
@@ -187,165 +191,6 @@ def adjust_slice_boundary_relations(relation_seq: pd.Series,
     return relation_seq
 
 
-def relate_structs(slice_table: pd.DataFrame,
-                   structures: StructurePair)->DE9IM_Value:
-    '''Calculate the overall 27 bit relationship integer for two structures.
-
-    When written in binary, the 27 bit relationship contains 3 9-bit
-    parts corresponding to DE-9IM relationships. The left-most 9 bits
-    are the relationship between the second structure's contour and the
-    first structure's convex hull polygon. The middle 9 bits are the
-    relationship between the second structure's contour and the first
-    structure's exterior polygon (i.e. with any holes filled). The
-    right-most 9 bits are the relationship between the second
-    structure's contour and the first structure's contour.
-
-    Args:
-        slice_table (pd.DataFrame): A table of with StructureSlice or na as the
-            values, SliceIndex as the index and ROI_Num as the Columns.
-
-        structures (StructurePair): A tuple of ROI numbers which index
-            columns in slice_table.
-
-    Returns:
-        DE9IM_Value: An integer corresponding to a 27 bit binary value
-            reflecting the combined DE-9IM relationship between the
-            second contour and the first contour convex hull, exterior and
-            contour.
-    '''
-    slice_structures = slice_table.loc[:, [structures[0],
-                                           structures[1]]]
-    # Remove Slices that have neither structure.
-    slice_structures.dropna(how='all', inplace=True)
-    boundary_slices = slice_table.apply(find_boundary_slices)
-
-    # For slices that have only one of the two structures, replace the nan
-    # values with empty polygons for duck typing.
-    slice_structures.fillna(StructureSlice([]), inplace=True)
-    # Get the relationships between the two structures for all slices.
-    relation_seq = slice_structures.agg(relate_structures,
-                                        structures=structures,
-                                        axis='columns')
-    # Adjust the relationship metrics for the boundary slices of both structures.
-    relation_seq = adjust_slice_boundary_relations(relation_seq, structures,
-                                                   boundary_slices)
-     # Get the overall relationship for the two structures by merging the
-    # relationships for the individual slices.
-    relation_binary = merge_rel(relation_seq)
-    return relation_binary
-
-
-@dataclass()
-class RelationshipTest:
-    '''The test binaries used to identify a relationship type.
-
-    Each test definitions consists of 2 27-bit binaries, a mask and a value.
-    Each of the 27-bit binaries contain 3 9-bit parts associated with DE-9IM
-    relationships. The left-most 9 bits are associated with the relationship
-    between one structure's convex hull and another structure's contour. The
-    middle 9 bits are associated with the relationship between the first
-    structure's exterior polygon (i.e. with any holes filled) and the second
-    structure's contour. The right-most 9 bits are associated with the
-    relationship between first structure's contour and the second structure's
-    contour.
-
-    Named relationships are identified by logical patterns such as: T*T*F*FF*
-        The 'T' indicates the bit must be True.
-        The 'F' indicates the bit must be False.
-        The '*' indicates the bit can be either True or False.
-    Ane example of a complete relationship logic is:
-    Surrounds (One structure resides completely within a hole in another
-               structure):
-        Region Test =   FF*FF****  - The contours of the two structures have no
-                                     regions in common.
-        Exterior Test = T***F*F**  - With holes filled, one structure is within
-                                     the other.
-        Hull Test =     *********  - Together, the Region and Exterior Tests
-                                     sufficiently identifies the relationship,
-                                     so the Hull Test is not necessary.
-    The mask binary is a sequence of 0s and 1s with every '*' as a '0' and every
-    'T' or 'F' bit as a '1'.  The operation: relationship_integer & mask will
-    set all of the bit that are allowed to be either True or False to 0.
-
-    The value binary is a sequence of 0s and 1s with every 'T' as a '1' and
-    every '*' or 'F' bit as a '0'. The relationship is identified when value
-    binary is equal to the result of the `relationship_integer & mask`
-    operation.
-    '''
-    relation_type: RelationshipType = RelationshipType.UNKNOWN
-    mask: int = 0b000000000000000000000000000
-    value: int = 0b000000000000000000000000000
-
-    def __repr__(self) -> str:
-        rep_str = ''.join([
-            f'RelationshipTest({self.relation_type}\n',
-            ' ' * 4,
-            f'mask =  0b{self.mask:0>27b}\n',
-            ' ' * 4,
-            f'value = 0b{self.value:0>27b}'
-            ])
-        return rep_str
-
-    def test(self, relation: int)->RelationshipType:
-        '''Apply the defined test to the supplied relation binary.
-
-        Args:
-            relation (int): The number corresponding to a 27-bit binary of
-                relationship values.
-
-        Returns:
-            RelationshipType: The RelationshipType if the test passes,
-                otherwise None.
-        '''
-        masked_relation = relation & self.mask
-        if masked_relation == self.value:
-            return self.relation_type
-        return None
-
-
-def identify_relation(relation_binary) -> RelationshipType:
-    '''Applies a collection of definitions for named relationships to a supplied
-    relationship binary.
-
-    The defined relationships are:
-        Relationship      Region Test   Exterior Test   Hull Test
-        Disjoint          FF*FF****     FF*FF****       FF*FF****
-        Shelters          FF*FF****     FF*FF****       T***F*F**
-        Surrounds         FF*FF****     T***F*F**
-        Borders_Interior  FF*FT****     T***T****
-        Borders           FF*FT****     FF*FT****
-        Contains          T*T*F*FF*
-        Partition         T*T*T*FF*
-        Equals	          T*F**FFF*
-        Overlaps          TTTT*TTT*
-
-    Args:
-        relation_binary (int): An integer generated from the combined DE-9IM
-            tests.
-
-    Returns:
-        RelationshipType: The identified RelationshipType if one of the tests
-            passes, otherwise RelationshipType.UNKNOWN.
-    '''
-    # Relationship Test Definitions
-    test_binaries = [
-        RelationshipTest(RelationshipType.SURROUNDS,        0b000000000100010110110110000, 0b000000000100000000000000000),
-        RelationshipTest(RelationshipType.SHELTERS,         0b111000100110110000110110000, 0b111000000000000000000000000),
-        RelationshipTest(RelationshipType.DISJOINT,         0b110110000110110000110110000, 0b000000000000000000000000000),
-        RelationshipTest(RelationshipType.BORDERS,          0b000000000001001110110110000, 0b000000000001001110000010000),
-        RelationshipTest(RelationshipType.BORDERS_INTERIOR, 0b000000000101010110110110000, 0b000000000101000000000010000),
-        RelationshipTest(RelationshipType.OVERLAPS,         0b000000000000000000101000100, 0b000000000000000000101000100),
-        RelationshipTest(RelationshipType.PARTITION,        0b000000000000000000101010110, 0b000000000000000000101010000),
-        RelationshipTest(RelationshipType.CONTAINS,         0b000000000000000000101010110, 0b000000000000000000101000000),
-        RelationshipTest(RelationshipType.EQUALS,           0b000000000000000000101001110, 0b000000000000000000100000000)
-        ]
-    for rel_def in test_binaries:
-        result = rel_def.test(relation_binary)
-        if result:
-            return result
-    return RelationshipType.UNKNOWN
-
-
 def merge_rel(relation_seq: pd.Series)->int:
     '''Aggregate all the relationship values from each slice to obtain
         one relationship value for the two structures.
@@ -366,14 +211,14 @@ def merge_rel(relation_seq: pd.Series)->int:
     return merged_rel
 
 
-def non_boundary_relations(slice_table: pd.DataFrame,
+def get_non_boundary_relations(slice_table: pd.DataFrame,
                            selected_roi: StructurePair) -> pd.Series:
-    '''Determine the DE-9IM relations for the slices that are not boundary slices.
+    '''Determine the relation for contours that are not on boundary slices.
 
-    DE-9IM relations are calculated for the slices that contain primary
-    contours and are not boundary slices of the primary structure.  Boundary
-    slices for the secondary structure are not considered unless they are also
-    boundary slices of the primary structure.
+    The 27 bit relationship integers are calculated for the slices that contain
+    primary contours and are not boundary slices of the primary structure.
+    Boundary slices for the secondary structure are not considered unless they
+    are also boundary slices of the primary structure.
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
@@ -403,12 +248,12 @@ def non_boundary_relations(slice_table: pd.DataFrame,
     return relation_seq
 
 
-def find_matched_bdy_rel(slice_table: pd.DataFrame,
+def get_matched_bdy_rel(slice_table: pd.DataFrame,
                          selected_roi: StructurePair) -> pd.Series:
-    '''Find the DE-9IM relations for the boundary slices that are matched.
+    '''Determine the relation for contours on matched boundary slices.
 
     Matched boundary slices are those that are boundary slices of both
-    structures.  The DE-9IM relations are calculated for these slices.
+    structures.  The 27 bit relationship integer is calculated for these slices.
     If there are no matched boundary slices, an empty Series is returned.
     The boundary slices are selected based on the following conditions:
         1. The slice is at a boundary of the primary structure.
@@ -416,7 +261,8 @@ def find_matched_bdy_rel(slice_table: pd.DataFrame,
         3. The one of the neighbouring slices has neither primary nor secondary
             contour.
     The relations are adjusted to account for the fact that these are boundary
-    slices of the 3D structure.
+    slices of the 3D structure.  As a result the interior relations are shifted
+    to become boundary relations.
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
@@ -455,20 +301,23 @@ def find_matched_bdy_rel(slice_table: pd.DataFrame,
     relation_seq = adjust_slice_boundary_relations(relation_seq, selected_roi)
     return relation_seq
 
-def find_offset_bdy_rel(slice_table: pd.DataFrame,
-                         selected_roi: StructurePair) -> pd.Series:
-    '''Find the DE-9IM relations for the boundary slices that are offset.
 
-    DE-9IM relations are calculated for boundary slices where the boundary of
-    a primary structure is a neighbour of the boundary of the secondary
-    structure. If there are no offset boundary slices, an empty Series is
-    returned.  The boundary slices are selected on the following basis:
+def get_offset_bdy_rel(slice_table: pd.DataFrame,
+                         selected_roi: StructurePair) -> pd.Series:
+    '''Determine the relation for contours on offset boundary slices.
+
+    Offset boundary slices are those where the boundary of the primary structure
+    is a neighbour of the boundary of the secondary structure.  The 27 bit
+    relationship integer is calculated for these slices. If there are no
+    offset boundary slices, an empty Series is returned.  The boundary slices
+    are selected on the following basis:
         1. The slice is at a boundary of the primary structure.
         2. The slice does not have the secondary structure.
         3. The one of the neighbouring slices has only the second structure.
-    Relations are calculated for the primary slice and the neighbouring
+    Relations are calculated between the primary slice and the neighbouring
     secondary slice and adjusted to account for the fact that these are boundary
-    slices of the 3D structure.
+    slices of the 3D structure.  As a result the interior relations are shifted
+    to become boundary relations.
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
@@ -589,6 +438,154 @@ def find_offset_bdy_rel(slice_table: pd.DataFrame,
     # boundary slices of the 3D structure
     relation_seq = adjust_slice_boundary_relations(relation_seq, selected_roi)
     return relation_seq
+
+
+@dataclass()
+class RelationshipTest:
+    '''The test binaries used to identify a relationship type.
+
+    Each test definitions consists of 2 27-bit binaries, a mask and a value.
+    Each of the 27-bit binaries contain 3 9-bit parts associated with DE-9IM
+    relationships. The left-most 9 bits are associated with the relationship
+    between one structure's convex hull and another structure's contour. The
+    middle 9 bits are associated with the relationship between the first
+    structure's exterior polygon (i.e. with any holes filled) and the second
+    structure's contour. The right-most 9 bits are associated with the
+    relationship between first structure's contour and the second structure's
+    contour.
+
+    Named relationships are identified by logical patterns such as: T*T*F*FF*
+        The 'T' indicates the bit must be True.
+        The 'F' indicates the bit must be False.
+        The '*' indicates the bit can be either True or False.
+    Ane example of a complete relationship logic is:
+    Surrounds (One structure resides completely within a hole in another
+               structure):
+        Region Test =   FF*FF****  - The contours of the two structures have no
+                                     regions in common.
+        Exterior Test = T***F*F**  - With holes filled, one structure is within
+                                     the other.
+        Hull Test =     *********  - Together, the Region and Exterior Tests
+                                     sufficiently identifies the relationship,
+                                     so the Hull Test is not necessary.
+    The mask binary is a sequence of 0s and 1s with every '*' as a '0' and every
+    'T' or 'F' bit as a '1'.  The operation: relationship_integer & mask will
+    set all of the bit that are allowed to be either True or False to 0.
+
+    The value binary is a sequence of 0s and 1s with every 'T' as a '1' and
+    every '*' or 'F' bit as a '0'. The relationship is identified when value
+    binary is equal to the result of the `relationship_integer & mask`
+    operation.
+    '''
+    relation_type: RelationshipType = RelationshipType.UNKNOWN
+    mask: int = 0b000000000000000000000000000
+    value: int = 0b000000000000000000000000000
+
+    def __repr__(self) -> str:
+        rep_str = ''.join([
+            f'RelationshipTest({self.relation_type}\n',
+            ' ' * 4,
+            f'mask =  0b{self.mask:0>27b}\n',
+            ' ' * 4,
+            f'value = 0b{self.value:0>27b}'
+            ])
+        return rep_str
+
+    def test(self, relation: int)->RelationshipType:
+        '''Apply the defined test to the supplied relation binary.
+
+        Args:
+            relation (int): The number corresponding to a 27-bit binary of
+                relationship values.
+
+        Returns:
+            RelationshipType: The RelationshipType if the test passes,
+                otherwise None.
+        '''
+        masked_relation = relation & self.mask
+        if masked_relation == self.value:
+            return self.relation_type
+        return None
+
+
+def identify_relation(relation_binary) -> RelationshipType:
+    '''Applies a collection of definitions for named relationships to a supplied
+    relationship binary.
+
+    The defined relationships are:
+        Relationship      Region Test   Exterior Test   Hull Test
+        Disjoint          FF*FF****     FF*FF****       FF*FF****
+        Shelters          FF*FF****     FF*FF****       T***F*F**
+        Surrounds         FF*FF****     T***F*F**
+        Borders_Interior  FF*FT****     T***T****
+        Borders           FF*FT****     FF*FT****
+        Contains          T*T*F*FF*
+        Partition         T*T*T*FF*
+        Equals	          T*F**FFF*
+        Overlaps          TTTT*TTT*
+
+    Args:
+        relation_binary (int): An integer generated from the combined DE-9IM
+            tests.
+
+    Returns:
+        RelationshipType: The identified RelationshipType if one of the tests
+            passes, otherwise RelationshipType.UNKNOWN.
+    '''
+    # Relationship Test Definitions
+    test_binaries = [
+        RelationshipTest(RelationshipType.SURROUNDS,        0b000000000100010110110110000, 0b000000000100000000000000000),
+        RelationshipTest(RelationshipType.SHELTERS,         0b111000100110110000110110000, 0b111000000000000000000000000),
+        RelationshipTest(RelationshipType.DISJOINT,         0b110110000110110000110110000, 0b000000000000000000000000000),
+        RelationshipTest(RelationshipType.BORDERS,          0b000000000001001110110110000, 0b000000000001001110000010000),
+        RelationshipTest(RelationshipType.BORDERS_INTERIOR, 0b000000000101010110110110000, 0b000000000101000000000010000),
+        RelationshipTest(RelationshipType.OVERLAPS,         0b000000000000000000101000100, 0b000000000000000000101000100),
+        RelationshipTest(RelationshipType.PARTITION,        0b000000000000000000101010110, 0b000000000000000000101010000),
+        RelationshipTest(RelationshipType.CONTAINS,         0b000000000000000000101010110, 0b000000000000000000101000000),
+        RelationshipTest(RelationshipType.EQUALS,           0b000000000000000000101001110, 0b000000000000000000100000000)
+        ]
+    for rel_def in test_binaries:
+        result = rel_def.test(relation_binary)
+        if result:
+            return result
+    return RelationshipType.UNKNOWN
+
+
+def find_relationship(slice_table: pd.DataFrame,
+                      selected_roi: StructurePair) -> RelationshipType:
+    '''Get the relationship between two structures.
+
+    The relationship is based on the DE-9IM relationships between individual
+    slices for the two structures' contours, hulls and exteriors.  For slices
+    that are not at the boundary of the first structure, the DE-9IM relationship
+    is obtained by comparing the contours of the two structures.  For boundary
+
+    The relationship is identified by comparing the DE-9IM
+
+    determined by comparing the DE-9IM relationships between
+    the two structures.  The relationships are calculated for all slices that
+    contain contours for both structures.  The relationship is identified by
+    comparing the DE-9IM relationships for the two
+
+    Args:
+        slice_table (pd.DataFrame): _description_
+        selected_roi (StructurePair): _description_
+
+    Returns:
+        RelationshipType: _description_
+    '''
+    all_relations = []
+    mid_relations = get_non_boundary_relations(slice_table, selected_roi)
+    if not mid_relations.empty:
+        all_relations.append(mid_relations)
+    matching_boundary_relations = get_matched_bdy_rel(slice_table, selected_roi)
+    if not matching_boundary_relations.empty:
+        all_relations.append(matching_boundary_relations)
+    offset_boundary_relations = get_offset_bdy_rel(slice_table, selected_roi)
+    if not offset_boundary_relations.empty:
+        all_relations.append(offset_boundary_relations)
+    relation_binary = merge_rel(pd.concat(all_relations))
+    return identify_relation(relation_binary)
 
 
 # %% Relationship class
