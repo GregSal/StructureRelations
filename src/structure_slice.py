@@ -13,7 +13,7 @@ import pandas as pd
 import shapely
 
 # Local packages
-from types_and_classes import PRECISION, SliceIndex, StructurePair
+from types_and_classes import PRECISION, SliceIndexType, StructurePairType
 from types_and_classes import InvalidContour, InvalidContourRelation
 from utilities import poly_round
 
@@ -43,6 +43,8 @@ class StructureSlice():
         hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
             surrounding the contour MultiPolygon.
     '''
+    # TODO: Calculate Contour metrics on a per-region basis see ContourSlice in
+    # RS_DICOM_Utilities.py
     def __init__(self, contours: List[shapely.Polygon], **kwargs) -> None:
         '''Iteratively create a shapely MultiPolygon from a list of shapely
         Polygons.
@@ -69,8 +71,8 @@ class StructureSlice():
             self.add_contour(contour, ignore_errors=ignore_errors)
 
     def add_contour(self, contour: shapely.Polygon, ignore_errors=False) -> None:
-        '''Add a shapely Polygon to the current MultiPolygon from a list of shapely
-        Polygons.
+        '''Add a shapely Polygon to the current MultiPolygon from a list of
+        shapely Polygons.
 
         Polygons that are contained within the already formed MultiPolygon are
         treated as holes and subtracted from the MultiPolygon.  Polygons
@@ -81,6 +83,9 @@ class StructureSlice():
             contour (shapely.Polygon): The shapely Polygon to be added.
                 The shapely Polygon must either be contained in or be disjoint
                 with the existing MultiPolygon.
+            ignore_errors (bool, optional): If True, the function will not raise
+                an error when the supplied shapely Polygon overlaps with the
+                existing MultiPolygon. Defaults to False.
 
         Raises:
             ValueError: When the supplied shapely Polygon overlaps with the
@@ -220,9 +225,93 @@ def empty_structure(structure:  Union[StructureSlice, float]) -> bool:
         bool: False if the structure is type StructureSlice and is not empty.
             Otherwise True.
     '''
-    if isinstance(structure, StructureSlice):
-        return structure.is_empty
-    return True
+    if not isinstance(structure, StructureSlice):
+        return True
+    return structure.is_empty
+
+
+def has_area(poly: Union[StructureSlice, float])->bool:
+    '''Check if the structure has area.
+
+    Tests whether the structure has an area greater than zero or is empty.
+
+    Args:
+        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
+
+    Returns:
+        bool: True if the structure has an area greater than zero, False
+            otherwise.
+    '''
+    if poly.is_empty:
+        return False
+    area = poly.contour.area
+    return area > 0
+
+
+def contains_point(poly: Union[StructureSlice, float],
+                   point: shapely.Point)->bool:
+    '''Check if the structure contains the given point.
+
+    Tests whether the structure contains the given point or is empty.
+    This is a convenience function that wraps the shapely Polygon.contains
+    method, allowing it to be applied to a series of StructureSlice objects.
+
+    Args:
+        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
+        point (shapely.Point): A shapely Point object.
+
+    Returns:
+        bool: True if the structure contains the point, False otherwise.
+    '''
+    if poly.is_empty:
+        return False
+    return poly.contour.contains(point)
+
+
+def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
+    '''Get the centroid of the structure.
+
+    Returns the centroid of the structure or NaN if the structure is empty.
+
+    Args:
+        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
+
+    Returns:
+        shapely.Point: The centroid of the structure.
+    '''
+    if poly.is_empty:
+        return shapely.Point()
+    return poly.contour.centroid
+
+
+def merge_contours(slice_contours: pd.Series,
+                   ignore_errors=False) -> StructureSlice:
+    '''Merge contours for a single slice into a single StructureSlice.
+
+    the supplied slice_contours are sorted by area in descending order and
+    merged into a single StructureSlice instance. StructureSlice treats every
+    contour as a hole or a solid region.  The largest contour is treated as a
+    solid region and for each of the remaining contours, if the contour is
+    contained within the solid region, it is treated as a hole.  If the contour
+    is disjoint with the solid region, it is combined with the solid region.
+
+    Args:
+        slice_data (pd.Series): A series of individual structure contours.
+        ignore_errors (bool, optional): If True, overlapping contours are
+            allowed and combined to generate a larger solid region.
+            Defaults to False.
+    '''
+    ranked_contours = slice_contours.sort_values('Area', ascending=False)
+    try:
+        structure_slice = StructureSlice(list(ranked_contours.Contour),
+                                            ignore_errors=ignore_errors)
+    except InvalidContour as err:
+        msg = str(err)
+        roi_num = ranked_contours.index[0][0]
+        slice_idx = ranked_contours.index[0][1]
+        print(f'{msg}\t for ROI: {roi_num} on slice: {slice_idx}')
+        structure_slice = StructureSlice([])
+    return structure_slice
 
 
 def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
@@ -235,25 +324,14 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
 
     Args:
         slice_data (pd.Series): A series of individual structure contours.
-        ignore_errors (bool, optional): _description_. Defaults to False.
+        ignore_errors (bool, optional): If True, overlapping contours are
+            allowed and combined to generate a larger solid region.
+            Defaults to False.
 
     Returns:
         pd.DataFrame: A table of StructureSlice data with an SliceIndex and
             ROI_Num as the index and columns respectively.
     '''
-    def merge_contours(slice_contours: pd.Series, ignore_errors=False):
-        ranked_contours = slice_contours.sort_values('Area', ascending=False)
-        try:
-            structure_slice = StructureSlice(list(ranked_contours.Contour),
-                                             ignore_errors=ignore_errors)
-        except InvalidContour as err:
-            msg = str(err)
-            roi_num = ranked_contours.index[0][0]
-            slice_idx = ranked_contours.index[0][1]
-            print(f'{msg}\t for ROI: {roi_num} on slice: {slice_idx}')
-            structure_slice = None
-        return structure_slice
-
     sorted_data = slice_data.sort_index(level=['Slice Index', 'ROI Num']).copy()
     sorted_data['Area'] = sorted_data.map(lambda x: x.area)
     structure_group = sorted_data.groupby(level=['Slice Index', 'ROI Num'])
@@ -264,7 +342,7 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
 
 
 def select_slices(slice_table: pd.DataFrame,
-                  selected_roi: StructurePair) -> pd.DataFrame:
+                  selected_roi: StructurePairType) -> pd.DataFrame:
     '''Select the slices that have either of the structures.
 
     Select all slices that have either of the structures.
@@ -273,15 +351,15 @@ def select_slices(slice_table: pd.DataFrame,
         slice_table (pd.DataFrame): A table of StructureSlice data with
             SliceIndex as the index, ROI_Num for columns and StructureSlice or
             NaN as the values.
-        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+        selected_roi (StructurePairType): A tuple of two ROI_Num to select.
 
     Returns:
         pd.DataFrame:  A subset of slice_table with the two selected_roi as the
             columns and the range of slices hat have either of the structures as
             the index.
     '''
-    start = SliceIndex(slice_table[selected_roi].first_valid_index())
-    end = SliceIndex(slice_table[selected_roi].last_valid_index())
+    start = SliceIndexType(slice_table[selected_roi].first_valid_index())
+    end = SliceIndexType(slice_table[selected_roi].last_valid_index())
     structure_slices = slice_table.loc[start:end, selected_roi]
     return structure_slices
 
@@ -330,8 +408,8 @@ def find_neighbouring_slice(structure_slices) -> pd.DataFrame:
     the slice index in the positive and negative direction.
 
     Args:
-        structure_slices (pd.Series): A series with SliceIndex as the index and
-            StructureSlice or na as the values.
+        structure_slices (pd.Series): A series with SliceIndexType as the index
+            and StructureSlice or NaN as the values.
 
     Returns:
         pd.DataFrame: A table with columns labeled ['z_pos', 'z_neg'], where
@@ -339,13 +417,32 @@ def find_neighbouring_slice(structure_slices) -> pd.DataFrame:
             direction and 'z_neg' is the SliceIndex of the neighbouring slice
             in the negative direction.
     '''
-    def neighbouring_slice(slice_index, missing_slices, shift_direction=1,
-                        shift_start=0):
+    def neighbouring_slice(slice_index: pd.Series, missing_slices: pd.Series,
+                           shift_direction=1, shift_start=0)->pd.Series:
+        '''Find the neighbouring slices for each missing slice.
+
+        For each slice that is missing a structure, find the neighbouring slices
+        that contain the structure.  The neighbouring slices are found by
+        shifting the slice index until a non-empty structure is found.
+
+        Args:
+            slice_index (pd.Series): A series with SliceIndexType as the index
+                and the values.
+            missing_slices (pd.Series): A subset of slice_index containing index
+                values that ar missing a structure.
+            shift_direction (int, optional): The direction to shift the slice
+                index. Defaults to 1.
+            shift_start (int, optional): The starting shift size. Defaults to 0.
+        '''
+        # TODO this function (neighbouring_slice) seems very awkward.  It should
+        # be possible to simplify this function.
         ref = slice_index[missing_slices]
         ref_missing = list(missing_slices)
         shift_size = shift_start
         while ref_missing:
             shift_size += shift_direction
+            # Shift the slice index by the shift size and select the indexes
+            # that need a neighbour.
             shift_slice = slice_index.shift(shift_size)[missing_slices]
             ref_idx = ref.isin(ref_missing)
             ref[ref_idx] = shift_slice[ref_idx]
@@ -354,7 +451,8 @@ def find_neighbouring_slice(structure_slices) -> pd.DataFrame:
         return ref
 
     slice_index = structure_slices.index.to_series()
-    missing_slices = slice_index[structure_slices.isna()]
+    # Find the slices that are missing a structure
+    missing_slices = slice_index[structure_slices.apply(empty_structure)]
     z_neg = neighbouring_slice(slice_index, missing_slices, shift_direction=-1)
     z_pos = neighbouring_slice(slice_index, missing_slices, shift_direction=1)
     ref = pd.concat([z_pos, z_neg], axis='columns')
@@ -362,24 +460,22 @@ def find_neighbouring_slice(structure_slices) -> pd.DataFrame:
     return ref
 
 
-def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndex]:
+def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndexType]:
     '''Identify the first and last slices of a structure region.
 
     Slices without the structure are identified by `isna()`.
     Any slice that contains the structure, but has a neighbouring slices that
     does not contain the structure is considered a boundary slice.
 
-    In the future, add tests for zero area polygons.
-
     Args:
         structure_slices (pd.Series): A series with SliceIndex as the index and
             StructureSlice or na as the values.
 
     Returns:
-        List[SliceIndex]: A list of all slice indexes where the structure is
+        List[SliceIndexType]: A list of all slice indexes where the structure is
             not present on a neighbouring slice.
     '''
-    used_slices = ~structure_slices.isna()
+    used_slices = ~structure_slices.apply(empty_structure)
     start = used_slices & (used_slices ^ used_slices.shift(1))
     end = used_slices & (used_slices ^ used_slices.shift(-1))
     start_slices = list(structure_slices[start].index)
@@ -389,7 +485,7 @@ def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndex]:
 
 
 def identify_boundary_slices(structure_slices: Union[pd.Series, pd.DataFrame],
-                             selected_roi: StructurePair = None) -> pd.Series:
+                             selected_roi: StructurePairType = None) -> pd.Series:
     '''Identify boundary slices for the given structure or structures.
 
     Identifies the first and last slice that has a structure contour for the
@@ -401,8 +497,8 @@ def identify_boundary_slices(structure_slices: Union[pd.Series, pd.DataFrame],
     Args:
         structure_slices (Union[pd.Series, pd.DataFrame]): A Series or DataFrame
             containing StructureSlice data.
-        selected_roi (List[ROI_Num], optional): A list of two ROI_Num to select
-            when structure_slices is a DataFrame. Defaults to None.
+        selected_roi (StructurePairType, optional): A list of two ROI_Num to
+            select when structure_slices is a DataFrame. Defaults to None.
 
     Returns:
         pd.Series: A Series indicating whether each slice is a boundary slice.
