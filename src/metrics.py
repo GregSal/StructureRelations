@@ -2,54 +2,39 @@
 '''
 # %% Imports
 # Type imports
-
-from typing import Any, Dict, List, Tuple, Union
-from enum import Enum, auto
-from dataclasses import dataclass, field, asdict
+from typing import Dict, List
 
 # Standard Libraries
-from pathlib import Path
+from enum import Enum, auto
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from math import sqrt, pi, sin, cos, tan, radians
-from statistics import mean
-from itertools import zip_longest
+from math import sqrt
 from itertools import product
 
 # Shared Packages
 import numpy as np
 import pandas as pd
-#import xlwings as xw
-import pydicom
-import matplotlib.pyplot as plt
 import shapely
-from shapely.plotting import plot_polygon, plot_line
-import networkx as nx
 
+# Local packages
 from types_and_classes import InvalidContourRelation
-from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair
-from structure_slice import StructureSlice
+from types_and_classes import ContourType, StructurePairType, PRECISION
+from structure_slice import StructureSlice, contains_point, find_boundary_slices, get_centroid, has_area, identify_boundary_slices, select_slices, structure_neighbours
 from relations import RelationshipType
-from structure_slice import structure_neighbours
 
-# Global Settings
-PRECISION = 3
 
-# %% Metric Functions
-def broadcast_coords(center: np.array, limits: np.array) -> list[np.array]:
+# %% Margin Functions
+def broadcast_coords(center: np.array, limits: np.array) -> List[np.array]:
     '''Create points at each of the 4 limits, aligned with center_coords.
 
     Each limit value in limits is placed into an xy pair along with the
     appropriate x or y values from center_coords.
 
     Args:
-        center_coords (np.array): length 2 array of float with center
+        center (np.array): length 2 array of float with center
             coordinates.
 
     limits (np.array): length 4 array of float with x and y limits.
-
-    precision (int, optional): The number of decimal points to round to.
-        Defaults to global PRECISION constant.
 
 Returns:
     list[np.array]: A list of xy coordinate pairs at the specified limits,
@@ -61,6 +46,7 @@ Returns:
         xy_pairs[i * 2] = center.copy()
         xy_pairs[i * 2 + 1] = center.copy()
         for j in range(2):
+            # The index of the xy pair to modify.
             idx = i * 2 + j
             # replace the appropriate x or y value with one of the limits.
             xy_pairs[idx][j] = limits[i][j]
@@ -68,14 +54,17 @@ Returns:
 
 
 def length_between(line: shapely.LineString,
-                   poly_a: Contour, poly_b: Contour)->float:
+                   poly_a: ContourType, poly_b: ContourType)->float:
     '''Calculate the length of the line between poly_a and poly_b.
+
+    The length of the line segment that lies exterior to poly_b and interior to
+    poly_a.
 
     Args:
         line (shapely.LineString): A line passing through both poly_a and
             poly_b.
-        poly_a (Contour): The outer polygon.
-        poly_b (Contour): A polygon contained within poly_a
+        poly_a (ContourType): The outer polygon.
+        poly_b (ContourType): A polygon contained within poly_a
 
     Returns:
         float: The length of the line segment that lies between the outside
@@ -90,61 +79,8 @@ def length_between(line: shapely.LineString,
     line_between_ab = shapely.intersection(line_outside_b, exterior_a)
     return shapely.length(line_between_ab)
 
-# %% Margin related functions
-def get_z_margins(structures, slice_table, precision=PRECISION):
-    def centred_in(poly: StructureSlice, point: shapely.Point)->bool:
-        return poly.contour.contains(point)
 
-    def has_area(poly: StructureSlice, precision)->bool:
-        area = poly.contour.area
-        #area = round(poly.contour.area, precision)
-        return area > 0
-
-    def get_one_z_margin(slice_structures, structures, precision):
-        roi_a, roi_b = structures
-        # Select only the slices containing the second structure.
-        contour_b_slices = slice_structures[roi_b].dropna()
-        # Get the centre point of the end contour of the second structure.
-        centre_point = contour_b_slices.iloc[0].contour.centroid
-        # Identify the edge slice of the second structure.
-        end_slice = contour_b_slices.index[0]
-        # For the first structure replace the nan values with empty polygons.
-        contour_a_slices = slice_structures[roi_a].fillna(StructureSlice([]))
-        # Identify the slices beyond the edge of the second structure.
-        ext = contour_a_slices.index <= end_slice
-        # Identify the slices where the first structure contours contain the centre
-        # point of the end contour of the second structure.
-        aligned = contour_a_slices.apply(centred_in, point=centre_point)
-        # Identify the slices where structure a is present
-        has_a = contour_a_slices.apply(has_area, precision=PRECISION)
-        # Identify the slices where there is a transition from aligned to not aligned.
-        aligned_edge = aligned & ~aligned.shift(1, fill_value=False)
-        struct_edge = has_a & ~has_a.shift(1, fill_value=False)
-        # Select the transition point closest to the edge of the second structure.
-        aligned_lim = aligned[ext][aligned_edge].index[-1]
-        struct_lim = has_a[ext][struct_edge].index[-1]
-        # The margin in the desired direction is the difference between the edge of
-        # the second structure and the corresponding edge of the first structure.
-        aligned_margin = end_slice - aligned_lim
-        struct_margin = end_slice - struct_lim
-        z_lim = {'aligned': round(aligned_margin, precision),
-                 'struct': round(struct_margin, precision)}
-        return z_lim
-
-    roi_a, roi_b = structures
-    slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
-
-    z_neg_margin = get_one_z_margin(slice_structures, structures, precision)
-
-    slice_structures_rev = slice_structures.copy()
-    slice_structures_rev.index = slice_structures_rev.index * -1
-    slice_structures_rev.sort_index(inplace=True)
-    z_pos_margin = get_one_z_margin(slice_structures_rev, structures, precision)
-    margins = {'z_neg': z_neg_margin, 'z_pos': z_pos_margin}
-    return pd.DataFrame(margins).T
-
-
-def orthogonal_margins(poly_a: Contour, poly_b: Contour,
+def orthogonal_margins(poly_a: ContourType, poly_b: ContourType,
                        precision: int = PRECISION)->Dict[str, float]:
     '''Calculate the orthogonal margins between poly_a and poly_b.
 
@@ -153,8 +89,8 @@ def orthogonal_margins(poly_a: Contour, poly_b: Contour,
     cross the centre point of poly_b.
 
     Args:
-        poly_a (Contour): The outer polygon.
-        poly_b (Contour): A polygon contained within poly_a
+        poly_a (ContourType): The outer polygon.
+        poly_b (ContourType): A polygon contained within poly_a
         precision (int, optional): The number of decimal points to round to.
             Defaults to global PRECISION constant.
 
@@ -181,7 +117,59 @@ def orthogonal_margins(poly_a: Contour, poly_b: Contour,
     return orthogonal_lengths
 
 
-def min_margin(poly_a: Contour, poly_b: Contour,
+def get_z_margins(slice_table: pd.DataFrame,
+                  structures: StructurePairType)->Dict[str, float]:
+    '''Calculate the orthogonal z margins between two structures.
+
+    The z margins are the distances between the edge of the second structure and
+    the edge of the first structure in the z direction.
+    **** NOTE if the structures contain two or more contours on a slice, the
+    centre will not align with either contour and the margins will be incorrect.
+    StructureSlice needs to calculate a centre point for each region in the
+    StructureSlice.
+
+    Args:
+        slice_structures (pd.DataFrame): A DataFrame with the structure names as
+            columns and the slice number as the index. The values are
+            StructureSlice objects.
+
+        structures (StructurePairType): The reference numbers for two different
+            structures to be compared.
+
+    Returns:
+        Dict[str, float]: A dictionary containing the z margins in each
+            direction. The keys of the dictionary are:
+                ['z_neg', 'z_pos']
+    '''
+    structure_slices = select_slices(slice_table, structures)
+    roi_a, roi_b = structures
+    # Select only the slices containing the second structure.
+    contour_b_edges = identify_boundary_slices(structure_slices[roi_b]))
+    # Get the centre point of the edge contours of the second structure.
+    centre_points = contour_b_edges.apply(get_centroid)
+    # Identify the slices of the primary structure that do not contain
+    # the second structure.
+    roi_a_index = set(structure_slices[roi_a].index)
+    roi_b_index = set(structure_slices[roi_b].index)
+    non_overlap = roi_a_index - roi_b_index
+    contour_a_slices = structure_slices[roi_a].loc[non_overlap]
+    distances = []
+    for index, centre in centre_points.iteritems():
+        # Identify the slices where the first structure contours contain the
+        # centre point of the second structure.
+        aligned = contour_a_slices.apply(contains_point, point=centre)
+        distance = contour_a_slices.index[aligned] - index
+        distances.append(distance)
+    if not distances:
+        return {}
+    # The minimum and maximum distances between the two structures.
+    z_pos = min(d for d in distances if d >= 0)
+    z_neg = max(d for d in distances if d <= 0)
+    margins = {'z_neg': -z_neg, 'z_pos': z_pos}
+    return margins
+
+
+def min_margin(poly_a: ContourType, poly_b: ContourType,
                precision: int = PRECISION)->Dict[str, float]:
     boundary_a = poly_a.exterior
     boundary_b = poly_b.exterior
@@ -190,7 +178,7 @@ def min_margin(poly_a: Contour, poly_b: Contour,
     return rounded_distance
 
 
-def max_margin(poly_a: Contour, poly_b: Contour,
+def max_margin(poly_a: ContourType, poly_b: ContourType,
                precision: int = PRECISION)->Dict[str, float]:
     boundary_a = poly_a.exterior
     boundary_b = poly_b.exterior
@@ -207,14 +195,41 @@ def agg_margins(margin_table: pd.DataFrame):
     return margin_agg
 
 
-def margins(poly_a: StructureSlice, poly_b: StructureSlice,
-            relation: RelationshipType,
-            precision: int = PRECISION)->pd.Series:
-    def calculate_margins(polygon_a: Contour, polygon_b: Contour,
+def calculate_margins(slice_table: pd.DataFrame, structures: StructurePairType,
+                      precision: int = PRECISION)->pd.Series:
+    structure_slices = select_slices(slice_table, structures)
+    roi_a, roi_b = structures
+    for polygon_a, polygon_b in product(poly_a.contour.geoms,
+                                        poly_b.contour.geoms):
+        if ((relation == RelationshipType.CONTAINS) |
+            (relation == RelationshipType.PARTITION)):
+            margin_dict = calculate_margins(polygon_a, polygon_b, precision)
+        elif ((relation == RelationshipType.SURROUNDS) |
+              (relation == RelationshipType.BORDERS_INTERIOR)):
+            # Compare all holes in each a polygon with each b polygon.
+            for hole_ring in polygon_a.interiors:
+                hole = shapely.Polygon(hole_ring)
+                margin_dict = calculate_margins(hole, polygon_b, precision)
+                if margin_dict:
+                    margin_list.append(margin_dict)
+                margin_dict = {}  # Clear margin_dict so it is not added twice.
+        elif relation == RelationshipType.SHELTERS:
+            # The outer region to use for the margin is the "hole" formed by
+            # closing the contour using the convex hull.  This can be obtained
+            # by subtracting the contour polygon from its  convex hull polygon.
+            hull = shapely.convex_hull(polygon_a)
+            semi_hole = shapely.difference(hull, polygon_a)
+            margin_dict = calculate_margins(semi_hole, polygon_b, precision)
+def margins(slice_table: pd.DataFrame, structures: StructurePairType,
+            relation: RelationshipType, precision: int = PRECISION)->pd.Series:
+    def calculate_margins(polygon_a: ContourType, polygon_b: ContourType,
                           precision: int = PRECISION)->Dict[str, float]:
         # Only calculate margins when the a polygon contains the b polygon.
         if polygon_a.contains(polygon_b):
             margin_dict = orthogonal_margins(polygon_a, polygon_b, precision)
+            margin_dict.update(
+                get_z_margins(slice_table, structures, precision))
+
             margin_dict['max'] = max_margin(polygon_a, polygon_b, precision)
             margin_dict['min'] = min_margin(polygon_a, polygon_b, precision)
             return margin_dict
@@ -463,7 +478,7 @@ class Metric(ABC):
     metric_type: MetricType
     default_format_template: str
 
-    def __init__(self, structures: StructurePair, **kwargs):
+    def __init__(self, structures: StructurePairType, **kwargs):
         self.structures = structures
         self.metric = {}
         self.calculate_metric(**kwargs)
@@ -591,7 +606,7 @@ class MarginMetric(Metric):
         'MIN':  'Min: {min:3.1f}',
         'MAX':  'Max: {max:3.1f}'
         }
-    def __init__(self, structures: StructurePair, **kwargs):
+    def __init__(self, structures: StructurePairType, **kwargs):
         super().__init__(structures, **kwargs)
         self.format_dict = self.default_format_dict.copy()
         self.display_orthogonal_margins = True
