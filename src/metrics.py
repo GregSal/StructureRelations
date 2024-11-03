@@ -28,8 +28,9 @@ import networkx as nx
 
 from types_and_classes import InvalidContourRelation
 from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair
-from types_and_classes import StructureSlice, RelationshipType
-from utilities import structure_neighbours
+from structure_slice import StructureSlice
+from relations import RelationshipType
+from structure_slice import structure_neighbours
 
 # Global Settings
 PRECISION = 3

@@ -1,3 +1,11 @@
+# %% Imports
+import pandas as pd
+from structure_slice import StructureSlice, find_boundary_slices
+from types_and_classes import StructurePair
+from relations import RelationshipType, adjust_slice_boundary_relations, identify_relation, merge_rel, relate_structures
+from metrics import MarginMetric, DistanceMetric, NoMetric
+from metrics import OverlapVolumeMetric, OverlapSurfaceMetric
+
 # %% Relationship class
 class Relationship():
     symmetric_relations = [
