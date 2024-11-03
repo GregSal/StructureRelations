@@ -21,7 +21,7 @@ import shapely
 import pydicom
 from shapely.plotting import plot_polygon, plot_line
 
-from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_round
+from types_and_classes import ROI_Type, SliceIndexType, ContourType, StructurePairType, poly_round
 from types_and_classes import InvalidContour
 
 from types_and_classes import StructureSlice
@@ -72,7 +72,7 @@ class ResolutionType(Enum):
 class StructureInfo:
     '''Structure information obtained from the DICOM Structure file.
     Attributes Are:
-        roi_number (ROI_Num): The unique indexing reference to the structure.
+        roi_number (ROI_Type): The unique indexing reference to the structure.
         structure_id (str): The unique label for the structure.
         structure_name (str, optional): A short description of the structure.
             Default is an empty string.
@@ -98,7 +98,7 @@ class StructureInfo:
                     isodose line as structure).
                 '': Algorithm is not known.
     '''
-    roi_number: ROI_Num
+    roi_number: ROI_Type
     structure_id: str
     structure_name: str = ''
     structure_type: str = 'None'  # DICOM Structure Type
@@ -131,9 +131,9 @@ class StructureInfo:
 class StructureParameters:
     '''Structure parameters calculated from structure's contour points.
     Attributes Are:
-        sup_slice (SliceIndex, optional): The SUP-most CT slice offset
+        sup_slice (SliceIndexType, optional): The SUP-most CT slice offset
             containing contour point for the structure. Default is np.nan:
-        inf_slice (SliceIndex, optional): The INF-most CT slice offset
+        inf_slice (SliceIndexType, optional): The INF-most CT slice offset
             containing contour point for the structure. Default is np.nan:
         length (float, optional): The distance between the SUP-most and INF-most
             CT slices.  It assumes a continuous structure. Default is np.nan:
@@ -176,8 +176,8 @@ class StructureParameters:
                     isodose line as structure).
                 '': Algorithm is not known.
     '''
-    sup_slice: SliceIndex = np.nan
-    inf_slice: SliceIndex = np.nan
+    sup_slice: SliceIndexType = np.nan
+    inf_slice: SliceIndexType = np.nan
     length: float = np.nan
     volume: float = np.nan
     surface_area: float = np.nan
@@ -219,7 +219,7 @@ class Structure():
         'Range: ({sup_slice}cm, {inf_slice}cm)'
         ])
 
-    def __init__(self, roi: ROI_Num, struct_id: str, **kwargs) -> None:
+    def __init__(self, roi: ROI_Type, struct_id: str, **kwargs) -> None:
         super().__setattr__('roi_num', roi)
         super().__setattr__('id', struct_id)
         super().__setattr__('show', True)

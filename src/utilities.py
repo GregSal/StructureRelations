@@ -1,23 +1,12 @@
 '''Utility Functions'''
 # %% Imports
 # Type imports
-
-from itertools import chain
-from typing import List, Dict
-
-# Standard Libraries
-from math import ceil, sin, cos, radians, sqrt
-
+from typing import List
 
 # Shared Packages
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import shapely
-from shapely.plotting import plot_polygon, plot_line
 
-from types_and_classes import PRECISION, ROI_Num, SliceIndex, Contour, StructurePair
-
+from types_and_classes import PRECISION
 
 
 # %% Rounding Functions

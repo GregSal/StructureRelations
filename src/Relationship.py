@@ -1,7 +1,7 @@
 # %% Imports
 import pandas as pd
 from structure_slice import StructureSlice, find_boundary_slices
-from types_and_classes import StructurePair
+from types_and_classes import StructurePairType
 from relations import RelationshipType, adjust_slice_boundary_relations, identify_relation, merge_rel, relate_structures
 from metrics import MarginMetric, DistanceMetric, NoMetric
 from metrics import OverlapVolumeMetric, OverlapSurfaceMetric
@@ -34,7 +34,7 @@ class Relationship():
         RelationshipType.UNKNOWN: NoMetric,
         }
 
-    def __init__(self, structures: StructurePair,
+    def __init__(self, structures: StructurePairType,
                  slice_table: pd.DataFrame = pd.DataFrame(), **kwargs) -> None:
         self.is_logical = False
         self.show = True
@@ -73,7 +73,7 @@ class Relationship():
     def is_transitive(self)-> bool:
         return self.relationship_type in self.transitive_relations
 
-    def set_structures(self, structures: StructurePair,
+    def set_structures(self, structures: StructurePairType,
                        slice_table: pd.DataFrame = pd.DataFrame()) -> None:
         # FIXME Stub method to be replaced with set_structures function.
         # Order the structures with the larger one first

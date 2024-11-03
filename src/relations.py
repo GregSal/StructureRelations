@@ -14,12 +14,11 @@ import pandas as pd
 import shapely
 
 # Local packages
-from types_and_classes import StructurePair
-from types_and_classes import DE9IM_Value, DE27IM_Value
-from types_and_classes import StructureSlice
+from types_and_classes import StructurePairType
+from types_and_classes import DE9IM_Type, DE27IM_Type
+from structure_slice import StructureSlice
 from structure_slice import empty_structure
 from structure_slice import identify_boundary_slices, select_slices
-
 
 
 # Global Settings
@@ -28,7 +27,31 @@ PRECISION = 3
 
 # %% Relationship Type Definitions
 class RelationshipType(Enum):
-    '''The names for defined relationship types.'''
+    '''The names for defined relationship types.
+
+    The relationship types are based on the DE-9IM relationship between two
+    structures.  The relationship types are defined as follows:
+    DISJOINT: The two structures have no regions in common.
+    SURROUNDS: One structure resides completely within a hole in another
+                structure.
+    SHELTERS: One structure is within the convex outline of the other.
+    BORDERS: The two structures share a common exterior boundary.
+    BORDERS_INTERIOR: The two structures share a common boundary and one is
+                        within the other.
+    OVERLAPS: The two structures share a common region.
+    PARTITION: The two structures share a common region and one is within the
+                other.
+    CONTAINS: One structure contains the other.
+    EQUALS: The two structures are identical.
+    LOGICAL: The relationship is based on a logical combination of other
+                relationships.
+    UNKNOWN: The relationship has not been identified.
+
+    The class also includes properties to check if the relationship is
+    symmetric, and / or transitive.
+
+    Text formatting is provided by the label and __str__ properties.
+    '''
     DISJOINT = auto()
     SURROUNDS = auto()
     SHELTERS = auto()
@@ -151,17 +174,16 @@ def identify_relation(relation_binary) -> RelationshipType:
     relationship binary.
 
     The defined relationships are:
-    **** These are not Correct!! ****
         Relationship      Region Test   Exterior Test   Hull Test
         Disjoint          FF*FF****     FF*FF****       FF*FF****
-        Shelters          FF*FF****     FF*FF****       T***F*F**
-        Surrounds         FF*FF****     T***F*F**
+        Shelters          FF*FF****     FF*FF****       TTT***F**
+        Surrounds         FF*FF****     T***F*FF*
         Borders_Interior  FF*FT****     T***T****
-        Borders           FF*FT****     FF*FT****
+        Borders           FF*FT****     T*T*F*FF*
         Contains          T*T*F*FF*
         Partition         T*T*T*FF*
         Equals	          T*F**FFF*
-        Overlaps          TTTT*TTT*
+        Overlaps          T*T***T**
 
     Args:
         relation_binary (int): An integer generated from the combined DE-9IM
@@ -210,7 +232,7 @@ def identify_relation(relation_binary) -> RelationshipType:
 
 # %% Relationship Identification Functions
 def relate_contours(contour1: StructureSlice,
-                    contour2: StructureSlice)->DE27IM_Value:
+                    contour2: StructureSlice)->DE27IM_Type:
     '''Get the 27 bit relationship integer for two polygons,
 
     When written in binary, the 27 bit relationship contains 3 9-bit
@@ -229,12 +251,12 @@ def relate_contours(contour1: StructureSlice,
             The row index contains the slice index distances.
 
     Returns:
-        DE9IM_Value: An integer corresponding to a 27 bit binary value
+        DE9IM_Type: An integer corresponding to a 27 bit binary value
             reflecting the combined DE-9IM relationship between contour2 and
             contour1's convex hull, exterior and polygon.
     '''
     def compare(mpoly1: shapely.MultiPolygon,
-                mpoly2: shapely.MultiPolygon)->DE9IM_Value:
+                mpoly2: shapely.MultiPolygon)->DE9IM_Type:
         '''Get the DE-9IM relationship string for two contours
 
         The relationship string is converted to binary format, where 'F'
@@ -247,7 +269,7 @@ def relate_contours(contour1: StructureSlice,
                 structure on the same slice.
 
         Returns:
-            DE9IM_Value: A length 9 string of '1's and '0's reflecting the DE-9IM
+            DE9IM_Type: A length 9 string of '1's and '0's reflecting the DE-9IM
                 relationship between the supplied contours.
         '''
         relation_str = shapely.relate(mpoly1, mpoly2)
@@ -267,7 +289,7 @@ def relate_contours(contour1: StructureSlice,
 
 
 def relate_structures(slice_structures: pd.DataFrame,
-                      structures: StructurePair)->DE9IM_Value:
+                      structures: StructurePairType)->DE9IM_Type:
     '''Get the 27 bit relationship integer for two structures on a given slice.
 
     This is a convenience function that allows the relate_contours function to
@@ -281,10 +303,10 @@ def relate_structures(slice_structures: pd.DataFrame,
             column index contains the roi numbers for the structures.
             The row index contains the slice index distances.
 
-        structures (StructurePair): A tuple of ROI numbers which index
+        structures (StructurePairType): A tuple of ROI numbers which index
             columns in slice_structures.
     Returns:
-        DE9IM_Value: An integer corresponding to a 27 bit binary value
+        DE9IM_Type: An integer corresponding to a 27 bit binary value
             reflecting the combined DE-9IM relationship between the
             second contour and the first contour convex hull, exterior and
             contour.
@@ -296,7 +318,7 @@ def relate_structures(slice_structures: pd.DataFrame,
 
 
 def adjust_slice_boundary_relations(relation_seq: pd.Series,
-                                    structures: StructurePair,
+                                    structures: StructurePairType,
                                     boundary_slices: pd.DataFrame=None)->pd.Series:
     '''Adjust the DE-9IM relationship metric for the boundary slices of both
     structures.
@@ -309,12 +331,12 @@ def adjust_slice_boundary_relations(relation_seq: pd.Series,
     every third value of the DE-9IM relationship metric is shifted by 1.
 
     Args:
-        relation_seq (pd.Series): A series with SliceIndex as the index and
+        relation_seq (pd.Series): A series with SliceIndexType as the index and
             DE-9IM relationship metrics as the values.
-        structures (StructurePair): A tuple of ROI numbers which index
+        structures (StructurePairType): A tuple of ROI numbers which index
             columns in boundary_slices.
-        boundary_slices (pd.DataFrame, optional): Table with ROI_Num as columns
-            and SliceIndex as values. Every value in a given column indicates a
+        boundary_slices (pd.DataFrame, optional): Table with ROI_Type as columns
+            and SliceIndexType as values. Every value in a given column indicates a
             boundary slice for that ROI.  If not supplied, every row
             in relation_seq is assumed to be a boundary slice for both ROIs.
 
@@ -322,8 +344,8 @@ def adjust_slice_boundary_relations(relation_seq: pd.Series,
         pd.Series: The supplied relation_seq with adjusted DE-9IM relationship
         metrics for the boundary slices of both structures.
     '''
-    def shift_values(value: DE9IM_Value, mask: DE9IM_Value,
-                     shift: int)->DE9IM_Value:
+    def shift_values(value: DE9IM_Type, mask: DE9IM_Type,
+                     shift: int)->DE9IM_Type:
         # Select the DE-9IM relationship values related to the interior.
         interior_relations = value & mask
         # Select the DE-9IM relationship values related to the exterior.
@@ -381,7 +403,7 @@ def merge_rel(relation_seq: pd.Series)->int:
 
 
 def get_non_boundary_relations(slice_table: pd.DataFrame,
-                           selected_roi: StructurePair) -> pd.Series:
+                           selected_roi: StructurePairType) -> pd.Series:
     '''Determine the relation for contours that are not on boundary slices.
 
     The 27 bit relationship integers are calculated for the slices that contain
@@ -391,13 +413,13 @@ def get_non_boundary_relations(slice_table: pd.DataFrame,
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            SliceIndexType as the index, ROI_Type for columns and StructureSlice or
             NaN as the values.
-        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+        selected_roi (StructurePairType): A tuple of two ROI_Type to select.
 
     Returns:
         pd.Series: The relationship values between the contours from each
-            non-boundary slice, with SliceIndex as the index.
+            non-boundary slice, with SliceIndexType as the index.
     '''
     # select the slices spanned by both structures
     structure_slices = select_slices(slice_table, selected_roi)
@@ -418,7 +440,7 @@ def get_non_boundary_relations(slice_table: pd.DataFrame,
 
 
 def get_matched_bdy_rel(slice_table: pd.DataFrame,
-                         selected_roi: StructurePair) -> pd.Series:
+                         selected_roi: StructurePairType) -> pd.Series:
     '''Determine the relation for contours on matched boundary slices.
 
     Matched boundary slices are those that are boundary slices of both
@@ -435,13 +457,13 @@ def get_matched_bdy_rel(slice_table: pd.DataFrame,
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            SliceIndexType as the index, ROI_Type for columns and StructureSlice or
             NaN as the values.
-        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+        selected_roi (StructurePairType): A tuple of two ROI_Type to select.
 
     Returns:
         pd.Series: The relationship values between the contours from each
-            matched boundary slice, with SliceIndex as the index.  If there are
+            matched boundary slice, with SliceIndexType as the index.  If there are
             no matched boundary slices, an empty Series is returned.
     '''
     structure_slices = slice_table[selected_roi]
@@ -472,7 +494,7 @@ def get_matched_bdy_rel(slice_table: pd.DataFrame,
 
 
 def get_offset_bdy_rel(slice_table: pd.DataFrame,
-                         selected_roi: StructurePair) -> pd.Series:
+                         selected_roi: StructurePairType) -> pd.Series:
     '''Determine the relation for contours on offset boundary slices.
 
     Offset boundary slices are those where the boundary of the primary structure
@@ -490,17 +512,17 @@ def get_offset_bdy_rel(slice_table: pd.DataFrame,
 
     Args:
         slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index, ROI_Num for columns and StructureSlice or
+            SliceIndexType as the index, ROI_Type for columns and StructureSlice or
             NaN as the values.
-        selected_roi (StructurePair): A tuple of two ROI_Num to select.
+        selected_roi (StructurePairType): A tuple of two ROI_Type to select.
 
     Returns:
         pd.Series: The relationship values between the contours from each
-            offset boundary slice, with SliceIndex as the index.  If there are
+            offset boundary slice, with SliceIndexType as the index.  If there are
             no offset boundary slices, an empty Series is returned.
     '''
     def select_boundary_slices(slice_table: pd.DataFrame,
-                               selected_roi: StructurePair)->pd.Series:
+                               selected_roi: StructurePairType)->pd.Series:
         '''Select boundary slices where the boundaries of the two structures meet.
 
         The boundary slices are selected based on the following conditions:
@@ -510,12 +532,12 @@ def get_offset_bdy_rel(slice_table: pd.DataFrame,
 
         Args:
             slice_table (pd.DataFrame): A table of StructureSlice data with
-                SliceIndex as the index, ROI_Num for columns and StructureSlice
+                SliceIndexType as the index, ROI_Type for columns and StructureSlice
                 or NaN as the values.
-            selected_roi (StructurePair): A tuple of two ROI_Num to select.
+            selected_roi (StructurePairType): A tuple of two ROI_Type to select.
 
         Returns:
-            pd.Series: A boolean series with SliceIndex as the index. Values
+            pd.Series: A boolean series with SliceIndexType as the index. Values
             are True for slices where the boundaries of the two structures meet.
         '''
         # Select the slices spanned by both structures
@@ -544,27 +566,27 @@ def get_offset_bdy_rel(slice_table: pd.DataFrame,
         return selected_rows
 
     def pair_neighbouring_slices(slice_table: pd.DataFrame,
-                                        selected_roi: StructurePair,
+                                        selected_roi: StructurePairType,
                                         selected_rows: pd.Series)->pd.DataFrame:
         '''Combine primary slices from the selected rows with neighbouring
         secondary slices.
 
         Join the primary slice with a neighbouring secondary slice. If a
         primary slice has two neighbouring secondary slices, the one with the
-        lower SliceIndex is selected.
+        lower SliceIndexType is selected.
 
         Args:
             slice_table (pd.DataFrame): A table of StructureSlice data with
-                SliceIndex as the index, ROI_Num for columns and StructureSlice
+                SliceIndexType as the index, ROI_Type for columns and StructureSlice
                 or NaN as the values.
-            selected_roi (StructurePair): A tuple of two ROI_Num to select.
-            selected_rows (pd.Series): A boolean series with SliceIndex as the
+            selected_roi (StructurePairType): A tuple of two ROI_Type to select.
+            selected_rows (pd.Series): A boolean series with SliceIndexType as the
                 index. Values are True for slices where the boundaries of the
                 two structures meet.
 
         Returns:
-            pd.Series: A table of StructureSlice pairs with SliceIndex as
-                the index, ROI_Num for columns and StructureSlice as the values.
+            pd.Series: A table of StructureSlice pairs with SliceIndexType as
+                the index, ROI_Type for columns and StructureSlice as the values.
                 The table contains the StructureSlice for primary slice and the
                 neighbouring StructureSlice for the secondary slice.
         '''
@@ -610,7 +632,7 @@ def get_offset_bdy_rel(slice_table: pd.DataFrame,
 
 
 def find_relationship(slice_table: pd.DataFrame,
-                      selected_roi: StructurePair) -> RelationshipType:
+                      selected_roi: StructurePairType) -> RelationshipType:
     '''Get the relationship between two structures.
 
     The relationship is based on the DE-9IM relationships between individual
@@ -627,7 +649,7 @@ def find_relationship(slice_table: pd.DataFrame,
 
     Args:
         slice_table (pd.DataFrame): _description_
-        selected_roi (StructurePair): _description_
+        selected_roi (StructurePairType): _description_
 
     Returns:
         RelationshipType: _description_

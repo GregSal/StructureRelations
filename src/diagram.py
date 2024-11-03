@@ -22,7 +22,7 @@ import pydicom
 from shapely.plotting import plot_polygon, plot_line
 import pygraphviz as pgv
 
-from types_and_classes import ROI_Num, SliceIndex, Contour, StructurePair, poly_round
+from types_and_classes import ROI_Type, SliceIndexType, ContourType, StructurePairType, poly_round
 from types_and_classes import InvalidContour
 
 from types_and_classes import StructureSlice, RelationshipType

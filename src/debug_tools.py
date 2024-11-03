@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import shapely
 from shapely.plotting import plot_polygon, plot_line
 
-from types_and_classes import PRECISION, SliceIndex
+from types_and_classes import PRECISION, SliceIndexType
 
 from structure_slice import StructureSlice
 from utilities import poly_round
@@ -134,8 +134,8 @@ def type_table(sr):
 # %% Contour Creation Functions
 def make_slice_list(height: float = None, number_slices: int = None,
                     start: float = 0.0, spacing: float = 0.1,
-                    precision=PRECISION) -> List[SliceIndex]:
-    '''Generate a list of SliceIndex with the desired range and increment.
+                    precision=PRECISION) -> List[SliceIndexType]:
+    '''Generate a list of SliceIndexType with the desired range and increment.
 
 
     height or number_slices must be provided.
@@ -148,17 +148,17 @@ def make_slice_list(height: float = None, number_slices: int = None,
             If None, number_slices is required. Defaults to None.
         number_slices (int, optional): The number of slices to include in the
             list. If None, height is required. Defaults to None.
-        start (float, optional): The lowest SliceIndex value. Defaults to 0.0.
+        start (float, optional): The lowest SliceIndexType value. Defaults to 0.0.
         spacing (float, optional): The gap between slices. Not used if both
             height and number_slices are provided. Defaults to 0.1.
-        precision (int, optional): SliceIndex values are rounded to this number
+        precision (int, optional): SliceIndexType values are rounded to this number
             of decimal places.precision. Defaults to PRECISION (3).
 
     Raises:
         ValueError: if neither height nor number_slices is provided.
 
     Returns:
-        List[SliceIndex]: A list of SliceIndex for testing purposes.
+        List[SliceIndexType]: A list of SliceIndexType for testing purposes.
     '''
     if height:
         if number_slices:
@@ -168,7 +168,7 @@ def make_slice_list(height: float = None, number_slices: int = None,
     elif not number_slices:
         msg = 'At least one of height or number_slices must be specified.'
         raise ValueError(msg)
-    slices = [round(SliceIndex(num*spacing + start), precision)
+    slices = [round(SliceIndexType(num*spacing + start), precision)
               for num in range(number_slices)]
     return slices
 
@@ -228,7 +228,7 @@ def box_points(width: float, height: float = None, offset_x: float = 0,
 
 def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3)->Dict[SliceIndex, tuple[float, float]]:
+                precision=3)->Dict[SliceIndexType, tuple[float, float]]:
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
@@ -239,13 +239,13 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
     for slice_idx, radius in r_coord:
         slice_points = circle_points(radius, offset_x, offset_y, num_points,
                                       precision)
-        slice_data[SliceIndex(slice_idx)] = slice_points
+        slice_data[SliceIndexType(slice_idx)] = slice_points
     return slice_data
 
 
 def cylinder_points(radius: float, length: float, spacing: float = 0.1,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3)->Dict[SliceIndex, tuple[float, float]]:
+                precision=3)->Dict[SliceIndexType, tuple[float, float]]:
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
@@ -255,7 +255,7 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
     slice_data = {}
     for slice_idx, r in r_coord:
         slice_points = box_points(r, length, offset_x, offset_y, precision)
-        slice_data[SliceIndex(slice_idx)] = slice_points
+        slice_data[SliceIndexType(slice_idx)] = slice_points
     return slice_data
 
 
@@ -268,7 +268,7 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
     for slice_idx, xy_points in points_dict.items():
         slice_contour = shapely.Polygon(xy_points)
         roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndex(slice_idx),
+                     'Slice Index': SliceIndexType(slice_idx),
                      'Contour': slice_contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
@@ -287,7 +287,7 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
     slice_list = []
     for slice_idx in z_coord:
         roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndex(slice_idx),
+                     'Slice Index': SliceIndexType(slice_idx),
                      'Contour': contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
@@ -305,7 +305,7 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
     for slice_idx, xy_points in points_dict.items():
         slice_contour = shapely.Polygon(xy_points)
         roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndex(slice_idx),
+                     'Slice Index': SliceIndexType(slice_idx),
                      'Contour': slice_contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
@@ -330,7 +330,7 @@ def make_box(width: float, length: float = None, height: float = None,
     slice_list = []
     for slice_idx in z_coord:
         roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndex(slice_idx),
+                     'Slice Index': SliceIndexType(slice_idx),
                      'Contour': contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
@@ -349,7 +349,7 @@ def make_contour_slices(shape: shapely.Polygon, spacing: float = 0.1,
     slice_list = []
     for slice_idx in z_coord:
         roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndex(slice_idx),
+                     'Slice Index': SliceIndexType(slice_idx),
                      'Contour': contour}
         slice_list.append(roi_slice)
     slice_contours = pd.DataFrame(slice_list)
