@@ -5,6 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
+from math import pi, sqrt
 from typing import List, Union
 
 # Shared Packages
@@ -43,8 +44,7 @@ class StructureSlice():
         hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
             surrounding the contour MultiPolygon.
     '''
-    # TODO: Calculate Contour metrics on a per-region basis see ContourSlice in
-    # RS_DICOM_Utilities.py
+
     def __init__(self, contours: List[shapely.Polygon], **kwargs) -> None:
         '''Iteratively create a shapely MultiPolygon from a list of shapely
         Polygons.
@@ -208,6 +208,31 @@ class StructureSlice():
         '''
         count = len(self.contour.geoms)
         return count == 0
+
+    def extract_regions(self)->pd.DataFrame:
+        '''Extract the individual regions from the contour MultiPolygon.
+
+        Calculate the area, center, perimeter and circular radius for each
+        region. The resulting DataFrame has the following columns:
+            'polygon', 'area', 'centroid', 'perimeter' and 'radius'.
+        The 'polygon' column contains the shapely Polygon for each region.
+        The circular radius is the radius of a circle with the same area
+        as the region.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the extracted region data.
+        '''
+        region_list = []
+        for poly in self.contour.geoms:
+            poly_dict = {'polygon': poly,
+                         'area': poly.area,
+                         'centroid': poly.centroid,
+                         'perimeter': poly.length,
+                         'radius': round(sqrt(self.contour.area / pi),
+                                         self.precision)}
+
+            region_list.append(poly_dict)
+        return pd.DataFrame(region_list)
 
 
 # %% Slice related functions
@@ -522,3 +547,20 @@ def identify_boundary_slices(structure_slices: Union[pd.Series, pd.DataFrame],
                          'DataFrame.')
     is_boundary_slice = structure_slices.index.isin(boundary_slice_index)
     return pd.Series(is_boundary_slice, index=structure_slices.index)
+
+
+def get_region_centres(structure_slice)->pd.Series:
+    '''Get the centroid of each region in the structure slice.
+
+    Args:
+        structure_slice (StructureSlice): A StructureSlice object.
+
+    Returns:
+        pd.Series: A Series containing the centroid of each region in the
+            structure slice.
+    '''
+    if structure_slice.is_empty:
+        return pd.Series()
+    region_data = structure_slice.extract_regions()
+    region_centres = region_data['centroid']
+    return region_centres
