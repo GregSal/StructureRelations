@@ -198,7 +198,7 @@ def agg_margins(margin_table: pd.DataFrame):
     margin_agg['max'] = margin_table['max'].max()
     return margin_agg
 
-
+# TODO It ould be best if metric functions did not depend on relation.
 def margins(poly_a: StructureSlice, poly_b: StructureSlice,
             relation: RelationshipType,
             precision: int = PRECISION)->pd.Series:
