@@ -195,33 +195,9 @@ def agg_margins(margin_table: pd.DataFrame):
     return margin_agg
 
 
-def calculate_margins(slice_table: pd.DataFrame, structures: StructurePairType,
-                      precision: int = PRECISION)->pd.Series:
-    structure_slices = select_slices(slice_table, structures)
-    roi_a, roi_b = structures
-    for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                        poly_b.contour.geoms):
-        if ((relation == RelationshipType.CONTAINS) |
-            (relation == RelationshipType.PARTITION)):
-            margin_dict = calculate_margins(polygon_a, polygon_b, precision)
-        elif ((relation == RelationshipType.SURROUNDS) |
-              (relation == RelationshipType.BORDERS_INTERIOR)):
-            # Compare all holes in each a polygon with each b polygon.
-            for hole_ring in polygon_a.interiors:
-                hole = shapely.Polygon(hole_ring)
-                margin_dict = calculate_margins(hole, polygon_b, precision)
-                if margin_dict:
-                    margin_list.append(margin_dict)
-                margin_dict = {}  # Clear margin_dict so it is not added twice.
-        elif relation == RelationshipType.SHELTERS:
-            # The outer region to use for the margin is the "hole" formed by
-            # closing the contour using the convex hull.  This can be obtained
-            # by subtracting the contour polygon from its  convex hull polygon.
-            hull = shapely.convex_hull(polygon_a)
-            semi_hole = shapely.difference(hull, polygon_a)
-            margin_dict = calculate_margins(semi_hole, polygon_b, precision)
-def margins(slice_table: pd.DataFrame, structures: StructurePairType,
-            relation: RelationshipType, precision: int = PRECISION)->pd.Series:
+def margins(poly_a: StructureSlice, poly_b: StructureSlice,
+            relation: RelationshipType,
+            precision: int = PRECISION)->pd.Series:
     def calculate_margins(polygon_a: ContourType, polygon_b: ContourType,
                           precision: int = PRECISION)->Dict[str, float]:
         # Only calculate margins when the a polygon contains the b polygon.
