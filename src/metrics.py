@@ -205,6 +205,7 @@ def margins(poly_a: StructureSlice, poly_b: StructureSlice,
     def calculate_margins(polygon_a: ContourType, polygon_b: ContourType,
                           precision: int = PRECISION)->Dict[str, float]:
         # Only calculate margins when the a polygon contains the b polygon.
+        # FIXME get_z_margins now needs slice_table and structures
         if polygon_a.contains(polygon_b):
             margin_dict = orthogonal_margins(polygon_a, polygon_b, precision)
             margin_dict.update(
