@@ -19,7 +19,11 @@ import shapely
 # Local packages
 from types_and_classes import InvalidContourRelation
 from types_and_classes import ContourType, StructurePairType, PRECISION
-from structure_slice import StructureSlice, contains_point, find_boundary_slices, get_centroid, has_area, identify_boundary_slices, select_slices, structure_neighbours
+from structure_slice import StructureSlice, contains_point
+from structure_slice import find_boundary_slices, get_centroid
+from structure_slice import get_region_centres, has_area
+from structure_slice import identify_boundary_slices, select_slices
+from structure_slice import structure_neighbours
 from relations import RelationshipType
 
 
@@ -144,9 +148,9 @@ def get_z_margins(slice_table: pd.DataFrame,
     structure_slices = select_slices(slice_table, structures)
     roi_a, roi_b = structures
     # Select only the slices containing the second structure.
-    contour_b_edges = identify_boundary_slices(structure_slices[roi_b]))
+    contour_b_edges = identify_boundary_slices(structure_slices[roi_b])
     # Get the centre point of the edge contours of the second structure.
-    centre_points = contour_b_edges.apply(get_centroid)
+    centre_points = contour_b_edges.apply(get_region_centres)
     # Identify the slices of the primary structure that do not contain
     # the second structure.
     roi_a_index = set(structure_slices[roi_a].index)
@@ -158,23 +162,23 @@ def get_z_margins(slice_table: pd.DataFrame,
         # Identify the slices where the first structure contours contain the
         # centre point of the second structure.
         aligned = contour_a_slices.apply(contains_point, point=centre)
-        distance = contour_a_slices.index[aligned] - index
-        distances.append(distance)
+        dist = contour_a_slices.index[aligned] - index
+        distances.append(dist)
     if not distances:
         return {}
     # The minimum and maximum distances between the two structures.
     z_pos = min(d for d in distances if d >= 0)
     z_neg = max(d for d in distances if d <= 0)
-    margins = {'z_neg': -z_neg, 'z_pos': z_pos}
-    return margins
+    margin = {'z_neg': -z_neg, 'z_pos': z_pos}
+    return margin
 
 
 def min_margin(poly_a: ContourType, poly_b: ContourType,
                precision: int = PRECISION)->Dict[str, float]:
     boundary_a = poly_a.exterior
     boundary_b = poly_b.exterior
-    distance = boundary_a.distance(boundary_b)
-    rounded_distance = round(distance, precision)
+    dist = boundary_a.distance(boundary_b)
+    rounded_distance = round(dist, precision)
     return rounded_distance
 
 
@@ -182,8 +186,8 @@ def max_margin(poly_a: ContourType, poly_b: ContourType,
                precision: int = PRECISION)->Dict[str, float]:
     boundary_a = poly_a.exterior
     boundary_b = poly_b.exterior
-    distance = boundary_a.hausdorff_distance(boundary_b)
-    rounded_distance = round(distance, precision)
+    dist = boundary_a.hausdorff_distance(boundary_b)
+    rounded_distance = round(dist, precision)
     return rounded_distance
 
 
