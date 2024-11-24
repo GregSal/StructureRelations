@@ -174,7 +174,7 @@ def make_slice_list(height: float = None, number_slices: int = None,
 
 
 def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
-                  num_points: int = 16, precision=3)->list[tuple[float, float]]:
+                  num_points: int = 16, precision=3, z:float=None)->list[tuple[float, float]]:
     deg_step = radians(360/num_points)
     degree_points = np.arange(stop=radians(360), step=deg_step)
     if radius == 0:
@@ -183,7 +183,11 @@ def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
     y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
     x_coord = x_coord + offset_x
     y_coord = y_coord + offset_y
-    coords = [(x,y) for x,y in zip(x_coord,y_coord)]
+    if z is not None:
+        z = float(z)
+        coords = [(x,y,z) for x,y in zip(x_coord,y_coord)]
+    else:
+        coords = list(zip(x_coord,y_coord))
     return coords
 
 
