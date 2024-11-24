@@ -25,7 +25,7 @@ def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
     '''
     dim = shapely.get_coordinate_dimension(point)
     if dim == 2:
-        x, y = shapely.get_coordinates(point, include_z=True)[0]
+        x, y = shapely.get_coordinates(point)[0]
         clean_coords = [round(x,precision), round(y,precision)]
     elif dim == 3:
         x, y, z = shapely.get_coordinates(point, include_z=True)[0]
@@ -42,7 +42,7 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
     Args:
         polygon (shapely.Polygon): The polygon to clean.
 
-        precision (int, optional): The number of decimal points to round to.
+        precision (int, optional): The number of decimal points sto round to.
             Defaults to global PRECISION constant.
 
     Returns:
@@ -52,7 +52,7 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
     dim = shapely.get_coordinate_dimension(polygon)
     if dim == 2:
         polygon_points = [(round(x,precision), round(y,precision))
-                          for x,y in shapely.get_coordinates(polygon, include_z=True)]
+                          for x,y in shapely.get_coordinates(polygon)]
     elif dim == 3:
         polygon_points = [(round(x,precision), round(y,precision), round(z,precision))
                           for x,y,z in shapely.get_coordinates(polygon, include_z=True)]
