@@ -16,7 +16,7 @@ import shapely
 # Local packages
 from types_and_classes import PRECISION, SliceIndexType, StructurePairType
 from types_and_classes import InvalidContour, InvalidContourRelation
-from utilities import poly_round
+from utilities import point_round, poly_round
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -66,6 +66,10 @@ class StructureSlice():
             ignore_errors = kwargs['ignore_errors']
         else:
             ignore_errors = False
+        if 'slice_position' in kwargs:
+            self.slice_position = kwargs['slice_position']
+        else:
+            self.slice_position = None
         self.contour = shapely.MultiPolygon()
         for contour in contours:
             self.add_contour(contour, ignore_errors=ignore_errors)
@@ -91,6 +95,14 @@ class StructureSlice():
             ValueError: When the supplied shapely Polygon overlaps with the
                 existing MultiPolygon.
         '''
+        # check for slice position
+        dim = shapely.get_coordinate_dimension(contour)
+        if dim == 3:
+            slice_position = shapely.get_coordinates(contour, include_z=True)[0][2]
+            if self.slice_position is None:
+                self.slice_position = slice_position
+            elif slice_position != self.slice_position:
+                raise ValueError('Slice position mismatch.')
         # Apply requisite rounding to polygon
         contour_round = poly_round(contour, self.precision)
         # Check for valid contour
@@ -233,6 +245,33 @@ class StructureSlice():
 
             region_list.append(poly_dict)
         return pd.DataFrame(region_list)
+
+    def centers(self, coverage: str)->List[shapely.Point]:
+        '''A list of the geometric centers of each polygon in the ContourSlice.
+
+        Args:
+            coverage (str): The type of coverage to use for the centroid
+                calculations.  Must be one of 'external', 'hull' or 'contour'.
+
+        Returns:
+            List[shapely.Point]: A list of the geometric centers of each polygon
+            in the ContourSlice.
+        '''
+        centre_list = []
+        # select the polygon type
+        if coverage == 'contour':
+            polygons = [poly for poly in self.contour.geoms]
+        elif coverage == 'exterior':
+            polygons = self.exterior
+        elif coverage == 'hull':
+            polygons = self.hull
+        else:
+            raise ValueError('Invalid coverage type')
+        # calculate the centroid for each polygon
+        for poly in polygons:
+            centre_point = point_round(poly.centroid, self.precision)
+            centre_list.append(centre_point)
+        return centre_list
 
 
 # %% Slice related functions
