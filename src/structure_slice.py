@@ -297,7 +297,7 @@ class StructureSlice():
         # calculate the centroid for each polygon
         for poly in polygons.geoms:
             raw_limits = [round(val, self.precision) for val in poly.bounds]
-            limits = np.array(raw_limits).reshape((2,-1))
+            limits = np.array(raw_limits).reshape((2,-1)).T
             limits_list.append(limits)
         return limits_list
 
