@@ -79,7 +79,11 @@ def plot_ab(poly_a, poly_b):
     plot_geom(ax, only_b, color='green')
     both_ab = shapely.intersection(poly_a, poly_b)
     plot_geom(ax, both_ab, color='orange')
+
+    ax.axhline(0, color='gray', linestyle='--')
+    ax.axvline(0, color='gray', linestyle='--')
     plt.show()
+    return ax
 
 
 def plot_roi(slice_table, roi_list: List[int]):
