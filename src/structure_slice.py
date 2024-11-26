@@ -176,7 +176,7 @@ class StructureSlice():
         return hull
 
 
-    def select_extent(self, coverage: str) -> shapely.MultiPolygon:
+    def select(self, coverage: str) -> shapely.MultiPolygon:
         # select the polygon type
         if coverage == 'contour':
             polygon = self.contour
@@ -273,7 +273,7 @@ class StructureSlice():
             in the ContourSlice.
         '''
         centre_list = []
-        polygons = self.select_extent(coverage)
+        polygons = self.select(coverage)
         # calculate the centroid for each polygon
         for poly in polygons.geoms:
             centre_point = point_round(poly.centroid, self.precision)
@@ -281,25 +281,8 @@ class StructureSlice():
         return centre_list
 
 
-    def limits(self, coverage: str = 'contour')->List[shapely.Point]:
-        '''A list of the extent of each polygon in the ContourSlice.
 
-        Args:
-            coverage (str): The type of coverage to use for the extent.
-                Must be one of 'external', 'hull' or 'contour'.
 
-        Returns:
-            List[np.array]: A list of the extent of each polygon in the
-                ContourSlice.
-        '''
-        limits_list = []
-        polygons = self.select_extent(coverage)
-        # calculate the centroid for each polygon
-        for poly in polygons.geoms:
-            raw_limits = [round(val, self.precision) for val in poly.bounds]
-            limits = np.array(raw_limits).reshape((2,-1)).T
-            limits_list.append(limits)
-        return limits_list
 
 # %% Slice related functions
 def empty_structure(structure:  Union[StructureSlice, float]) -> bool:
