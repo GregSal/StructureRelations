@@ -1,14 +1,18 @@
-# This is a test script for embedded spheres
-
 #from math import sqrt
-#rom BOPTools import BOPFeatures
 from typing import Tuple
 vector = Tuple[float, float, float]
-import Part
 
-save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+from BOPTools import BOPFeatures
+
+script_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
+image_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
+
+
 # %% Functions
-def add_measurement(start, end, offset=1.0, label='m1',
+def add_measurement(doc, start, end, offset=1.0, label='m1',
                     text_color=(0,0,0), line_color=(0,0,0)):
     m1 = doc.addObject("App::MeasureDistance", label)
     m1.P1 = App.Vector(start[0] * 10, start[1] * 10, start[2] * 10)
@@ -41,51 +45,53 @@ def make_sphere(doc: App.Document, part_name: str, radius: float,
 def make_cylinder(doc: App.Document, part_name: str,
                   radius: float, height: float,
                   offset: vector, direction: vector)->Part.Feature:
+    orientation = App.Vector(*direction)
     placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
-    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, direction)
+    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, orientation)
     struct = make_structure(doc, cylinder, part_name)
     return struct
 
-
 # Structure Interactions Coloring
-def interactions(doc, struct_a, struct_b):
-    # Structure Intersections
-    def find_overlapping(doc, struct_a, struct_b, color, label):
-        overlapping = struct_a.Shape.common(struct_b.Shape)
-        if overlapping.Volume == 0:
-            return None
-        struct = doc.addObject("Part::Feature", label)
-        struct.Label = label
-        struct.Shape = overlapping
-        struct.ViewObject.ShapeColor = color
+def interactions(doc, struct_1, struct_2)->Tuple[Part.Feature]:
+    def cut_a(doc, struct_a, struct_b, color, label)->Part.Feature:
+        bp = BOPFeatures.BOPFeatures(doc)
+        struct_a_only = bp.make_cut([struct_a.Name, struct_b.Name])
+        struct_a_only.Label = label
+        if struct_a_only.Shape.isNull():
+            doc.removeObject(struct_a_only.Name)
+            struct_a_only = None
+        else:
+            struct_a_only.ViewObject.ShapeColor = color
         doc.recompute()
-        return struct
+        return struct_a_only
 
-    # Structure Differences
-    def find_exclusion(doc, struct_a, struct_b, color, label):
-        exclusion = struct_a.Shape.cut(struct_b.Shape)
-        print(label, exclusion.Volume)
-        if exclusion.Volume == 0:
-            return None
-        struct = doc.addObject("Part::Feature", label)
-        struct.Label = label
-        struct.Shape = exclusion
-        struct.ViewObject.ShapeColor = color
+    def find_overlapping(doc, struct_a, struct_b, color, label)->Part.Feature:
+        bp = BOPFeatures.BOPFeatures(doc)
+        overlapping = bp.make_multi_common([struct_a.Name, struct_b.Name])
         doc.recompute()
-        return struct
+        overlapping.Label = label
+        if overlapping.Shape.isNull():
+            doc.removeObject(overlapping.Name)
+            overlapping = None
+        else:
+            overlapping.ViewObject.ShapeColor = color
+        #doc.recompute()
+        return overlapping
 
     # Define Structure Colors
-    a_color = (0,0,255)  #  Blue
-    b_color = (0,255,0)  #  Green
-    both_color = (255,170,0)  # Orange
-    # Define Structure Labels
-    a_label = "Only A"
-    b_label = "Only B"
-    both_label = "Both"
-    a_only = find_exclusion(doc, struct_a, struct_b, a_color, a_label)
-    b_only = find_exclusion(doc, struct_b, struct_a, b_color, b_label)
-    both = find_overlapping(doc, struct_a, struct_b, both_color, both_label)
-    return a_only, b_only, both
+    struct_1_color = (0,0,255)  #  Blue
+    struct_2_color = (0,255,0)  #  Green
+    intersect_color = (255,170,0)  # Orange
+    # Structure Intersections
+    struct_1_only = cut_a(doc, struct_1, struct_2, struct_1_color,
+                          "Structure 1 Only")
+    struct_2_only = cut_a(doc, struct_2, struct_1, struct_2_color,
+                          "Structure 2 Only")
+    overlapping = find_overlapping(doc, struct_1, struct_2, intersect_color,
+                                   "Overlapping Structures")
+    doc.recompute()
+    return struct_1_only, struct_2_only, overlapping
+
 
 
 # Cropped views
@@ -143,7 +149,44 @@ def crop_orth(a_only, b_only, both, direction):
         Gui.SendMsgToActiveView("ViewFit")
     #Gui.ActiveDocument.ActiveView.setAxisCross(False)
 
-Gui.activateWorkbench("PartWorkbench")
+
+
+def make_crop(doc, struct_1_only, overlapping):
+
+    # Define Structure Colors
+    struct_1_color = (0,0,255)  #  Blue
+    struct_2_color = (0,255,0)  #  Green
+    intersect_color = (255,170,0)  # Orange
+
+
+    crop_box = doc.addObject("Part::Box", "CropX")
+    cropping_size = struct_1_only.Shape.BoundBox
+    cropping_center = cropping_size.Center
+    cropping_center[1] = cropping_size.YMin - 1
+    cropping_center[2] = cropping_size.ZMin -1
+    crop_box.Placement=App.Placement(cropping_center, App.Rotation(0,0,0), App.Vector(0,0,0))
+    crop_box.Length = f'{-cropping_size.XMin + 2} mm'
+    crop_box.Width = f'{cropping_size.YLength + 2} mm'
+    crop_box.Height = f'{cropping_size.ZLength + 2} mm'
+    doc.recompute()
+
+    # Crop & color structures
+    bp = BOPFeatures.BOPFeatures(doc)
+    cropped_struct_1 = bp.make_cut([struct_1_only.Name, "CropX"])
+    doc.recompute()
+    cropped_struct_1.ViewObject.ShapeColor = struct_1_color
+    cropped_struct_1.Label = "Struct_1_crop_X"
+
+    cropped_overlap = bp.make_cut([overlapping.Name, "CropX"])
+    doc.recompute()
+    cropped_overlap.ViewObject.ShapeColor = intersect_color
+    cropped_overlap.Label = "Structure Overlap Crop_X"
+
+
+
+
+
+
 
 #crop_box.DrawStyle = u"Dotted"
 #crop_box.DisplayMode = u"Wireframe"
