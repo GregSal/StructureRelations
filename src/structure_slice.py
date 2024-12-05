@@ -549,9 +549,13 @@ def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndexType]:
         List[SliceIndexType]: A list of all slice indexes where the structure is
             not present on a neighbouring slice.
     '''
+    # create a mask for the slices that contain the structure
     used_slices = ~structure_slices.apply(empty_structure)
+    # Identify the slices that contain the structure but have a neighbouring
+    # slice that does not contain the structure.
     start = used_slices & (used_slices ^ used_slices.shift(1))
     end = used_slices & (used_slices ^ used_slices.shift(-1))
+    # Combine the start and end slices to create a list of boundary slices.
     start_slices = list(structure_slices[start].index)
     end_slices = list(structure_slices[end].index)
     boundaries = start_slices + end_slices
