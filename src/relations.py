@@ -309,10 +309,14 @@ def relate_structures(slice_structures: pd.DataFrame,
         DE9IM_Type: An integer corresponding to a 27 bit binary value
             reflecting the combined DE-9IM relationship between the
             second contour and the first contour convex hull, exterior and
-            contour.
+            contour. If either contour is empty, np.nan is returned.
     '''
     structure = slice_structures[structures[0]]
+    if empty_structure(structure):
+        return np.nan
     other_contour = slice_structures[structures[1]]
+    if empty_structure(other_contour):
+        return np.nan
     binary_relation = relate_contours(structure, other_contour)
     return binary_relation
 
