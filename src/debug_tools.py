@@ -10,6 +10,7 @@ from math import ceil, sin, cos, radians, sqrt
 
 
 # Shared Packages
+from matplotlib.pylab import f
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -42,7 +43,15 @@ def com_text(com):
 
 
 # %% Debugging display functions
-def bin_format(bin_val: int):
+def bin_format(bin_val: int, ignore_errors=False):
+    if np.isnan(bin_val):
+        return ''
+    try:
+        bin_val = int(bin_val)
+    except ValueError as err:
+        if ignore_errors:
+            return 'Error'
+        raise ValueError('bin_val must be an integer.') from err
     bin_str = bin(bin_val)
     if len(bin_str) < 29:
         zero_pad = 29 - len(bin_str)

@@ -18,7 +18,7 @@ from types_and_classes import StructurePairType
 from types_and_classes import DE9IM_Type, DE27IM_Type
 from structure_slice import StructureSlice, find_boundary_slices
 from structure_slice import empty_structure
-from structure_slice import identify_boundary_slices, select_slices
+from structure_slice import select_slices
 
 
 # Global Settings
