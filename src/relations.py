@@ -36,7 +36,7 @@ class RelationshipType(Enum):
                 structure.
     SHELTERS: One structure is within the convex outline of the other.
     BORDERS: The two structures share a common exterior boundary.
-    BORDERS_INTERIOR: The two structures share a common boundary and one is
+    CONFINES: The two structures share a common boundary and one is
                         within the other.
     OVERLAPS: The two structures share a common region.
     PARTITION: The two structures share a common region and one is within the
