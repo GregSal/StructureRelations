@@ -6,7 +6,7 @@ Types, Classes and utility function definitions.
 # %% Imports
 # Type imports
 from math import pi, sqrt
-from typing import List, Union
+from typing import Any, Dict, List, Union
 
 # Shared Packages
 import numpy as np
@@ -132,6 +132,18 @@ class StructureSlice():
         else:
             self.contour = shapely.MultiPolygon([new_contours])
 
+    def parameters(self)->Dict[str, Any]:
+        '''Return a dictionary of the structure parameters.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the structure parameters.
+                The dictionary contains the following keys:
+                    'precision': The contour coordinate precision.
+                    'slice_position': The slice position of the structure.
+        '''
+        return {'precision': self.precision,
+                'slice_position': self.slice_position}
+
     @property
     def exterior(self)-> shapely.MultiPolygon:
         '''The solid exterior contour MultiPolygon.
@@ -175,6 +187,15 @@ class StructureSlice():
             hull = shapely.MultiPolygon([combined])
         return hull
 
+    @property
+    def interiors(self)-> List[shapely.Polygon]:
+        '''A list of the holes in the contour as shapely.Polygon objects.
+        '''
+        holes = []
+        for poly in self.contour.geoms:
+            holes.extend(poly.interiors)
+        hole_polygons = [shapely.Polygon(hole) for hole in holes]
+        return hole_polygons
 
     def select(self, coverage: str) -> shapely.MultiPolygon:
         # select the polygon type
@@ -376,9 +397,11 @@ def merge_contours(slice_contours: pd.Series,
             Defaults to False.
     '''
     ranked_contours = slice_contours.sort_values('Area', ascending=False)
+    slice_position = slice_contours.index.get_level_values('Slice Index')[0]
     try:
         structure_slice = StructureSlice(list(ranked_contours.Contour),
-                                            ignore_errors=ignore_errors)
+                                         slice_position=slice_position,
+                                         ignore_errors=ignore_errors)
     except InvalidContour as err:
         msg = str(err)
         roi_num = ranked_contours.index[0][0]
