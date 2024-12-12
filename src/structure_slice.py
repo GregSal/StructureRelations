@@ -16,8 +16,42 @@ import shapely
 
 # Local packages
 from types_and_classes import PRECISION, SliceIndexType, StructurePairType
+from types_and_classes import ROI_Type, ContourType
 from types_and_classes import InvalidContour, InvalidContourRelation
 from utilities import point_round, poly_round
+
+#%% Region Class
+class Region:
+    def __init__(self, roi: ROI_Type, slice: SliceIndexType,
+                 polygon: ContourType, is_hole: bool = False,
+                 is_boundary: bool = False):
+        self.roi = roi
+        self.slice = slice
+        self.is_hole = is_hole
+        self.is_boundary = is_boundary
+        self.region_labels = []
+        self.polygon = polygon
+
+    def __repr__(self):
+        return ''.join([f'Region(roi={self.roi}, ',
+                        f'slice={self.slice}, ',
+                        f'is_hole={self.is_hole}, ',
+                        f'is_boundary={self.is_boundary}, ',
+                        f'region_labels={self.region_labels}, ',
+                        #f'polygon={self.polygon})'
+            ])
+
+    def part_of(self, other: 'Region') -> bool:
+        # Check if the region is part of another region
+        # This is done to ensure that If the region is a hole, it is not part
+        # of the parent region.
+        # Holes can only be part of other holes
+        if not self.is_hole == other.is_hole:
+            return False
+        # The interior of both polygons must overlap.
+        pattern = '2********'
+        return self.polygon.relate_pattern(other.polygon, pattern)
+
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -438,6 +472,86 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
     return slice_table
 
 
+#%% Select Regions
+def expand_region_table(regions_dict: dict[ROI_Type, dict[SliceIndexType, dict[str, Region]]]) -> pd.DataFrame:
+    expanded_data = []
+    for roi, slices in regions_dict.items():
+        for slice_index, regions in slices.items():
+            for region in regions:
+                for label in region.region_labels:
+                    expanded_data.append({
+                        'ROI': roi,
+                        'Slice': slice_index,
+                        'Label': label,
+                        'Region': region
+                    })
+    return pd.DataFrame(expanded_data)
+
+
+# Function to create Region instances from slice-table DataFrame
+def create_regions_from_slice_table(slice_table: pd.DataFrame) -> dict[ROI_Type, dict[SliceIndexType, list[Region]]]:
+    regions_dict = {}
+    idx = 0
+    for roi in slice_table.columns:
+        regions_dict[roi] = {}
+        previous_regions = []
+        last_slice = None
+        # Iterate over slices in the slice_table for a given ROI
+        for slice_index, structure_slice in slice_table[roi].items():
+            # Create a list of Region instances for each slice
+            if slice_index not in regions_dict[roi]:
+                regions_dict[roi][slice_index] = []
+            # Create Region instances for each polygon and hole in the slice
+            if not empty_structure(structure_slice):
+                for polygon in structure_slice.contour.geoms:
+                    # Create Region instances for each polygon in the slice
+                    # Note: the polygon includes its holes.
+                    region = Region(roi, slice_index, polygon, is_hole=False,
+                                    is_boundary=False)
+                    regions_dict[roi][slice_index].append(region)
+                    # Create Region instances for each hole in the polygon
+                    for interior in polygon.interiors:
+                        hole = shapely.Polygon(interior)
+                        region_hole = Region(roi, slice_index, hole,
+                                             is_hole=True, is_boundary=False)
+                        regions_dict[roi][slice_index].append(region_hole)
+                # Set unique labels for each region on the first slice
+                if slice_index == slice_table[roi].first_valid_index():
+                    for region in regions_dict[roi][slice_index]:
+                        region.region_labels.append(chr(97 + idx))  # 'a', 'b', 'c', ...
+                        idx += 1
+                        region.is_boundary = True
+                else:
+                    # Find overlapping polygons and give them the same region labels
+                    for region in regions_dict[roi][slice_index]:
+                        matched = False
+                        for prev_region in previous_regions:
+                            if region.part_of(prev_region):
+                                region.region_labels.extend(prev_region.region_labels)
+                                matched = True
+                                break
+                        if not matched:
+                            region.region_labels.append(chr(97 + idx))
+                            idx += 1
+                            region.is_boundary = True
+            # Mark polygons in the previous region as boundary if not matched
+            for prev_region in previous_regions:
+                if not any(region.part_of(prev_region) for region in regions_dict[roi][slice_index]):
+                    prev_region.is_boundary = True
+            previous_regions = regions_dict[roi][slice_index]
+            last_slice = slice_index
+        # Mark regions in the last slice as boundary.
+        if last_slice is not None:
+            for region in regions_dict[roi][last_slice]:
+                region.is_boundary = True
+    # Expand the regions_dict into a DataFrame with one column per region
+    region_table = expand_region_table(regions_dict)
+    region_table.set_index(['ROI', 'Label', 'Slice'], inplace=True)
+    region_table = region_table.unstack(['ROI', 'Label'])
+    return region_table
+
+
+#%% Select Slices and neighbours
 def select_slices(slice_table: pd.DataFrame,
                   selected_roi: StructurePairType) -> pd.DataFrame:
     '''Select the slices that have either of the structures.

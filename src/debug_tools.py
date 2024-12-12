@@ -19,7 +19,7 @@ from shapely.plotting import plot_polygon, plot_line
 
 from types_and_classes import PRECISION, SliceIndexType
 
-from structure_slice import StructureSlice
+from structure_slice import Region, StructureSlice
 from utilities import poly_round
 
 
@@ -142,6 +142,18 @@ def type_table(sr):
     type_str = sr.map(f)
     lbl_dict = {idx: type_lbl for idx, type_lbl in type_str.items()}
     return lbl_dict
+
+
+def is_hole(region):
+    if isinstance(region, Region):
+        return region.is_hole
+    return ''
+
+
+def is_boundary(region):
+    if isinstance(region, Region):
+        return region.is_boundary
+    return ''
 
 
 # %% Contour Creation Functions
