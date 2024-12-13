@@ -174,17 +174,16 @@ def identify_relation(relation_binary) -> RelationshipType:
     relationship binary.
 
     The defined relationships are:
-        Relationship      Region Test   Exterior Test   Hull Test
-        Disjoint          FF*FF****     FF*FF****       FF*FF****
-        Shelters          FF*FF****     FF*FF****       TTT***F**
-        Surrounds         FF*FF****     T***F*FF*
-        Borders_Interior  FF*FT****     T***T****
-        Borders           FF*FT****     T*T*F*FF*
-        Contains          T*T*F*FF*
-        Partition         T*T*T*FF*
-        Equals	          T*F**FFF*
-        Overlaps          T*T***T**
-
+        Relationship  Region Test  Exterior Test  Hull Test
+        Disjoint      FF*FF****    F***F****      F***F****
+        Shelters      FF*FF****    F***F****      T***F****
+        Surrounds     FF*FF****    T***F****      *********
+        Borders       F***T****    F***T****      *********
+        Confines      F***T****    T***T****      *********
+        Partitions    T*T*T*F**    T*T*T*F**      T*T***F**
+        Contains      TF*FF****    T***F****      T********
+        Overlaps      T*T*T*T**    T*T*T*T**      T*T***T**
+        Equals        T*F*T****    T***T****      T********
     Args:
         relation_binary (int): An integer generated from the combined DE-9IM
             tests.
@@ -196,32 +195,32 @@ def identify_relation(relation_binary) -> RelationshipType:
     # Relationship Test Definitions
     test_binaries = [
         RelationshipTest(RelationshipType.SURROUNDS,
-                         0b000000000100010110110110000,
+                         0b110110000100010000000000000,
                          0b000000000100000000000000000),
         RelationshipTest(RelationshipType.SHELTERS,
-                         0b111000100110110000110110000,
-                         0b111000000000000000000000000),
+                         0b110110000100010000100010000,
+                         0b000000000000000000100000000),
         RelationshipTest(RelationshipType.DISJOINT,
-                         0b110110000110110000110110000,
+                         0b110110000100010000100010000,
                          0b000000000000000000000000000),
         RelationshipTest(RelationshipType.BORDERS,
-                         0b000000000001001110110110000,
-                         0b000000000001001110000010000),
+                         0b100010000100010000000000000,
+                         0b000010000000010000000000000),
         RelationshipTest(RelationshipType.BORDERS_INTERIOR,
-                         0b000000000101010110110110000,
-                         0b000000000101000000000010000),
+                         0b100010000100010000000000000,
+                         0b000010000100010000000000000),
         RelationshipTest(RelationshipType.OVERLAPS,
-                         0b000000000000000000101000100,
-                         0b000000000000000000101000100),
+                         0b101010100101010100101000100,
+                         0b101010100101010100101000100),
         RelationshipTest(RelationshipType.PARTITION,
-                         0b000000000000000000101010110,
-                         0b000000000000000000101010000),
+                         0b101010100101010100101000100,
+                         0b101010000101010000101000000),
         RelationshipTest(RelationshipType.CONTAINS,
-                         0b000000000000000000101010110,
-                         0b000000000000000000101000000),
+                         0b110110000100010000100000000,
+                         0b100000000100000000100000000),
         RelationshipTest(RelationshipType.EQUALS,
-                         0b000000000000000000101001110,
-                         0b000000000000000000100000000)
+                         0b101010000100010000100000000,
+                         0b100010000100010000100000000),
         ]
     for rel_def in test_binaries:
         result = rel_def.test(relation_binary)
@@ -338,6 +337,10 @@ def adjust_boundary_relation(relation: DE27IM_Type,
             'a' indicates that the first (primary) polygon is at a boundary.
             'b' indicates that the second (secondary) polygon is at a boundary.
             'both' (The default) indicates that both polygons are at a boundary.
+            'hole_in_a' indicates that the first polygon is at a boundary with
+             a hole.
+            'hole_in_b' indicates that the second polygon is at a boundary with
+             a hole.
 
     Returns:
         DE27IM_Type: The supplied relationship metric with the interior portion
@@ -364,12 +367,18 @@ def adjust_boundary_relation(relation: DE27IM_Type,
         relation = int(relation)
     except ValueError:
         raise ValueError(f"Invalid DE27IM value: {relation}")
-    b_mask = 0b111000000111000000111000000
     a_mask = 0b100100100100100100100100100
+    b_mask = 0b111000000111000000111000000
+    hole_in_a_mask = 0b100100100000000000000100000
+    hole_in_b_mask = 0b111000000000000000000000000
     if shift_type == 'a':
         relations_bin = shift_value(relation, a_mask, 1)
     elif shift_type == 'b':
         relations_bin = shift_value(relation, b_mask, 3)
+    elif shift_type == 'hole_in_a':
+        relations_bin = shift_value(relation, hole_in_a_mask, 1)
+    elif shift_type == 'hole_in_b':
+        relations_bin = shift_value(relation, hole_in_b_mask, 3)
     elif shift_type == 'both':
         relations_bin = shift_value(relation, b_mask, 3)
         relations_bin = shift_value(relations_bin, a_mask, 1)

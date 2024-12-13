@@ -473,23 +473,22 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
 
 
 #%% Select Regions
-def expand_region_table(regions_dict: dict[ROI_Type, dict[SliceIndexType, dict[str, Region]]]) -> pd.DataFrame:
-    expanded_data = []
-    for roi, slices in regions_dict.items():
-        for slice_index, regions in slices.items():
-            for region in regions:
-                for label in region.region_labels:
-                    expanded_data.append({
-                        'ROI': roi,
-                        'Slice': slice_index,
-                        'Label': label,
-                        'Region': region
-                    })
-    return pd.DataFrame(expanded_data)
-
-
 # Function to create Region instances from slice-table DataFrame
-def create_regions_from_slice_table(slice_table: pd.DataFrame) -> dict[ROI_Type, dict[SliceIndexType, list[Region]]]:
+def make_region_table(slice_table: pd.DataFrame) -> dict[ROI_Type, dict[SliceIndexType, list[Region]]]:
+    def expand_regions(regions_dict: dict[ROI_Type, dict[SliceIndexType, dict[str, Region]]]) -> pd.DataFrame:
+        expanded_data = []
+        for roi, slices in regions_dict.items():
+            for slice_index, regions in slices.items():
+                for region in regions:
+                    for label in region.region_labels:
+                        expanded_data.append({
+                            'ROI': roi,
+                            'Slice': slice_index,
+                            'Label': label,
+                            'Region': region
+                        })
+        return pd.DataFrame(expanded_data)
+
     regions_dict = {}
     idx = 0
     for roi in slice_table.columns:
@@ -545,7 +544,7 @@ def create_regions_from_slice_table(slice_table: pd.DataFrame) -> dict[ROI_Type,
             for region in regions_dict[roi][last_slice]:
                 region.is_boundary = True
     # Expand the regions_dict into a DataFrame with one column per region
-    region_table = expand_region_table(regions_dict)
+    region_table = expand_regions(regions_dict)
     region_table.set_index(['ROI', 'Label', 'Slice'], inplace=True)
     region_table = region_table.unstack(['ROI', 'Label'])
     return region_table
