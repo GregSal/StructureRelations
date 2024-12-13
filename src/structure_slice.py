@@ -547,6 +547,7 @@ def make_region_table(slice_table: pd.DataFrame) -> dict[ROI_Type, dict[SliceInd
     region_table = expand_regions(regions_dict)
     region_table.set_index(['ROI', 'Label', 'Slice'], inplace=True)
     region_table = region_table.unstack(['ROI', 'Label'])
+    region_table.columns = region_table.columns.droplevel(0)
     return region_table
 
 
