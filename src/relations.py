@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import LiteralString
+from typing import LiteralString, Union
 
 # Standard Libraries
 from enum import Enum, auto
@@ -315,7 +315,7 @@ class DE27IM():
             self.relation = relation_str
             self.int = self.to_int(relation_str)
         elif relation_int is not None:
-            self.int = relation
+            self.int = relation_int
             self.relation = self.to_str(relation_int)
         else:
             raise ValueError(''.join([
@@ -323,6 +323,12 @@ class DE27IM():
                 'to create a DE27IM object.'
                 ]))
         self.int = int(self.relation, base=2)
+
+    @property
+    def is_null(self)->bool:
+        '''Check if the relationship is null.
+        '''
+        return self.int == 0
 
     @staticmethod
     def to_str(relation_int: int)->str:
@@ -445,16 +451,23 @@ def relate_structures(slice_structures: pd.DataFrame,
         structures (StructurePairType): A tuple of ROI numbers which index
             columns in slice_structures.
     Returns:
-        DE27IM: An integer corresponding to a 27 bit binary value
-            reflecting the combined DE-9IM relationship between the
-            second contour and the first contour convex hull, exterior and
-            contour. If either contour is empty, np.nan is returned.
+        DE27IM: The 27 bit relationship integer  reflecting the combined DE-9IM
+            relationship between the second contour and the first contour
+            convex hull, exterior and contour. If either contour is empty,
+            DE27IM(relation_int=0) is returned.
     '''
     structure = slice_structures[structures[0]]
     if empty_structure(structure):
-        return np.nan
+        return DE27IM(relation_int=0)
     other_contour = slice_structures[structures[1]]
     if empty_structure(other_contour):
-        return np.nan
-    binary_relation = DE27IM(structure, other_contour)
-    return binary_relation
+        return DE27IM(relation_int=0)
+    relation = DE27IM(structure, other_contour)
+    return relation
+
+
+def merged_relations(relations):
+    merged = DE27IM(relation_int=0)
+    for relation in list(relations):
+        merged = merged.merge(relation)
+    return merged
