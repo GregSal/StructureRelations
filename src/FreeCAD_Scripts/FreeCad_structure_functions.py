@@ -42,6 +42,14 @@ def make_sphere(doc: App.Document, part_name: str, radius: float,
     return struct
 
 
+def make_cube(doc: App.Document, part_name: str, size: float,
+                offset: vector)->Part.Feature:
+    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
+    cube = Part.makeBox(size * 10, size * 10, size * 10, placement)
+    struct = make_structure(doc, cube, part_name)
+    return struct
+
+
 def make_cylinder(doc: App.Document, part_name: str,
                   radius: float, height: float,
                   offset: vector, direction: vector)->Part.Feature:
@@ -55,27 +63,35 @@ def make_cylinder(doc: App.Document, part_name: str,
 def interactions(doc, struct_1, struct_2)->Tuple[Part.Feature]:
     def cut_a(doc, struct_a, struct_b, color, label)->Part.Feature:
         bp = BOPFeatures.BOPFeatures(doc)
-        struct_a_only = bp.make_cut([struct_a.Name, struct_b.Name])
-        struct_a_only.Label = label
-        if struct_a_only.Shape.isNull():
-            doc.removeObject(struct_a_only.Name)
+        try:
+            struct_a_only = bp.make_cut([struct_a.Name, struct_b.Name])
+        except AttributeError:
             struct_a_only = None
         else:
-            struct_a_only.ViewObject.ShapeColor = color
+            struct_a_only.Label = label
+            if struct_a_only.Shape.isNull():
+                doc.removeObject(struct_a_only.Name)
+                struct_a_only = None
+            else:
+                struct_a_only.ViewObject.ShapeColor = color
         doc.recompute()
         return struct_a_only
 
     def find_overlapping(doc, struct_a, struct_b, color, label)->Part.Feature:
         bp = BOPFeatures.BOPFeatures(doc)
-        overlapping = bp.make_multi_common([struct_a.Name, struct_b.Name])
-        doc.recompute()
-        overlapping.Label = label
-        if overlapping.Shape.isNull():
-            doc.removeObject(overlapping.Name)
+        try:
+            overlapping = bp.make_multi_common([struct_a.Name, struct_b.Name])
+        except AttributeError:
             overlapping = None
         else:
-            overlapping.ViewObject.ShapeColor = color
-        #doc.recompute()
+            doc.recompute()
+            overlapping.Label = label
+            if overlapping.Shape.isNull():
+                doc.removeObject(overlapping.Name)
+                overlapping = None
+            else:
+                overlapping.ViewObject.ShapeColor = color
+        doc.recompute()
         return overlapping
 
     # Define Structure Colors
