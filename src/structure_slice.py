@@ -340,7 +340,8 @@ class StructureSlice():
 
 
 # %% Slice related functions
-def empty_structure(structure:  Union[StructureSlice, float]) -> bool:
+def empty_structure(structure:  Union[StructureSlice, float],
+                    invert=False) -> bool:
     '''Check if the structure is empty.
 
     Tests whether structure is NaN or an empty StructureSlice.
@@ -355,8 +356,12 @@ def empty_structure(structure:  Union[StructureSlice, float]) -> bool:
             Otherwise True.
     '''
     if not isinstance(structure, StructureSlice):
-        return True
-    return structure.is_empty
+        is_empty = True
+    else:
+        is_empty =  structure.is_empty
+    if invert:
+        return not is_empty
+    return is_empty
 
 
 def has_area(poly: Union[StructureSlice, float])->bool:
