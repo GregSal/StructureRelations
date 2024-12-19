@@ -309,12 +309,29 @@ class DE27IM():
                  contour_b: StructureSlice = None,
                  relation_str: str = None,
                  relation_int: int = None):
-        if (contour_a is not None) & (contour_b is not None):
-            self.relation = self.relate_contours(contour_a, contour_b)
+        if contour_a is not None:
+            if contour_b is not None:
+                # If both contours are supplied, the relationship is calculated.
+                self.relation = self.relate_contours(contour_a, contour_b)
+                self.int = self.to_int(self.relation)
+            else:
+                # If only the A contour is supplied, the relationship is
+                # Then A is exterior to B
+                self.int = 0b001001001001001001001001001
+                self.relation = self.to_str(self.int)
+        elif contour_b is not None:
+            # If only the B contour is supplied, the relationship is
+            # Then B is exterior to A
+            self.int = 0b000000111000000111000000111
+            self.relation = self.to_str(self.int)
         elif relation_str is not None:
+            # If contours are not supplied, but a relationship string is
+            # supplied, the relationship is set.
             self.relation = relation_str
             self.int = self.to_int(relation_str)
         elif relation_int is not None:
+            # If contours are not supplied, but a relationship integer is
+            # supplied, the relationship is set.
             self.int = relation_int
             self.relation = self.to_str(relation_int)
         else:
@@ -322,7 +339,6 @@ class DE27IM():
                 'Must supply either StructureSlices or a relationship string ',
                 'to create a DE27IM object.'
                 ]))
-        self.int = int(self.relation, base=2)
 
     @property
     def is_null(self)->bool:
@@ -458,10 +474,10 @@ def relate_structures(slice_structures: pd.DataFrame,
     '''
     structure = slice_structures[structures[0]]
     if empty_structure(structure):
-        return DE27IM(relation_int=0)
+        structure = None
     other_contour = slice_structures[structures[1]]
     if empty_structure(other_contour):
-        return DE27IM(relation_int=0)
+        other_contour = None
     relation = DE27IM(structure, other_contour)
     return relation
 
