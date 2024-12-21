@@ -377,9 +377,35 @@ class DE27IM():
                         contour_b: StructureSlice)->DE27IM_Type:
         '''Get the 27 bit relationship for two structures on a given slice.
         '''
-        contour = DE9IM(contour_a.contour, contour_b.contour)
-        external = DE9IM(contour_a.exterior, contour_b.contour)
-        convex_hull = DE9IM(contour_a.hull, contour_b.contour)
+        if isinstance(contour_a, StructureSlice):
+            if isinstance(contour_b, StructureSlice):
+                contour = DE9IM(contour_a.contour, contour_b.contour)
+                external = DE9IM(contour_a.exterior, contour_b.contour)
+                convex_hull = DE9IM(contour_a.hull, contour_b.contour)
+            else:
+                raise ValueError(''.join([
+                    'Both contours must either be StructureSlice objects or ',
+                    'shapely Polygon objects. contour_b input was: ',
+                    f'{str(type(contour_b))}'
+                    ]))
+        else:
+            if isinstance(contour_a, shapely.Polygon):
+                if isinstance(contour_b, shapely.Polygon):
+                    contour = DE9IM(contour_a, contour_b)
+                    external = DE9IM(relation_str='FFFFFFFFF')
+                    convex_hull = DE9IM(relation_str='FFFFFFFFF')
+                else:
+                    raise ValueError(''.join([
+                        'Both contours must either be StructureSlice objects or ',
+                        'shapely Polygon objects. contour_b input was: ',
+                        f'{str(type(contour_b))}'
+                        ]))
+            else:
+                raise ValueError(''.join([
+                    'Both contours must either be StructureSlice objects or ',
+                    'shapely Polygon objects. contour_a input was: ',
+                    f'{str(type(contour_a))}'
+                    ]))
 
         # Convert the DE-9IM relationships into a DE-27IM relationship string.
         full_relation = ''.join([contour.relation,

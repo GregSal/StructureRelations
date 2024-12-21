@@ -52,6 +52,20 @@ class Region:
         pattern = '2********'
         return self.polygon.relate_pattern(other.polygon, pattern)
 
+    @property
+    def is_empty(self)-> bool:
+        '''Check if the slice is empty.
+
+        Returns:
+            bool: True if the slice is empty, False otherwise.
+        '''
+        if self.polygon is None:
+            return True
+        if self.polygon.is_empty:
+            return True
+        if self.polygon.area == 0:
+            return True
+        return False
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -355,7 +369,7 @@ def empty_structure(structure:  Union[StructureSlice, float],
         bool: False if the structure is type StructureSlice and is not empty.
             Otherwise True.
     '''
-    if not isinstance(structure, StructureSlice):
+    if not isinstance(structure, (StructureSlice, Region)):
         is_empty = True
     else:
         is_empty =  structure.is_empty

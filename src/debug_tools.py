@@ -65,6 +65,14 @@ def bin_format(bin_val: int, ignore_errors=False):
     return bin_fmt.format(**bin_dict)
 
 
+def show_bounds(polygon):
+    a = polygon.bounds
+    b = pd.DataFrame([[a[0], a[1]],[a[2], a[3]]],
+             columns=['x', 'y'],
+             index=['min', 'max'])
+    return b
+
+
 def plot_ab(poly_a, poly_b):
     def plot_geom(ax, geom, color='black'):
         if isinstance(geom, (shapely.Polygon, shapely.MultiPolygon)):
