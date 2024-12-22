@@ -242,6 +242,29 @@ class DE9IM():
         new_str = ''.join(new_str_list)
         return self.__class__(relation_str=new_str)
 
+    def test_relation(self, mask: int, value: int)->RelationshipType:
+        '''Apply the defined test to the supplied relation binary.
+
+        Args:
+            relation (int): The number corresponding to a 9-bit binary of
+                relationship values.
+            mask (int): A sequence of 0s and 1s with every '*' as a '0' and every
+                'T' or 'F' bit as a '1'.  The operation:
+                `relationship_integer & mask` will set all of the bits that are
+                allowed to be either True or False to 0.
+            value (int): The value binary is a sequence of 0s and 1s with every 'T'
+                as a '1' and every '*' or 'F' bit as a '0'. The relationship is
+                identified when value binary is equal to the result of the
+                `relationship_integer & mask` operation.
+        Returns:
+            bool: True if the test passes, False otherwise.
+        '''
+        relation_int = self.to_int()
+        masked_relation = relation_int & mask
+        if masked_relation == value:
+            return True
+        return False
+
     def __repr__(self):
         return f'<DE9IM>: {self.relation_str}'
 
