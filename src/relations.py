@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import LiteralString, Union
+from typing import List, LiteralString, Union
 
 # Standard Libraries
 from enum import Enum, auto
@@ -180,6 +180,7 @@ class DE9IM():
             self.relation_str = shapely.relate(poly_a, poly_b)
         elif relation_str is not None:
             self.relation_str = relation_str
+
         else:
             raise ValueError(''.join([
                 'Must supply either polygons or a relationship string to ',
@@ -196,7 +197,7 @@ class DE9IM():
 
     def to_int(self, shift=0):
         shift_factor = 2**shift
-        binary_relation = int(self.relation, base=2) * shift_factor
+        binary_relation = int(self.to_bool(), base=2) * shift_factor
         return binary_relation
 
     def boundary_adjustment(self, boundary_type: str)->'DE9IM':
@@ -308,11 +309,12 @@ class DE27IM():
     def __init__(self, contour_a: StructureSlice = None,
                  contour_b: StructureSlice = None,
                  relation_str: str = None,
-                 relation_int: int = None):
+                 relation_int: int = None,
+                 adjustments: List[str] = None):
         if contour_a is not None:
             if contour_b is not None:
                 # If both contours are supplied, the relationship is calculated.
-                self.relation = self.relate_contours(contour_a, contour_b)
+                self.relation = self.relate_contours(contour_a, contour_b, adjustments)
                 self.int = self.to_int(self.relation)
             else:
                 # If only the A contour is supplied, the relationship is
@@ -374,7 +376,8 @@ class DE27IM():
 
     def relate_contours(self,
                         contour_a: StructureSlice,
-                        contour_b: StructureSlice)->DE27IM_Type:
+                        contour_b: StructureSlice,
+                        adjustments: List[str] = None)->DE27IM_Type:
         '''Get the 27 bit relationship for two structures on a given slice.
         '''
         if isinstance(contour_a, StructureSlice):
@@ -388,25 +391,37 @@ class DE27IM():
                     'shapely Polygon objects. contour_b input was: ',
                     f'{str(type(contour_b))}'
                     ]))
-        else:
-            if isinstance(contour_a, shapely.Polygon):
-                if isinstance(contour_b, shapely.Polygon):
-                    contour = DE9IM(contour_a, contour_b)
-                    external = DE9IM(relation_str='FFFFFFFFF')
-                    convex_hull = DE9IM(relation_str='FFFFFFFFF')
-                else:
-                    raise ValueError(''.join([
-                        'Both contours must either be StructureSlice objects or ',
-                        'shapely Polygon objects. contour_b input was: ',
-                        f'{str(type(contour_b))}'
-                        ]))
+        elif isinstance(contour_a, shapely.Polygon):
+            if isinstance(contour_b, shapely.Polygon):
+                contour = DE9IM(contour_a, contour_b)
+                external = DE9IM(relation_str='FFFFFFFFF')
+                convex_hull = DE9IM(relation_str='FFFFFFFFF')
             else:
                 raise ValueError(''.join([
                     'Both contours must either be StructureSlice objects or ',
-                    'shapely Polygon objects. contour_a input was: ',
-                    f'{str(type(contour_a))}'
+                    'shapely Polygon objects. contour_b input was: ',
+                    f'{str(type(contour_b))}'
                     ]))
-
+        else:
+            raise ValueError(''.join([
+                'Both contours must either be StructureSlice objects or ',
+                'shapely Polygon objects. contour_a input was: ',
+                f'{str(type(contour_a))}'
+                ]))
+        if adjustments:
+            for adj in adjustments:
+                if adj == 'transpose':
+                    contour = contour.transpose()
+                    external = external.transpose()
+                    convex_hull = convex_hull.transpose()
+                elif adj == 'boundary_a':
+                    contour = contour.boundary_adjustment('a')
+                    external = external.boundary_adjustment('a')
+                    convex_hull = convex_hull.boundary_adjustment('a')
+                elif adj == 'boundary_b':
+                    contour = contour.boundary_adjustment('b')
+                    external = external.boundary_adjustment('b')
+                    convex_hull = convex_hull.boundary_adjustment('b')
         # Convert the DE-9IM relationships into a DE-27IM relationship string.
         full_relation = ''.join([contour.relation,
                                  external.relation,
