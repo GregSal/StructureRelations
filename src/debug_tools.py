@@ -42,6 +42,22 @@ def com_text(com):
     return com_fmt
 
 
+def to_str(relation_int: int, size=27)->str:
+    str_size = size + 2  # Accounts for '0b' prefix.
+    bin_str = bin(relation_int)
+    if len(bin_str) < str_size:
+        zero_pad = str_size - len(bin_str)
+        bin_str = '0' * zero_pad + bin_str[2:]
+    elif len(bin_str) > str_size:
+        raise ValueError(''.join([
+            'The input integer must be {size} bits long. The input integer ',
+            'was: ', f'{len(bin_str) - 2}'
+            ]))
+    else:
+        bin_str = bin_str[2:]
+    return bin_str
+
+
 # %% Debugging display functions
 def bin_format(bin_val: int, ignore_errors=False):
     if np.isnan(bin_val):

@@ -231,6 +231,32 @@ class DE9IM():
         new_str = ''.join(new_str_list)
         return self.__class__(relation_str=new_str)
 
+    def hole_adjustment(self, hole: str)->'DE9IM':
+        '''Adjust the DE-9IM relationship matrix of a hole (negative space).
+        The “*Interior*” bits of the DE-9IM relationship metric are swapped
+        with the “*Exterior*”.
+        '''
+        if hole == 'a':
+            # Get the Interior, Boundary and Exterior relations for the "a" polygon.
+            interiors = self.relation_str[0:3]
+            boundaries = self.relation_str[3:6]
+            exteriors = self.relation_str[6:9]
+            # Swap the Interior and Exterior relations
+            new_str_list = exteriors + boundaries + interiors
+        elif hole == 'b':
+            # Get the Interior, Boundary and Exterior relations for the "b" polygon.
+            interiors = self.relation_str[0:9:3]
+            boundaries = self.relation_str[1:9:3]
+            exteriors = self.relation_str[2:9:3]
+            # Swap the Interior and Exterior relations
+            new_str_list = []
+            for i, b, e in zip(interiors, boundaries, exteriors):
+                new_str_list.extend([e, b, i])
+        else:
+            raise ValueError(f'Invalid hole type: {hole}')
+        new_str = ''.join(new_str_list)
+        return self.__class__(relation_str=new_str)
+
     def transpose(self)->'DE9IM':
         '''Transpose the DE-9IM relationship matrix.
         '''
@@ -264,6 +290,30 @@ class DE9IM():
         if masked_relation == value:
             return True
         return False
+
+    def merge(self, relations: List[DE9IM]):
+        def to_str(relation_int: int)->str:
+            size=9
+            str_size = size + 2  # Accounts for '0b' prefix.
+            bin_str = bin(relation_int)
+            if len(bin_str) < str_size:
+                zero_pad = str_size - len(bin_str)
+                bin_str = '0' * zero_pad + bin_str[2:]
+            elif len(bin_str) > str_size:
+                raise ValueError(''.join([
+                    'The input integer must be {size} bits long. The input integer ',
+                    'was: ', f'{len(bin_str) - 2}'
+                    ]))
+            else:
+                bin_str = bin_str[2:]
+            return bin_str
+
+        num = self.to_int()
+        for relation in relations:
+            num = num | relation.to_int()
+        num_str = to_str(num, size=9)
+        matrix = DE9IM(relation_str=num_str)
+        return matrix
 
     def __repr__(self):
         return f'<DE9IM>: {self.relation_str}'
