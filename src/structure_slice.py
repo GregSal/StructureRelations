@@ -107,6 +107,10 @@ class StructureSlice():
             contours (List[shapely.Polygon]): A list of polygons to be merged
             into a single MultiPolygon.
         '''
+        if 'roi' in kwargs:
+            self.roi = kwargs['roi']
+        else:
+            self.roi = None
         if 'precision' in kwargs:
             self.precision = kwargs['precision']
         else:
@@ -305,30 +309,30 @@ class StructureSlice():
         count = len(self.contour.geoms)
         return count == 0
 
-    def extract_regions(self)->pd.DataFrame:
+    def extract_regions(self, extract_holes=False)->List[Region]:
         '''Extract the individual regions from the contour MultiPolygon.
-
-        Calculate the area, center, perimeter and circular radius for each
-        region. The resulting DataFrame has the following columns:
-            'polygon', 'area', 'centroid', 'perimeter' and 'radius'.
-        The 'polygon' column contains the shapely Polygon for each region.
-        The circular radius is the radius of a circle with the same area
-        as the region.
 
         Returns:
             pd.DataFrame: A DataFrame containing the extracted region data.
         '''
-        region_list = []
+        regions_list = []
+        roi = self.roi
+        slice_index = self.slice_position
         for poly in self.contour.geoms:
-            poly_dict = {'polygon': poly,
-                         'area': poly.area,
-                         'centroid': poly.centroid,
-                         'perimeter': poly.length,
-                         'radius': round(sqrt(self.contour.area / pi),
-                                         self.precision)}
-
-            region_list.append(poly_dict)
-        return pd.DataFrame(region_list)
+            # Create Region instances for each polygon in the slice
+            # Note: the polygon includes its holes.
+            region = Region(roi, slice_index, poly,
+                            is_hole=False, is_boundary=False)
+            regions_list.append(region)
+            if extract_holes:
+                # Create Region instances for each hole in the polygon
+                for interior in poly.interiors:
+                    hole = shapely.Polygon(interior)
+                    region_hole = Region(self.roi, self.slice_position,
+                                         hole,
+                                         is_hole=True, is_boundary=False)
+                    regions_list.append(region_hole)
+        return regions_list
 
     def centers(self, coverage: str = 'contour')->List[shapely.Point]:
         '''A list of the geometric centers of each polygon in the ContourSlice.
@@ -451,9 +455,11 @@ def merge_contours(slice_contours: pd.Series,
     '''
     ranked_contours = slice_contours.sort_values('Area', ascending=False)
     slice_position = slice_contours.index.get_level_values('Slice Index')[0]
+    roi_num = ranked_contours.index[0][0]
     try:
         structure_slice = StructureSlice(list(ranked_contours.Contour),
                                          slice_position=slice_position,
+                                         roi=roi_num,
                                          ignore_errors=ignore_errors)
     except InvalidContour as err:
         msg = str(err)
