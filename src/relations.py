@@ -56,7 +56,7 @@ class RelationshipType(Enum):
     SURROUNDS = auto()
     SHELTERS = auto()
     BORDERS = auto()
-    BORDERS_INTERIOR = auto()
+    CONFINES = auto()
     OVERLAPS = auto()
     PARTITION = auto()
     CONTAINS = auto()
@@ -291,7 +291,7 @@ class DE9IM():
             return True
         return False
 
-    def merge(self, relations: List[DE9IM]):
+    def merge(self, relations: List["DE9IM"]) -> "DE9IM":
         def to_str(relation_int: int)->str:
             size=9
             str_size = size + 2  # Accounts for '0b' prefix.
@@ -311,7 +311,7 @@ class DE9IM():
         num = self.to_int()
         for relation in relations:
             num = num | relation.to_int()
-        num_str = to_str(num, size=9)
+        num_str = to_str(num)
         matrix = DE9IM(relation_str=num_str)
         return matrix
 
@@ -350,33 +350,33 @@ class DE27IM():
     '''
     # Relationship Test Definitions
     test_binaries = [
-        RelationshipTest(RelationshipType.SURROUNDS,
-                         0b110110000100010000000000000,
-                         0b000000000100000000000000000),
-        RelationshipTest(RelationshipType.SHELTERS,
-                         0b110110000100010000100010000,
-                         0b000000000000000000100000000),
         RelationshipTest(RelationshipType.DISJOINT,
-                         0b110110000100010000100010000,
+                         0b110110000100000000100000000,
                          0b000000000000000000000000000),
+        RelationshipTest(RelationshipType.SHELTERS,
+                         0b1110110000100000000100000000,
+                         0b000000000000000000100000000),
+        RelationshipTest(RelationshipType.SURROUNDS,
+                         0b110110000100000000000000000,
+                         0b000000000100000000000000000),
         RelationshipTest(RelationshipType.BORDERS,
-                         0b100010000100010000000000000,
-                         0b000010000000010000000000000),
-        RelationshipTest(RelationshipType.BORDERS_INTERIOR,
-                         0b100010000100010000000000000,
-                         0b000010000100010000000000000),
+                         0b100010000100000000000000000,
+                         0b000010000000000000000000000),
+        RelationshipTest(RelationshipType.CONFINES,
+                         0b100010000100000000000000000,
+                         0b000010000100000000000000000),
         RelationshipTest(RelationshipType.OVERLAPS,
-                         0b101010100101010100101000100,
-                         0b101010100101010100101000100),
-        RelationshipTest(RelationshipType.PARTITION,
-                         0b101010100101010100101000100,
-                         0b101010000101010000101000000),
+                         0b100100000000000000000000000,
+                         0b100100000000000000000000000),
         RelationshipTest(RelationshipType.CONTAINS,
-                         0b110110000100010000100000000,
-                         0b110000000100000000100000000),
+                         0b100110000000000000000000000,
+                         0b100000000000000000000000000),
         RelationshipTest(RelationshipType.EQUALS,
-                         0b101010000100010000100000000,
-                         0b100010000100010000100000000),
+                         0b101110000000000000000000000,
+                         0b100010000000000000000000000),
+        RelationshipTest(RelationshipType.PARTITION,
+                         0b101110000000000000000000000,
+                         0b101010000000000000000000000),
         ]
 
     def __init__(self, contour_a: StructureSlice = None,
