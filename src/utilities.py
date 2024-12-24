@@ -2,13 +2,13 @@
 # %% Imports
 # Type imports
 from dataclasses import asdict, dataclass
-from typing import Dict, List
+from typing import Dict, List, Union
 
 # Shared Packages
 import numpy as np
 import shapely
 
-from types_and_classes import PRECISION
+from types_and_classes import PRECISION, SliceIndexType
 
 
 # %% Rounding Functions
@@ -62,6 +62,36 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
         raise ValueError(f"Invalid coordinate dimension: {dim}")
     clean_poly = shapely.Polygon(polygon_points)
     return clean_poly
+
+
+#%% Interpolation Functions
+def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
+                        p1: shapely.Polygon,
+                        p2: shapely.Polygon = None) -> shapely.Polygon:
+    # If multiple slices given, calculate the new z value.
+    if isinstance(slices, (list, tuple)):
+        new_z = np.mean(slices)
+    else:
+        new_z = slices
+    # If no second polygon given, use the centroid of the first polygon as the
+    # boundary.
+    if p2 is None:
+        boundary2 = p1.centroid
+    else:
+        boundary2 = p2.boundary
+    # Interpolate the new polygon coordinates as half way between the p1
+    # boundary and boundary 2.
+    new_cords = []
+    for crd in p1.boundary.coords:
+        ln = shapely.shortest_line(shapely.Point(crd), boundary2)
+        ptn = ln.interpolate(0.5, normalized=True)
+        new_cords.append(ptn)
+    # Build the new polygon from the interpolated coordinates.
+    itp_poly = shapely.Polygon(new_cords)
+    # Add the z value to the polygon.
+    itp_poly = shapely.force_3d(itp_poly, new_z)
+    return itp_poly
+
 
 # %% Extent Functions
 @dataclass(eq=True, order=True)
