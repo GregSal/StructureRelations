@@ -452,7 +452,22 @@ class DE27IM():
                         contour_b: StructureSlice,
                         adjustments: List[str] = None)->DE27IM_Type:
         '''Get the 27 bit relationship for two structures on a given slice.
+        Possible adjustments are:
+            'transpose': Transpose the relationship matrix.
+            'boundary_a': Adjust the relationship matrix for the boundary slice
+                of contour_a.
+            'boundary_b': Adjust the relationship matrix for the boundary slice
+                of contour_b.
+            'hole_a': Adjust the relationship matrix for the hole (negative space)
+                of contour_a.
+            'hole_b': Adjust the relationship matrix for the hole (negative space)
+                of contour_b.
         '''
+        # If contour_a and contour_b are both StructureSlices, then get the
+        # full 27 bit relationship.
+        # If contour_a and contour_b are both Shapley Polygons, then get the
+        # 9 bit DE9IM relationship and pad the other 18 bits with 0s.
+        padding = 'F' * 9
         if isinstance(contour_a, StructureSlice):
             if isinstance(contour_b, StructureSlice):
                 contour = DE9IM(contour_a.contour, contour_b.contour)
@@ -467,8 +482,8 @@ class DE27IM():
         elif isinstance(contour_a, shapely.Polygon):
             if isinstance(contour_b, shapely.Polygon):
                 contour = DE9IM(contour_a, contour_b)
-                external = DE9IM(relation_str='FFFFFFFFF')
-                convex_hull = DE9IM(relation_str='FFFFFFFFF')
+                external = DE9IM(relation_str=padding)
+                convex_hull = DE9IM(relation_str=padding)
             else:
                 raise ValueError(''.join([
                     'Both contours must either be StructureSlice objects or ',
@@ -481,20 +496,32 @@ class DE27IM():
                 'shapely Polygon objects. contour_a input was: ',
                 f'{str(type(contour_a))}'
                 ]))
+        # Apply adjustments to the relationship matrix.
+        # Note: The order of the adjustments is important.
         if adjustments:
-            for adj in adjustments:
-                if adj == 'transpose':
-                    contour = contour.transpose()
-                    external = external.transpose()
-                    convex_hull = convex_hull.transpose()
-                elif adj == 'boundary_a':
-                    contour = contour.boundary_adjustment('a')
-                    external = external.boundary_adjustment('a')
-                    convex_hull = convex_hull.boundary_adjustment('a')
-                elif adj == 'boundary_b':
-                    contour = contour.boundary_adjustment('b')
-                    external = external.boundary_adjustment('b')
-                    convex_hull = convex_hull.boundary_adjustment('b')
+            # Apply Boundary Adjustments
+            if 'boundary_a' in adjustments:
+                contour = contour.boundary_adjustment('a')
+                external = external.boundary_adjustment('a')
+                convex_hull = convex_hull.boundary_adjustment('a')
+            if 'boundary_a' in adjustments:
+                contour = contour.boundary_adjustment('b')
+                external = external.boundary_adjustment('b')
+                convex_hull = convex_hull.boundary_adjustment('b')
+            # Apply Hole Adjustments
+            if 'hole_a' in adjustments:
+                contour = contour.hole_adjustment('a')
+                external = external.hole_adjustment('a')
+                convex_hull = convex_hull.hole_adjustment('a')
+            if 'hole_b' in adjustments:
+                contour = contour.hole_adjustment('b')
+                external = external.hole_adjustment('b')
+                convex_hull = convex_hull.hole_adjustment('b')
+            # Apply Transpose Adjustment
+            if 'transpose' in adjustments:
+                contour = contour.transpose()
+                external = external.transpose()
+                convex_hull = convex_hull.transpose()
         # Convert the DE-9IM relationships into a DE-27IM relationship string.
         full_relation = ''.join([contour.relation,
                                  external.relation,

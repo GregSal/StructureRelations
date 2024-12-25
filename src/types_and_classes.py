@@ -16,6 +16,7 @@ import shapely
 # Index to structures defined in Structure RT DICOM file
 ROI_Type = NewType('ROI_Type', int)  # pylint: disable=invalid-name
 
+RegionIndexType = NewType('RegionIndexType', Tuple[int, str])  # pylint: disable=invalid-name
 # The offset in cm between a given image slice and the DICOm origin in the
 # `Z` direction.
 SliceIndexType = NewType('SliceIndexType', float)
