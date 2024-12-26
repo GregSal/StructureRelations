@@ -2,6 +2,7 @@
 # %% Imports
 # Type imports
 from dataclasses import asdict, dataclass
+import re
 from typing import Dict, List, Union
 
 # Shared Packages
@@ -65,6 +66,68 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
 
 
 #%% Interpolation Functions
+def match_boundaries(p1, p2):
+    if p1.is_empty:
+        boundary1 = None
+    else:
+        boundary1 = p1.exterior
+    if p2 is None:
+        if boundary1:
+            boundary2 = p1.centroid
+        else:
+            raise ValueError('No second polygon given and first polygon is empty.')
+    else:
+        boundary2 = p2.exterior
+        if not boundary1:
+            boundary1 = p2.centroid
+    return boundary1, boundary2
+
+def match_holes(p1, p2):
+    if p1.is_empty:
+        holes1 = []
+    else:
+        holes1 = list(p1.interiors)
+    # If no second polygon given, use the centroid of the first polygon as the
+    # boundary.
+    if p2 is None:
+        if holes1:
+            matched_holes = [(hole, hole.centroid) for hole in holes1]
+        else:
+            matched_holes = []
+        return matched_holes
+    holes2 =  list(p2.interiors)
+    if not holes1:
+        matched_holes = [(hole, hole.centroid) for hole in holes2]
+        return matched_holes
+
+    # match the holes of the second polygon to the first polygon
+    matched_holes = []
+    hole2_matched = {i: False for i in range(len(holes2))}
+    for hole1 in holes1:
+        matched1 = False
+        for idx, hole2 in enumerate(holes2):
+            if hole1.overlaps(hole2):
+                matched_holes.append((hole1, hole2))
+                matched1 = True
+                hole2_matched[idx] = True
+        if not matched1:
+            matched_holes.append((hole1, hole1.centroid))
+    # Add any unmatched holes from the second polygon.
+    for idx, hole2 in enumerate(holes2):
+        if not hole2_matched[idx]:
+            matched_holes.append((hole2, hole2.centroid))
+    return matched_holes
+
+
+def interpolate_boundaries(boundary1, boundary2):
+    new_cords = []
+    for crd in boundary1.coords:
+        ln = shapely.shortest_line(shapely.Point(crd), boundary2)
+        ptn = ln.interpolate(0.5, normalized=True)
+        new_cords.append(ptn)
+    return new_cords
+
+
 def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
                         p1: shapely.Polygon,
                         p2: shapely.Polygon = None) -> shapely.Polygon:
@@ -73,24 +136,29 @@ def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
         new_z = np.mean(slices)
     else:
         new_z = slices
-    # If no second polygon given, use the centroid of the first polygon as the
-    # boundary.
-    if p2 is None:
-        boundary2 = p1.centroid
-    else:
-        boundary2 = p2.boundary
+    # If either of the polygons are multi-polygons, raise an error.
+    if isinstance(p1, shapely.MultiPolygon):
+        raise ValueError('Only single polygons are supported.')
+    if isinstance(p2, shapely.MultiPolygon):
+        raise ValueError('Only single polygons are supported.')
+
+    boundary1, boundary2 = match_boundaries(p1, p2)
     # Interpolate the new polygon coordinates as half way between the p1
     # boundary and boundary 2.
-    new_cords = []
-    for crd in p1.boundary.coords:
-        ln = shapely.shortest_line(shapely.Point(crd), boundary2)
-        ptn = ln.interpolate(0.5, normalized=True)
-        new_cords.append(ptn)
+    new_cords = interpolate_boundaries(boundary1, boundary2)
+    # Add the holes to the new polygon.
+    new_holes = []
+    matched_holes = match_holes(p1, p2)
+    for hole1, hole2 in matched_holes:
+        new_hole = interpolate_boundaries(hole1, hole2)
+        new_holes.append(new_hole)
     # Build the new polygon from the interpolated coordinates.
-    itp_poly = shapely.Polygon(new_cords)
+    itp_poly = shapely.Polygon(new_cords, holes=new_holes)
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
+
+
 
 
 # %% Extent Functions
