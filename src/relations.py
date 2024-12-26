@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import List, LiteralString, Union
+from typing import List, LiteralString, Tuple, Union
 
 # Standard Libraries
 from enum import Enum, auto
@@ -14,10 +14,10 @@ import pandas as pd
 import shapely
 
 # Local packages
-from types_and_classes import StructurePairType
-from types_and_classes import DE9IM_Type, DE27IM_Type
-from structure_slice import StructureSlice
-from structure_slice import empty_structure
+from types_and_classes import StructurePairType, RegionIndexType
+from structure_slice import Region, StructureSlice
+from structure_slice import empty_structure, make_region_table, select_slices
+from utilities import interpolate_polygon
 
 
 # Global Settings
@@ -627,3 +627,153 @@ def merged_relations(relations):
     for relation in list(relations):
         merged = merged.merge(relation)
     return merged
+
+
+def is_boundary(region):
+    if isinstance(region, Region):
+        return region.is_boundary
+    return False
+
+
+def is_hole(region):
+    if isinstance(region, Region):
+        return region.is_hole
+    return False
+
+
+def find_boundary_slices(region_table: pd.DataFrame, group_regions=False):
+    has_boundary = region_table.map(is_boundary)
+    boundaries = has_boundary.fillna(0).astype(bool)
+    if group_regions:
+        boundaries = has_boundary.stack('ROI', future_stack=True)
+        boundaries = boundaries.apply(any, axis='columns')
+        boundaries = boundaries.unstack('ROI')
+    return boundaries
+
+
+def identify_neighbour_slices(region_table: pd.DataFrame):
+    def has_neighbour(region_table: pd.DataFrame, offset: int):
+        not_empty = region_table.map(empty_structure, invert=True)
+        neighbour = not_empty.shift(offset)
+        neighbour['neighbour'] = neighbour.index.to_series()
+        neighbour['neighbour'] = neighbour['neighbour'].shift(offset)
+        neighbour = neighbour.dropna()
+        neighbour.set_index('neighbour', append=True, inplace=True)
+        return neighbour
+
+    next_slice = has_neighbour(region_table, 1)
+    prev_slice = has_neighbour(region_table, -1)
+    neighbour_match = pd.concat([next_slice, prev_slice], axis='index')
+    neighbour_match.sort_index(inplace=True)
+    return neighbour_match
+
+
+def find_boundary_pairs(neighbour, region_boundaries, region_idx, is_hole):
+    # If the region is a hole, select the neighbour slice that has a contour.
+    # Otherwise, select the neighbour slice that has no contour.
+    if is_hole:
+        nbr_match = neighbour.T
+    else:
+        nbr_match = neighbour.map(lambda x: not x).T
+    boundary_neighbour_index = nbr_match.join(region_boundaries[region_idx],
+                                              rsuffix='bdr')
+    boundary_neighbour_index = boundary_neighbour_index.T.apply(all)
+    index_list = list(boundary_neighbour_index[boundary_neighbour_index].index)
+    return index_list
+
+
+def interpolate_region(region_num, regions: pd.DataFrame,
+                       slice_pair: Tuple[int, int]):
+    # Matched Interpolated Secondary Slice
+    region_1 = regions.at[slice_pair[0], region_num]
+    region_2 = regions.at[slice_pair[1], region_num]
+    if empty_structure(region_1):
+        if empty_structure(region_2):
+            interpolated_region = np.nan
+        else:
+            interpolated_region = interpolate_polygon(slice_pair,
+                                                      region_2.polygon)
+    else:
+        if empty_structure(region_2):
+            interpolated_region = interpolate_polygon(slice_pair,
+                                                      region_1.polygon)
+        else:
+            interpolated_region = interpolate_polygon(slice_pair,
+                                                      region_1.polygon,
+                                                      region_2.polygon)
+    return interpolated_region
+
+
+def set_adjustments(region_table: pd.DataFrame, region_boundaries,
+                    selected_roi: StructurePairType,
+                    region1: RegionIndexType, region2: RegionIndexType,
+                    slices: List[float]):
+    # The first region is always a boundary.
+    adjustments = ['boundary_a']
+    # If the region is a hole, then adjust interior and exterior parts
+    # of the relation need to be swapped.
+    is_hole = region_table[region1].dropna().iat[1].is_hole
+    if is_hole:
+        adjustments.append('hole_a')
+    # If the "Secondary" ROI is the primary ROI, then the relation needs to be
+    # transposed.
+    is_secondary_roi = selected_roi.index(region1[0]) == 1
+    if is_secondary_roi:
+        adjustments.append('transpose')
+    # Check whether the secondary slices are also at a boundary.
+    if any(region_boundaries.loc[list(slices), region2]):
+        adjustments.append('boundary_b')
+    is_hole2 = region_table[region2].dropna().iat[1].is_hole
+    if is_hole2:
+        adjustments.append('hole_b')
+    return adjustments
+
+
+def get_boundary_relations(region_table, neighbour_match, region_boundaries, selected_roi):
+    boundary_relations = {}
+    nbr_grp = neighbour_match[selected_roi].T.groupby(level=['ROI', 'Label'])
+    for region_idx, neighbour in nbr_grp:
+        is_hole = region_table[region_idx].dropna().iat[1].is_hole
+        index_list = find_boundary_pairs(neighbour, region_boundaries, region_idx, is_hole)
+        other_roi_num = [r for r in selected_roi if not r == region_idx[0]][0]
+        for slice_pair in index_list:
+            # Interpolated Boundary Slice
+            boundary_region = interpolate_region(region_idx, region_table,
+                                                slice_pair)
+            # Loop through the regions of the other roi
+            for other_region in region_table[other_roi_num].columns:
+                other_region_idx = (other_roi_num, other_region)
+                # Interpolate the other roi
+                other_region = interpolate_region(other_region_idx, region_table,
+                                                slice_pair)
+                adjustments = set_adjustments(region_table, region_boundaries,
+                                              selected_roi, region_idx,
+                                              other_region_idx, slice_pair)
+                # Get boundary relation as a DE27IM object.
+                boundary_relation = DE27IM(boundary_region, other_region,
+                                        adjustments=adjustments)
+                region_pair = tuple([region_idx, other_region_idx, slice_pair])
+                boundary_relations[region_pair] = boundary_relation
+    return boundary_relations
+
+
+def find_relations(slice_table, selected_roi):
+    # Split each Structure into distinct regions for boundary tests.
+    region_table = make_region_table(slice_table)
+    # Identify the boundary slices of each region.
+    region_boundaries = find_boundary_slices(region_table)
+    # For each slice of each region identify the whether the region is present on
+    # the neighbouring slice.
+    neighbour_match = identify_neighbour_slices(region_table)
+
+    boundary_relations = get_boundary_relations(region_table, neighbour_match, region_boundaries, selected_roi)
+    # Slice range = Min(starting slice) to Max(ending slice)
+    selected_slices = select_slices(slice_table, selected_roi)
+    # Send all slices with both Primary and Secondary contours for standard
+    # relation testing
+    mid_relations = list(selected_slices.agg(relate_structures,
+                                             structures=selected_roi,
+                                             axis='columns'))
+    mid_relations.extend(boundary_relations.values())
+    relation =  merged_relations(mid_relations)
+    return relation
