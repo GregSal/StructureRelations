@@ -5,7 +5,6 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from math import pi, sqrt
 from typing import Any, Dict, List, Union
 
 # Shared Packages
@@ -16,30 +15,31 @@ import shapely
 
 # Local packages
 from types_and_classes import PRECISION, SliceIndexType, StructurePairType
-from types_and_classes import ROI_Type, ContourType
+from types_and_classes import ROI_Type
 from types_and_classes import InvalidContour, InvalidContourRelation
 from utilities import point_round, poly_round
 
+
+# %% Type definitions and Globals
+# An enclosed region representing either a structure area, or a hole within
+# that structure.  The float type is present to allow for np.nan values.
+ContourType = Union["Region", "StructureSlice", shapely.Polygon, float]
+
+
 #%% Region Class
 class Region:
-    def __init__(self, roi: ROI_Type, slice: SliceIndexType,
-                 polygon: ContourType, is_hole: bool = False,
+    def __init__(self, roi: ROI_Type, slice_position: SliceIndexType,
+                 polygon: Union["Region", "StructureSlice", shapely.Polygon, float], is_hole: bool = False,
                  is_boundary: bool = False):
         self.roi = roi
-        self.slice = slice
+        self.slice = slice_position
         self.is_hole = is_hole
         self.is_boundary = is_boundary
         self.region_labels = []
-        self.polygon = polygon
-
-    def __repr__(self):
-        return ''.join([f'Region(roi={self.roi}, ',
-                        f'slice={self.slice}, ',
-                        f'is_hole={self.is_hole}, ',
-                        f'is_boundary={self.is_boundary}, ',
-                        f'region_labels={self.region_labels}, ',
-                        #f'polygon={self.polygon})'
-            ])
+        if isinstance(polygon, shapely.Polygon):
+            self.polygon = polygon
+        else:
+            self.polygon = None
 
     def part_of(self, other: 'Region') -> bool:
         # Check if the region is part of another region
@@ -66,6 +66,25 @@ class Region:
         if self.polygon.area == 0:
             return True
         return False
+
+    @property
+    def area(self)-> float:
+        '''The area encompassed by the polygon.
+
+        Returns:
+            float: The area encompassed by the polygon.
+        '''
+        return self.polygon.area
+
+    def __repr__(self):
+        return ''.join([f'Region(roi={self.roi}, ',
+                        f'slice={self.slice}, ',
+                        f'is_hole={self.is_hole}, ',
+                        f'is_boundary={self.is_boundary}, ',
+                        f'region_labels={self.region_labels}, ',
+                        #f'polygon={self.polygon})'
+            ])
+
 
 # %% StructureSlice Class
 class StructureSlice():
@@ -307,7 +326,11 @@ class StructureSlice():
             bool: True if the slice is empty, False otherwise.
         '''
         count = len(self.contour.geoms)
-        return count == 0
+        if count == 0:
+            return True
+        if float(self.area) == 0.0:
+            return True
+        return False
 
     def extract_regions(self, extract_holes=False)->List[Region]:
         '''Extract the individual regions from the contour MultiPolygon.
@@ -358,8 +381,7 @@ class StructureSlice():
 
 
 # %% Slice related functions
-def empty_structure(structure:  Union[StructureSlice, float],
-                    invert=False) -> bool:
+def empty_structure(structure: ContourType, invert=False) -> bool:
     '''Check if the structure is empty.
 
     Tests whether structure is NaN or an empty StructureSlice.
@@ -373,16 +395,20 @@ def empty_structure(structure:  Union[StructureSlice, float],
         bool: False if the structure is type StructureSlice and is not empty.
             Otherwise True.
     '''
-    if not isinstance(structure, (StructureSlice, Region)):
+    if not isinstance(structure, (StructureSlice, Region, shapely.Polygon)):
+        is_empty = True
+    elif structure.is_empty:
+        is_empty =  True
+    elif structure.area == 0:
         is_empty = True
     else:
-        is_empty =  structure.is_empty
+        is_empty = False
     if invert:
         return not is_empty
     return is_empty
 
 
-def has_area(poly: Union[StructureSlice, float])->bool:
+def has_area(poly: ContourType)->bool:
     '''Check if the structure has area.
 
     Tests whether the structure has an area greater than zero or is empty.
@@ -394,9 +420,9 @@ def has_area(poly: Union[StructureSlice, float])->bool:
         bool: True if the structure has an area greater than zero, False
             otherwise.
     '''
-    if poly.is_empty:
+    if empty_structure(poly):
         return False
-    area = poly.contour.area
+    area = poly.area
     return area > 0
 
 
@@ -415,9 +441,15 @@ def contains_point(poly: Union[StructureSlice, float],
     Returns:
         bool: True if the structure contains the point, False otherwise.
     '''
-    if poly.is_empty:
+    if empty_structure(poly):
         return False
-    return poly.contour.contains(point)
+    if isinstance(poly, StructureSlice):
+        return poly.contour.contains(point)
+    if isinstance(poly, Region):
+        return poly.polygon.contains(point)
+    if isinstance(poly, shapely.Polygon):
+        return poly.contains(point)
+    return False
 
 
 def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
@@ -431,9 +463,15 @@ def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
     Returns:
         shapely.Point: The centroid of the structure.
     '''
-    if poly.is_empty:
+    if empty_structure(poly):
         return shapely.Point()
-    return poly.contour.centroid
+    if isinstance(poly, StructureSlice):
+        return poly.contour.centroid
+    if isinstance(poly, Region):
+        return poly.polygon.centroid
+    if isinstance(poly, shapely.Polygon):
+        return poly.centroid
+    return shapely.Point()
 
 
 def merge_contours(slice_contours: pd.Series,

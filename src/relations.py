@@ -16,9 +16,8 @@ import shapely
 # Local packages
 from types_and_classes import StructurePairType
 from types_and_classes import DE9IM_Type, DE27IM_Type
-from structure_slice import StructureSlice, find_boundary_slices
+from structure_slice import StructureSlice
 from structure_slice import empty_structure
-from structure_slice import select_slices
 
 
 # Global Settings
@@ -379,13 +378,13 @@ class DE27IM():
                          0b101010000000000000000000000),
         ]
 
-    def __init__(self, contour_a: StructureSlice = None,
+    def __init__(self, contour_a: Union[StructureSlice, shapely.Polygon] = None,
                  contour_b: StructureSlice = None,
                  relation_str: str = None,
                  relation_int: int = None,
                  adjustments: List[str] = None):
-        if contour_a is not None:
-            if contour_b is not None:
+        if not empty_structure(contour_a):
+            if not empty_structure(contour_b):
                 # If both contours are supplied, the relationship is calculated.
                 self.relation = self.relate_contours(contour_a, contour_b, adjustments)
                 self.int = self.to_int(self.relation)
@@ -447,10 +446,10 @@ class DE27IM():
                 ])) from err
         return relation_int
 
-    def relate_contours(self,
-                        contour_a: StructureSlice,
+    @staticmethod
+    def relate_contours(contour_a: StructureSlice,
                         contour_b: StructureSlice,
-                        adjustments: List[str] = None)->DE27IM_Type:
+                        adjustments: List[str] = None)->str:
         '''Get the 27 bit relationship for two structures on a given slice.
         Possible adjustments are:
             'transpose': Transpose the relationship matrix.

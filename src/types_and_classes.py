@@ -6,7 +6,7 @@ Types, Classes and utility function definitions.
 # %% Imports
 # Type imports
 
-from typing import NewType, Tuple
+from typing import NewType, Union, Tuple
 
 # Shared Packages
 import shapely
@@ -20,10 +20,6 @@ RegionIndexType = NewType('RegionIndexType', Tuple[int, str])  # pylint: disable
 # The offset in cm between a given image slice and the DICOm origin in the
 # `Z` direction.
 SliceIndexType = NewType('SliceIndexType', float)
-
-# An enclosed region representing either a structure area, or a hole within .
-# that structure.
-ContourType = NewType('ContourType', shapely.Polygon)
 
 # The reference numbers for two different structures to be compared.
 StructurePairType = NewType('StructurePairType', Tuple[ROI_Type, ROI_Type])
