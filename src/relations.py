@@ -353,7 +353,7 @@ class DE27IM():
                          0b110110000100000000100000000,
                          0b000000000000000000000000000),
         RelationshipTest(RelationshipType.SHELTERS,
-                         0b1110110000100000000100000000,
+                         0b111011000010000000010000000,
                          0b000000000000000000100000000),
         RelationshipTest(RelationshipType.SURROUNDS,
                          0b110110000100000000000000000,
@@ -503,7 +503,7 @@ class DE27IM():
                 contour = contour.boundary_adjustment('a')
                 external = external.boundary_adjustment('a')
                 convex_hull = convex_hull.boundary_adjustment('a')
-            if 'boundary_a' in adjustments:
+            if 'boundary_b' in adjustments:
                 contour = contour.boundary_adjustment('b')
                 external = external.boundary_adjustment('b')
                 convex_hull = convex_hull.boundary_adjustment('b')
@@ -629,19 +629,12 @@ def merged_relations(relations):
     return merged
 
 
-def is_boundary(region):
-    if isinstance(region, Region):
-        return region.is_boundary
-    return False
-
-
-def is_hole(region):
-    if isinstance(region, Region):
-        return region.is_hole
-    return False
-
-
 def find_boundary_slices(region_table: pd.DataFrame, group_regions=False):
+    def is_boundary(region):
+        if isinstance(region, Region):
+            return region.is_boundary
+        return False
+
     has_boundary = region_table.map(is_boundary)
     boundaries = has_boundary.fillna(0).astype(bool)
     if group_regions:
