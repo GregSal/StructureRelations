@@ -648,6 +648,7 @@ def make_region_table(slice_table: pd.DataFrame) -> RegionDict:
                                                             prev_region,
                                                             region_collection)
             previous_slice_index = slice_index
+            previous_regions = current_regions
         # Mark regions in the last slice as boundary.
         if previous_slice_index is not None:
             for region in region_collection[roi][previous_slice_index]:
