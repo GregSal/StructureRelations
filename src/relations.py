@@ -232,21 +232,24 @@ class DE9IM():
 
     def hole_adjustment(self, hole: str)->'DE9IM':
         '''Adjust the DE-9IM relationship matrix of a hole (negative space).
-        The “*Interior*” bits of the DE-9IM relationship metric are swapped
-        with the “*Exterior*”.
+        The “*Interior*” bits of the DE-9IM relationship metric become the
+        “*Exterior*” bits and the new “*Interior*” bits become 'F'.
         '''
         if hole == 'a':
             # Get the Interior, Boundary and Exterior relations for the "a" polygon.
+            # The interior of a hole is the exterior of the structure.
+            # the exterior of a hole is undefined. It may or may not be within
+            # the interior of the structure.
             interiors = self.relation_str[0:3]
             boundaries = self.relation_str[3:6]
-            exteriors = self.relation_str[6:9]
+            exteriors = 'F' * 3
             # Swap the Interior and Exterior relations
             new_str_list = exteriors + boundaries + interiors
         elif hole == 'b':
             # Get the Interior, Boundary and Exterior relations for the "b" polygon.
             interiors = self.relation_str[0:9:3]
             boundaries = self.relation_str[1:9:3]
-            exteriors = self.relation_str[2:9:3]
+            exteriors = 'F' * 3
             # Swap the Interior and Exterior relations
             new_str_list = []
             for i, b, e in zip(interiors, boundaries, exteriors):
@@ -662,12 +665,13 @@ def identify_neighbour_slices(region_table: pd.DataFrame):
 
 
 def find_boundary_pairs(neighbour, region_boundaries, region_idx, is_hole):
-    # If the region is a hole, select the neighbour slice that has a contour.
-    # Otherwise, select the neighbour slice that has no contour.
-    if is_hole:
-        nbr_match = neighbour.T
-    else:
-        nbr_match = neighbour.map(lambda x: not x).T
+    # X If the region is a hole, select the neighbour slice that has a contour.
+    # X Otherwise, select the neighbour slice that has no contour.
+    # Changed my mind, always select the neighbour slice that has no contour.
+    #if is_hole:
+    #    nbr_match = neighbour.T
+    #else:
+    nbr_match = neighbour.map(lambda x: not x).T
     boundary_neighbour_index = nbr_match.join(region_boundaries[region_idx],
                                               rsuffix='bdr')
     boundary_neighbour_index = boundary_neighbour_index.T.apply(all)
