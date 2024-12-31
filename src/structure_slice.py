@@ -5,8 +5,9 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
+from itertools import chain
 from typing import Any, Dict, List, Tuple, Union
-
+from collections import defaultdict
 # Shared Packages
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from types_and_classes import PRECISION, SliceIndexType, StructurePairType
 from types_and_classes import ROI_Type
 from types_and_classes import InvalidContour, InvalidContourRelation
 from utilities import interpolate_polygon, point_round, poly_round
+
 
 
 # %% Type definitions and Globals
@@ -47,6 +49,11 @@ class Region:
         # Check if the region is part of another region
         # This is done to ensure that If the region is a hole, it is not part
         # of the parent region.
+        # regions can only be part of other regions with the same roi
+        if not self.roi == other.roi:
+            return False
+        # TODO add check for slice position. Regions can only be part of other
+        # regions on the neighbouring slice.
         # Holes can only be part of other holes
         if not self.is_hole == other.is_hole:
             return False
@@ -539,119 +546,144 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
 
 #%% Select Regions
 RegionDict = Dict[ROI_Type, Dict[SliceIndexType, List[Region]]]
-def interpolate_regions(roi: ROI_Type,
-                        slice_pair: Tuple[SliceIndexType, SliceIndexType],
-                        current_region: Region,
-                        region_collection: RegionDict):
+
+
+def slice_regions(structure_slice):
+    # Create Region instances for each polygon and hole in the slice
+    local_regions = []
+    roi = structure_slice.roi
+    slice_index = structure_slice.slice_position
+    for polygon in structure_slice.contour.geoms:
+        # Create Region instances for each polygon in the slice
+        # Note: the polygon includes its holes.
+        region = Region(roi, slice_index, polygon, is_hole=False,
+                        is_boundary=False)
+        local_regions.append(region)
+        # Create Region instances for each hole in the polygon
+        for interior in polygon.interiors:
+            hole = shapely.Polygon(interior)
+            region_hole = Region(roi, slice_index, hole, is_hole=True,
+                                 is_boundary=False)
+            local_regions.append(region_hole)
+    return local_regions
+
+
+def add_new_label(idx: int, region: Region) -> int:
+    region.region_labels.append(chr(97 + idx))  # 'a', 'b', 'c', ...
+    idx += 1
+    return idx
+
+
+def match_regions(current_region: Region, previous_regions: List[Region])->List[str]:
+    region_labels = current_region.region_labels
+    for prev_region in previous_regions:
+        if current_region.part_of(prev_region):
+            region_labels.extend(prev_region.region_labels)
+    return region_labels
+
+
+def boundary_region(previous_slice: SliceIndexType, current_region: Region):
+    if previous_slice is None:
+        # If there is no previous slice, (i.e. this is the first slice in
+        # slice_table) then don't create an interpolated region.
+        return None
+    roi = current_region.roi
+    current_slice = current_region.slice
+    slice_pair = (previous_slice, current_slice)
     # Interpolated boundary slices are placed between the first slice with the
     # region and the last slice before the region.
-    intp_slice = np.mean(slice_pair)
-    if intp_slice not in region_collection[roi]:
-        region_collection[roi][intp_slice] = []
     intp_poly = interpolate_polygon(slice_pair, current_region.polygon)
+    intp_slice = intp_poly.centroid.z
     bdry_region = Region(roi, intp_slice, intp_poly,
                             is_hole=current_region.is_hole,
                             is_boundary=True,
                             is_interpolated=True)
-    bdry_region.region_labels = current_region.region_labels
-    region_collection[roi][intp_slice].append(bdry_region)
-    return region_collection
+    bdry_region.region_labels = current_region.region_labels.copy()
+    return bdry_region
+
+
+def expand_regions(region_collection: RegionDict) -> pd.DataFrame:
+    expanded_data = []
+    for roi, slices in region_collection.items():
+        for slice_index, regions in slices.items():
+            for region in regions:
+                for label in region.region_labels:
+                    expanded_data.append({
+                        'ROI': roi,
+                        'Slice': slice_index,
+                        'Label': label,
+                        'Region': region
+                    })
+    return pd.DataFrame(expanded_data)
 
 
 # Function to create Region instances from slice-table DataFrame
 def make_region_table(slice_table: pd.DataFrame) -> RegionDict:
-    def expand_regions(region_collection: RegionDict) -> pd.DataFrame:
-        expanded_data = []
-        for roi, slices in region_collection.items():
-            for slice_index, regions in slices.items():
-                for region in regions:
-                    for label in region.region_labels:
-                        expanded_data.append({
-                            'ROI': roi,
-                            'Slice': slice_index,
-                            'Label': label,
-                            'Region': region
-                        })
-        return pd.DataFrame(expanded_data)
-
-
-    # Add interpolated contours for the other non-boundary regions
     region_collection = {}
     idx = 0
     for roi in slice_table.columns:
-        region_collection[roi] = {}
+        region_collection[roi] = defaultdict(list)
         previous_regions = []
-        previous_slice_index = None
+        previous_slice = None
         # Iterate over slices in the slice_table for a given ROI
         for slice_index, structure_slice in slice_table[roi].items():
+            if empty_structure(structure_slice):
+                # Ignore empty slices
+                continue
+            # Identify whether this is the first slice in for a given ROI:
+            first_slice = (slice_index == slice_table[roi].first_valid_index())
             # Create a list of Region instances for each slice
-            if slice_index not in region_collection[roi]:
-                region_collection[roi][slice_index] = []
-            # Create Region instances for each polygon and hole in the slice
-            if not empty_structure(structure_slice):
-                for polygon in structure_slice.contour.geoms:
-                    # Create Region instances for each polygon in the slice
-                    # Note: the polygon includes its holes.
-                    region = Region(roi, slice_index, polygon, is_hole=False,
-                                    is_boundary=False)
-                    region_collection[roi][slice_index].append(region)
-                    # Create Region instances for each hole in the polygon
-                    for interior in polygon.interiors:
-                        hole = shapely.Polygon(interior)
-                        region_hole = Region(roi, slice_index, hole,
-                                             is_hole=True, is_boundary=False)
-                        region_collection[roi][slice_index].append(region_hole)
-                # Set unique labels for each region on the first slice
-                if slice_index == slice_table[roi].first_valid_index():
-                    for region in region_collection[roi][slice_index]:
-                        region.region_labels.append(chr(97 + idx))  # 'a', 'b', 'c', ...
-                        if previous_slice_index is not None:
-                            # Create an interpolated region half way to the
-                            # previous slice.
-                            slice_pair = (previous_slice_index, slice_index)
-                            region_collection = interpolate_regions(
-                                roi, slice_pair, region, region_collection)
-                        else:
-                            # If there is no previous slice, (i.e. this is the
-                            # first slice in slice_table) then don't create an
-                            # interpolated region.
-                            region.is_boundary = True
-                        # Increment the region label index
-                        idx += 1
+            current_regions = slice_regions(structure_slice)
+            for region in current_regions:
+                if first_slice:
+                    # If this is the first slice in for a given ROI, then
+                    # set unique labels for each region on the first slice and
+                    # create an interpolated boundary region.
+                    idx = add_new_label(idx, region)
+                    bdry_region = boundary_region(previous_slice, region)
+                    if bdry_region:
+                        # If the boundary region is created, add it to the
+                        # region_collection in the interpolated slice.
+                        intp_slice = bdry_region.slice
+                        region_collection[roi][intp_slice].append(bdry_region)
+                    else:
+                        # If the boundary region is note created, set the
+                        # current region as a boundary region.
+                        region.is_boundary = True
                 else:
-                    # Find overlapping polygons and give them the same region labels
-                    for region in region_collection[roi][slice_index]:
-                        matched = False
-                        for prev_region in previous_regions:
-                            if region.part_of(prev_region):
-                                region.region_labels.extend(prev_region.region_labels)
-                                matched = True
-                                break
-                        if not matched:
-                            region.region_labels.append(chr(97 + idx))
-                            # Create an interpolated region half way to the
-                            # previous slice.
-                            slice_pair = (previous_slice_index, slice_index)
-                            region_collection = interpolate_regions(
-                                roi, slice_pair, region, region_collection)
-                            idx += 1
-                            region.is_boundary = True
-            # Interpolate boundaries from the previous region if not matched
-            current_regions = region_collection[roi][slice_index]
+                    # Find overlapping polygons and give them the same region
+                    # labels.
+                    region_labels = match_regions(region, previous_regions)
+                    if region_labels:
+                        region.region_labels = region_labels
+                    else:
+                        # If the region does not match any previous region, then
+                        # give it a unique label and create an interpolated
+                        # region half way to the previous slice.
+                        idx = add_new_label(idx, region)
+                        bdry_region = boundary_region(previous_slice, region)
+                        intp_slice = bdry_region.slice
+                        region_collection[roi][intp_slice].append(bdry_region)
+            # Add the current regions to the region_collection.
+            region_collection[roi][slice_index] = current_regions
+            # Identify any previous regions that did not match with a current
+            # region and create interpolated boundaries.
+            all_labels = [region.region_labels for region in current_regions]
+            matched_labels = set(label for label in chain(all_labels))
             for prev_region in previous_regions:
-                matched_region = any(region.part_of(prev_region)
-                                     for region in current_regions)
-                if not matched_region:
-                    # Create an interpolated region half way to the previous slice.
-                    slice_pair = (previous_slice_index, slice_index)
-                    region_collection = interpolate_regions(roi, slice_pair,
-                                                            prev_region,
-                                                            region_collection)
-            previous_slice_index = slice_index
+                if set(prev_region.region_labels).isdisjoint(matched_labels):
+                    bdry_region = boundary_region(slice_index, prev_region)
+                    if bdry_region:
+                        intp_slice = bdry_region.slice
+                        region_collection[roi][intp_slice].append(bdry_region)
+                    else:
+                        prev_region.is_boundary = True
+            # Update the previous_slice and previous_regions for the next slice.
+            previous_slice = slice_index
             previous_regions = current_regions
-        # Mark regions in the last slice as boundary.
-        if previous_slice_index is not None:
-            for region in region_collection[roi][previous_slice_index]:
+        # Mark regions in the last slice as boundaries.
+        if previous_slice is not None:
+            for region in previous_regions:
                 region.is_boundary = True
     # Expand the regions_dict into a DataFrame with one column per region
     region_table = expand_regions(region_collection)
@@ -659,6 +691,9 @@ def make_region_table(slice_table: pd.DataFrame) -> RegionDict:
     region_table = region_table.unstack(['ROI', 'Label'])
     region_table.columns = region_table.columns.droplevel(0)
     return region_table
+
+
+
 
 
 #%% Select Slices and neighbours
