@@ -8,7 +8,7 @@ Types, Classes and utility function definitions.
 from typing import Any, Dict, List, Tuple, Union
 
 # Standard Libraries
-from itertools import chain
+from itertools import chain, combinations
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -45,10 +45,11 @@ def generate_slice_neighbours(slice_table: pd.DataFrame) -> pd.DataFrame:
         pd.Series: A series of SliceNeighbours with SliceIndex as the index.
     '''
     neighbours = slice_table.index.to_frame()
-    starting_slice = neighbours.iloc[0]
-    ending_slice = neighbours.iloc[-1]
-    neighbours['previous'] = neighbours.shift(1, fill_value=starting_slice)
-    neighbours['next'] = neighbours.shift(-1, fill_value=ending_slice)
+    starting_slice = neighbours.iat[0, 0]
+    ending_slice = neighbours.iat[-1, 0]
+    this_slice = neighbours['Slice Index']
+    neighbours['previous'] = this_slice.shift(1, fill_value=starting_slice)
+    neighbours['next'] =this_slice.shift(-1, fill_value=ending_slice)
     neighbours.columns = ['this_slice', 'previous_slice', 'next_slice']
     return neighbours
 
@@ -94,19 +95,19 @@ def create_edges(graph: nx.Graph) -> None:
     Args:
         graph (nx.Graph): The graph containing the nodes.
     '''
-    for node1 in graph.nodes(data=True):
+    for node1, node2 in combinations(graph.nodes(data=True), 2):
         roi1, slice_index1, _ = node1[0]
-        for node2 in graph.nodes(data=True):
-            roi2, slice_index2, _ = node2[0]
-            if roi1 != roi2:
-                continue
-            if not node1[1]['slice_neighbours'].is_neighbour(slice_index2):
-                continue
-            if node1[1]['is_hole'] != node2[1]['is_hole']:
-                continue
-            if node1[1]['polygon'].intersects(node2[1]['polygon']):
-                weight = abs(slice_index1 - slice_index2)
-                graph.add_edge(node1[0], node2[0], weight=weight)
+        roi2, slice_index2, _ = node2[0]
+        if roi1 != roi2:
+            continue
+        if not node1[1]['slice_neighbours'].is_neighbour(slice_index2):
+            continue
+        if node1[1]['is_hole'] != node2[1]['is_hole']:
+            continue
+        if node1[1]['polygon'].intersects(node2[1]['polygon']):
+            weight = abs(slice_index1 - slice_index2)
+            graph.add_edge(node1[0], node2[0], weight=weight)
+
 
 def identify_boundaries(graph: nx.Graph) -> List[Tuple]:
     '''Identify boundary nodes in the graph.
@@ -159,5 +160,4 @@ def generate_region_graph(slice_table: pd.DataFrame) -> nx.Graph:
         for structure_slice in row.dropna():
             structure_slice.extract_regions(graph)
     create_edges(graph)
-    boundaries = identify_boundaries(graph)
-    return graph, boundaries
+    return graph

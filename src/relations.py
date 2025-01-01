@@ -15,8 +15,7 @@ import shapely
 
 # Local packages
 from types_and_classes import StructurePairType, RegionIndexType
-from structure_slice import Region, StructureSlice
-from structure_slice import empty_structure, make_region_table, select_slices
+from structure_slice import StructureSlice, empty_structure
 from utilities import interpolate_polygon
 
 
@@ -243,10 +242,10 @@ class DE9IM():
             interiors = self.relation_str[0:3]
             boundaries = self.relation_str[3:6]
             exteriors = 'F' * 3
-            # Swap the Interior and Exterior relations
+            # The Interior relations become Exterior relations
             new_str_list = exteriors + boundaries + interiors
         elif hole == 'b':
-            # Get the Interior, Boundary and Exterior relations for the "b" polygon.
+            # The Interior relations become Exterior relations
             interiors = self.relation_str[0:9:3]
             boundaries = self.relation_str[1:9:3]
             exteriors = 'F' * 3
@@ -500,6 +499,8 @@ class DE27IM():
                 ]))
         # Apply adjustments to the relationship matrix.
         # Note: The order of the adjustments is important.
+        # When hole adjustments are applied, only the "contour" bits are relevant,
+        # the external and hull bits are set to 'FFFFFFFFF'.
         if adjustments:
             # Apply Boundary Adjustments
             if 'boundary_a' in adjustments:
@@ -513,12 +514,12 @@ class DE27IM():
             # Apply Hole Adjustments
             if 'hole_a' in adjustments:
                 contour = contour.hole_adjustment('a')
-                external = external.hole_adjustment('a')
-                convex_hull = convex_hull.hole_adjustment('a')
+                external = DE9IM(relation_str='F' * 9)
+                convex_hull = DE9IM(relation_str='F' * 9)
             if 'hole_b' in adjustments:
                 contour = contour.hole_adjustment('b')
-                external = external.hole_adjustment('b')
-                convex_hull = convex_hull.hole_adjustment('b')
+                external = DE9IM(relation_str='F' * 9)
+                convex_hull = DE9IM(relation_str='F' * 9)
             # Apply Transpose Adjustment
             if 'transpose' in adjustments:
                 contour = contour.transpose()
@@ -631,12 +632,6 @@ def merged_relations(relations):
         merged = merged.merge(relation)
     return merged
 
-
-def find_boundary_slices(region_table: pd.DataFrame, group_regions=False):
-    def is_boundary(region):
-        if isinstance(region, Region):
-            return region.is_boundary
-        return False
 
     has_boundary = region_table.map(is_boundary)
     boundaries = has_boundary.fillna(0).astype(bool)
