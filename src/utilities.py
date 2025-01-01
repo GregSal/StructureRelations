@@ -32,14 +32,16 @@ def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
         clean_coords = [round(x,precision), round(y,precision)]
     elif dim == 3:
         x, y, z = shapely.get_coordinates(point, include_z=True)[0]
-        clean_coords = [round(x,precision), round(y,precision), round(z,precision)]
+        clean_coords = [round(x,precision), round(y,precision),
+                        round(z,precision)]
     else:
         raise ValueError(f"Invalid coordinate dimension: {dim}")
     clean_coords = (round(x,precision), round(y,precision))
     return shapely.Point(clean_coords)
 
 
-def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Polygon:
+def poly_round(polygon: shapely.Polygon,
+               precision: int = PRECISION)->shapely.Polygon:
     '''Round the coordinates of a polygon to the specified precision.
 
     Args:
@@ -57,8 +59,10 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
         polygon_points = [(round(x,precision), round(y,precision))
                           for x,y in shapely.get_coordinates(polygon)]
     elif dim == 3:
-        polygon_points = [(round(x,precision), round(y,precision), round(z,precision))
-                          for x,y,z in shapely.get_coordinates(polygon, include_z=True)]
+        polygon_points = [(round(x,precision), round(y,precision),
+                           round(z,precision))
+                          for x,y,z in shapely.get_coordinates(polygon,
+                                                               include_z=True)]
     else:
         raise ValueError(f"Invalid coordinate dimension: {dim}")
     clean_poly = shapely.Polygon(polygon_points)
@@ -66,71 +70,77 @@ def poly_round(polygon: shapely.Polygon, precision: int = PRECISION)->shapely.Po
 
 
 #%% Interpolation Functions
-def match_boundaries(p1, p2):
-    if p1.is_empty:
-        boundary1 = None
-    else:
-        boundary1 = p1.exterior
-    if p2 is None:
-        if boundary1:
-            boundary2 = p1.centroid
-        else:
-            raise ValueError('No second polygon given and first polygon is empty.')
-    else:
-        boundary2 = p2.exterior
-        if not boundary1:
-            boundary1 = p2.centroid
-    return boundary1, boundary2
-
-def match_holes(p1, p2):
-    if p1.is_empty:
-        holes1 = []
-    else:
-        holes1 = list(p1.interiors)
-    # If no second polygon given, use the centroid of the first polygon as the
-    # boundary.
-    if p2 is None:
-        if holes1:
-            matched_holes = [(hole, hole.centroid) for hole in holes1]
-        else:
-            matched_holes = []
-        return matched_holes
-    holes2 =  list(p2.interiors)
-    if not holes1:
-        matched_holes = [(hole, hole.centroid) for hole in holes2]
-        return matched_holes
-
-    # match the holes of the second polygon to the first polygon
-    matched_holes = []
-    hole2_matched = {i: False for i in range(len(holes2))}
-    for hole1 in holes1:
-        matched1 = False
-        for idx, hole2 in enumerate(holes2):
-            if hole1.overlaps(hole2):
-                matched_holes.append((hole1, hole2))
-                matched1 = True
-                hole2_matched[idx] = True
-        if not matched1:
-            matched_holes.append((hole1, hole1.centroid))
-    # Add any unmatched holes from the second polygon.
-    for idx, hole2 in enumerate(holes2):
-        if not hole2_matched[idx]:
-            matched_holes.append((hole2, hole2.centroid))
-    return matched_holes
-
-
-def interpolate_boundaries(boundary1, boundary2):
-    new_cords = []
-    for crd in boundary1.coords:
-        ln = shapely.shortest_line(shapely.Point(crd), boundary2)
-        ptn = ln.interpolate(0.5, normalized=True)
-        new_cords.append(ptn)
-    return new_cords
-
 
 def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
                         p1: shapely.Polygon,
                         p2: shapely.Polygon = None) -> shapely.Polygon:
+    def match_boundaries(p1, p2):
+        if p1.is_empty:
+            boundary1 = None
+        else:
+            boundary1 = p1.exterior
+        if p2 is None:
+            if boundary1:
+                boundary2 = p1.centroid
+            else:
+                raise ValueError('No second polygon given and first polygon is empty.')
+        else:
+            boundary2 = p2.exterior
+            if not boundary1:
+                boundary1 = p2.centroid
+        return boundary1, boundary2
+
+    def match_holes(p1, p2):
+        if p1.is_empty:
+            holes1 = []
+        else:
+            holes1 = list(p1.interiors)
+        # If no second polygon given, use the centroid of each first hole as the
+        # matching second hole boundary.
+        if p2 is None:
+            if holes1:
+                matched_holes = [(hole, hole.centroid) for hole in holes1]
+            else:
+                matched_holes = []
+            return matched_holes
+        # If the first polygon does not have any holes, and the second polygon
+        # does, use the centroid of the second hole as the matching first hole
+        # boundary.
+        holes2 =  list(p2.interiors)
+        if not holes1:
+            matched_holes = [(hole, hole.centroid) for hole in holes2]
+            return matched_holes
+        # If both polygons have holes, match the holes match the holes of the
+        # second polygon to the first polygon.
+        matched_holes = []
+        # set each second hole as not matched.
+        hole2_matched = {i: False for i in range(len(holes2))}
+        for hole1 in holes1:
+            matched1 = False  # set the first hole as not matched.
+            for idx, hole2 in enumerate(holes2):
+                if hole1.overlaps(hole2):
+                    matched_holes.append((hole1, hole2))
+                    matched1 = True # set the first hole as matched.
+                    hole2_matched[idx] = True  # set the second hole as matched.
+            # If the first hole is not matched, use the centroid of the first
+            # hole as the matching second hole boundary.
+            if not matched1:
+                matched_holes.append((hole1, hole1.centroid))
+        # Add any unmatched holes from the second polygon, using the centroid of
+        # the second hole as the matching first hole boundary.
+        for idx, hole2 in enumerate(holes2):
+            if not hole2_matched[idx]:
+                matched_holes.append((hole2, hole2.centroid))
+        return matched_holes
+
+    def interpolate_boundaries(boundary1, boundary2):
+        new_cords = []
+        for crd in boundary1.coords:
+            ln = shapely.shortest_line(shapely.Point(crd), boundary2)
+            ptn = ln.interpolate(0.5, normalized=True)
+            new_cords.append(ptn)
+        return new_cords
+
     # If multiple slices given, calculate the new z value.
     if isinstance(slices, (list, tuple)):
         new_z = np.mean(slices)

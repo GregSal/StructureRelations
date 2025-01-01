@@ -7,6 +7,7 @@ Types, Classes and utility function definitions.
 # Type imports
 
 from typing import NewType, Union, Tuple
+from dataclasses import dataclass
 
 # Shared Packages
 import shapely
@@ -49,3 +50,15 @@ class InvalidContour(ValueError, StructuresException):
 
 class InvalidContourRelation(ValueError, StructuresException):
     '''Exception raised for invalid contour relationship data.'''
+
+@dataclass
+class SliceNeighbours:
+    this_slice: SliceIndexType
+    previous_slice: SliceIndexType
+    next_slice: SliceIndexType
+
+    def is_neighbour(self, other_slice: SliceIndexType) -> bool:
+        return self.previous_slice <= other_slice <= self.next_slice
+
+    def gaps(self) -> Union[int, float]:
+        return abs(self.next_slice - self.previous_slice) / 2

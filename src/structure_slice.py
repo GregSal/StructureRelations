@@ -5,94 +5,31 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from itertools import chain
 from typing import Any, Dict, List, Tuple, Union
-from collections import defaultdict
+
+# Standard Libraries
+
+
 # Shared Packages
-import numpy as np
+
 import pandas as pd
 #import xlwings as xw
 import shapely
+import networkx as nx
 
 # Local packages
-from types_and_classes import PRECISION, SliceIndexType, StructurePairType
+from types_and_classes import PRECISION, SliceIndexType, SliceNeighbours
 from types_and_classes import ROI_Type
 from types_and_classes import InvalidContour, InvalidContourRelation
-from utilities import interpolate_polygon, point_round, poly_round
-
+from utilities import point_round, poly_round
 
 
 # %% Type definitions and Globals
 # An enclosed region representing either a structure area, or a hole within
-# that structure.  The float type is present to allow for np.nan values.
-ContourType = Union["Region", "StructureSlice", shapely.Polygon, float]
-
-
-#%% Region Class
-class Region:
-    def __init__(self, roi: ROI_Type, slice_position: SliceIndexType,
-                 polygon: ContourType, is_hole: bool = False,
-                 is_boundary: bool = False,
-                 is_interpolated: bool = False):
-        self.roi = roi
-        self.slice = slice_position
-        self.is_hole = is_hole
-        self.is_boundary = is_boundary
-        self.is_interpolated = is_interpolated
-        self.region_labels = []
-        if isinstance(polygon, shapely.Polygon):
-            self.polygon = polygon
-        else:
-            self.polygon = None
-
-    def part_of(self, other: 'Region') -> bool:
-        # Check if the region is part of another region
-        # This is done to ensure that If the region is a hole, it is not part
-        # of the parent region.
-        # regions can only be part of other regions with the same roi
-        if not self.roi == other.roi:
-            return False
-        # TODO add check for slice position. Regions can only be part of other
-        # regions on the neighbouring slice.
-        # Holes can only be part of other holes
-        if not self.is_hole == other.is_hole:
-            return False
-        # The interior of both polygons must overlap.
-        pattern = '2********'
-        return self.polygon.relate_pattern(other.polygon, pattern)
-
-    @property
-    def is_empty(self)-> bool:
-        '''Check if the slice is empty.
-
-        Returns:
-            bool: True if the slice is empty, False otherwise.
-        '''
-        if self.polygon is None:
-            return True
-        if self.polygon.is_empty:
-            return True
-        if self.polygon.area == 0:
-            return True
-        return False
-
-    @property
-    def area(self)-> float:
-        '''The area encompassed by the polygon.
-
-        Returns:
-            float: The area encompassed by the polygon.
-        '''
-        return self.polygon.area
-
-    def __repr__(self):
-        return ''.join([f'Region(roi={self.roi}, ',
-                        f'slice={self.slice}, ',
-                        f'is_hole={self.is_hole}, ',
-                        f'is_boundary={self.is_boundary}, ',
-                        f'region_labels={self.region_labels}, ',
-                        #f'polygon={self.polygon})'
-            ])
+# that structure. The type also include a dictionary that contains the string
+# 'polygon' as a key and a shapely.Polygon as the matching value.
+# The float type is present to allow for np.nan values.
+ContourType = Union["StructureSlice", shapely.Polygon, Dict[str, Any], float]
 
 
 # %% StructureSlice Class
@@ -136,9 +73,9 @@ class StructureSlice():
             into a single MultiPolygon.
         '''
         if 'roi' in kwargs:
-            self.roi = kwargs['roi']
+            self.roi: ROI_Type = kwargs['roi']
         else:
-            self.roi = None
+            self.roi: ROI_Type = None
         if 'precision' in kwargs:
             self.precision = kwargs['precision']
         else:
@@ -148,9 +85,10 @@ class StructureSlice():
         else:
             ignore_errors = False
         if 'slice_position' in kwargs:
-            self.slice_position = kwargs['slice_position']
+            self.slice_position: SliceIndexType = kwargs['slice_position']
         else:
-            self.slice_position = None
+            self.slice_position: SliceIndexType = None
+        self.slice_neighbours: SliceNeighbours = None
         self.contour = shapely.MultiPolygon()
         for contour in contours:
             self.add_contour(contour, ignore_errors=ignore_errors)
@@ -277,13 +215,43 @@ class StructureSlice():
         hole_polygons = [shapely.Polygon(hole) for hole in holes]
         return hole_polygons
 
+    def extract_regions(self, graph: nx.Graph, extract_holes=True) -> None:
+        '''Extract the individual regions from the contour MultiPolygon and add
+        them as nodes to the graph.
+
+        Args:
+            graph (nx.Graph): The graph to add the regions to.
+            extract_holes (bool, optional): Whether to extract holes as
+                separate regions. Defaults to True.
+        '''
+        roi = self.roi
+        slice_index = self.slice_position
+        for poly in self.contour.geoms:
+            is_empty = poly.area == 0
+            # Create nodes for each polygon in the slice
+            graph.add_node((roi, slice_index, poly.wkt), polygon=poly, roi=roi,
+                           slice_index=slice_index, is_hole=False,
+                           is_boundary=False, is_interpolated=False,
+                           is_empty=is_empty,
+                           slice_neighbours=self.slice_neighbours)
+            if extract_holes:
+                # Create nodes for each hole in the polygon
+                for interior in poly.interiors:
+                    hole = shapely.Polygon(interior)
+                    is_empty = hole.area == 0
+                    graph.add_node((roi, slice_index, hole.wkt), polygon=hole,
+                                   roi=roi, slice_index=slice_index,
+                                   is_hole=True, is_boundary=False,
+                                   is_interpolated=False, is_empty=is_empty,
+                                   slice_neighbours=self.slice_neighbours)
+
     def select(self, coverage: str) -> shapely.MultiPolygon:
         # select the polygon type
-        if coverage == 'contour':
+        if (coverage == 'contour'):
             polygon = self.contour
-        elif coverage == 'exterior':
+        elif (coverage == 'exterior'):
             polygon = self.exterior
-        elif coverage == 'hull':
+        elif (coverage == 'hull'):
             polygon = self.hull
         else:
             raise ValueError('Invalid coverage type')
@@ -341,30 +309,17 @@ class StructureSlice():
             return True
         return False
 
-    def extract_regions(self, extract_holes=False)->List[Region]:
-        '''Extract the individual regions from the contour MultiPolygon.
+    def set_slice_neighbours(self, previous_slice: SliceIndexType,
+                             next_slice: SliceIndexType) -> None:
+        '''Set the SliceNeighbours attribute for the StructureSlice.
 
-        Returns:
-            pd.DataFrame: A DataFrame containing the extracted region data.
+        Args:
+            previous_slice (SliceIndexType): The previous slice index.
+            next_slice (SliceIndexType): The next slice index.
         '''
-        regions_list = []
-        roi = self.roi
-        slice_index = self.slice_position
-        for poly in self.contour.geoms:
-            # Create Region instances for each polygon in the slice
-            # Note: the polygon includes its holes.
-            region = Region(roi, slice_index, poly,
-                            is_hole=False, is_boundary=False)
-            regions_list.append(region)
-            if extract_holes:
-                # Create Region instances for each hole in the polygon
-                for interior in poly.interiors:
-                    hole = shapely.Polygon(interior)
-                    region_hole = Region(self.roi, self.slice_position,
-                                         hole,
-                                         is_hole=True, is_boundary=False)
-                    regions_list.append(region_hole)
-        return regions_list
+        self.slice_neighbours = SliceNeighbours(this_slice=self.slice_position,
+                                                previous_slice=previous_slice,
+                                                next_slice=next_slice)
 
     def centers(self, coverage: str = 'contour')->List[shapely.Point]:
         '''A list of the geometric centers of each polygon in the ContourSlice.
@@ -393,25 +348,33 @@ class StructureSlice():
 def empty_structure(structure: ContourType, invert=False) -> bool:
     '''Check if the structure is empty.
 
-    Tests whether structure is NaN or an empty StructureSlice.
-    If the structure is a StructureSlice, it is considered empty if it has
-    no contours.
+    Tests whether structure has an 'is_empty' attribute, an 'is_empty' key.
+    If so, use the value obtained from this attribute or dictionary value.
+    Otherwise, if it has a zero area or does not have an area attribute
+    `is_empty` is False.
 
     Args:
         structure (Union[StructureSlice, float]): A StructureSlice or NaN object.
+        invert (bool, optional): If True, return the opposite of the result.
 
     Returns:
         bool: False if the structure is type StructureSlice and is not empty.
-            Otherwise True.
+            Otherwise True.  If invert True, the result is opposite.
     '''
-    if not isinstance(structure, (StructureSlice, Region, shapely.Polygon)):
-        is_empty = True
-    elif structure.is_empty:
-        is_empty =  True
-    elif structure.area == 0:
-        is_empty = True
-    else:
-        is_empty = False
+    is_empty = True
+    # check for an is_empty attribute.
+    try:
+        is_empty = structure.is_empty
+    except AttributeError:
+        # if there is no is_empty attribute, check for an 'is_empty' key.
+        try:
+            is_empty = structure['is_empty']
+        except (TypeError, KeyError):
+            # if there is no 'is_empty' key, check for an area attribute.
+            try:
+                is_empty = structure.area == 0
+            except AttributeError:
+                is_empty = True
     if invert:
         return not is_empty
     return is_empty
@@ -451,37 +414,44 @@ def contains_point(poly: Union[StructureSlice, float],
         bool: True if the structure contains the point, False otherwise.
     '''
     if empty_structure(poly):
-        return False
-    if isinstance(poly, StructureSlice):
-        return poly.contour.contains(point)
-    if isinstance(poly, Region):
-        return poly.polygon.contains(point)
-    if isinstance(poly, shapely.Polygon):
-        return poly.contains(point)
-    return False
+        contains = False
+    elif isinstance(poly, StructureSlice):
+        contains = poly.contour.contains(point)
+    elif isinstance(poly, shapely.Polygon):
+        contains = poly.contains(point)
+    else:
+        try:
+            contains = poly.polygon.contains(point)
+        except AttributeError:
+            contains = False
+    return contains
 
 
 def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
     '''Get the centroid of the structure.
 
-    Returns the centroid of the structure or NaN if the structure is empty.
+    Returns the centroid of the structure or an empty Point object the
+    structure is empty.
 
     Args:
-        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
+        poly (Union[StructureSlice, float]): A StructureSlice, shapely.Polygon
+            or object containing a 'polygon' attribute.
 
     Returns:
         shapely.Point: The centroid of the structure.
     '''
     if empty_structure(poly):
-        return shapely.Point()
-    if isinstance(poly, StructureSlice):
-        return poly.contour.centroid
-    if isinstance(poly, Region):
-        return poly.polygon.centroid
-    if isinstance(poly, shapely.Polygon):
-        return poly.centroid
-    return shapely.Point()
-
+        centroid = shapely.Point()
+    elif isinstance(poly, StructureSlice):
+        centroid = poly.contour.centroid
+    elif isinstance(poly, shapely.Polygon):
+        centroid = poly.centroid
+    else:
+        try:
+            centroid = poly.polygon.centroid
+        except AttributeError:
+            centroid = shapely.Point()
+    return centroid
 
 def merge_contours(slice_contours: pd.Series,
                    ignore_errors=False) -> StructureSlice:
@@ -515,387 +485,3 @@ def merge_contours(slice_contours: pd.Series,
         print(f'{msg}\t for ROI: {roi_num} on slice: {slice_idx}')
         structure_slice = StructureSlice([])
     return structure_slice
-
-
-def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
-    '''Merge contour data to build a table of StructureSlice data
-
-    The table index is SliceIndex, sorted from smallest to largest. The table
-    columns are ROI_Num.
-    Individual structure contours with the same ROI_Num and SliceIndex are
-    merged into a single StructureSlice instance
-
-    Args:
-        slice_data (pd.Series): A series of individual structure contours.
-        ignore_errors (bool, optional): If True, overlapping contours are
-            allowed and combined to generate a larger solid region.
-            Defaults to False.
-
-    Returns:
-        pd.DataFrame: A table of StructureSlice data with an SliceIndex and
-            ROI_Num as the index and columns respectively.
-    '''
-    sorted_data = slice_data.sort_index(level=['Slice Index', 'ROI Num']).copy()
-    sorted_data['Area'] = sorted_data.map(lambda x: x.area)
-    structure_group = sorted_data.groupby(level=['Slice Index', 'ROI Num'])
-    structure_data = structure_group.apply(merge_contours,
-                                           ignore_errors=ignore_errors)
-    slice_table = structure_data.unstack('ROI Num')
-    return slice_table
-
-
-#%% Select Regions
-RegionDict = Dict[ROI_Type, Dict[SliceIndexType, List[Region]]]
-
-
-def slice_regions(structure_slice):
-    # Create Region instances for each polygon and hole in the slice
-    local_regions = []
-    roi = structure_slice.roi
-    slice_index = structure_slice.slice_position
-    for polygon in structure_slice.contour.geoms:
-        # Create Region instances for each polygon in the slice
-        # Note: the polygon includes its holes.
-        region = Region(roi, slice_index, polygon, is_hole=False,
-                        is_boundary=False)
-        local_regions.append(region)
-        # Create Region instances for each hole in the polygon
-        for interior in polygon.interiors:
-            hole = shapely.Polygon(interior)
-            region_hole = Region(roi, slice_index, hole, is_hole=True,
-                                 is_boundary=False)
-            local_regions.append(region_hole)
-    return local_regions
-
-
-def add_new_label(idx: int, region: Region) -> int:
-    region.region_labels.append(chr(97 + idx))  # 'a', 'b', 'c', ...
-    idx += 1
-    return idx
-
-
-def match_regions(current_region: Region, previous_regions: List[Region])->List[str]:
-    region_labels = current_region.region_labels
-    for prev_region in previous_regions:
-        if current_region.part_of(prev_region):
-            region_labels.extend(prev_region.region_labels)
-    return region_labels
-
-
-def boundary_region(previous_slice: SliceIndexType, current_region: Region):
-    if previous_slice is None:
-        # If there is no previous slice, (i.e. this is the first slice in
-        # slice_table) then don't create an interpolated region.
-        return None
-    roi = current_region.roi
-    current_slice = current_region.slice
-    slice_pair = (previous_slice, current_slice)
-    # Interpolated boundary slices are placed between the first slice with the
-    # region and the last slice before the region.
-    intp_poly = interpolate_polygon(slice_pair, current_region.polygon)
-    intp_slice = intp_poly.centroid.z
-    bdry_region = Region(roi, intp_slice, intp_poly,
-                            is_hole=current_region.is_hole,
-                            is_boundary=True,
-                            is_interpolated=True)
-    bdry_region.region_labels = current_region.region_labels.copy()
-    return bdry_region
-
-
-def expand_regions(region_collection: RegionDict) -> pd.DataFrame:
-    expanded_data = []
-    for roi, slices in region_collection.items():
-        for slice_index, regions in slices.items():
-            for region in regions:
-                for label in region.region_labels:
-                    expanded_data.append({
-                        'ROI': roi,
-                        'Slice': slice_index,
-                        'Label': label,
-                        'Region': region
-                    })
-    return pd.DataFrame(expanded_data)
-
-
-# Function to create Region instances from slice-table DataFrame
-def make_region_table(slice_table: pd.DataFrame) -> RegionDict:
-    region_collection = {}
-    idx = 0
-    for roi in slice_table.columns:
-        region_collection[roi] = defaultdict(list)
-        previous_regions = []
-        previous_slice = None
-        # Iterate over slices in the slice_table for a given ROI
-        for slice_index, structure_slice in slice_table[roi].items():
-            if empty_structure(structure_slice):
-                # Ignore empty slices
-                continue
-            # Identify whether this is the first slice in for a given ROI:
-            first_slice = (slice_index == slice_table[roi].first_valid_index())
-            # Create a list of Region instances for each slice
-            current_regions = slice_regions(structure_slice)
-            for region in current_regions:
-                if first_slice:
-                    # If this is the first slice in for a given ROI, then
-                    # set unique labels for each region on the first slice and
-                    # create an interpolated boundary region.
-                    idx = add_new_label(idx, region)
-                    bdry_region = boundary_region(previous_slice, region)
-                    if bdry_region:
-                        # If the boundary region is created, add it to the
-                        # region_collection in the interpolated slice.
-                        intp_slice = bdry_region.slice
-                        region_collection[roi][intp_slice].append(bdry_region)
-                    else:
-                        # If the boundary region is note created, set the
-                        # current region as a boundary region.
-                        region.is_boundary = True
-                else:
-                    # Find overlapping polygons and give them the same region
-                    # labels.
-                    region_labels = match_regions(region, previous_regions)
-                    if region_labels:
-                        region.region_labels = region_labels
-                    else:
-                        # If the region does not match any previous region, then
-                        # give it a unique label and create an interpolated
-                        # region half way to the previous slice.
-                        idx = add_new_label(idx, region)
-                        bdry_region = boundary_region(previous_slice, region)
-                        intp_slice = bdry_region.slice
-                        region_collection[roi][intp_slice].append(bdry_region)
-            # Add the current regions to the region_collection.
-            region_collection[roi][slice_index] = current_regions
-            # Identify any previous regions that did not match with a current
-            # region and create interpolated boundaries.
-            all_labels = [region.region_labels for region in current_regions]
-            matched_labels = set(label for label in chain(all_labels))
-            for prev_region in previous_regions:
-                if set(prev_region.region_labels).isdisjoint(matched_labels):
-                    bdry_region = boundary_region(slice_index, prev_region)
-                    if bdry_region:
-                        intp_slice = bdry_region.slice
-                        region_collection[roi][intp_slice].append(bdry_region)
-                    else:
-                        prev_region.is_boundary = True
-            # Update the previous_slice and previous_regions for the next slice.
-            previous_slice = slice_index
-            previous_regions = current_regions
-        # Mark regions in the last slice as boundaries.
-        if previous_slice is not None:
-            for region in previous_regions:
-                region.is_boundary = True
-    # Expand the regions_dict into a DataFrame with one column per region
-    region_table = expand_regions(region_collection)
-    region_table.set_index(['ROI', 'Label', 'Slice'], inplace=True)
-    region_table = region_table.unstack(['ROI', 'Label'])
-    region_table.columns = region_table.columns.droplevel(0)
-    return region_table
-
-
-
-
-
-#%% Select Slices and neighbours
-def select_slices(slice_table: pd.DataFrame,
-                  selected_roi: StructurePairType) -> pd.DataFrame:
-    '''Select the slices that have either of the structures.
-
-    Select all slices that have either of the structures.
-
-    Args:
-        slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index, ROI_Num for columns and StructureSlice or
-            NaN as the values.
-        selected_roi (StructurePairType): A tuple of two ROI_Num to select.
-
-    Returns:
-        pd.DataFrame:  A subset of slice_table with the two selected_roi as the
-            columns and the range of slices hat have either of the structures as
-            the index.
-    '''
-    start = SliceIndexType(slice_table[selected_roi].first_valid_index())
-    end = SliceIndexType(slice_table[selected_roi].last_valid_index())
-    structure_slices = slice_table.loc[start:end, selected_roi]
-    return structure_slices
-
-
-def structure_neighbours(slice_structures: pd.DataFrame,
-                         shift_direction=-1) -> pd.DataFrame:
-    '''Generate a table with the second of the two structure columns shifted by
-    shift_direction.
-
-    Take a DataFrame with two columns of StructureSlice.  Shift the second
-    column by the amount specified with shift_direction. Calculate the gap
-    between the the their Slice_index's (The DataFrame index).  Return a
-    DataFrame with columns labeled ['a', 'b', 'height'], where 'a' is the
-    original first column, 'b' is the shifted second column and 'height' is the
-    calculated SliceIndex gap.
-
-    Args:
-        slice_structures (pd.DataFrame): a DataFrame containing two columns of
-            StructureSlice with SliceIndex values as the index.
-        shift_direction (int, optional): The number of rows to shift the second
-            structure's slices. Defaults to -1.
-
-    Returns:
-        pd.DataFrame: a table with columns labeled ['a', 'b', 'height'], where
-            'a' is the original first column, 'b' is the shifted second column
-            and 'height' is the calculated SliceIndex gap.
-    '''
-    used_slices = slice_structures.copy()
-    used_slices.dropna(how='all', inplace=True)
-    used_slices.columns = ['a', 'b']
-    slices_index = used_slices.index.to_series()
-    slices_gaps = slices_index.shift(shift_direction) - slices_index
-    neighbour = used_slices['b'].shift(shift_direction)
-    slice_shift = pd.concat([used_slices['a'], neighbour, slices_gaps],
-                            axis='columns')
-    slice_shift.dropna(inplace=True)
-    slice_shift.columns = ['a', 'b', 'height']
-    return slice_shift
-
-
-def find_neighbouring_slice(structure_slices) -> pd.DataFrame:
-    '''Find the neighbouring slices for each missing slice.
-
-    For each slice that is missing a structure, find the neighbouring slices
-    that contain the structure.  The neighbouring slices are found by shifting
-    the slice index in the positive and negative direction.
-
-    Args:
-        structure_slices (pd.Series): A series with SliceIndexType as the index
-            and StructureSlice or NaN as the values.
-
-    Returns:
-        pd.DataFrame: A table with columns labeled ['z_pos', 'z_neg'], where
-            'z_pos' is the SliceIndex of the neighbouring slice in the positive
-            direction and 'z_neg' is the SliceIndex of the neighbouring slice
-            in the negative direction.
-    '''
-    def neighbouring_slice(slice_index: pd.Series, missing_slices: pd.Series,
-                           shift_direction=1, shift_start=0)->pd.Series:
-        '''Find the neighbouring slices for each missing slice.
-
-        For each slice that is missing a structure, find the neighbouring slices
-        that contain the structure.  The neighbouring slices are found by
-        shifting the slice index until a non-empty structure is found.
-
-        Args:
-            slice_index (pd.Series): A series with SliceIndexType as the index
-                and the values.
-            missing_slices (pd.Series): A subset of slice_index containing index
-                values that ar missing a structure.
-            shift_direction (int, optional): The direction to shift the slice
-                index. Defaults to 1.
-            shift_start (int, optional): The starting shift size. Defaults to 0.
-        '''
-        # TODO this function (neighbouring_slice) seems very awkward.  It should
-        # be possible to simplify this function.
-        ref = slice_index[missing_slices]
-        ref_missing = list(missing_slices)
-        shift_size = shift_start
-        while ref_missing:
-            shift_size += shift_direction
-            # Shift the slice index by the shift size and select the indexes
-            # that need a neighbour.
-            shift_slice = slice_index.shift(shift_size)[missing_slices]
-            ref_idx = ref.isin(ref_missing)
-            ref[ref_idx] = shift_slice[ref_idx]
-            ref_missing = list(set(ref) & set(missing_slices))
-            ref_missing.sort()
-        return ref
-
-    slice_index = structure_slices.index.to_series()
-    # Find the slices that are missing a structure
-    missing_slices = slice_index[structure_slices.apply(empty_structure)]
-    z_neg = neighbouring_slice(slice_index, missing_slices, shift_direction=-1)
-    z_pos = neighbouring_slice(slice_index, missing_slices, shift_direction=1)
-    ref = pd.concat([z_pos, z_neg], axis='columns')
-    ref.columns = ['z_pos', 'z_neg']
-    return ref
-
-
-def find_boundary_slices(structure_slices: pd.Series) -> List[SliceIndexType]:
-    '''Identify the first and last slices of a structure region.
-
-    Slices without the structure are identified by `isna()`.
-    Any slice that contains the structure, but has a neighbouring slices that
-    does not contain the structure is considered a boundary slice.
-
-    Args:
-        structure_slices (pd.Series): A series with SliceIndex as the index and
-            StructureSlice or na as the values.
-
-    Returns:
-        List[SliceIndexType]: A list of all slice indexes where the structure is
-            not present on a neighbouring slice.
-    '''
-    # create a mask for the slices that contain the structure
-    used_slices = ~structure_slices.apply(empty_structure)
-    # Identify the slices that contain the structure but have a neighbouring
-    # slice that does not contain the structure.
-    start = used_slices & (used_slices ^ used_slices.shift(1))
-    end = used_slices & (used_slices ^ used_slices.shift(-1))
-    # Combine the start and end slices to create a list of boundary slices.
-    start_slices = list(structure_slices[start].index)
-    end_slices = list(structure_slices[end].index)
-    boundaries = start_slices + end_slices
-    return boundaries
-
-
-def identify_boundary_slices(structure_slices: Union[pd.Series, pd.DataFrame],
-                             selected_roi: StructurePairType = None) -> pd.Series:
-    '''Identify boundary slices for the given structure or structures.
-
-    Identifies the first and last slice that has a structure contour for the
-    given structure or structures. If a DataFrame is provided, the boundary
-    slices are identified for the structures specified in selected_roi.
-    If a Series is provided, the boundary slices are identified for the single
-    structure and the selected_roi is ignored.
-
-    Args:
-        structure_slices (Union[pd.Series, pd.DataFrame]): A Series or DataFrame
-            containing StructureSlice data.
-        selected_roi (StructurePairType, optional): A list of two ROI_Num to
-            select when structure_slices is a DataFrame. Defaults to None.
-
-    Returns:
-        pd.Series: A Series indicating whether each slice is a boundary slice.
-    '''
-    if isinstance(structure_slices, pd.Series):
-        boundary_slice_index = set(find_boundary_slices(structure_slices))
-    elif isinstance(structure_slices, pd.DataFrame):
-        try:
-            roi_a, roi_b = selected_roi
-        except ValueError as err:
-            raise ValueError('selected_roi must be a tuple of two integers when'
-                             ' structure_slices is a DataFrame.') from err
-        # Identify the slices that are boundary slices for either of the
-        # structures.
-        boundary_slice_index = set(find_boundary_slices(
-            structure_slices[roi_a]))
-        boundary_slice_index.update(find_boundary_slices(
-            structure_slices[roi_b]))
-    else:
-        raise ValueError('structure_slices must be either a Series or a '
-                         'DataFrame.')
-    is_boundary_slice = structure_slices.index.isin(boundary_slice_index)
-    return pd.Series(is_boundary_slice, index=structure_slices.index)
-
-
-def get_region_centres(structure_slice)->pd.Series:
-    '''Get the centroid of each region in the structure slice.
-
-    Args:
-        structure_slice (StructureSlice): A StructureSlice object.
-
-    Returns:
-        pd.Series: A Series containing the centroid of each region in the
-            structure slice.
-    '''
-    if structure_slice.is_empty:
-        return pd.Series()
-    region_data = structure_slice.extract_regions()
-    region_centres = region_data['centroid']
-    return region_centres
