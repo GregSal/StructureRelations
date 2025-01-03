@@ -2,12 +2,12 @@
 # %% Imports
 # Type imports
 from dataclasses import asdict, dataclass
-import re
 from typing import Dict, List, Union
 
 # Shared Packages
 import numpy as np
 import shapely
+from shapely.geometry import Polygon
 
 from types_and_classes import PRECISION, SliceIndexType
 
@@ -70,6 +70,20 @@ def poly_round(polygon: shapely.Polygon,
 
 
 #%% Interpolation Functions
+def calculate_new_slice_index(slices: Union[List[SliceIndexType], SliceIndexType]) -> float:
+    '''Calculate the new z value based on the given slices.
+
+    Args:
+        slices (Union[List[SliceIndexType], SliceIndexType]): The slices to calculate the new z value from.
+
+    Returns:
+        float: The calculated new z value.
+    '''
+    if isinstance(slices, (list, tuple)):
+        return np.mean(slices)
+    else:
+        return slices
+
 
 def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
                         p1: shapely.Polygon,
@@ -140,12 +154,8 @@ def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
             ptn = ln.interpolate(0.5, normalized=True)
             new_cords.append(ptn)
         return new_cords
-
-    # If multiple slices given, calculate the new z value.
-    if isinstance(slices, (list, tuple)):
-        new_z = np.mean(slices)
-    else:
-        new_z = slices
+    # Use the new function
+    new_z = calculate_new_slice_index(slices)
     # If either of the polygons are multi-polygons, raise an error.
     if isinstance(p1, shapely.MultiPolygon):
         raise ValueError('Only single polygons are supported.')

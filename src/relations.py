@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import List, LiteralString, Tuple, Union
+from typing import List, LiteralString, Tuple, Union, Dict
 
 # Standard Libraries
 from enum import Enum, auto
@@ -12,8 +12,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import shapely
+import networkx as nx
 
 # Local packages
+from structure_set import identify_boundaries, select_slices
 from types_and_classes import StructurePairType, RegionIndexType
 from structure_slice import StructureSlice, empty_structure
 from utilities import interpolate_polygon
@@ -633,15 +635,6 @@ def merged_relations(relations):
     return merged
 
 
-    has_boundary = region_table.map(is_boundary)
-    boundaries = has_boundary.fillna(0).astype(bool)
-    if group_regions:
-        boundaries = has_boundary.stack('ROI', future_stack=True)
-        boundaries = boundaries.apply(any, axis='columns')
-        boundaries = boundaries.unstack('ROI')
-    return boundaries
-
-
 def identify_neighbour_slices(region_table: pd.DataFrame):
     def has_neighbour(region_table: pd.DataFrame, offset: int):
         not_empty = region_table.map(empty_structure, invert=True)
@@ -721,44 +714,65 @@ def set_adjustments(region_table: pd.DataFrame, region_boundaries,
     return adjustments
 
 
-def get_boundary_relations(region_table, neighbour_match, region_boundaries, selected_roi):
+def get_boundary_relations(graph: nx.Graph, selected_roi: Tuple[int, int]) -> Dict[Tuple, DE9IM]:
+    """
+    Get boundary relations between regions in the graph for the selected ROIs.
+
+    Args:
+        graph (nx.Graph): The region graph.
+        selected_roi (Tuple[int, int]): A tuple of two ROI numbers which refer to the roi attributes in the nodes.
+
+    Returns:
+        Dict[Tuple, DE9IM]: A dictionary with keys as tuples of region indices and slice pairs, and values as DE9IM objects.
+    """
     boundary_relations = {}
-    nbr_grp = neighbour_match[selected_roi].T.groupby(level=['ROI', 'Label'])
-    for region_idx, neighbour in nbr_grp:
-        is_hole = region_table[region_idx].dropna().iat[1].is_hole
-        index_list = find_boundary_pairs(neighbour, region_boundaries, region_idx, is_hole)
-        other_roi_num = [r for r in selected_roi if not r == region_idx[0]][0]
-        for slice_pair in index_list:
-            # Interpolated Boundary Slice
-            boundary_region = interpolate_region(region_idx, region_table,
-                                                slice_pair)
-            # Loop through the regions of the other roi
-            for other_region in region_table[other_roi_num].columns:
-                other_region_idx = (other_roi_num, other_region)
-                # Interpolate the other roi
-                other_region = interpolate_region(other_region_idx, region_table,
-                                                slice_pair)
-                adjustments = set_adjustments(region_table, region_boundaries,
-                                              selected_roi, region_idx,
-                                              other_region_idx, slice_pair)
-                # Get boundary relation as a DE27IM object.
-                boundary_relation = DE27IM(boundary_region, other_region,
-                                        adjustments=adjustments)
-                region_pair = tuple([region_idx, other_region_idx, slice_pair])
-                boundary_relations[region_pair] = boundary_relation
+    boundaries = identify_boundaries(graph)
+
+    for boundary_node in boundaries:
+        boundary_data = graph.nodes[boundary_node]
+        roi = boundary_data['roi']
+        if roi not in selected_roi:
+            continue
+
+        other_roi = selected_roi[1] if roi == selected_roi[0] else selected_roi[0]
+        slice_neighbours = boundary_data['slice_neighbours']
+        slice_index = boundary_data['slice_index']
+        other_slice = slice_neighbours.prev_slice, next_slice = boundary_data['slice_neighbours']
+
+        sub_graph = graph.subgraph([n for n, d in graph.nodes(data=True) if d['roi'] == other_roi and prev_slice <= d['slice_index'] <= next_slice])
+
+        for other_node in sub_graph.nodes:
+            other_data = graph.nodes[other_node]
+            other_slice_index = other_data['slice_index']
+
+            if other_slice_index == slice_index:
+                relation = DE9IM(boundary_data['polygon'], other_data['polygon'])
+            else:
+                if other_slice_index < slice_index:
+                    prev_polygon = other_data['polygon']
+                    next_polygon = graph.nodes[sub_graph.nodes[other_node + 1]]['polygon']
+                else:
+                    prev_polygon = graph.nodes[sub_graph.nodes[other_node - 1]]['polygon']
+                    next_polygon = other_data['polygon']
+
+                interpolated_polygon = interpolate_polygon(prev_polygon, next_polygon, prev_slice, next_slice, slice_index)
+                relation = DE9IM(boundary_data['polygon'], interpolated_polygon)
+
+            boundary_relations[(boundary_node, other_node, (slice_index, other_slice_index))] = relation
+
     return boundary_relations
 
 
 def find_relations(slice_table, selected_roi):
     # Split each Structure into distinct regions for boundary tests.
-    region_table = make_region_table(slice_table)
+    #region_table = make_region_table(slice_table)
     # Identify the boundary slices of each region.
-    region_boundaries = find_boundary_slices(region_table)
+    #region_boundaries = find_boundary_slices(region_table)
     # For each slice of each region identify the whether the region is present on
     # the neighbouring slice.
-    neighbour_match = identify_neighbour_slices(region_table)
+    #neighbour_match = identify_neighbour_slices(region_table)
 
-    boundary_relations = get_boundary_relations(region_table, neighbour_match, region_boundaries, selected_roi)
+    #boundary_relations = get_boundary_relations(region_table, neighbour_match, region_boundaries, selected_roi)
     # Slice range = Min(starting slice) to Max(ending slice)
     selected_slices = select_slices(slice_table, selected_roi)
     # Send all slices with both Primary and Secondary contours for standard
@@ -766,6 +780,6 @@ def find_relations(slice_table, selected_roi):
     mid_relations = list(selected_slices.agg(relate_structures,
                                              structures=selected_roi,
                                              axis='columns'))
-    mid_relations.extend(boundary_relations.values())
+    #mid_relations.extend(boundary_relations.values())
     relation =  merged_relations(mid_relations)
     return relation
