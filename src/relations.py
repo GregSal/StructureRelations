@@ -2,6 +2,7 @@
 '''
 # %% Imports
 # Type imports
+from functools import partial
 from typing import List, LiteralString, Tuple, Union, Dict
 
 # Standard Libraries
@@ -15,6 +16,7 @@ import shapely
 import networkx as nx
 
 # Local packages
+from diagram import ROI_Type, SliceIndexType
 from structure_set import identify_boundaries, select_slices
 from types_and_classes import StructurePairType, RegionIndexType
 from structure_slice import StructureSlice, empty_structure
@@ -725,6 +727,16 @@ def get_boundary_relations(graph: nx.Graph, selected_roi: Tuple[int, int]) -> Di
     Returns:
         Dict[Tuple, DE9IM]: A dictionary with keys as tuples of region indices and slice pairs, and values as DE9IM objects.
     """
+    def matched_region(node, roi: ROI_Type, prev_slice: SliceIndexType,
+                       next_slice: SliceIndexType)->bool:
+        if node['roi'] != selected_roi[0]
+            return False
+        if node['slice_index'] <= prev_slice:
+            return False
+        if node['slice_index'] >= next_slice:
+            return False
+        return True
+
     boundary_relations = {}
     boundaries = identify_boundaries(graph)
 
@@ -737,9 +749,14 @@ def get_boundary_relations(graph: nx.Graph, selected_roi: Tuple[int, int]) -> Di
         other_roi = selected_roi[1] if roi == selected_roi[0] else selected_roi[0]
         slice_neighbours = boundary_data['slice_neighbours']
         slice_index = boundary_data['slice_index']
-        other_slice = slice_neighbours.prev_slice, next_slice = boundary_data['slice_neighbours']
 
-        sub_graph = graph.subgraph([n for n, d in graph.nodes(data=True) if d['roi'] == other_roi and prev_slice <= d['slice_index'] <= next_slice])
+        prev_slice = slice_neighbours.prev_slice,
+        next_slice = slice_neighbours.next_slice
+        node_selector = partial(matched_region, roi=other_roi,
+                                prev_slice=prev_slice,
+                                next_slice=next_slice)
+        sub_graph = nx.subgraph_view(graph, filter_node=node_selector)
+        other_indexes = {idx: node for node, idx in sub_graph.nodes.data('slice_index').items()}
 
         for other_node in sub_graph.nodes:
             other_data = graph.nodes[other_node]
