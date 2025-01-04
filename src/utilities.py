@@ -7,7 +7,6 @@ from typing import Dict, List, Union
 # Shared Packages
 import numpy as np
 import shapely
-from shapely.geometry import Polygon
 
 from types_and_classes import PRECISION, SliceIndexType
 

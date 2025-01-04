@@ -5,33 +5,19 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import Any, Dict, List, Tuple, Union
+from typing import List, Tuple
 
 # Standard Libraries
-from itertools import chain, combinations
-from collections import defaultdict
-from dataclasses import dataclass
+from itertools import combinations
 
 # Shared Packages
-import numpy as np
 import pandas as pd
-#import xlwings as xw
-import shapely
 import networkx as nx
 
 # Local packages
-from types_and_classes import PRECISION, SliceIndexType, SliceNeighbours, StructurePairType
-from types_and_classes import ROI_Type
-from types_and_classes import InvalidContour, InvalidContourRelation
-from utilities import calculate_new_slice_index, interpolate_polygon, point_round, poly_round
-from structure_slice import StructureSlice, merge_contours
-
-
-
-# %% Type definitions and Globals
-# An enclosed region representing either a structure area, or a hole within
-# that structure.  The float type is present to allow for np.nan values.
-ContourType = Union["StructureSlice", shapely.Polygon, float]
+from structure_slice import merge_contours
+from types_and_classes import SliceIndexType, StructurePairType
+from utilities import calculate_new_slice_index, interpolate_polygon
 
 
 def generate_slice_neighbours(slice_table: pd.DataFrame) -> pd.DataFrame:
@@ -90,37 +76,42 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
     return slice_table
 
 
-def create_edges(graph: nx.Graph) -> None:
-    '''Create edges between nodes in the graph based on specified criteria.
+def generate_region_graph(slice_table: pd.DataFrame) -> nx.Graph:
+    '''Generate a region graph from a slice table.
 
     Args:
-        graph (nx.Graph): The graph containing the nodes.
-    '''
-    for node1, node2 in combinations(graph.nodes(data=True), 2):
-        roi1, slice_index1, _ = node1[0]
-        roi2, slice_index2, _ = node2[0]
-        if roi1 != roi2:
-            continue
-        if not node1[1]['slice_neighbours'].is_neighbour(slice_index2):
-            continue
-        if node1[1]['is_hole'] != node2[1]['is_hole']:
-            continue
-        if node1[1]['polygon'].intersects(node2[1]['polygon']):
-            weight = abs(slice_index1 - slice_index2)
-            graph.add_edge(node1[0], node2[0], weight=weight)
-
-
-def identify_boundaries(graph: nx.Graph) -> List[Tuple]:
-    '''Identify boundary nodes in the graph.
-
-    Args:
-        graph (nx.Graph): The graph containing the nodes.
+        slice_table (pd.DataFrame): A table of StructureSlice data with
+            SliceIndex as the index.
 
     Returns:
-        List[Tuple]: A list of nodes that are boundaries.
+        nx.Graph: A graph representing the regions in the slice table.
     '''
-    boundaries = [node for node, degree in graph.degree() if degree < 2]
-    return boundaries
+    def create_edges(graph: nx.Graph) -> None:
+        '''Create edges between nodes in the graph based on specified criteria.
+
+        Args:
+            graph (nx.Graph): The graph containing the nodes.
+        '''
+        for node1, node2 in combinations(graph.nodes(data=True), 2):
+            roi1, slice_index1, _ = node1[0]
+            roi2, slice_index2, _ = node2[0]
+            if roi1 != roi2:
+                continue
+            if not node1[1]['slice_neighbours'].is_neighbour(slice_index2):
+                continue
+            if node1[1]['is_hole'] != node2[1]['is_hole']:
+                continue
+            if node1[1]['polygon'].intersects(node2[1]['polygon']):
+                weight = abs(slice_index1 - slice_index2)
+                graph.add_edge(node1[0], node2[0], weight=weight)
+
+    graph = nx.Graph()
+    for _, row in slice_table.iterrows():
+        for structure_slice in row.dropna():
+            structure_slice.extract_regions(graph)
+    create_edges(graph)
+    generate_interpolated_boundaries(graph)
+    return graph
 
 
 def generate_interpolated_boundaries(graph: nx.Graph) -> None:
@@ -129,6 +120,18 @@ def generate_interpolated_boundaries(graph: nx.Graph) -> None:
     Args:
         graph (nx.Graph): The graph containing the nodes.
     '''
+    def identify_boundaries(graph: nx.Graph) -> List[Tuple]:
+        '''Identify boundary nodes in the graph.
+
+        Args:
+            graph (nx.Graph): The graph containing the nodes.
+
+        Returns:
+            List[Tuple]: A list of nodes that are boundaries.
+        '''
+        boundaries = [node for node, degree in graph.degree() if degree < 2]
+        return boundaries
+
     boundaries = identify_boundaries(graph)
     for boundary_node in boundaries:
         node_data = graph.nodes[boundary_node]
@@ -154,26 +157,6 @@ def generate_interpolated_boundaries(graph: nx.Graph) -> None:
                        is_empty=False,
                        slice_neighbours=slice_neighbours)
         graph.add_edge(boundary_node, intp_node_label, weight=distance)
-
-
-def generate_region_graph(slice_table: pd.DataFrame) -> nx.Graph:
-    '''Generate a region graph from a slice table.
-
-    Args:
-        slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index.
-
-    Returns:
-        nx.Graph: A graph representing the regions in the slice table.
-    '''
-    graph = nx.Graph()
-    for _, row in slice_table.iterrows():
-        for structure_slice in row.dropna():
-            structure_slice.extract_regions(graph)
-    create_edges(graph)
-    generate_interpolated_boundaries(graph)
-    return graph
-
 
 
 #%% Select Slices and neighbours
