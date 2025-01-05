@@ -74,6 +74,7 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
         next_slice = slice_neighbours.at[slice_index, 'next_slice']
         for structure_slice in row.dropna():
             structure_slice.set_slice_neighbours(previous_slice, next_slice)
+    slice_table.sort_index(inplace=True)
     return slice_table
 
 
@@ -101,7 +102,11 @@ def generate_interpolated_boundaries(graph: RegionGraph) -> None:
         polygon = node_data['polygon']
         slice_neighbours = node_data['slice_neighbours']
         this_slice = slice_neighbours.this_slice
-        if slice_neighbours.previous_slice != this_slice:
+        # Find the neighbouring node (only one because degree is 1)
+        nbr = list(graph[boundary_node])
+        # Find the slice index of the neighbouring node
+        nbr_slice = graph.nodes[nbr[0]]['slice_index']
+        if slice_neighbours.previous_slice != nbr_slice:
             other_slice = slice_neighbours.previous_slice
         else:
             other_slice = slice_neighbours.next_slice
