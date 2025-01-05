@@ -5,7 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import List, Tuple
+from typing import List
 
 # Standard Libraries
 from itertools import combinations
@@ -17,6 +17,7 @@ import networkx as nx
 # Local packages
 from structure_slice import merge_contours
 from types_and_classes import SliceIndexType, StructurePairType
+from types_and_classes import RegionNode, RegionGraph, RegionIndexType
 from utilities import calculate_new_slice_index, interpolate_polygon
 
 
@@ -76,7 +77,49 @@ def make_slice_table(slice_data: pd.Series, ignore_errors=False)->pd.DataFrame:
     return slice_table
 
 
-def generate_region_graph(slice_table: pd.DataFrame) -> nx.Graph:
+def generate_interpolated_boundaries(graph: RegionGraph) -> None:
+    '''Identify boundary nodes in the graph and generate interpolated boundary slices.
+
+    Args:
+        graph (RegionGraph): The graph containing the nodes.
+    '''
+    def identify_boundaries(graph: RegionGraph) -> List[RegionIndexType]:
+        '''Identify boundary nodes in the graph.
+
+        Args:
+            graph (RegionGraph): The graph containing the nodes.
+
+        Returns:
+            List[Tuple]: A list of nodes that are boundaries.
+        '''
+        boundaries = [node for node, degree in graph.degree() if degree < 2]
+        return boundaries
+
+    boundaries = identify_boundaries(graph)
+    for boundary_node in boundaries:
+        node_data = graph.nodes[boundary_node]
+        polygon = node_data['polygon']
+        slice_neighbours = node_data['slice_neighbours']
+        this_slice = slice_neighbours.this_slice
+        if slice_neighbours.previous_slice != this_slice:
+            other_slice = slice_neighbours.previous_slice
+        else:
+            other_slice = slice_neighbours.next_slice
+        slice_pair = (this_slice, other_slice)
+        new_slice = calculate_new_slice_index(slice_pair)
+        distance=abs(this_slice - other_slice)
+        node_data = RegionNode(roi=node_data['roi'], slice_index=new_slice,
+                               is_hole=node_data['is_hole'], is_boundary=True,
+                               is_interpolated=True, is_empty=False,
+                               slice_neighbours=slice_neighbours)
+        intp_poly = interpolate_polygon(slice_pair, polygon)
+        node_data.polygon = intp_poly
+        node_data.add_node(graph)
+        intp_node_label = node_data.node_label()
+        graph.add_edge(boundary_node, intp_node_label, weight=distance)
+
+
+def generate_region_graph(slice_table: pd.DataFrame) -> RegionGraph:
     '''Generate a region graph from a slice table.
 
     Args:
@@ -113,50 +156,6 @@ def generate_region_graph(slice_table: pd.DataFrame) -> nx.Graph:
     generate_interpolated_boundaries(graph)
     return graph
 
-
-def generate_interpolated_boundaries(graph: nx.Graph) -> None:
-    '''Identify boundary nodes in the graph and generate interpolated boundary slices.
-
-    Args:
-        graph (nx.Graph): The graph containing the nodes.
-    '''
-    def identify_boundaries(graph: nx.Graph) -> List[Tuple]:
-        '''Identify boundary nodes in the graph.
-
-        Args:
-            graph (nx.Graph): The graph containing the nodes.
-
-        Returns:
-            List[Tuple]: A list of nodes that are boundaries.
-        '''
-        boundaries = [node for node, degree in graph.degree() if degree < 2]
-        return boundaries
-
-    boundaries = identify_boundaries(graph)
-    for boundary_node in boundaries:
-        node_data = graph.nodes[boundary_node]
-        polygon = node_data['polygon']
-        slice_neighbours = node_data['slice_neighbours']
-        this_slice = slice_neighbours.this_slice
-        if slice_neighbours.previous_slice != this_slice:
-            other_slice = slice_neighbours.previous_slice
-        else:
-            other_slice = slice_neighbours.next_slice
-        slice_pair = (this_slice, other_slice)
-        new_slice = calculate_new_slice_index(slice_pair)
-        distance=abs(this_slice - other_slice)
-        intp_poly = interpolate_polygon(slice_pair, polygon)
-        intp_node_label = (node_data['roi'], new_slice, intp_poly.wkt)
-        graph.add_node(intp_node_label,
-                       polygon=intp_poly,
-                       roi=node_data['roi'],
-                       slice_index=new_slice,
-                       is_hole=node_data['is_hole'],
-                       is_boundary=True,
-                       is_interpolated=True,
-                       is_empty=False,
-                       slice_neighbours=slice_neighbours)
-        graph.add_edge(boundary_node, intp_node_label, weight=distance)
 
 
 #%% Select Slices and neighbours

@@ -2,7 +2,7 @@
 # %% Imports
 # Type imports
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Union
+from typing import Dict, Tuple, List, Union
 
 # Shared Packages
 import numpy as np
@@ -10,7 +10,9 @@ import shapely
 
 from types_and_classes import PRECISION, SliceIndexType
 
-
+slice_sequence = Union[List[SliceIndexType],
+                       Tuple[SliceIndexType, SliceIndexType],
+                       SliceIndexType]
 # %% Rounding Functions
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
     '''Round the coordinates of a shapley point to the specified precision.
@@ -69,7 +71,8 @@ def poly_round(polygon: shapely.Polygon,
 
 
 #%% Interpolation Functions
-def calculate_new_slice_index(slices: Union[List[SliceIndexType], SliceIndexType]) -> float:
+def calculate_new_slice_index(slices: slice_sequence,
+                              precision=PRECISION) -> float:
     '''Calculate the new z value based on the given slices.
 
     Args:
@@ -79,13 +82,13 @@ def calculate_new_slice_index(slices: Union[List[SliceIndexType], SliceIndexType
         float: The calculated new z value.
     '''
     if isinstance(slices, (list, tuple)):
-        return np.mean(slices)
+        new_slice = round(np.mean(slices), precision)
+        return new_slice
     else:
         return slices
 
 
-def interpolate_polygon(slices: Union[List[SliceIndexType], SliceIndexType],
-                        p1: shapely.Polygon,
+def interpolate_polygon(slices: slice_sequence, p1: shapely.Polygon,
                         p2: shapely.Polygon = None) -> shapely.Polygon:
     def match_boundaries(p1, p2):
         if p1.is_empty:

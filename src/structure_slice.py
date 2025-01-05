@@ -5,21 +5,18 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 # Standard Libraries
 
-
 # Shared Packages
-
 import pandas as pd
-#import xlwings as xw
 import shapely
-import networkx as nx
 
 # Local packages
-from types_and_classes import PRECISION, SliceIndexType, SliceNeighbours
-from types_and_classes import ROI_Type
+from types_and_classes import PRECISION
+from types_and_classes import ROI_Type, SliceIndexType, SliceNeighbours
+from types_and_classes import RegionNode, RegionNodeType, RegionGraph
 from types_and_classes import InvalidContour, InvalidContourRelation
 from utilities import point_round, poly_round
 
@@ -29,7 +26,7 @@ from utilities import point_round, poly_round
 # that structure. The type also include a dictionary that contains the string
 # 'polygon' as a key and a shapely.Polygon as the matching value.
 # The float type is present to allow for np.nan values.
-ContourType = Union["StructureSlice", shapely.Polygon, Dict[str, Any], float]
+ContourType = Union["StructureSlice", RegionNodeType, shapely.Polygon, float]
 
 
 # %% StructureSlice Class
@@ -215,36 +212,6 @@ class StructureSlice():
         hole_polygons = [shapely.Polygon(hole) for hole in holes]
         return hole_polygons
 
-    def extract_regions(self, graph: nx.Graph, extract_holes=True) -> None:
-        '''Extract the individual regions from the contour MultiPolygon and add
-        them as nodes to the graph.
-
-        Args:
-            graph (nx.Graph): The graph to add the regions to.
-            extract_holes (bool, optional): Whether to extract holes as
-                separate regions. Defaults to True.
-        '''
-        roi = self.roi
-        slice_index = self.slice_position
-        for poly in self.contour.geoms:
-            is_empty = poly.area == 0
-            # Create nodes for each polygon in the slice
-            graph.add_node((roi, slice_index, poly.wkt), polygon=poly, roi=roi,
-                           slice_index=slice_index, is_hole=False,
-                           is_boundary=False, is_interpolated=False,
-                           is_empty=is_empty,
-                           slice_neighbours=self.slice_neighbours)
-            if extract_holes:
-                # Create nodes for each hole in the polygon
-                for interior in poly.interiors:
-                    hole = shapely.Polygon(interior)
-                    is_empty = hole.area == 0
-                    graph.add_node((roi, slice_index, hole.wkt), polygon=hole,
-                                   roi=roi, slice_index=slice_index,
-                                   is_hole=True, is_boundary=False,
-                                   is_interpolated=False, is_empty=is_empty,
-                                   slice_neighbours=self.slice_neighbours)
-
     def select(self, coverage: str) -> shapely.MultiPolygon:
         # select the polygon type
         if (coverage == 'contour'):
@@ -257,6 +224,40 @@ class StructureSlice():
             raise ValueError('Invalid coverage type')
         return polygon
 
+    def extract_regions(self, graph: RegionGraph, extract_holes=True) -> None:
+        '''Extract the individual regions from the contour MultiPolygon and add
+        them as nodes to the graph.
+
+        Args:
+            graph (nx.Graph): The graph to add the regions to.
+            extract_holes (bool, optional): Whether to extract holes as
+                separate regions. Defaults to True.
+        '''
+        node_data = RegionNode(roi=self.roi, slice_index=self.slice_position,
+                               slice_neighbours=self.slice_neighbours)
+        for poly in self.contour.geoms:
+            # Ensure that node settings specific to individual regions on a
+            # slice are not propagated to other regions on the slice.
+            node_data.reset()
+            if poly.area == 0:
+                node_data.is_empty = True
+            else:
+                node_data.polygon = poly
+            # Create nodes for each polygon in the slice
+            node_data.add_node(graph)
+            if extract_holes:
+                # Create nodes for each hole in the polygon
+                for interior in poly.interiors:
+                    # Ensure that node settings specific to individual holes
+                    # on a slice are not propagated to other holes on the slice.
+                    node_data.reset()
+                    node_data.is_hole = True
+                    hole = shapely.Polygon(interior)
+                    if hole.area == 0:
+                        node_data.is_empty = True
+                    else:
+                        node_data.polygon = hole
+                    node_data.add_node(graph)
 
     @property
     def area(self)-> float:
@@ -341,9 +342,6 @@ class StructureSlice():
         return centre_list
 
 
-
-
-
 # %% Slice related functions
 def empty_structure(structure: ContourType, invert=False) -> bool:
     '''Check if the structure is empty.
@@ -363,17 +361,21 @@ def empty_structure(structure: ContourType, invert=False) -> bool:
     '''
     is_empty = True
     # check for an is_empty attribute.
+    # This is used for StructureSlice objects.
     try:
         is_empty = structure.is_empty
     except AttributeError:
         # if there is no is_empty attribute, check for an 'is_empty' key.
+        # This is used for RegionNode objects.
         try:
             is_empty = structure['is_empty']
         except (TypeError, KeyError):
             # if there is no 'is_empty' key, check for an area attribute.
+            # This is used for shapely.Polygon objects.
             try:
                 is_empty = structure.area == 0
             except AttributeError:
+                # if there is no area attribute, the structure is considered empty.
                 is_empty = True
     if invert:
         return not is_empty
@@ -386,20 +388,31 @@ def has_area(poly: ContourType)->bool:
     Tests whether the structure has an area greater than zero or is empty.
 
     Args:
-        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
+        poly (ContourType): A StructureSlice, RegionNode, Polygon, or NaN object.
 
     Returns:
         bool: True if the structure has an area greater than zero, False
             otherwise.
     '''
     if empty_structure(poly):
-        return False
-    area = poly.area
-    return area > 0
+        area = False
+    else:
+        try:
+             # check for a StructureSlice or shapely.Polygon object.
+            area = poly.area
+        except AttributeError:
+            # check for a RegionNodeType object.
+            try:
+                area = poly['polygon'].area
+            except (TypeError, KeyError):
+                # Anything else is considered to have no area.
+                area = False
+    if area:
+        return area > 0
+    return area
 
 
-def contains_point(poly: Union[StructureSlice, float],
-                   point: shapely.Point)->bool:
+def contains_point(poly: ContourType, point: shapely.Point)->bool:
     '''Check if the structure contains the given point.
 
     Tests whether the structure contains the given point or is empty.
@@ -413,17 +426,24 @@ def contains_point(poly: Union[StructureSlice, float],
     Returns:
         bool: True if the structure contains the point, False otherwise.
     '''
+    contains = False
+    # check for an empty poly.
     if empty_structure(poly):
         contains = False
-    elif isinstance(poly, StructureSlice):
-        contains = poly.contour.contains(point)
-    elif isinstance(poly, shapely.Polygon):
-        contains = poly.contains(point)
     else:
         try:
-            contains = poly.polygon.contains(point)
+            # check for a StructureSlice object.
+            contains = poly.contour.contains(point)
         except AttributeError:
-            contains = False
+            try:
+                # check for a shapely.Polygon object.
+                contains = poly.contains(point)
+            except AttributeError:
+                try:
+                    # check for a RegionNodeType object.
+                    contains = poly['polygon'].contains(point)
+                except (TypeError, KeyError):
+                    contains = False
     return contains
 
 
@@ -442,16 +462,23 @@ def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
     '''
     if empty_structure(poly):
         centroid = shapely.Point()
-    elif isinstance(poly, StructureSlice):
-        centroid = poly.contour.centroid
-    elif isinstance(poly, shapely.Polygon):
-        centroid = poly.centroid
     else:
         try:
-            centroid = poly.polygon.centroid
+            # check for a StructureSlice object.
+            centroid = poly.contour.centroid
         except AttributeError:
-            centroid = shapely.Point()
+            try:
+                # check for a shapely.Polygon object.
+                centroid = poly.centroid
+            except AttributeError:
+                try:
+                    # check for a RegionNodeType object.
+                    centroid = poly['polygon'].centroid
+                except (TypeError, KeyError):
+                    # Anything else is considered to have no centroid.
+                    centroid = shapely.Point()
     return centroid
+
 
 def merge_contours(slice_contours: pd.Series,
                    ignore_errors=False) -> StructureSlice:

@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import Any, List, LiteralString, Tuple, Union, Dict
+from typing import List, LiteralString, Tuple, Union
 
 # Standard Libraries
 from enum import Enum, auto
@@ -10,17 +10,16 @@ from dataclasses import dataclass
 from functools import partial
 
 # Shared Packages
-import numpy as np
 import pandas as pd
 import shapely
 import networkx as nx
 
 # Local packages
-from diagram import ROI_Type, SliceIndexType
-from structure_set import generate_region_graph, select_slices
-from types_and_classes import StructurePairType, RegionIndexType, RegionType, RegionGraph
-from structure_slice import StructureSlice, empty_structure
+from types_and_classes import ROI_Type, SliceIndexType, StructurePairType
+from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
 from utilities import interpolate_polygon
+from structure_slice import StructureSlice, empty_structure
+from structure_set import generate_region_graph, select_slices
 
 
 # Global Settings
@@ -174,6 +173,7 @@ class RelationshipTest:
 class DE9IM():
     '''The DE-9IM relationship string for two polygons.
     '''
+    # A length 9 string of '1's and '0's representing a DE-9IM relationship.
     def __init__(self,
                  poly_a: shapely.MultiPolygon = None,
                  poly_b: shapely.MultiPolygon = None,
@@ -350,9 +350,15 @@ class DE27IM():
         Contains      TF*FF****    T***F****      T********
         Overlaps      T*T*T*T**    T*T*T*T**      T*T***T**
         Equals        T*F*T****    T***T****      T********
-
-
     '''
+    # A 27 bit binary value composed of three DE9IM_Values concatenated.
+    # The right-most 9 binary digits represent the DE-9IM relationship between
+    #    polygon b and polygon a.
+    # The middle 9 binary digits represent the DE-9IM relationship between
+    #    polygon b and the *exterior* of polygon a.
+    # The left 9 binary digits represent the DE-9IM relationship between
+    #    polygon b and the *convex hull* of polygon a.
+
     # Relationship Test Definitions
     test_binaries = [
         RelationshipTest(RelationshipType.DISJOINT,
@@ -637,7 +643,7 @@ def merged_relations(relations):
     return merged
 
 
-def set_adjustments(region1: RegionType, region2: RegionType,
+def set_adjustments(region1: RegionNodeType, region2: RegionNodeType,
                     selected_roi: StructurePairType):
     # The first region is always a boundary.
     adjustments = ['boundary_a']
@@ -658,7 +664,7 @@ def set_adjustments(region1: RegionType, region2: RegionType,
     return adjustments
 
 
-def build_node_selector(region: RegionType,
+def build_node_selector(region: RegionNodeType,
                         selected_roi: StructurePairType) -> partial[bool]:
     # build a function to select regions from the other ROI that are between
     # region's prev_slice and next_slice.
@@ -712,7 +718,7 @@ def get_boundary_relations(graph: RegionGraph,
         return boundaries
 
     def get_matching_region(sub_graph: RegionGraph,
-                            region1: RegionType)->Union[RegionType, None]:
+                            region1: RegionNodeType)->Union[RegionNodeType, None]:
         # if a region has the same slice index as the boundary, then return it.
         slice_index = region1['slice_index']
         sub_graph_slices = sub_graph.nodes.data('slice_index')
