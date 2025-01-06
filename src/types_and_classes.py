@@ -86,8 +86,13 @@ class RegionNode:
     counter: ClassVar = 0
 
     def __post_init__(self) -> None:
+        self.force_types()
         self.index = RegionNode.counter
         RegionNode.counter += 1
+
+    def force_types(self):
+        self.roi = ROI_Type(int(self.roi))
+        self.slice_index = SliceIndexType(float(self.slice_index))
 
     def node_label(self) -> RegionIndexType:
         # A RegionIndexType is used as a locator for nodes in a region graph.
@@ -95,7 +100,7 @@ class RegionNode:
         #   - The Region's ROI number,
         #   - The Region's The slice index,
         #   - An indexer value to force unique nodes.
-        return (self.roi, self.slice_index, self.index)
+        return (int(self.roi), float(self.slice_index), int(self.index))
 
     def add_node(self, graph: RegionGraph) -> None:
         graph.add_node(self.node_label(),

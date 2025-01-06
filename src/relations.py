@@ -15,7 +15,7 @@ import shapely
 import networkx as nx
 
 # Local packages
-from types_and_classes import ROI_Type, SliceIndexType, StructurePairType
+from types_and_classes import ROI_Type, RegionNode, SliceIndexType, StructurePairType
 from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
 from utilities import interpolate_polygon
 from structure_slice import StructureSlice, empty_structure
@@ -664,19 +664,10 @@ def set_adjustments(region1: RegionNodeType, region2: RegionNodeType,
     return adjustments
 
 
-def build_node_selector(region: RegionNodeType,
-                        selected_roi: StructurePairType) -> partial[bool]:
-    # build a function to select regions from the other ROI that are between
-    # region's prev_slice and next_slice.
-    def matched_region(node, roi: ROI_Type, prev_slice: SliceIndexType,
-                       next_slice: SliceIndexType)->bool:
-        if node['roi'] != roi:
-            return False
-        if node['slice_index'] <= prev_slice:
-            return False
-        if node['slice_index'] >= next_slice:
-            return False
-        return True
+def node_selector(region_graph: RegionGraph, region: RegionNodeType,
+                  selected_roi: StructurePairType) -> List[RegionIndexType]:
+    # Select regions from the other ROI that are between region's
+    # prev_slice and next_slice.
 
     # get the other roi
     roi = region['roi']
@@ -686,21 +677,83 @@ def build_node_selector(region: RegionNodeType,
         other_roi = selected_roi[0]
     # get the slice neighbours
     slice_neighbours = region['slice_neighbours']
-    prev_slice = slice_neighbours.prev_slice,
+    prev_slice = slice_neighbours.previous_slice
     next_slice = slice_neighbours.next_slice
-    # Build the test for neighbouring regions in the other ROI.
-    node_selector = partial(matched_region, roi=other_roi,
-                            prev_slice=prev_slice,
-                            next_slice=next_slice)
-    return node_selector
+    # Select regions from the other ROI that are between region's
+    # prev_slice and next_slice.
+    selected_nodes = []
+    for label, node in region_graph.nodes.items():
+        if node['roi'] != other_roi:
+            continue
+        if node['slice_index'] < prev_slice:
+            continue
+        if node['slice_index'] > next_slice:
+            continue
+        selected_nodes.append(label)
+
+    selection = region_graph.subgraph(selected_nodes)
+    return selection
 
 
-def get_boundary_relations(graph: RegionGraph,
+def get_interpolated_regions(sub_graph):
+    # Assume for now that the subgraph only contains two nodes
+    # Select the first node in sub_graph.
+    # Select that node's neighbour.
+    # build an interpolated region from these two regions.
+    # Get the necessary adjustments for the relationship.
+    # Determine the relationship.
+    if len(sub_graph) != 2:
+        raise ValueError('Subgraph must contain only two nodes.')
+    # Select the first node in the subgraph
+    first_node = sub_graph.nodes[0]
+    # As a sanity check select it's neighbour as the second node rather
+    # than just selecting the second node
+    neighbour_node = next(sub_graph.neighbors(first_node))
+    second_node = sub_graph.nodes[neighbour_node]
+    # Get the slice indexes for the two nodes
+    slices = (first_node['slice_index'], second_node['slice_index'])
+    # Define a new node to store the interpolated region
+    intp_node = RegionNode(**second_node)
+    intp_node.is_interpolated = True
+    if second_node['is_boundary']:
+        intp_node.is_boundary = True
+    # Interpolate the region to match the boundary slice
+    intp_poly = interpolate_polygon(slices, first_node['polygon'],
+                                    second_node['polygon'])
+    # Update the node with the interpolated polygon
+    intp_node.polygon = intp_poly
+    return intp_node
+
+
+def get_boundaries(graph: RegionGraph,
+                    selected_roi: StructurePairType)->List[RegionIndexType]:
+    boundaries = []
+    for node in graph.nodes:
+        region = graph.nodes[node]
+        if region['is_boundary'] and region['roi'] in selected_roi:
+            boundaries.append(node)
+    return boundaries
+
+
+def get_matching_region(sub_graph: RegionGraph,
+                        region1: RegionNodeType)->Union[RegionNodeType, None]:
+    # if a region has the same slice index as the boundary, then return it.
+    slice_index = region1['slice_index']
+    sub_graph_slices = dict(sub_graph.nodes.data('slice_index'))
+    other_indexes = {idx: node for node, idx in sub_graph_slices.items()}
+    if slice_index in other_indexes:
+        other_node = other_indexes[slice_index]
+        region2 = sub_graph.nodes[other_node]
+        return region2
+    return None
+
+
+def get_boundary_relations(region_graph: RegionGraph,
                            selected_roi: Tuple[int, int]) -> List[DE27IM]:
     '''Get boundary relations between regions in the graph for the selected ROIs.
 
     Args:
-        graph (nx.Graph): The region graph.
+        region_graph (nx.Graph): The region graph.
         selected_roi (Tuple[int, int]): A tuple of two ROI numbers which refer
             to the structures to be compared.
 
@@ -708,104 +761,35 @@ def get_boundary_relations(graph: RegionGraph,
         List[DE27IM]: A list of the boundary relationships for the two selected
             ROIs.
     '''
-    def get_boundaries(graph: RegionGraph,
-                       selected_roi: StructurePairType)->List[RegionIndexType]:
-        boundaries = []
-        for node in graph.nodes:
-            region = graph.nodes[node]
-            if region['is_boundary'] and region['roi'] in selected_roi:
-                boundaries.append(node)
-        return boundaries
-
-    def get_matching_region(sub_graph: RegionGraph,
-                            region1: RegionNodeType)->Union[RegionNodeType, None]:
-        # if a region has the same slice index as the boundary, then return it.
-        slice_index = region1['slice_index']
-        sub_graph_slices = sub_graph.nodes.data('slice_index')
-        other_indexes = {idx: node for node, idx in sub_graph_slices.items()}
-        if slice_index in other_indexes:
-            other_node = other_indexes[slice_index]
-            region2 = graph.nodes[other_node]
-            drop_nodes(sub_graph, region2)
-            return region2
-        return None
-
-    def drop_nodes(graph: nx.Graph, node):
-        # drop the node and its neighbours from the graph
-        for neighbour in graph.neighbors(node):
-            graph.remove_node(neighbour)
-            graph.remove_node(node)
-
-    def interpolate_node_pair(sub_graph: nx.Graph, first_node):
-            neighbour_node = next(sub_graph.neighbors(first_node))
-            second_node = graph.nodes[neighbour_node]
-            slices = (first_node['slice_index'], second_node['slice_index'])
-            # Interpolate the region to match the boundary slice
-            intp_poly = interpolate_polygon(slices, first_node['polygon'],
-                                            second_node['polygon'])
-            return intp_poly, second_node
-
     boundary_relations = []
-    boundaries = get_boundaries(graph, selected_roi)
+    boundaries = get_boundaries(region_graph, selected_roi)
     for boundary_node in boundaries:
-        region1 = graph.nodes[boundary_node]
+        region1 = region_graph.nodes[boundary_node]
         # Select for neighbouring regions in the other ROI.
-        node_selector = build_node_selector(region1, selected_roi)
-        sub_graph = nx.subgraph_view(graph, filter_node=node_selector)
+        sub_graph = node_selector(region_graph, region1, selected_roi)
 
         # if a region has the same slice index as the boundary, then use it to
         # determine the relationship.
         second_node = get_matching_region(sub_graph, region1)
-        if second_node is not None:
-            # Get the necessary adjustments for the relationship.
-            adjustments = set_adjustments(region1, second_node, selected_roi)
-            relation = DE27IM(region1['polygon'], second_node['polygon'],
-                              adjustments=adjustments)
-            # Store the relationship
-            boundary_relations.append(relation)
-
-        # For the remaining regions that are not in the same slice as the
-        # boundary interpolate regions to match the boundary slice.
-        # Select a node in sub_graph that has only one edge.
-        # Select that node's neighbour.
-        # build an interpolated region from these two regions.
+        if second_node is None:
+            # Otherwise interpolate the region to match the boundary slice.
+            second_node = get_interpolated_regions(sub_graph)
         # Get the necessary adjustments for the relationship.
-        # Determine the relationship.
-        done = False
-        while not done:
-            leaf_nodes = [node for node, degree in sub_graph.degree()
-                          if degree == 1]
-            if not leaf_nodes:
-                done = True
-                continue
-            first_node = leaf_nodes[0]
-            # Interpolate the region to match the boundary slice
-            intp_poly, second_node = interpolate_node_pair(sub_graph,
-                                                           first_node)
-            # Get the necessary adjustments for the relationship
-            adjustments = set_adjustments(region1, first_node, selected_roi)
-            # Check both first_node and second_node for boundary status.
-            # All other adjustments will be the same for both nodes.
-            if second_node['is_boundary']:
-                adjustments.append('boundary_b')
-            # Determine the relationship
-            relation = DE27IM(region1['polygon'], intp_poly,
-                              adjustments=adjustments)
-            # Store the relationship
-            boundary_relations.append(relation)
-            # Remove the processed nodes from the sub_graph
-            drop_nodes(sub_graph, first_node)
+        adjustments = set_adjustments(region1, second_node, selected_roi)
+        relation = DE27IM(region1['polygon'], second_node['polygon'],
+                            adjustments=adjustments)
+        # Store the relationship
+        boundary_relations.append(relation)
     return boundary_relations
 
 
-def find_relations(slice_table, selected_roi):
+def find_relations(slice_table, regions, selected_roi):
     selected_slices = select_slices(slice_table, selected_roi)
     # Send all slices with both Primary and Secondary contours for standard
     # relation testing
     mid_relations = list(selected_slices.agg(relate_structures,
                                              structures=selected_roi,
                                              axis='columns'))
-    regions = generate_region_graph(slice_table)
     boundary_relations = get_boundary_relations(regions, selected_roi)
     mid_relations.extend(boundary_relations)
     relation =  merged_relations(mid_relations)
