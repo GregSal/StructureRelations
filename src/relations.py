@@ -6,7 +6,7 @@ from typing import List, LiteralString, Tuple, Union
 
 # Standard Libraries
 from enum import Enum, auto
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from functools import partial
 
 # Shared Packages
@@ -413,13 +413,13 @@ class DE27IM():
             else:
                 # If only the A contour is supplied, the relationship is
                 #   A is exterior to B
-                relation_group = tuple([self.exterior_a] * 3)
+                relation_group = tuple([DE9IM(relation_str=self.exterior_a)] * 3)
                 self.relation = self.combine_groups(relation_group, adjustments)
                 self.int = self.to_int(self.relation)
         elif contour_b is not None:
             # If only the B contour is supplied, the relationship is
             #   B is exterior to A
-            relation_group = tuple([self.exterior_b] * 3)
+            relation_group = tuple([DE9IM(relation_str=self.exterior_b)] * 3)
             self.relation = self.combine_groups(relation_group, adjustments)
             self.int = self.to_int(self.relation)
         elif relation_str is not None:
@@ -550,19 +550,22 @@ class DE27IM():
                                    for de9im in relation_group)
         # Apply Hole Adjustments
         if 'hole_a' in adjustments:
+            contour, external, convex_hull = relation_group
             contour = contour.hole_adjustment('a')
             external = DE9IM(relation_str=self.padding)
             convex_hull = DE9IM(relation_str=self.padding)
+            relation_group = (contour, external, convex_hull)
         if 'hole_b' in adjustments:
+            contour, external, convex_hull = relation_group
             contour = contour.hole_adjustment('b')
             external = DE9IM(relation_str=self.padding)
             convex_hull = DE9IM(relation_str=self.padding)
+            relation_group = (contour, external, convex_hull)
         # Apply Transpose Adjustment
         if 'transpose' in adjustments:
-            contour = contour.transpose()
-            external = external.transpose()
-            convex_hull = convex_hull.transpose()
-        return contour, external, convex_hull
+            relation_group = tuple(de9im.transpose()
+                                   for de9im in relation_group)
+        return relation_group
 
     def combine_groups(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
                        adjustments: List[str])-> str:
@@ -730,10 +733,11 @@ def get_interpolated_regions(sub_graph):
     if len(sub_graph) != 2:
         raise ValueError('Subgraph must contain only two nodes.')
     # Select the first node in the subgraph
-    first_node = sub_graph.nodes[0]
+    first_node_label = list(sub_graph.nodes)[0]
+    first_node = sub_graph.nodes[first_node_label]
     # As a sanity check select it's neighbour as the second node rather
     # than just selecting the second node
-    neighbour_node = next(sub_graph.neighbors(first_node))
+    neighbour_node = next(sub_graph.neighbors(first_node_label))
     second_node = sub_graph.nodes[neighbour_node]
     # Get the slice indexes for the two nodes
     slices = (first_node['slice_index'], second_node['slice_index'])
@@ -742,8 +746,8 @@ def get_interpolated_regions(sub_graph):
     # Define a new node to store the interpolated region
     intp_node = RegionNode(**second_node)
     intp_node.is_interpolated = True
-    intp_node['slice_index'] = new_slice
-    intp_node['slice_neighbours'] = new_neighbours
+    intp_node.slice_index = new_slice
+    intp_node.slice_neighbours = new_neighbours
     if second_node['is_boundary']:
         intp_node.is_boundary = True
     # Interpolate the region to match the boundary slice
@@ -751,7 +755,7 @@ def get_interpolated_regions(sub_graph):
                                     second_node['polygon'])
     # Update the node with the interpolated polygon
     intp_node.polygon = intp_poly
-    return intp_node
+    return asdict(intp_node)
 
 
 def get_boundaries(graph: RegionGraph,
