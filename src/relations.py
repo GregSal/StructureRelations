@@ -15,10 +15,10 @@ import shapely
 import networkx as nx
 
 # Local packages
-from types_and_classes import ROI_Type, RegionNode, SliceIndexType, StructurePairType
+from types_and_classes import ROI_Type, RegionNode, SliceIndexType, SliceNeighbours, StructurePairType
 from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
-from utilities import interpolate_polygon
-from structure_slice import StructureSlice, empty_structure
+from utilities import calculate_new_slice_index, interpolate_polygon
+from structure_slice import ContourType, StructureSlice, empty_structure
 from structure_set import generate_region_graph, select_slices
 
 
@@ -390,29 +390,42 @@ class DE27IM():
                          0b101010000000000000000000000),
         ]
 
-    def __init__(self, contour_a: Union[StructureSlice, shapely.Polygon] = None,
-                 contour_b: StructureSlice = None,
+    # padding is a string of 'FFFFFFFFF', which becomes 9 zeros when converted
+    # to binary.  Padding is used in cases where Exterior and Hull relationships
+    # are not relevant.
+    padding = 'F' * 9  # 'FFFFFFFFF'
+    # If only the A contour is supplied, then A is exterior to B
+    exterior_a = 'FF1' * 3  # 'FF1FF1FF1'
+    # If only the B contour is supplied, then B is exterior to A
+    exterior_b = 'F' * 3 + 'F' * 3 + '1' * 3  # 'FFFFFF111'
+
+    def __init__(self, contour_a: ContourType = None,
+                 contour_b: ContourType = None,
                  relation_str: str = None,
                  relation_int: int = None,
                  adjustments: List[str] = None):
         if not empty_structure(contour_a):
             if not empty_structure(contour_b):
                 # If both contours are supplied, the relationship is calculated.
-                self.relation = self.relate_contours(contour_a, contour_b, adjustments)
+                self.relation = self.relate_contours(contour_a, contour_b,
+                                                     adjustments)
                 self.int = self.to_int(self.relation)
             else:
                 # If only the A contour is supplied, the relationship is
-                # Then A is exterior to B
-                self.int = 0b001001001001001001001001001
-                self.relation = self.to_str(self.int)
+                #   A is exterior to B
+                relation_group = tuple([self.exterior_a] * 3)
+                self.relation = self.combine_groups(relation_group, adjustments)
+                self.int = self.to_int(self.relation)
         elif contour_b is not None:
             # If only the B contour is supplied, the relationship is
-            # Then B is exterior to A
-            self.int = 0b000000111000000111000000111
-            self.relation = self.to_str(self.int)
+            #   B is exterior to A
+            relation_group = tuple([self.exterior_b] * 3)
+            self.relation = self.combine_groups(relation_group, adjustments)
+            self.int = self.to_int(self.relation)
         elif relation_str is not None:
             # If contours are not supplied, but a relationship string is
             # supplied, the relationship is set.
+            # Note: adjustments are not applied to the relationship string.
             self.relation = relation_str
             self.int = self.to_int(relation_str)
         elif relation_int is not None:
@@ -458,8 +471,7 @@ class DE27IM():
                 ])) from err
         return relation_int
 
-    @staticmethod
-    def relate_contours(contour_a: StructureSlice,
+    def relate_contours(self, contour_a: StructureSlice,
                         contour_b: StructureSlice,
                         adjustments: List[str] = None)->str:
         '''Get the 27 bit relationship for two structures on a given slice.
@@ -476,25 +488,12 @@ class DE27IM():
         '''
         # If contour_a and contour_b are both StructureSlices, then get the
         # full 27 bit relationship.
-        # If contour_a and contour_b are both Shapley Polygons, then get the
-        # 9 bit DE9IM relationship and pad the other 18 bits with 0s.
-        padding = 'F' * 9
         if isinstance(contour_a, StructureSlice):
             if isinstance(contour_b, StructureSlice):
                 contour = DE9IM(contour_a.contour, contour_b.contour)
                 external = DE9IM(contour_a.exterior, contour_b.contour)
                 convex_hull = DE9IM(contour_a.hull, contour_b.contour)
-            else:
-                raise ValueError(''.join([
-                    'Both contours must either be StructureSlice objects or ',
-                    'shapely Polygon objects. contour_b input was: ',
-                    f'{str(type(contour_b))}'
-                    ]))
-        elif isinstance(contour_a, shapely.Polygon):
-            if isinstance(contour_b, shapely.Polygon):
-                contour = DE9IM(contour_a, contour_b)
-                external = DE9IM(relation_str=padding)
-                convex_hull = DE9IM(relation_str=padding)
+                relation_group = (contour, external, convex_hull)
             else:
                 raise ValueError(''.join([
                     'Both contours must either be StructureSlice objects or ',
@@ -502,43 +501,75 @@ class DE27IM():
                     f'{str(type(contour_b))}'
                     ]))
         else:
-            raise ValueError(''.join([
-                'Both contours must either be StructureSlice objects or ',
-                'shapely Polygon objects. contour_a input was: ',
-                f'{str(type(contour_a))}'
-                ]))
+            # If contour_a and contour_b are shapely Polygons or RegionNodeType
+            # objects, then get the 9 bit DE9IM relationship and pad the other
+            # 18 bits with 0s.
+            if isinstance(contour_a, shapely.Polygon):
+                poly_a = contour_a
+            else:
+                try:
+                    poly_a = contour_a.polygon
+                except AttributeError as err:
+                    raise ValueError(''.join([
+                        'Both contours must either be StructureSlice objects ',
+                        'or a combination of shapely Polygon objects and ',
+                        'RegionNodeType objects. contour_a input was: ',
+                    f'{str(type(contour_a))}'
+                    ])) from err
+            if isinstance(contour_b, shapely.Polygon):
+                poly_b = contour_b
+            else:
+                try:
+                    poly_b = contour_b.polygon
+                except AttributeError as err:
+                    raise ValueError(''.join([
+                        'Both contours must either be StructureSlice objects ',
+                        'or a combination of shapely Polygon objects and ',
+                        'RegionNodeType objects. contour_b input was: ',
+                    f'{str(type(contour_b))}'
+                    ])) from err
+            contour = DE9IM(poly_a, poly_b)
+            external = DE9IM(relation_str=self.padding)
+            convex_hull = DE9IM(relation_str=self.padding)
+            relation_group = (contour, external, convex_hull)
+        relation_str = self.combine_groups(relation_group, adjustments)
+        return relation_str
+
+    def apply_adjustments(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
+                          adjustments: List[str])-> tuple[DE9IM, DE9IM, DE9IM]:
         # Apply adjustments to the relationship matrix.
         # Note: The order of the adjustments is important.
         # When hole adjustments are applied, only the "contour" bits are relevant,
         # the external and hull bits are set to 'FFFFFFFFF'.
+        # Apply Boundary Adjustments
+        if 'boundary_a' in adjustments:
+            relation_group = tuple(de9im.boundary_adjustment('a')
+                                   for de9im in relation_group)
+        if 'boundary_b' in adjustments:
+            relation_group = tuple(de9im.boundary_adjustment('b')
+                                   for de9im in relation_group)
+        # Apply Hole Adjustments
+        if 'hole_a' in adjustments:
+            contour = contour.hole_adjustment('a')
+            external = DE9IM(relation_str=self.padding)
+            convex_hull = DE9IM(relation_str=self.padding)
+        if 'hole_b' in adjustments:
+            contour = contour.hole_adjustment('b')
+            external = DE9IM(relation_str=self.padding)
+            convex_hull = DE9IM(relation_str=self.padding)
+        # Apply Transpose Adjustment
+        if 'transpose' in adjustments:
+            contour = contour.transpose()
+            external = external.transpose()
+            convex_hull = convex_hull.transpose()
+        return contour, external, convex_hull
+
+    def combine_groups(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
+                       adjustments: List[str])-> str:
         if adjustments:
-            # Apply Boundary Adjustments
-            if 'boundary_a' in adjustments:
-                contour = contour.boundary_adjustment('a')
-                external = external.boundary_adjustment('a')
-                convex_hull = convex_hull.boundary_adjustment('a')
-            if 'boundary_b' in adjustments:
-                contour = contour.boundary_adjustment('b')
-                external = external.boundary_adjustment('b')
-                convex_hull = convex_hull.boundary_adjustment('b')
-            # Apply Hole Adjustments
-            if 'hole_a' in adjustments:
-                contour = contour.hole_adjustment('a')
-                external = DE9IM(relation_str='F' * 9)
-                convex_hull = DE9IM(relation_str='F' * 9)
-            if 'hole_b' in adjustments:
-                contour = contour.hole_adjustment('b')
-                external = DE9IM(relation_str='F' * 9)
-                convex_hull = DE9IM(relation_str='F' * 9)
-            # Apply Transpose Adjustment
-            if 'transpose' in adjustments:
-                contour = contour.transpose()
-                external = external.transpose()
-                convex_hull = convex_hull.transpose()
+            relation_group = self.apply_adjustments(relation_group, adjustments)
         # Convert the DE-9IM relationships into a DE-27IM relationship string.
-        full_relation = ''.join([contour.relation,
-                                 external.relation,
-                                 convex_hull.relation])
+        full_relation = ''.join(de9im.relation for de9im in relation_group)
         relation_str = full_relation.replace('F','0').replace('2','1')
         return relation_str
 
@@ -636,14 +667,8 @@ def relate_structures(slice_structures: pd.DataFrame,
     return relation
 
 
-def merged_relations(relations):
-    merged = DE27IM(relation_int=0)
-    for relation in list(relations):
-        merged = merged.merge(relation)
-    return merged
-
-
-def set_adjustments(region1: RegionNodeType, region2: RegionNodeType,
+def set_adjustments(region1: RegionNodeType,
+                    region2: Union[RegionNodeType, None],
                     selected_roi: StructurePairType):
     # The first region is always a boundary.
     adjustments = ['boundary_a']
@@ -651,7 +676,7 @@ def set_adjustments(region1: RegionNodeType, region2: RegionNodeType,
     # relation need to be adjusted.
     if region1['is_hole']:
         adjustments.append('hole_a')
-    if region2['is_hole']:
+    if region2 is not None and region2['is_hole']:
         adjustments.append('hole_b')
     # If the "Secondary" ROI is the primary ROI, then the relation needs to be
     # transposed.
@@ -659,11 +684,11 @@ def set_adjustments(region1: RegionNodeType, region2: RegionNodeType,
     if is_secondary_roi:
         adjustments.append('transpose')
     # Check whether the secondary slices are also at a boundary.
-    if region2['is_boundary']:
+    if region2 is not None and region2['is_boundary']:
         adjustments.append('boundary_b')
     return adjustments
 
-
+# %% Functions for boundary relations
 def node_selector(region_graph: RegionGraph, region: RegionNodeType,
                   selected_roi: StructurePairType) -> List[RegionIndexType]:
     # Select regions from the other ROI that are between region's
@@ -712,9 +737,13 @@ def get_interpolated_regions(sub_graph):
     second_node = sub_graph.nodes[neighbour_node]
     # Get the slice indexes for the two nodes
     slices = (first_node['slice_index'], second_node['slice_index'])
+    new_slice = calculate_new_slice_index(slices)
+    new_neighbours = SliceNeighbours(new_slice, *slices)
     # Define a new node to store the interpolated region
     intp_node = RegionNode(**second_node)
     intp_node.is_interpolated = True
+    intp_node['slice_index'] = new_slice
+    intp_node['slice_neighbours'] = new_neighbours
     if second_node['is_boundary']:
         intp_node.is_boundary = True
     # Interpolate the region to match the boundary slice
@@ -767,20 +796,28 @@ def get_boundary_relations(region_graph: RegionGraph,
         region1 = region_graph.nodes[boundary_node]
         # Select for neighbouring regions in the other ROI.
         sub_graph = node_selector(region_graph, region1, selected_roi)
-
-        # if a region has the same slice index as the boundary, then use it to
-        # determine the relationship.
-        second_node = get_matching_region(sub_graph, region1)
-        if second_node is None:
-            # Otherwise interpolate the region to match the boundary slice.
-            second_node = get_interpolated_regions(sub_graph)
-        # Get the necessary adjustments for the relationship.
-        adjustments = set_adjustments(region1, second_node, selected_roi)
-        relation = DE27IM(region1['polygon'], second_node['polygon'],
-                            adjustments=adjustments)
+        if len(sub_graph) == 0:
+            region2 = None  # No regions in the other ROI.
+        else:
+            # if a region has the same slice index as the boundary, then use it to
+            # determine the relationship.
+            region2 = get_matching_region(sub_graph, region1)
+            if region2 is None:
+                # Otherwise interpolate the region to match the boundary slice.
+                region2 = get_interpolated_regions(sub_graph)
+            # Get the necessary adjustments for the relationship.
+        adjustments = set_adjustments(region1, region2, selected_roi)
+        relation = DE27IM(region1, region2, adjustments=adjustments)
         # Store the relationship
         boundary_relations.append(relation)
     return boundary_relations
+
+# %% Functions for finding relations
+def merged_relations(relations):
+    merged = DE27IM(relation_int=0)
+    for relation in list(relations):
+        merged = merged.merge(relation)
+    return merged
 
 
 def find_relations(slice_table, regions, selected_roi):
