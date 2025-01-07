@@ -359,24 +359,27 @@ def empty_structure(structure: ContourType, invert=False) -> bool:
         bool: False if the structure is type StructureSlice and is not empty.
             Otherwise True.  If invert True, the result is opposite.
     '''
-    is_empty = True
-    # check for an is_empty attribute.
-    # This is used for StructureSlice objects.
-    try:
-        is_empty = structure.is_empty
-    except AttributeError:
-        # if there is no is_empty attribute, check for an 'is_empty' key.
-        # This is used for RegionNode objects.
+    # Check for None
+    if structure is None:
+        is_empty = True
+    else:
+        # check for an is_empty attribute.
+        # This is used for StructureSlice objects.
         try:
-            is_empty = structure['is_empty']
-        except (TypeError, KeyError):
-            # if there is no 'is_empty' key, check for an area attribute.
-            # This is used for shapely.Polygon objects.
+            is_empty = structure.is_empty
+        except AttributeError:
+            # if there is no is_empty attribute, check for an 'is_empty' key.
+            # This is used for RegionNode objects.
             try:
-                is_empty = structure.area == 0
-            except AttributeError:
-                # if there is no area attribute, the structure is considered empty.
-                is_empty = True
+                is_empty = structure['is_empty']
+            except (TypeError, KeyError):
+                # if there is no 'is_empty' key, check for an area attribute.
+                # This is used for shapely.Polygon objects.
+                try:
+                    is_empty = structure.area == 0
+                except AttributeError:
+                    # if there is no area attribute, the structure is considered empty.
+                    is_empty = True
     if invert:
         return not is_empty
     return is_empty
