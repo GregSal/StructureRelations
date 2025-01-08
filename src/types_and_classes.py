@@ -44,6 +44,14 @@ class SliceNeighbours:
     previous_slice: SliceIndexType
     next_slice: SliceIndexType
 
+    def __post_init__(self) -> None:
+        self.force_types()
+
+    def force_types(self):
+        self.this_slice = SliceIndexType(float(self.this_slice))
+        self.previous_slice = SliceIndexType(float(self.previous_slice))
+        self.next_slice = SliceIndexType(float(self.next_slice))
+
     def is_neighbour(self, other_slice: SliceIndexType) -> bool:
         return self.previous_slice <= other_slice <= self.next_slice
 
@@ -87,6 +95,12 @@ class RegionNode:
 
     def __post_init__(self) -> None:
         self.force_types()
+        self.index = None
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def update_index(self):
         self.index = RegionNode.counter
         RegionNode.counter += 1
 
@@ -103,6 +117,7 @@ class RegionNode:
         return (int(self.roi), float(self.slice_index), int(self.index))
 
     def add_node(self, graph: RegionGraph) -> None:
+        self.update_index()
         graph.add_node(self.node_label(),
                        polygon=self.polygon,
                        roi=self.roi,
@@ -112,6 +127,7 @@ class RegionNode:
                        is_interpolated=self.is_interpolated,
                        is_empty=self.is_empty,
                        slice_neighbours=self.slice_neighbours)
+
 
     def reset(self) -> None:
         self.polygon = shapely.geometry.Polygon()

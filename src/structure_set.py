@@ -98,9 +98,9 @@ def generate_interpolated_boundaries(graph: RegionGraph) -> None:
 
     boundaries = identify_boundaries(graph)
     for boundary_node in boundaries:
-        node_data = graph.nodes[boundary_node]
-        polygon = node_data['polygon']
-        slice_neighbours = node_data['slice_neighbours']
+        node = graph.nodes[boundary_node]
+        polygon = node['polygon']
+        slice_neighbours = node['slice_neighbours']
         this_slice = slice_neighbours.this_slice
         # Find the neighbouring node (only one because degree is 1)
         nbr = list(graph[boundary_node])
@@ -114,8 +114,8 @@ def generate_interpolated_boundaries(graph: RegionGraph) -> None:
         new_slice = calculate_new_slice_index(slice_pair)
         distance=abs(this_slice - other_slice)
         new_neighbours = SliceNeighbours(new_slice, this_slice, other_slice)
-        node_data = RegionNode(roi=node_data['roi'], slice_index=new_slice,
-                               is_hole=node_data['is_hole'], is_boundary=True,
+        node_data = RegionNode(roi=node['roi'], slice_index=new_slice,
+                               is_hole=node['is_hole'], is_boundary=True,
                                is_interpolated=True, is_empty=False,
                                slice_neighbours=new_neighbours)
         intp_poly = interpolate_polygon(slice_pair, polygon)

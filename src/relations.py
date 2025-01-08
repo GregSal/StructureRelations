@@ -508,7 +508,7 @@ class DE27IM():
                 poly_a = contour_a
             else:
                 try:
-                    poly_a = contour_a.polygon
+                    poly_a = contour_a['polygon']
                 except AttributeError as err:
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
@@ -520,7 +520,7 @@ class DE27IM():
                 poly_b = contour_b
             else:
                 try:
-                    poly_b = contour_b.polygon
+                    poly_b = contour_b['polygon']
                 except AttributeError as err:
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
