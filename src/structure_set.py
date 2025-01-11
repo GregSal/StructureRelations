@@ -5,6 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
+from warnings import  warn
 from typing import List
 
 # Standard Libraries
@@ -104,16 +105,20 @@ def generate_interpolated_boundaries(graph: RegionGraph) -> None:
         this_slice = slice_neighbours.this_slice
         # Find the neighbouring node (only one because degree is 1)
         nbr = list(graph[boundary_node])
+        if not nbr:
+            warn(f'ROI {node["roi"]} has a isolated contour on slice {this_slice}')
+            continue
         # Find the slice index of the neighbouring node
         nbr_slice = graph.nodes[nbr[0]]['slice_index']
         if slice_neighbours.previous_slice != nbr_slice:
             other_slice = slice_neighbours.previous_slice
+            slice_pair = (other_slice, this_slice )
         else:
             other_slice = slice_neighbours.next_slice
-        slice_pair = (this_slice, other_slice)
+            slice_pair = (this_slice, other_slice)
         new_slice = calculate_new_slice_index(slice_pair)
         distance=abs(this_slice - other_slice)
-        new_neighbours = SliceNeighbours(new_slice, this_slice, other_slice)
+        new_neighbours = SliceNeighbours(new_slice, *slice_pair)
         node_data = RegionNode(roi=node['roi'], slice_index=new_slice,
                                is_hole=node['is_hole'], is_boundary=True,
                                is_interpolated=True, is_empty=False,
