@@ -45,6 +45,8 @@ def poly_round(polygon: shapely.Polygon,
                precision: int = PRECISION)->shapely.Polygon:
     '''Round the coordinates of a polygon to the specified precision.
 
+    Note: this function does not work for polygons with holes.
+
     Args:
         polygon (shapely.Polygon): The polygon to clean.
 
@@ -55,6 +57,8 @@ def poly_round(polygon: shapely.Polygon,
         shapely.Polygon: The supplied polygon with all coordinate points
             rounded to the supplied precision.
     '''
+    if len(polygon.interiors) > 0:
+        raise ValueError("Cannot round polygons with holes using this function.")
     dim = shapely.get_coordinate_dimension(polygon)
     if dim == 2:
         polygon_points = [(round(x,precision), round(y,precision))
