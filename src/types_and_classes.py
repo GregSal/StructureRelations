@@ -128,7 +128,6 @@ class RegionNode:
                        is_empty=self.is_empty,
                        slice_neighbours=self.slice_neighbours)
 
-
     def reset(self) -> None:
         self.polygon = shapely.geometry.Polygon()
         self.is_empty = True

@@ -178,3 +178,4 @@ _Test Results/
 reference/
 Test Data/
 *.bat
+src/UnUsedFunctions.py

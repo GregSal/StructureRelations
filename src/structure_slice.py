@@ -18,7 +18,7 @@ from types_and_classes import PRECISION
 from types_and_classes import ROI_Type, SliceIndexType, SliceNeighbours
 from types_and_classes import RegionNode, RegionNodeType, RegionGraph
 from types_and_classes import InvalidContour, InvalidContourRelation
-from utilities import point_round, poly_round
+from utilities import poly_round
 
 
 # %% Type definitions and Globals
@@ -147,18 +147,6 @@ class StructureSlice():
         else:
             self.contour = shapely.MultiPolygon([new_contours])
 
-    def parameters(self)->Dict[str, Any]:
-        '''Return a dictionary of the structure parameters.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the structure parameters.
-                The dictionary contains the following keys:
-                    'precision': The contour coordinate precision.
-                    'slice_position': The slice position of the structure.
-        '''
-        return {'precision': self.precision,
-                'slice_position': self.slice_position}
-
     @property
     def exterior(self)-> shapely.MultiPolygon:
         '''The solid exterior contour MultiPolygon.
@@ -270,33 +258,6 @@ class StructureSlice():
         return area_p
 
     @property
-    def external_area(self)-> float:
-        '''The area encompassed by the convex hulls of each polygon on the
-        slice.
-
-        Returns:
-            float: The area encompassed by the convex hulls of each polygon on
-                the slice.
-        '''
-        solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                  for poly in self.contour.geoms]
-        solid = shapely.unary_union(solids)
-        return solid.area
-
-    @property
-    def hull_area(self)-> float:
-        '''The area encompassed by the convex hulls of each polygon on the
-        slice.
-
-        Returns:
-            float: The area encompassed by the convex hulls of each polygon on
-                the slice.
-        '''
-        solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
-        solid = shapely.unary_union(solids)
-        return solid.area
-
-    @property
     def is_empty(self)-> bool:
         '''Check if the slice is empty.
 
@@ -321,26 +282,6 @@ class StructureSlice():
         self.slice_neighbours = SliceNeighbours(this_slice=self.slice_position,
                                                 previous_slice=previous_slice,
                                                 next_slice=next_slice)
-
-    def centers(self, coverage: str = 'contour')->List[shapely.Point]:
-        '''A list of the geometric centers of each polygon in the ContourSlice.
-
-        Args:
-            coverage (str): The type of coverage to use for the centroid
-                calculations.  Must be one of 'external', 'hull' or 'contour'.
-
-        Returns:
-            List[shapely.Point]: A list of the geometric centers of each polygon
-            in the ContourSlice.
-        '''
-        centre_list = []
-        polygons = self.select(coverage)
-        # calculate the centroid for each polygon
-        for poly in polygons.geoms:
-            centre_point = point_round(poly.centroid, self.precision)
-            centre_list.append(centre_point)
-        return centre_list
-
 
 # %% Slice related functions
 def empty_structure(structure: ContourType, invert=False) -> bool:
@@ -383,104 +324,6 @@ def empty_structure(structure: ContourType, invert=False) -> bool:
     if invert:
         return not is_empty
     return is_empty
-
-
-def has_area(poly: ContourType)->bool:
-    '''Check if the structure has area.
-
-    Tests whether the structure has an area greater than zero or is empty.
-
-    Args:
-        poly (ContourType): A StructureSlice, RegionNode, Polygon, or NaN object.
-
-    Returns:
-        bool: True if the structure has an area greater than zero, False
-            otherwise.
-    '''
-    if empty_structure(poly):
-        area = False
-    else:
-        try:
-             # check for a StructureSlice or shapely.Polygon object.
-            area = poly.area
-        except AttributeError:
-            # check for a RegionNodeType object.
-            try:
-                area = poly['polygon'].area
-            except (TypeError, KeyError):
-                # Anything else is considered to have no area.
-                area = False
-    if area:
-        return area > 0
-    return area
-
-
-def contains_point(poly: ContourType, point: shapely.Point)->bool:
-    '''Check if the structure contains the given point.
-
-    Tests whether the structure contains the given point or is empty.
-    This is a convenience function that wraps the shapely Polygon.contains
-    method, allowing it to be applied to a series of StructureSlice objects.
-
-    Args:
-        poly (Union[StructureSlice, float]): A StructureSlice or NaN object.
-        point (shapely.Point): A shapely Point object.
-
-    Returns:
-        bool: True if the structure contains the point, False otherwise.
-    '''
-    contains = False
-    # check for an empty poly.
-    if empty_structure(poly):
-        contains = False
-    else:
-        try:
-            # check for a StructureSlice object.
-            contains = poly.contour.contains(point)
-        except AttributeError:
-            try:
-                # check for a shapely.Polygon object.
-                contains = poly.contains(point)
-            except AttributeError:
-                try:
-                    # check for a RegionNodeType object.
-                    contains = poly['polygon'].contains(point)
-                except (TypeError, KeyError):
-                    contains = False
-    return contains
-
-
-def get_centroid(poly: Union[StructureSlice, float])->shapely.Point:
-    '''Get the centroid of the structure.
-
-    Returns the centroid of the structure or an empty Point object the
-    structure is empty.
-
-    Args:
-        poly (Union[StructureSlice, float]): A StructureSlice, shapely.Polygon
-            or object containing a 'polygon' attribute.
-
-    Returns:
-        shapely.Point: The centroid of the structure.
-    '''
-    if empty_structure(poly):
-        centroid = shapely.Point()
-    else:
-        try:
-            # check for a StructureSlice object.
-            centroid = poly.contour.centroid
-        except AttributeError:
-            try:
-                # check for a shapely.Polygon object.
-                centroid = poly.centroid
-            except AttributeError:
-                try:
-                    # check for a RegionNodeType object.
-                    centroid = poly['polygon'].centroid
-                except (TypeError, KeyError):
-                    # Anything else is considered to have no centroid.
-                    centroid = shapely.Point()
-    return centroid
 
 
 def merge_contours(slice_contours: pd.Series,
