@@ -114,11 +114,13 @@ class StructureSlice():
         # check for slice position
         dim = shapely.get_coordinate_dimension(contour)
         if dim == 3:
-            slice_position = shapely.get_coordinates(contour, include_z=True)[0][2]
-            if self.slice_position is None:
-                self.slice_position = slice_position
-            elif slice_position != self.slice_position:
-                raise ValueError('Slice position mismatch.')
+            coordinates = shapely.get_coordinates(contour, include_z=True)
+            if coordinates.size > 0:
+                slice_position = shapely.get_coordinates(contour, include_z=True)[0][2]
+                if self.slice_position is None:
+                    self.slice_position = slice_position
+                elif slice_position != self.slice_position:
+                    raise ValueError('Slice position mismatch.')
         # Apply requisite rounding to polygon
         contour_round = poly_round(contour, self.precision)
         # Check for valid contour
