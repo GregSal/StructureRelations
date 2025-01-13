@@ -70,6 +70,16 @@ def test_add_overlapping_contour_raises_error():
     with pytest.raises(InvalidContourRelation):
         structure_slice.add_contour(overlapping_contour)
 
+def test_inverted_order_raises_error():
+    '''Test that adding an overlapping polygon raises an InvalidContourRelation
+    error.
+    '''
+    contours = [shapely.geometry.Polygon([(1, 1), (1, 2), (2, 2), (2, 1)])]
+    new_contour = shapely.geometry.Polygon([(0, 0), (3, 0), (3, 3), (0, 3)])
+    structure_slice = StructureSlice(contours)
+    with pytest.raises(InvalidContourRelation):
+        structure_slice.add_contour(new_contour)
+
 def test_area_property():
     contours = [shapely.geometry.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])]
     structure_slice = StructureSlice(contours)

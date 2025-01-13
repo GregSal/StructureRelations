@@ -1,7 +1,6 @@
 import pytest
 import shapely
 
-from types_and_classes import InvalidContourRelation, ROI_Type, SliceIndexType, SliceNeighbours
 from structure_slice import StructureSlice
 
 from relations import DE9IM
