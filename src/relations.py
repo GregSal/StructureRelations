@@ -323,6 +323,10 @@ class DE9IM():
     def __repr__(self):
         return f'<DE9IM>: {self.relation_str}'
 
+    def __eq__(self, value):
+        # TODO define an equivalence relationship
+        pass
+
     def __str__(self):
         bin_str = self.relation
         if len(bin_str) < 9:

@@ -1,11 +1,9 @@
-import pytest
 import shapely
 
-from structure_slice import StructureSlice
 from types_and_classes import RegionNode, SliceNeighbours
 
-from relations import DE27IM, RelationshipType
-from debug_tools import box_points, circle_points
+from relations import DE27IM, DE9IM
+from debug_tools import circle_points
 
 def test_de27im_initialization_with_contours():
     poly_a = shapely.Polygon(circle_points(2))
@@ -71,5 +69,42 @@ def test_de27im_merge():
     assert merged_de27im.relation == expected_relation
     assert merged_de27im.int == int(expected_relation, 2)
 
+def test_de27im_apply_adjustments_boundary_a():
+    initial_relation_group = (DE9IM(relation_str='FF2FF1212'),
+                          DE9IM(relation_str='212FF1FF2'),
+                          DE9IM(relation_str='212FF1FF2'))
+    de27im = DE27IM(relation_int=0)
+    adjusted_de27im = de27im.apply_adjustments(initial_relation_group,
+                                               ['boundary_a'])
+    expected_relation = (DE9IM(relation_str='FFFFF2212'),
+                         DE9IM(relation_str='FFF212FF2'),
+                         DE9IM(relation_str='FFF212FF2'))
+    assert adjusted_de27im == expected_relation
 
-# TODO test DE9IM.apply_adjustments
+def test_de9im_apply_adjustments_boundary_b():
+    relation_str = '212FF1FF2'
+    de9im = DE9IM(relation_str=relation_str)
+    adjusted_de9im = de9im.boundary_adjustment('b')
+    expected_relation_str = 'F2F2F1FF2'
+    assert adjusted_de9im.relation_str == expected_relation_str
+
+def test_de9im_apply_adjustments_hole_a():
+    relation_str = '212FF1FF2'
+    de9im = DE9IM(relation_str=relation_str)
+    adjusted_de9im = de9im.hole_adjustment('a')
+    expected_relation_str = '000FF1FF2'
+    assert adjusted_de9im.relation_str == expected_relation_str
+
+def test_de9im_apply_adjustments_hole_b():
+    relation_str = '212FF1FF2'
+    de9im = DE9IM(relation_str=relation_str)
+    adjusted_de9im = de9im.hole_adjustment('b')
+    expected_relation_str = 'F2F2F0000'
+    assert adjusted_de9im.relation_str == expected_relation_str
+
+def test_de9im_apply_adjustments_transpose():
+    relation_str = '212FF1FF2'
+    de9im = DE9IM(relation_str=relation_str)
+    adjusted_de9im = de9im.transpose()
+    expected_relation_str = '2F2F1F2FF'
+    assert adjusted_de9im.relation_str == expected_relation_str
