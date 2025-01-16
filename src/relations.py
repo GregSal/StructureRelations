@@ -324,7 +324,6 @@ class DE9IM():
         return f'<DE9IM>: {self.relation_str}'
 
     def __eq__(self, value):
-        # TODO define an equivalence relationship
         if isinstance(value, self.__class__):
             return self.to_int() == value.to_int()
         if isinstance(value, int):

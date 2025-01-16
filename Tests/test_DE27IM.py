@@ -116,8 +116,6 @@ def test_de27im_apply_adjustments_hole_a():
     hole_a_adjustment = (DE9IM(relation_str='FFFFF1FF2'),
                         DE9IM(relation_str='FFFFFFFFF'),
                         DE9IM(relation_str='FFFFFFFFF'))
-    print(adjusted_de27im)
-    print(hole_a_adjustment)
     assert adjusted_de27im == hole_a_adjustment
 
 def test_de9im_apply_adjustments_hole_b():
@@ -131,13 +129,17 @@ def test_de9im_apply_adjustments_hole_b():
     hole_b_adjustment = (DE9IM(relation_str='FFFFFFF12'),
                         DE9IM(relation_str='FFFFFFFFF'),
                         DE9IM(relation_str='FFFFFFFFF'))
-    print(adjusted_de27im)
-    print(hole_b_adjustment)
     assert adjusted_de27im == hole_b_adjustment
 
 def test_de9im_apply_adjustments_transpose():
-    relation_str = '212FF1FF2'
-    de9im = DE9IM(relation_str=relation_str)
-    adjusted_de9im = de9im.transpose()
-    expected_relation_str = '2F2F1F2FF'
-    assert adjusted_de9im.relation_str == expected_relation_str
+    initial_relation_group = (DE9IM(relation_str='212FF1FF2'),
+                              DE9IM(relation_str='212FF1FF2'),
+                              DE9IM(relation_str='212FF1FF2'))
+
+    de27im = DE27IM(relation_int=0)
+    adjusted_de27im = de27im.apply_adjustments(initial_relation_group,
+                                            ['transpose'])
+    transpose_adjustment = (DE9IM(relation_str='2FF1FF212'),
+                            DE9IM(relation_str='2FF1FF212'),
+                            DE9IM(relation_str='2FF1FF212'))
+    assert adjusted_de27im == transpose_adjustment
