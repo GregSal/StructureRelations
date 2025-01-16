@@ -325,7 +325,13 @@ class DE9IM():
 
     def __eq__(self, value):
         # TODO define an equivalence relationship
-        pass
+        if isinstance(value, self.__class__):
+            return self.to_int() == value.to_int()
+        if isinstance(value, int):
+            return self.to_int() == value
+        if isinstance(value, str):
+            value_str = value.replace('F','0').replace('2','1')
+            return self.to_bool() == value_str
 
     def __str__(self):
         bin_str = self.relation
