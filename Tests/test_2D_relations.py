@@ -2,7 +2,7 @@ import shapely
 
 from structure_slice import StructureSlice
 from relations import DE27IM, RelationshipType
-from debug_tools import circle_points
+from debug_tools import circle_points, box_points
 
 class TestContains:
     def test_contains_centered(self):
@@ -64,3 +64,39 @@ class TestContains:
         relation_type = DE27IM(a, b).identify_relation()
         print(relation_type)
         assert relation_type == RelationshipType.CONTAINS
+
+class TestSurrounds:
+    def test_simple_surrounds(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle2 = shapely.Polygon(circle_points(1))
+        a = StructureSlice([circle6, circle4])
+        b = StructureSlice([circle2])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.SURROUNDS
+
+    def test_surrounds_middle_ring(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle5 = shapely.Polygon(circle_points(2.5))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle3 = shapely.Polygon(circle_points(1.5))
+        circle2 = shapely.Polygon(circle_points(1))
+        a = StructureSlice([circle6, circle5, circle2])
+        b = StructureSlice([circle4, circle3])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.SURROUNDS
+
+    def surrounds_two_holes_example(self):
+        box10x5 = shapely.Polygon(box_points(10,5))
+        circle4_left = shapely.Polygon(circle_points(2, offset_x=-3))
+        circle3_right = shapely.Polygon(circle_points(1.5, offset_x=3))
+        circle2_left = shapely.Polygon(circle_points(1, offset_x=-3,
+                                                     offset_y=0.5))
+        circle2_right = shapely.Polygon(circle_points(1, offset_x=3))
+        a = StructureSlice([box10x5, circle4_left, circle3_right,
+                            circle2_right])
+        b = StructureSlice([circle2_left])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.SURROUNDS
+
+class TestShelters:
