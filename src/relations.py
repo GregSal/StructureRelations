@@ -371,13 +371,13 @@ class DE27IM():
     # Relationship Test Definitions
     test_binaries = [
         RelationshipTest(RelationshipType.DISJOINT,
-                         0b110110000100000000100000000,
+                         0b110110000100010000100010000,
                          0b000000000000000000000000000),
         RelationshipTest(RelationshipType.SHELTERS,
-                         0b111011000010000000010000000,
+                         0b110110000100010000100010000,
                          0b000000000000000000100000000),
         RelationshipTest(RelationshipType.SURROUNDS,
-                         0b110110000100000000000000000,
+                         0b110110000100010000000000000,
                          0b000000000100000000000000000),
         RelationshipTest(RelationshipType.BORDERS,
                          0b100010000100000000000000000,
@@ -385,20 +385,19 @@ class DE27IM():
         RelationshipTest(RelationshipType.CONFINES,
                          0b100010000100000000000000000,
                          0b000010000100000000000000000),
-        RelationshipTest(RelationshipType.OVERLAPS,
-                         0b100000100000000000000000000,
-                         0b100000100000000000000000000),
         RelationshipTest(RelationshipType.CONTAINS,
-                         0b100110000000000000000000000,
-                         0b100000000000000000000000000),
+                         0b110110100100000000100000000,
+                         0b110000000100000000100000000),
         RelationshipTest(RelationshipType.EQUALS,
-                         0b101110000000000000000000000,
-                         0b100010000000000000000000000),
+                         0b101010100100000000100000000,
+                         0b100010000100000000100000000),
         RelationshipTest(RelationshipType.PARTITION,
-                         0b101110000000000000000000000,
-                         0b101010000000000000000000000),
+                         0b101010100100000000100000000,
+                         0b101010000100000000100000000),
+        RelationshipTest(RelationshipType.OVERLAPS,
+                         0b100000100100000000100000000,
+                         0b100000100100000000100000000)
         ]
-
     # padding is a string of 'FFFFFFFFF', which becomes 9 zeros when converted
     # to binary.  Padding is used in cases where Exterior and Hull relationships
     # are not relevant.

@@ -80,6 +80,17 @@ def bin_format(bin_val: int, ignore_errors=False):
         }
     return bin_fmt.format(**bin_dict)
 
+def bin2matrix(bin_val: int):
+    bin_str = to_str(bin_val)
+    if len(bin_str) < 9:
+        zero_pad = 9 - len(bin_str)
+        bin_str = '0' * zero_pad + bin_str[2:]
+    bin_fmt = '|{bin1}|\n|{bin2}|\n|{bin3}|'
+    bin_dict = {'bin1': bin_str[0:3],
+                'bin2': bin_str[3:6],
+                'bin3': bin_str[6:9]}
+    return bin_fmt.format(**bin_dict)
+
 
 def show_bounds(polygon):
     a = polygon.bounds

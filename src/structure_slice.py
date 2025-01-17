@@ -122,7 +122,9 @@ class StructureSlice():
                 elif slice_position != self.slice_position:
                     raise ValueError('Slice position mismatch.')
         # Apply requisite rounding to polygon
-        contour_round = poly_round(contour, self.precision)
+        #contour_round = poly_round(contour, self.precision)
+        # FIXME: This is a temporary fix to test rounding errors
+        contour_round = contour
         # Check for valid contour
         if not shapely.is_valid(contour_round):
             if ignore_errors:
