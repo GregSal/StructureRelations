@@ -1,5 +1,5 @@
 #from math import sqrt
-from typing import Tuple
+from typing import Tuple, List, Union
 vector = Tuple[float, float, float]
 
 import FreeCAD as App
@@ -7,11 +7,145 @@ import FreeCADGui as Gui
 import Part
 from BOPTools import BOPFeatures
 
-script_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
-image_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
+SCRIPT_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD_Scripts"
+IMAGE_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
 
 
-# %% Functions
+# %% Part Functions
+def make_sphere(radius: float,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
+                )->Part.Shape:
+    placement = App.Vector(
+        (offset_x) * 10,
+        (offset_y) * 10,
+        (offset_z) * 10
+        )
+    sphere = Part.makeSphere(radius * 10, placement)
+    return sphere
+
+
+def make_vertical_cylinder(radius: float, height: float,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
+                )->Part.Shape:
+    starting_z = offset_z - height / 2
+    placement = App.Vector(
+        (offset_x) * 10,
+        (offset_y) * 10,
+        (starting_z) * 10
+        )
+    cylinder = Part.makeCylinder(radius * 10, height * 10, placement)
+    return cylinder
+
+
+def make_horizontal_cylinder(radius: float, height: float,
+                offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
+                )->Part.Shape:
+    starting_x = offset_x - height / 2
+    placement = App.Vector(
+        (starting_x) * 10,
+        (offset_y) * 10,
+        (offset_z) * 10
+        )
+    direction = App.Vector(1, 0, 0)
+    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, direction)
+    return cylinder
+
+
+def make_box(length: float, width:float, height: float,
+             offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
+                )->Part.Shape:
+    starting_x = offset_x - height / 2
+    placement = App.Vector(
+        (starting_x) * 10,
+        (offset_y) * 10,
+        (offset_z) * 10
+        )
+    cylinder = Part.makeBox(length * 10, width * 10, height * 10, placement)
+    return cylinder
+
+
+def merge_parts(parts_list: List[Part.Shape])->Part.Shape:
+    shape = parts_list[0]
+    for part in parts_list[1:]:
+        shape = shape.fuse(part)
+    return shape
+
+
+# %% Interaction Functions
+def get_struct_1_only(struct_1, struct_2)->Union[Part.Shape, None]:
+    struct_1_only = struct_1.cut(struct_2)
+    if struct_1_only.Volume == 0:
+        return None
+    return struct_1_only
+
+
+def get_both_structs(struct_1, struct_2)->Union[Part.Shape, None]:
+    both_structs = struct_1.common(struct_2)
+    if both_structs.Volume == 0:
+        return None
+    return both_structs
+
+
+def interactions(struct_a, struct_b)->Tuple[Part.Shape]:
+    struct_a_only = get_struct_1_only(struct_a, struct_b)
+    struct_b_only = get_struct_1_only(struct_b, struct_a)
+    both_ab = get_both_structs(struct_b, struct_a)
+    return struct_a_only, struct_b_only, both_ab
+
+
+def show_structure(structure: Part.Shape, label:str,
+                   color:Tuple[int, int, int],
+                   transparency=75,
+                   display_as='Shaded',
+                   line_style='Solid')->Part.Feature:
+    if structure is None:
+        return None
+    struct = Part.show(structure)
+    struct.Label = label
+    struct.ViewObject.ShapeColor = color
+    struct.ViewObject.Transparency = transparency
+    struct.ViewObject.DisplayMode = display_as
+    # Options are 'Flat Lines' 'Shaded', 'Wireframe', 'Points'
+    struct.ViewObject.DrawStyle = line_style
+    # Options are 'solid' 'Dashed', 'Dotted', 'Dashdot'
+    return struct
+
+
+def display_interactions(struct_a, struct_b):
+    # Define Structure Colors
+    struct_a_color = (0,0,255)  #  Blue
+    struct_b_color = (0,255,0)  #  Green
+    intersect_color = (255,170,0)  # Orange
+    # Get Interactions
+    struct_a_only, struct_b_only, struct_ab = interactions(struct_a, struct_b)
+    # Display Interactions
+    struct_a = show_structure(struct_a_only, 'a', struct_a_color)
+    struct_b = show_structure(struct_b_only, 'b', struct_b_color)
+    both_struct = show_structure(struct_ab, 'both', intersect_color)
+    return struct_a, struct_b, both_struct
+
+
+# %% Other Display related functions
+def add_slice_plane(structures: List[Part.Shape], slice_position: float,
+                    slice_color = (200, 200, 200)):
+    combined = merge_parts(structures)
+    region_size = combined.BoundBox
+    placement = App.Vector(region_size.XMin,
+                           region_size.YMin,
+                           slice_position * 10)
+    slice_plane = Part.makePlane(region_size.XLength, region_size.YLength,
+                                 placement)
+    label = f'Slice: {slice_position:2.1f}'
+    show_structure(slice_plane, label, color=slice_color,
+                   display_as='Wireframe',
+                   line_style='Dashdot')
+    return slice_plane
+
+
+# %% OLD Functions
+
+
+
 def add_measurement(doc, start, end, offset=1.0, label='m1',
                     text_color=(0,0,0), line_color=(0,0,0)):
     m1 = doc.addObject("App::MeasureDistance", label)
@@ -34,83 +168,7 @@ def make_structure(doc: App.Document, shape: Part.Shape,
     return struct
 
 
-def make_sphere(doc: App.Document, part_name: str, radius: float,
-                offset: vector)->Part.Feature:
-    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
-    sphere = Part.makeSphere(radius * 10, placement)
-    struct = make_structure(doc, sphere, part_name)
-    return struct
-
-
-def make_cube(doc: App.Document, part_name: str, size: float,
-                offset: vector)->Part.Feature:
-    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
-    cube = Part.makeBox(size * 10, size * 10, size * 10, placement)
-    struct = make_structure(doc, cube, part_name)
-    return struct
-
-
-def make_cylinder(doc: App.Document, part_name: str,
-                  radius: float, height: float,
-                  offset: vector, direction: vector)->Part.Feature:
-    orientation = App.Vector(*direction)
-    placement = App.Vector(offset[0] * 10, offset[1] * 10, offset[2] * 10)
-    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, orientation)
-    struct = make_structure(doc, cylinder, part_name)
-    return struct
-
-# Structure Interactions Coloring
-def interactions(doc, struct_1, struct_2)->Tuple[Part.Feature]:
-    def cut_a(doc, struct_a, struct_b, color, label)->Part.Feature:
-        bp = BOPFeatures.BOPFeatures(doc)
-        try:
-            struct_a_only = bp.make_cut([struct_a.Name, struct_b.Name])
-        except AttributeError:
-            struct_a_only = None
-        else:
-            struct_a_only.Label = label
-            if struct_a_only.Shape.isNull():
-                doc.removeObject(struct_a_only.Name)
-                struct_a_only = None
-            else:
-                struct_a_only.ViewObject.ShapeColor = color
-        doc.recompute()
-        return struct_a_only
-
-    def find_overlapping(doc, struct_a, struct_b, color, label)->Part.Feature:
-        bp = BOPFeatures.BOPFeatures(doc)
-        try:
-            overlapping = bp.make_multi_common([struct_a.Name, struct_b.Name])
-        except AttributeError:
-            overlapping = None
-        else:
-            doc.recompute()
-            overlapping.Label = label
-            if overlapping.Shape.isNull():
-                doc.removeObject(overlapping.Name)
-                overlapping = None
-            else:
-                overlapping.ViewObject.ShapeColor = color
-        doc.recompute()
-        return overlapping
-
-    # Define Structure Colors
-    struct_1_color = (0,0,255)  #  Blue
-    struct_2_color = (0,255,0)  #  Green
-    intersect_color = (255,170,0)  # Orange
-    # Structure Intersections
-    struct_1_only = cut_a(doc, struct_1, struct_2, struct_1_color,
-                          "Structure 1 Only")
-    struct_2_only = cut_a(doc, struct_2, struct_1, struct_2_color,
-                          "Structure 2 Only")
-    overlapping = find_overlapping(doc, struct_1, struct_2, intersect_color,
-                                   "Overlapping Structures")
-    doc.recompute()
-    return struct_1_only, struct_2_only, overlapping
-
-
-
-# Cropped views
+# %% Cropped views
 def crop_dir(cropping_size, direction):
     if 'X' in direction:
         cropping_center = cropping_size.Center
@@ -199,9 +257,19 @@ def make_crop(doc, struct_1_only, overlapping):
     cropped_overlap.Label = "Structure Overlap Crop_X"
 
 
+# %% For future reference
+# _text_ = Draft.make_text(["Slice = 1.0"], placement=pl)
+# Gui.Selection.addSelection('D__OneDrive___Queen_s_University_Python_Projects_StructureRelations_src_Images_FreeCAD_Images__StackedSpheres_FCStd','Text')
+# Draft.autogroup(_text_)
 
 
+#add_measurement((0, 0, 1), (0, 0, -1), offset=2.0, label='Distance Between Upper Spheres')
+#file_name = 'StackedSpheres1'
+#file_path = save_path + "//" + file_name + ".png"
+#Gui.ActiveDocument.ActiveView.saveImage(file_path)#
 
+#file_path = save_path + "//" + file_name + ".FCStd"
+#App.activeDocument().saveAs(file_path)
 
 
 #crop_box.DrawStyle = u"Dotted"

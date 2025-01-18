@@ -315,6 +315,31 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
 def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
                 precision=3, roi_num=0)->pd.DataFrame:
+    '''Generate contour slices for a sphere.
+
+    The center of the sphere is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified.
+
+    Args:
+        radius (float): The radius of the sphere.
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        num_points (int, optional): The number of points to use for each contour
+            (polygon). Defaults to 16.
+        offset_x (float, optional): The x position of the center of the sphere.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the sphere.
+            Defaults to 0.
+        offset_z (float, optional): The y position of the center of the sphere.
+            Defaults to 0.
+        precision (int, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+        roi_num (int, optional): Thr structure index number. Defaults to 0.
+
+    Returns:
+        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
+            with 'ROI Num' and 'Slice Index' as the levels.
+            There is only one column 'Contour' which contains shapely Polygons.
+    '''
     slice_list = []
     points_dict = sphere_points(radius, spacing, num_points,
                                 offset_x, offset_y, offset_z, precision)
@@ -333,7 +358,34 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
                            num_points: int = 16, offset_x: float = 0,
                            offset_y: float = 0, offset_z: float = 0,
                            precision=PRECISION, roi_num=0)->pd.DataFrame:
-    z_coord = make_slice_list(height=length, spacing=spacing, start=offset_z,
+    '''Generate contour slices for a vertical cylinder.
+
+    The center of the cylinder is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified.
+
+    Args:
+        radius (float): The radius of the cylinder.
+        length (float): The length of the cylinder in the z direction
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        num_points (int, optional): The number of points to use for each contour
+            (polygon). Defaults to 16.
+        offset_x (float, optional): The x position of the center of the
+            cylinder. Defaults to 0.
+        offset_y (float, optional): The y position of the center of the
+            cylinder. Defaults to 0.
+        offset_z (float, optional): The z position of the center of the
+            cylinder. Defaults to 0.
+        precision (_type_, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+        roi_num (int, optional): Thr structure index number. Defaults to 0.
+
+    Returns:
+        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
+            with 'ROI Num' and 'Slice Index' as the levels.
+            There is only one column 'Contour' which contains shapely Polygons.
+    '''
+    starting_z = offset_z - length / 2
+    z_coord = make_slice_list(height=length, spacing=spacing, start=starting_z,
                               precision=precision)
     xy_points = circle_points(radius, offset_x, offset_y, num_points, precision)
     contour = shapely.Polygon(xy_points)
@@ -352,6 +404,32 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
                              offset_x: float = 0, offset_y: float = 0,
                              offset_z: float = 0, precision=PRECISION,
                              roi_num=0)->pd.DataFrame:
+    '''Generate contour slices for a horizontal cylinder.
+
+    The center of the cylinder is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified.
+
+    Args:
+        radius (float): The radius of the cylinder.
+        length (float): The length of the cylinder in the z direction
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        num_points (int, optional): The number of points to use for each contour
+            (polygon). Defaults to 16.
+        offset_x (float, optional): The x position of the center of the
+            cylinder. Defaults to 0.
+        offset_y (float, optional): The y position of the center of the
+            cylinder. Defaults to 0.
+        offset_z (float, optional): The z position of the center of the
+            cylinder. Defaults to 0.
+        precision (_type_, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+        roi_num (int, optional): Thr structure index number. Defaults to 0.
+
+    Returns:
+        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
+            with 'ROI Num' and 'Slice Index' as the levels.
+            There is only one column 'Contour' which contains shapely Polygons.
+    '''
     slice_list = []
     points_dict = cylinder_points(radius, length, spacing,
                                    offset_x, offset_y, offset_z, precision)
@@ -370,6 +448,33 @@ def make_box(width: float, length: float = None, height: float = None,
              offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
              spacing: float = 0.1, precision=PRECISION,
              roi_num=0)->pd.DataFrame:
+    '''Generate contour slices for a rectangular prism cylinder.
+
+    The center of the box is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified.
+
+    Args:
+        width (float): The x dimension of the box.
+        length (float): The y dimension of the box.
+        height (float): The z dimension of the box.
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        num_points (int, optional): The number of points to use for each contour
+            (polygon). Defaults to 16.
+        offset_x (float, optional): The x position of the center of the
+            box. Defaults to 0.
+        offset_y (float, optional): The y position of the center of the
+            box. Defaults to 0.
+        offset_z (float, optional): The z position of the center of the
+            box. Defaults to 0.
+        precision (_type_, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+        roi_num (int, optional): Thr structure index number. Defaults to 0.
+
+    Returns:
+        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
+            with 'ROI Num' and 'Slice Index' as the levels.
+            There is only one column 'Contour' which contains shapely Polygons.
+    '''
     if not height:
         if height == 0:
             height = 10**(-precision)
