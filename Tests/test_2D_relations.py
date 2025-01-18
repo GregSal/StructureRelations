@@ -227,7 +227,7 @@ class TestPartition:
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
-class Overlaps:
+class TestOverlaps:
     def test_overlaps_box(self):
         box4 = shapely.Polygon(box_points(4))
         box4_offset = shapely.Polygon(box_points(4, offset_x=2))
@@ -235,3 +235,100 @@ class Overlaps:
         b = StructureSlice([box4_offset])
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_box_circle(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        box6_offset = shapely.Polygon(box_points(6, offset_x=3))
+        a = StructureSlice([circle6])
+        b = StructureSlice([box6_offset])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_circles(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle6_offset = shapely.Polygon(circle_points(3, offset_x=2))
+        a = StructureSlice([circle6])
+        b = StructureSlice([circle6_offset])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_ring_box(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        box6_offset = shapely.Polygon(box_points(6, offset_x=3))
+        a = StructureSlice([circle6, circle4])
+        b = StructureSlice([box6_offset])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_ring_circle(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle6_offset = shapely.Polygon(circle_points(3, offset_x=2.5))
+        a = StructureSlice([circle6, circle4])
+        b = StructureSlice([circle6_offset])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_surrounded(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle2 = shapely.Polygon(circle_points(1.5, offset_x=1))
+        a = StructureSlice([circle6, circle4])
+        b = StructureSlice([circle2])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_surrounded_box(self):
+        box6 = shapely.Polygon(box_points(6))
+        box4 = shapely.Polygon(box_points(4))
+        box3 = shapely.Polygon(box_points(3, offset_x=1))
+        a = StructureSlice([box6, box4])
+        b = StructureSlice([box3])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_ring_surrounded(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle3 = shapely.Polygon(circle_points(1.5))
+        circle4 = shapely.Polygon(circle_points(2))
+        a = StructureSlice([circle6, circle3])
+        b = StructureSlice([circle4])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlaps_circle_island(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle2 = shapely.Polygon(circle_points(1))
+        a = StructureSlice([circle6, circle4, circle2])
+        b = StructureSlice([circle4])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def overlaps_concentric_rings(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        circle3 = shapely.Polygon(circle_points(1.5))
+        circle2 = shapely.Polygon(circle_points(1))
+        a = StructureSlice([circle6, circle3, circle2])
+        b = StructureSlice([circle4])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+class TestEquals:
+    def test_equals_box(self):
+        box6 = shapely.Polygon(box_points(6))
+        a = StructureSlice([box6])
+        b = StructureSlice([box6])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.EQUALS
+
+    def test_equals_circle(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle5 = shapely.Polygon(circle_points(2.5))
+        cropped_circle = shapely.intersection(circle6, circle5)
+        a = StructureSlice([circle5])
+        b = StructureSlice([cropped_circle])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.EQUALS
