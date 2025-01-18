@@ -1,410 +1,0 @@
-strict graph "" {
-	graph [bb="0,0,825,826.2",
-		bgcolor="#555555",
-		clusterrank=none,
-		fontcolor=white,
-		fontname="Helvetica,,Arial,sans-serif",
-		fontsize=16,
-		label="Structure Relations",
-		labelloc=t,
-		lheight=0.25,
-		lp="412.5,813.2",
-		lwidth=1.92
-	];
-	node [fixedsize=shape,
-		fontcolor=black,
-		fontname="Helvetica-Bold",
-		fontsize=12,
-		height=0.6,
-		label="\N",
-		labelloc=c,
-		nojustify=True,
-		penwidth=3,
-		style=filled,
-		width=1
-	];
-	edge [arrowhead=none,
-		arrowtail=none,
-		color="#e27dd6ff",
-		fontcolor="#55AAFF",
-		fontsize=10,
-		labelfloat=False,
-		labelfontname=Cambria,
-		penwidth=3,
-		style=solid
-	];
-	subgraph Organ {
-		graph [cluster=True];
-		26	[color="#e0ffff",
-			fontcolor="#000000",
-			height=0.59722,
-			label="Lung L",
-			pos="443,381.5",
-			shape=rectangle,
-			style="rounded, filled",
-			tooltip="ID: Lung LROI: 26DICOM Type ORGANCode: 7310Label: Left lungScheme: FMAVolume: 1776 ccLength: 24.2 cmRange: (5.8cm, -18.4cm)"];
-		27	[color="#ffdab9",
-			fontcolor="#000000",
-			height=0.59722,
-			label="Lung R",
-			pos="498,471.5",
-			shape=rectangle,
-			style="rounded, filled",
-			tooltip="ID: Lung RROI: 27DICOM Type ORGANCode: 7309Label: Right lungScheme: FMAVolume: 2556.676 ccLength: 23.8 cmRange: (6.6cm, \\
--17.2cm)"];
-		25	[color="#daa520",
-			fontcolor="#000000",
-			height=0.59722,
-			label="Lung B",
-			pos="184,561.5",
-			shape=rectangle,
-			style="rounded, filled",
-			tooltip="ID: Lung BROI: 25DICOM Type ORGANCode: 68877Label: Pair of lungsScheme: FMAVolume: 4332.676 ccLength: 25 cmRange: (6.6cm, \\
--18.4cm)"];
-		2	[color="#f0fff0",
-			fontcolor="#000000",
-			label=Skin,
-			pos="341,651.6",
-			shape=point,
-			style=invis,
-			tooltip="ID: SkinROI: 2DICOM Type ORGANCode: 7163Label: SkinScheme: FMAVolume: 1726.808 ccLength: 33.8 cmRange: (10.6cm, -23.2cm)",
-			width=0.6];
-	}
-	subgraph External {
-		graph [cluster=True];
-		1	[color="#00ff00",
-			fillcolor=white,
-			fontcolor="#000000",
-			height=1.1111,
-			label=BODY,
-			penwidth=2,
-			pos="583,760.2",
-			shape=doublecircle,
-			tooltip="ID: BODYROI: 1DICOM Type EXTERNALCode: BODYLabel: BodyScheme: 99VMS_STRUCTCODEVolume: 28951.626 ccLength: 33.8 cmRange: (\\
-10.6cm, -23.2cm)",
-			width=1.1111];
-	}
-	subgraph Target {
-		graph [cluster=True];
-		38	[color="#ff0000",
-			fontcolor="#FFFFFF",
-			height=0.59722,
-			label=GTV,
-			pos="333,21.5",
-			shape=pentagon,
-			tooltip="ID: GTVROI: 38DICOM Type GTVCode: GTVpLabel: Primary Gross Tumor VolumeScheme: 99VMS_STRUCTCODEVolume: 8.03 ccLength: 2.6 \\
-cmRange: (-0.4cm, -3cm)"];
-		24	[color="#ffff00",
-			fontcolor="#000000",
-			height=0.59722,
-			label=CTV,
-			pos="419,111.5",
-			shape=pentagon,
-			tooltip="ID: CTVROI: 24DICOM Type GTVCode: ITVLabel: Internal Target VolumeScheme: 99VMS_STRUCTCODEVolume: 34.45 ccLength: 3.6 cm\\
-Range: (0cm, -3.6cm)"];
-		30	[color="#00ffff",
-			fontcolor="#000000",
-			height=0.59722,
-			label=PTV,
-			pos="309,291.5",
-			shape=octagon,
-			tooltip="ID: PTVROI: 30DICOM Type PTVCode: PTVpLabel: Primary Planning Target VolumeScheme: 99VMS_STRUCTCODEVolume: 74.649 ccLength: \\
-4.6 cmRange: (0.6cm, -4.0cm)"];
-		41	[color="#00ffff",
-			fontcolor="#000000",
-			height=0.59722,
-			label="eval PTV",
-			pos="322,201.5",
-			shape=octagon,
-			tooltip="ID: eval PTVROI: 41DICOM Type PTVCode: PTVpLabel: Primary Planning Target VolumeScheme: 99VMS_STRUCTCODEVolume: 74.649 cc\\
-Length: 4.6 cmRange: (0.6cm, -4.0cm)"];
-	}
-	26 -- 38	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="552.5,201.5",
-		penwidth=6,
-		pos="479.29,368.62 491.58,362.66 503.96,354.07 511,342 568.38,243.57 526.39,185.33 464,90 441.72,55.963 396.58,38.168 365.57,29.569",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	26 -- 24	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="455.5,246.5",
-		penwidth=6,
-		pos="442.56,359.94 441.6,323.54 438.75,245.45 431,180 429.03,163.33 425.59,144.55 422.89,131.04",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	26 -- 30	[color=green,
-		dir=both,
-		label=Overlaps,
-		lp="385.5,336.5",
-		penwidth=6,
-		pos="406.83,364.36 393.88,358.02 379.43,350.28 367,342 353.12,332.75 338.85,320.62 327.94,310.68",
-		style=tapered,
-		tooltip="Percentage Overlap:	15%"];
-	26 -- 41	[color=yellow,
-		dir=forward,
-		label=Group,
-		lp="410.5,291.5",
-		penwidth=0.5,
-		pos="428.9,359.83 419.79,346.47 407.69,328.71 397,313 375.75,281.75 351.15,245.5 336.09,223.28",
-		style=dotted,
-		tooltip="Percentage Overlap:	15%"];
-	27 -- 26	[label=Disjoint,
-		lp="476,426.5",
-		pos="473.3,449.71 468.03,444.36 462.89,438.32 459,432 453.6,423.23 449.84,412.46 447.32,403.2",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	27 -- 38	[label=Disjoint,
-		lp="620,246.5",
-		pos="520.71,449.69 526.28,444.16 532.06,438.04 537,432 586.68,371.31 621.83,347.02 607,270 585.28,157.22 556.24,115.25 455,61 426.71,\\
-45.842 391.49,35.53 366.17,29.422",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	27 -- 24	[label=Disjoint,
-		lp="586,291.5",
-		pos="510.59,449.72 539.28,399.45 602.97,268.84 549,180 528.07,145.55 483.22,127.89 452.1,119.42",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	27 -- 30	[label=Disjoint,
-		lp="381,381.5",
-		pos="461.99,459.5 432.56,448.99 391.47,430.6 364,403 338.45,377.33 322.67,337.4 314.89,313.22",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	27 -- 41	[label=Disjoint,
-		lp="497,336.5",
-		pos="499.12,449.9 499.67,427.21 498.57,389.97 488,360 472.01,314.66 462.35,303.64 428,270 404.62,247.1 372.24,227.86 349.44,215.86",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	25 -- 26	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="369.5,471.5",
-		penwidth=6,
-		pos="217.74,539.71 238.73,526.61 266.17,509.17 290,493 334.6,462.73 385.06,425.74 415.43,403.16",
-		style=tapered,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	25 -- 27	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="324.5,516.5",
-		penwidth=6,
-		pos="220.19,543.73 244.13,533.15 276.45,519.87 306,511 359.24,495.02 422.79,483.75 461.77,477.69",
-		style=tapered,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	25 -- 38	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="64.5,291.5",
-		penwidth=6,
-		pos="147.74,553.73 106.86,543.76 46,520.81 46,472.5 46,472.5 46,472.5 46,110.5 46,58.319 221.61,33.927 298.1,25.778",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	25 -- 24	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="113.5,336.5",
-		penwidth=6,
-		pos="166.03,539.95 133.53,500.21 70.509,409.76 95,331 134.28,204.7 212.95,208.64 332,151 352.66,140.99 376.54,130.5 394.04,123",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	25 -- 30	[color=green,
-		dir=both,
-		label=Overlaps,
-		lp="231.5,426.5",
-		penwidth=6,
-		pos="186.18,539.85 191.56,497.13 208.76,397.5 257,331 263.99,321.36 274.11,313.11 283.56,306.74",
-		style=invis,
-		tooltip="Percentage Overlap:	15%"];
-	25 -- 41	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="156.5,381.5",
-		penwidth=6,
-		pos="175.02,539.98 151.34,482.41 94.788,318.51 181,241 211.66,213.44 232.52,234.88 272,223 279.19,220.84 286.77,218.03 293.79,215.18",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	2 -- 26	[label=Disjoint,
-		lp="423,516.5",
-		pos="351.05,632.3 364.25,607.74 387.55,562.53 403,522 418.71,480.8 431.63,430.74 438.24,403.19",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	2 -- 27	[label=Disjoint,
-		lp="473,561.5",
-		pos="359,638.72 369.74,631.39 383.49,621.59 395,612 409.25,600.13 413.15,597.27 425,583 449.24,553.82 472.56,516.35 486.07,493.4",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	2 -- 25	[label=Disjoint,
-		lp="256,606.5",
-		pos="320.04,645.15 298.66,639.04 265.03,627.86 239,612 225.95,604.04 213.14,592.79 203.18,583.02",
-		style=invis,
-		tooltip="Distance:	 2.60"];
-	2 -- 38	[color=blue,
-		dir=forward,
-		label=Island,
-		lp="12.5,336.5",
-		pos="325.21,636.66 321.7,634.13 317.87,631.74 314,630 275.58,612.78 262.21,620.6 221,612 122.47,591.43 0,663.16 0,562.5 0,562.5 0,562.5 \\
-0,110.5 0,49.133 214.06,29.601 298.93,24.269",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	2 -- 24	[color=blue,
-		dir=forward,
-		label=Island,
-		lp="637.5,381.5",
-		pos="361.95,645.96 393.86,637.97 455.01,618.9 494,583 612.42,473.97 621.75,411.81 641,252 648.52,189.59 596.53,182.26 542,151 526.18,\\
-141.93 480.64,128.8 449.64,120.46",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	2 -- 30	[color=blue,
-		dir=forward,
-		label=Island,
-		lp="273.5,471.5",
-		pos="340.35,629.82 338.37,600.08 330.62,545.22 301,511 288.24,496.26 271.59,509.37 261,493 241.61,463.02 281.59,358 300.18,313.11",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	2 -- 41	[color=blue,
-		dir=forward,
-		label=Island,
-		lp="193.5,426.5",
-		pos="334.25,630.67 323.99,602.22 302.5,549.19 273,511 265.49,501.27 261.33,501.01 252,493 220.43,465.91 198.36,469.81 181,432 161.09,\\
-388.65 262.45,268.66 304.45,221.7",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 26	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="606.5,561.5",
-		penwidth=6,
-		pos="588.57,720.55 595.48,657.82 600.15,532.55 543,450 527.14,427.1 500.77,409.77 479.09,398.41",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 27	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="556.5,606.5",
-		penwidth=6,
-		pos="571.89,721.72 553.75,660.55 518.39,541.27 504.15,493.26",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 25	[color=yellow,
-		dir=forward,
-		label=Contains,
-		lp="291.5,651.6",
-		penwidth=0.5,
-		pos="543.08,756.79 480.19,751.22 356.64,732.91 273,673.2 238.88,648.84 210.83,608.02 195.83,583.34",
-		style=dotted,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 2	[color=magenta,
-		dir=forward,
-		label="Cut-out",
-		lp="376,696.7",
-		pos="542.88,759.57 493.87,757.87 411.18,747.78 360,702.2 351.6,694.72 346.89,683.1 344.26,672.99",
-		style=invis,
-		tooltip="Percentage Overlap:	23%"];
-	1 -- 38	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="806.5,381.5",
-		penwidth=6,
-		pos="623.01,756.1 682.67,749.06 788,726.21 788,652.6 788,652.6 788,652.6 788,110.5 788,24.411 470.05,20.758 365.72,21.877",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 24	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="754.5,426.5",
-		penwidth=6,
-		pos="622,750.17 667.33,737.09 736,708.12 736,652.6 736,652.6 736,652.6 736,245.5 736,123 532.23,111.44 451.43,111.67",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 30	[color=yellow,
-		dir=forward,
-		label=Contains,
-		lp="380.5,516.5",
-		penwidth=0.5,
-		pos="550.23,736.94 498.57,699.62 400.14,618.89 362,522 360.21,517.45 360.68,515.71 362,511 364.54,501.97 370.46,502.03 373,493 378.18,\\
-474.6 379.82,467.85 373,450 363.01,423.83 343.51,428.07 331,403 316.5,373.95 311.55,336.11 309.87,313.1",
-		style=dotted,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	1 -- 41	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="691.5,471.5",
-		penwidth=6,
-		pos="616.27,737.64 641.19,718.6 671,688.36 671,652.6 671,652.6 671,652.6 671,515.5 671,402.74 700.1,333.61 607,270 576.73,249.32 478.69,\\
-260.37 443,252 429.17,248.76 426.35,245.85 413,241 390.8,232.93 384.71,232.3 363,223 358.32,221 353.41,218.71 348.69,216.41",
-		style=invis,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	24 -- 38	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="399.5,66.5",
-		penwidth=6,
-		pos="402.82,93.948 386.86,77.617 362.7,52.888 347.39,37.223",
-		style=tapered,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	30 -- 38	[color=yellow,
-		dir=forward,
-		label=Contains,
-		lp="300.5,156.5",
-		penwidth=0.5,
-		pos="296.23,269.79 289.02,256.86 280.73,239.57 277,223 272.8,204.36 274.74,198.98 277,180 283.38,126.4 310.05,67.544 324.16,39.365",
-		style=dotted,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	30 -- 24	[color=yellow,
-		dir=forward,
-		label=Contains,
-		lp="408.5,201.5",
-		penwidth=0.5,
-		pos="327.49,271.82 339.69,258.85 355.49,240.77 367,223 386.83,192.39 403.49,153.03 412.28,130.5",
-		style=dotted,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	30 -- 41	[color=white,
-		dir=forward,
-		label=Group,
-		lp="326.5,246.5",
-		penwidth=6,
-		pos="309.99,269.71 310.59,260.83 311.53,250.37 313,241 313.91,235.17 315.23,228.91 316.57,223.17",
-		style=tapered,
-		tooltip="Percentage Overlap:	15%"];
-	41 -- 38	[color=yellow,
-		dir=forward,
-		label=Contains,
-		lp="347.5,111.5",
-		penwidth=0.5,
-		pos="323.28,179.73 325.45,144.7 329.79,74.418 331.86,40.987",
-		style=dotted,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-	41 -- 24	[color=cyan,
-		dir=forward,
-		label=Contains,
-		lp="361.5,156.5",
-		penwidth=6,
-		pos="327.17,179.87 330.43,170.19 335.48,159.05 343,151 355.93,137.17 374.93,127.54 390.69,121.38",
-		style=tapered,
-		tooltip="        1.5   2.0          ANT  SUP                | /                    |/            1.5 RT--- ---LT 1.5          /|                    / |                \\
-INF  POST             2.0   1.0       Min: 2.1   Max: 0.9"];
-}
