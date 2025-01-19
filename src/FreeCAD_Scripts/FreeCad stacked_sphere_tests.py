@@ -20,6 +20,43 @@ Gui.ActiveDocument.ActiveView.saveImage(file_path)
 file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
 App.activeDocument().saveAs(file_path)
 
+# %% Make Concentric cylinders
+file_name = 'Concentric cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=5, height=0.7,
+                                          offset_x=0, offset_y=0, offset_z=0)
+contained_cylinder = make_vertical_cylinder(radius=3, height=0.5,
+                                            offset_x=0, offset_y=0, offset_z=0)
+
+a, b, both = display_interactions(primary_cylinder, contained_cylinder)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Embedded Boxes
+cube6 = make_box(width=6, offset_x=0, offset_y=0, offset_z=0)
+cube3 = make_box(width=3, offset_x=0, offset_y=0, offset_z=0)
+a, b, both = display_interactions(cube6, cube3)
+both.ViewObject.Transparency = 0
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+file_name = 'Embedded Boxes'
+file_path = IMAGE_PATH + "//" + file_name + ".png"
+Gui.ActiveDocument.ActiveView.saveImage(file_path)
+
+file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+App.activeDocument().saveAs(file_path)
+
 # %% Stacked Spheres1
 file_name = 'EmbededSpheres'
 file_path = image_path + "//" + file_name + ".FCStd"
@@ -48,18 +85,7 @@ a.Visibility = True
 
 
 
-# %% Make Concentric cylinders
-cylinder6 = make_vertical_cylinder(radius=3, height=10,
-                                   offset_x=0, offset_y=0, offset_z=0)
-cylinder4 = make_vertical_cylinder(radius=2, height=10,
-                                   offset_x=0, offset_y=0, offset_z=0)
 
-a, b, both = display_interactions(cylinder6, cylinder4)
-doc.recompute()
-Gui.activeDocument().activeView().viewIsometric()
-Gui.SendMsgToActiveView("ViewFit")
-Gui.ActiveDocument.ActiveView.setAxisCross(True)
-a.Visibility = True
 
 
 # %%

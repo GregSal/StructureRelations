@@ -51,14 +51,26 @@ def make_horizontal_cylinder(radius: float, height: float,
     return cylinder
 
 
-def make_box(length: float, width:float, height: float,
+def make_box(width: float, length: float = None, height: float = None,
              offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
                 )->Part.Shape:
-    starting_x = offset_x - height / 2
+    if height:
+        if height <= 0.0:
+            raise ValueError('Height must be greater than 0')
+    else:
+        height = width
+    if length:
+        if length <= 0.0:
+            raise ValueError('Length must be greater than 0')
+    else:
+        length = width
+    starting_x = offset_x - length / 2
+    starting_y = offset_y - width / 2
+    starting_z = offset_z - height / 2
     placement = App.Vector(
         (starting_x) * 10,
-        (offset_y) * 10,
-        (offset_z) * 10
+        (starting_y) * 10,
+        (starting_z) * 10
         )
     cylinder = Part.makeBox(length * 10, width * 10, height * 10, placement)
     return cylinder

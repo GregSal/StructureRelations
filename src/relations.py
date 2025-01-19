@@ -780,7 +780,8 @@ def get_interpolated_region(sub_graph):
     # Select the first node in sub_graph.
     # Select that node's neighbour.
     # build an interpolated region from these two regions.
-
+    # Assumes that the sub-graph has at least two nodes.
+    assert len(sub_graph) >= 2
     # Select the first node in the subgraph
     first_node_label = list(sub_graph.nodes)[0]
     first_node = sub_graph.nodes[first_node_label]
@@ -843,13 +844,13 @@ def get_boundary_relations(region_graph: RegionGraph,
             boundary_relations.append(relation)
 
         # Interpolate the remaining regions to match the boundary slice.
-        done = len(sub_graph) == 0
+        done = (len(sub_graph) == 0)
         while not done:
             # interpolate each relevant region to match the boundary slice.
             region2 = get_interpolated_region(sub_graph)
             relation = get_relation(region1, region2, selected_roi)
             boundary_relations.append(relation)
-            done = len(sub_graph) == 0
+            done = (len(sub_graph) == 0)
     return boundary_relations
 
 

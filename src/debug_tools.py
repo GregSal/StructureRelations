@@ -210,10 +210,11 @@ def make_slice_list(height: float = None, number_slices: int = None,
         List[SliceIndexType]: A list of SliceIndexType for testing purposes.
     '''
     if height:
+        # number of slices = number of spaces + 1
         if number_slices:
-            spacing = height / number_slices
+            spacing = height / (number_slices - 1) # Subtract one to include the end
         else:
-            number_slices = ceil(height / spacing)
+            number_slices = ceil(height / spacing) + 1  # Add one to include the end
     elif not number_slices:
         msg = 'At least one of height or number_slices must be specified.'
         raise ValueError(msg)
