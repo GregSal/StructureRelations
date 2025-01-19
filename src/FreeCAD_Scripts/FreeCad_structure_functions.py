@@ -1,5 +1,7 @@
 #from math import sqrt
 from typing import Tuple, List, Union
+
+from matplotlib.pylab import f
 vector = Tuple[float, float, float]
 
 import FreeCAD as App
@@ -24,16 +26,16 @@ def make_sphere(radius: float,
     return sphere
 
 
-def make_vertical_cylinder(radius: float, height: float,
+def make_vertical_cylinder(radius: float, length: float,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
                 )->Part.Shape:
-    starting_z = offset_z - height / 2
+    starting_z = offset_z - length / 2
     placement = App.Vector(
         (offset_x) * 10,
         (offset_y) * 10,
         (starting_z) * 10
         )
-    cylinder = Part.makeCylinder(radius * 10, height * 10, placement)
+    cylinder = Part.makeCylinder(radius * 10, length * 10, placement)
     return cylinder
 
 
@@ -79,7 +81,11 @@ def make_box(width: float, length: float = None, height: float = None,
 def merge_parts(parts_list: List[Part.Shape])->Part.Shape:
     shape = parts_list[0]
     for part in parts_list[1:]:
-        shape = shape.fuse(part)
+        overlap = shape.common(part)
+        if overlap.Volume == 0:
+            shape = shape.fuse(part)
+        else:
+            shape = shape.cut(part)
     return shape
 
 
@@ -108,8 +114,9 @@ def interactions(struct_a, struct_b)->Tuple[Part.Shape]:
 def show_structure(structure: Part.Shape, label:str,
                    color:Tuple[int, int, int],
                    transparency=75,
-                   display_as='Shaded',
-                   line_style='Solid')->Part.Feature:
+                   display_as='Flat Lines',
+                   line_style='Solid',
+                   line_color=(0,0,0))->Part.Feature:
     if structure is None:
         return None
     struct = Part.show(structure)
@@ -120,6 +127,7 @@ def show_structure(structure: Part.Shape, label:str,
     # Options are 'Flat Lines' 'Shaded', 'Wireframe', 'Points'
     struct.ViewObject.DrawStyle = line_style
     # Options are 'solid' 'Dashed', 'Dotted', 'Dashdot'
+    struct.ViewObject.LineColor = line_color
     return struct
 
 
@@ -137,6 +145,9 @@ def display_interactions(struct_a, struct_b):
     return struct_a, struct_b, both_struct
 
 
+
+
+
 # %% Other Display related functions
 def add_slice_plane(structures: List[Part.Shape], slice_position: float,
                     slice_color = (200, 200, 200)):
@@ -152,6 +163,49 @@ def add_slice_plane(structures: List[Part.Shape], slice_position: float,
                    display_as='Wireframe',
                    line_style='Dashdot')
     return slice_plane
+
+def swap_shape(orig: Part.Feature, new_shape: Part.Shape, suffix: str)->Part.Feature:
+    new_struct = Part.show(new_shape)
+    new_struct.Label = orig.Label + suffix
+    new_struct.ViewObject.ShapeColor = orig.ViewObject.ShapeColor
+    new_struct.ViewObject.Transparency = orig.ViewObject.Transparency
+    new_struct.ViewObject.DisplayMode = orig.ViewObject.DisplayMode
+    new_struct.ViewObject.DrawStyle = orig.ViewObject.DrawStyle
+    new_struct.ViewObject.LineColor = orig.ViewObject.LineColor
+    new_struct.ViewObject.LineWidth = orig.ViewObject.LineWidth
+    new_struct.ViewObject.LineWidth = orig.ViewObject.LineWidth
+    new_struct.ViewObject.PointSize = orig.ViewObject.PointSize
+    new_struct.ViewObject.PointColor = orig.ViewObject.PointColor
+    orig.ViewObject.Visibility = False
+    return new_struct
+
+def crop_quarter(feature_list: List[Part.Feature])->Part.Shape:
+    combined = None
+    for feature in feature_list:
+        if feature is not None:
+            if combined is None:
+                combined = feature.Shape
+            else:
+                combined = combined.fuse(feature.Shape)
+    region_size = combined.BoundBox
+    placement = region_size.Center
+    quarter_box = Part.makeBox(region_size.XMax, -region_size.YMin, region_size.ZMax,
+                               placement)
+    quarter_box.rotate(App.Vector(0, 0, 0),App.Vector(0, 0, -1), 90)
+    quarter_crop = combined.common(quarter_box)
+    cropped_list = []
+    for feature in feature_list:
+        if feature is not None:
+            feature_cropped = feature.Shape.cut(quarter_box)
+            feature_crop = swap_shape(feature, feature_cropped, '_cropped')
+            feature.ViewObject.Visibility = False
+        else:
+            feature_crop = None
+        cropped_list.append(feature_crop)
+    crop_box = show_structure(quarter_crop, 'Crop Lines', color=(255,255,255),
+                              display_as='Wireframe',
+                              line_style='Dotted', line_color= (255,0,0))
+    return cropped_list, crop_box
 
 
 # %% OLD Functions
@@ -171,102 +225,6 @@ def add_measurement(doc, start, end, offset=1.0, label='m1',
     return m1
 
 
-def make_structure(doc: App.Document, shape: Part.Shape,
-                   part_name: str)->Part.Feature:
-    struct = doc.addObject("Part::Feature", part_name)
-    struct.Label = part_name
-    struct.Shape = shape
-    doc.recompute()
-    return struct
-
-
-# %% Cropped views
-def crop_dir(cropping_size, direction):
-    if 'X' in direction:
-        cropping_center = cropping_size.Center
-        cropping_center[1] = cropping_size.YMin - 1
-        cropping_center[2] = cropping_size.ZMin - 1
-        box_size = (-cropping_size.XMin + 2,
-                    cropping_size.YLength + 2,
-                    cropping_size.ZLength + 2)
-    if 'Y' in direction:
-        cropping_center = cropping_size.Center
-        cropping_center[0] = cropping_size.XMin - 1
-        cropping_center[2] = cropping_size.ZMin -1
-        box_size = (cropping_size.XLength + 2,
-                    -cropping_size.YMin + 2,
-                    cropping_size.ZLength + 2)
-    if 'Z' in direction:
-        cropping_center = cropping_size.Center
-        cropping_center[0] = cropping_size.XMin - 1
-        cropping_center[1] = cropping_size.YMin - 1
-        box_size = (cropping_size.XLength + 2,
-                    cropping_size.YLength + 2,
-                    -cropping_size.ZMin + 2)
-    return cropping_center, box_size
-
-
-def struct_crop(struct, name, direction):
-    cropping_size = struct.Shape.BoundBox
-    cropping_center, box_size = crop_dir(cropping_size, direction)
-    cut_view = struct.Shape.cut(Part.makeBox(*box_size, cropping_center))
-    cropped_struct = doc.addObject("Part::Feature", name)
-    cropped_struct.Shape = cut_view
-    cropped_struct.ViewObject.ShapeColor = struct.ViewObject.ShapeColor
-    struct.Visibility = False
-
-
-def crop_orth(a_only, b_only, both, direction):
-    if a_only:
-        struct_crop(a_only, f'Crop_A_{direction}', direction)
-    if b_only:
-        struct_crop(b_only, f'Crop_B_{direction}', direction)
-    if both:
-        struct_crop(both, f'Crop_Both_{direction}', direction)
-    doc.recompute()
-    if 'X' in direction:
-        Gui.activeDocument().activeView().viewRight()
-        Gui.SendMsgToActiveView("ViewFit")
-    if 'Y' in direction:
-        Gui.activeDocument().activeView().viewRear()
-        Gui.SendMsgToActiveView("ViewFit")
-    if 'Z' in direction:
-        Gui.activeDocument().activeView().viewTop()
-        Gui.SendMsgToActiveView("ViewFit")
-    #Gui.ActiveDocument.ActiveView.setAxisCross(False)
-
-
-
-def make_crop(doc, struct_1_only, overlapping):
-
-    # Define Structure Colors
-    struct_1_color = (0,0,255)  #  Blue
-    struct_2_color = (0,255,0)  #  Green
-    intersect_color = (255,170,0)  # Orange
-
-
-    crop_box = doc.addObject("Part::Box", "CropX")
-    cropping_size = struct_1_only.Shape.BoundBox
-    cropping_center = cropping_size.Center
-    cropping_center[1] = cropping_size.YMin - 1
-    cropping_center[2] = cropping_size.ZMin -1
-    crop_box.Placement=App.Placement(cropping_center, App.Rotation(0,0,0), App.Vector(0,0,0))
-    crop_box.Length = f'{-cropping_size.XMin + 2} mm'
-    crop_box.Width = f'{cropping_size.YLength + 2} mm'
-    crop_box.Height = f'{cropping_size.ZLength + 2} mm'
-    doc.recompute()
-
-    # Crop & color structures
-    bp = BOPFeatures.BOPFeatures(doc)
-    cropped_struct_1 = bp.make_cut([struct_1_only.Name, "CropX"])
-    doc.recompute()
-    cropped_struct_1.ViewObject.ShapeColor = struct_1_color
-    cropped_struct_1.Label = "Struct_1_crop_X"
-
-    cropped_overlap = bp.make_cut([overlapping.Name, "CropX"])
-    doc.recompute()
-    cropped_overlap.ViewObject.ShapeColor = intersect_color
-    cropped_overlap.Label = "Structure Overlap Crop_X"
 
 
 # %% For future reference
@@ -302,3 +260,9 @@ def make_crop(doc, struct_1_only, overlapping):
 #file_path = save_path + "//" + file_name + ".FCStd"
 ##doc = App.getDocument(file_name)
 #App.activeDocument().saveAs(file_path)
+
+
+
+#Gui.runCommand('Std_ToggleVisibility',0)
+#Gui.runCommand('Std_ToggleClipPlane',0)
+#
