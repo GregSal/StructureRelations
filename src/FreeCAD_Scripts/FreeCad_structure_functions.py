@@ -150,7 +150,9 @@ def display_interactions(struct_a, struct_b):
 
 # %% Other Display related functions
 def add_slice_plane(structures: List[Part.Shape], slice_position: float,
-                    slice_color = (200, 200, 200)):
+                    slice_color = (200, 200, 200),
+                    display_style='Wireframe',
+                    line_style='Dashdot'):
     combined = merge_parts(structures)
     region_size = combined.BoundBox
     placement = App.Vector(region_size.XMin,
@@ -159,10 +161,9 @@ def add_slice_plane(structures: List[Part.Shape], slice_position: float,
     slice_plane = Part.makePlane(region_size.XLength, region_size.YLength,
                                  placement)
     label = f'Slice: {slice_position:2.1f}'
-    show_structure(slice_plane, label, color=slice_color,
-                   display_as='Wireframe',
-                   line_style='Dashdot')
-    return slice_plane
+    slice_display = show_structure(slice_plane, label, color=slice_color,
+                                   display_as=display_style, line_style='Dashdot')
+    return slice_display
 
 def swap_shape(orig: Part.Feature, new_shape: Part.Shape, suffix: str)->Part.Feature:
     new_struct = Part.show(new_shape)
@@ -179,7 +180,19 @@ def swap_shape(orig: Part.Feature, new_shape: Part.Shape, suffix: str)->Part.Fea
     orig.ViewObject.Visibility = False
     return new_struct
 
-def crop_quarter(feature_list: List[Part.Feature])->Part.Shape:
+def crop_quarter(feature_list: List[Part.Feature],
+                 quarter = (1,-1,1))->Part.Shape:
+    quarter_rotations = {
+        (1,1,1): (App.Vector(0, 0, 1), 0),
+        (1,-1,1): (App.Vector(0, 0, -1), 90),
+        (1,-1,-1): (App.Vector(1, 0, 0), 180),
+        # (-1,-1,1): (0,0,180),  # To be added as required
+        # (1,1,-1): (0,90,0),
+        # (1,-1,-1): (0,-90,0),
+        # (-1,1,-1): (0,-90,180),
+        # (-1,-1,-1): (0,90,180)
+        }
+    rotation = quarter_rotations[quarter]
     combined = None
     for feature in feature_list:
         if feature is not None:
@@ -191,7 +204,7 @@ def crop_quarter(feature_list: List[Part.Feature])->Part.Shape:
     placement = region_size.Center
     quarter_box = Part.makeBox(region_size.XMax, -region_size.YMin, region_size.ZMax,
                                placement)
-    quarter_box.rotate(App.Vector(0, 0, 0),App.Vector(0, 0, -1), 90)
+    quarter_box.rotate(App.Vector(0, 0, 0), *rotation)
     quarter_crop = combined.common(quarter_box)
     cropped_list = []
     for feature in feature_list:
