@@ -39,17 +39,17 @@ def make_vertical_cylinder(radius: float, length: float,
     return cylinder
 
 
-def make_horizontal_cylinder(radius: float, height: float,
+def make_horizontal_cylinder(radius: float, length: float,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0
                 )->Part.Shape:
-    starting_x = offset_x - height / 2
+    starting_x = offset_x - length / 2
     placement = App.Vector(
         (starting_x) * 10,
         (offset_y) * 10,
         (offset_z) * 10
         )
     direction = App.Vector(1, 0, 0)
-    cylinder = Part.makeCylinder(radius * 10, height * 10, placement, direction)
+    cylinder = Part.makeCylinder(radius * 10, length * 10, placement, direction)
     return cylinder
 
 
@@ -184,7 +184,7 @@ def crop_quarter(feature_list: List[Part.Feature],
                  quarter = (1,-1,1))->Part.Shape:
     quarter_rotations = {
         (1,1,1): (App.Vector(0, 0, 1), 0),
-        (1,-1,1): (App.Vector(0, 0, -1), 90),
+        (1,-1,1): (App.Vector(1, 0, 0), 90),
         (1,-1,-1): (App.Vector(1, 0, 0), 180),
         # (-1,-1,1): (0,0,180),  # To be added as required
         # (1,1,-1): (0,90,0),
@@ -204,7 +204,7 @@ def crop_quarter(feature_list: List[Part.Feature],
     placement = region_size.Center
     quarter_box = Part.makeBox(region_size.XMax, -region_size.YMin, region_size.ZMax,
                                placement)
-    quarter_box.rotate(App.Vector(0, 0, 0), *rotation)
+    quarter_box = quarter_box.rotate(App.Vector(0, 0, 0), *rotation)
     quarter_crop = combined.common(quarter_box)
     cropped_list = []
     for feature in feature_list:
@@ -216,6 +216,9 @@ def crop_quarter(feature_list: List[Part.Feature],
             feature_crop = None
         cropped_list.append(feature_crop)
     crop_box = show_structure(quarter_crop, 'Crop Lines', color=(255,255,255),
+                              display_as='Wireframe',
+                              line_style='Dotted', line_color= (255,0,0))
+    quarter_box = show_structure(quarter_box, 'Crop Lines', color=(255,255,255),
                               display_as='Wireframe',
                               line_style='Dotted', line_color= (255,0,0))
     return cropped_list, crop_box

@@ -141,3 +141,74 @@ crop_box = crop_quarter([a, b, both], quarter = (1,-1,-1))
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Concentric Surrounding cylinders
+file_name = 'Horizontal Surrounded cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_horizontal_cylinder(radius=6, length=10)
+cylinder_hole = make_horizontal_cylinder(radius=5, length=8)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_horizontal_cylinder(radius=3, length=6)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+crop_box = crop_quarter([a, b, both], quarter = (1,-1,1))
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Sphere in Sphere in Sphere
+file_name = 'Sphere in Shell'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+sphere12 = make_sphere(radius=6, offset_x=0, offset_y=0, offset_z=0)
+hole10 = make_sphere(radius=5, offset_x=0, offset_y=0, offset_z=0)
+spheres_a = merge_parts([sphere12, hole10])
+
+sphere6 = make_sphere(radius=3, offset_x=0, offset_y=0, offset_z=0)
+
+a, b, both = display_interactions(spheres_a, sphere6)
+both.ViewObject.Transparency = 0
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+cropped_list, crop_box = crop_quarter([a, b, both])
+a_crop, b_crop, both_crop = cropped_list
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Sphere in Sphere in Box
+file_name = 'Sphere in Cylinder in Box'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+cube6 = make_box(width=10)
+left_cylinder = make_vertical_cylinder(radius=2, length=8, offset_x=-2.5)
+right_cylinder = make_vertical_cylinder(radius=2, length=8, offset_x=2.5)
+holes_in_box = merge_parts([cube6, left_cylinder, right_cylinder])
+
+right_sphere = make_sphere(radius=1, offset_x=2.5)
+
+a, b, both = display_interactions(holes_in_box, right_sphere)
+both.ViewObject.Transparency = 0
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)

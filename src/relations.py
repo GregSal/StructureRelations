@@ -619,6 +619,15 @@ class DE27IM():
                 return result
         return RelationshipType.UNKNOWN
 
+    def __eq__(self, value):
+        if isinstance(value, self.__class__):
+            return self.int() == value.int()
+        if isinstance(value, int):
+            return self.int() == value
+        if isinstance(value, str):
+            value_str = value.replace('F','0').replace('2','1')
+            return self.int() == self.to_int(value_str)
+
     def __str__(self):
         bin_str = self.relation
         if len(bin_str) < 27:
