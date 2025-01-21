@@ -186,12 +186,14 @@ class StructureSlice():
             shapely.MultiPolygon: The bounding contour for the entire contour
                 MultiPolygon.
         '''
-        solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
-        combined = shapely.unary_union(solids)
-        if isinstance(combined, shapely.MultiPolygon):
-            hull = combined
-        else:
-            hull = shapely.MultiPolygon([combined])
+        # FIXME Definition of Hull may have to change
+        #solids = [shapely.convex_hull(poly) for poly in self.contour.geoms]
+        #combined = shapely.unary_union(solids)
+        #if isinstance(combined, shapely.MultiPolygon):
+        #    hull = combined
+        #else:
+        #    hull = shapely.MultiPolygon([combined])
+        hull = shapely.MultiPolygon([shapely.convex_hull(self.contour)])
         return hull
 
     @property
