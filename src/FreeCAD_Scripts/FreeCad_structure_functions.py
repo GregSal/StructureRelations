@@ -152,17 +152,21 @@ def display_interactions(struct_a, struct_b):
 def add_slice_plane(structures: List[Part.Shape], slice_position: float,
                     slice_color = (200, 200, 200),
                     display_style='Wireframe',
-                    line_style='Dashdot'):
+                    line_style='Dashdot',
+                    line_color=(0,0,0),
+                    scale_factor= 1.0):
     combined = merge_parts(structures)
     region_size = combined.BoundBox
     placement = App.Vector(region_size.XMin,
                            region_size.YMin,
                            slice_position * 10)
-    slice_plane = Part.makePlane(region_size.XLength, region_size.YLength,
+    slice_plane = Part.makePlane(region_size.XLength * scale_factor,
+                                 region_size.YLength * scale_factor,
                                  placement)
     label = f'Slice: {slice_position:2.1f}'
     slice_display = show_structure(slice_plane, label, color=slice_color,
-                                   display_as=display_style, line_style='Dashdot')
+                                   display_as=display_style,
+                                   line_style=line_style,line_color=line_color)
     return slice_display
 
 def swap_shape(orig: Part.Feature, new_shape: Part.Shape, suffix: str)->Part.Feature:
@@ -219,6 +223,51 @@ def crop_quarter(feature_list: List[Part.Feature],
                               display_as='Wireframe',
                               line_style='Dotted', line_color= (255,0,0))
     quarter_box = show_structure(quarter_box, 'Crop Lines', color=(255,255,255),
+                              display_as='Wireframe',
+                              line_style='Dotted', line_color= (255,0,0))
+    return cropped_list, crop_box
+
+
+def crop_half(feature_list: List[Part.Feature], quadrant='+Z')->Part.Shape:
+    combined = None
+    for feature in feature_list:
+        if feature is not None:
+            if combined is None:
+                combined = feature.Shape
+            else:
+                combined = combined.fuse(feature.Shape)
+    region_size = combined.BoundBox
+
+    half_position = {
+        '+X': App.Vector(region_size.Center.x,
+                         region_size.YMin,
+                         region_size.ZMin),
+        '-X': App.Vector(region_size.Center.x - region_size.XLength,
+                         region_size.YMin,
+                         region_size.ZMin),
+        '+Z': App.Vector(region_size.XMin,
+                         region_size.YMin,
+                         region_size.Center.z)
+        }
+    placement = half_position[quadrant]
+
+    half_box = Part.makeBox(region_size.XLength, region_size.YLength,
+                               region_size.ZLength,
+                               placement)
+    half_crop = combined.common(half_box)
+    cropped_list = []
+    for feature in feature_list:
+        if feature is not None:
+            feature_cropped = feature.Shape.cut(half_box)
+            feature_crop = swap_shape(feature, feature_cropped, '_cropped')
+            feature.ViewObject.Visibility = False
+        else:
+            feature_crop = None
+        cropped_list.append(feature_crop)
+    crop_box = show_structure(half_crop, 'Crop Lines', color=(255,255,255),
+                              display_as='Wireframe',
+                              line_style='Dotted', line_color= (255,0,0))
+    half_box = show_structure(half_box, 'Crop Lines', color=(255,255,255),
                               display_as='Wireframe',
                               line_style='Dotted', line_color= (255,0,0))
     return cropped_list, crop_box

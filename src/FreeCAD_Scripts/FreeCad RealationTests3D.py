@@ -1,5 +1,6 @@
 
 # %%  Create a new document
+from shapely import length
 from test_3D_relations import make_box
 
 
@@ -209,6 +210,125 @@ doc.recompute()
 Gui.activeDocument().activeView().viewIsometric()
 Gui.SendMsgToActiveView("ViewFit")
 Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Concentric Sheltered cylinder
+file_name = 'Sheltered cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=6, length=10)
+cylinder_hole = make_vertical_cylinder(radius=5, length=10)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_vertical_cylinder(radius=3, length=6)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
+plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
+plane_3 = add_slice_plane([outer_cylinder], slice_position=-3.0, display_style='Flat Lines')
+
+#crop_box = crop_quarter([a, b, both], quarter = (1,-1,-1))
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Concentric Sheltered horizontal cylinder
+file_name = 'Sheltered Horizontal cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_horizontal_cylinder(radius=6, length=10)
+cylinder_hole = make_horizontal_cylinder(radius=5, length=10)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_horizontal_cylinder(radius=3, length=6)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
+#plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
+plane_0 = add_slice_plane([outer_cylinder], slice_position=0.0,
+                          display_style='Flat Lines', scale_factor=1.1)
+
+crop_box = crop_half([a, b, both], quadrant='+Z')
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Three Parallel Cylinders
+file_name = 'Three Parallel Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+first_cylinder = make_vertical_cylinder(radius=1, length=10,
+                                        offset_x=-2, offset_y=-2)
+second_cylinder = make_vertical_cylinder(radius=1, length=10,
+                                        offset_x=2, offset_y=-2)
+third_cylinder = make_vertical_cylinder(radius=1, length=10,
+                                        offset_x=0, offset_y=2)
+cylinder_set = merge_parts([first_cylinder, second_cylinder, third_cylinder])
+
+central_cylinder = make_vertical_cylinder(radius=1, length=10, offset_y=-0.5)
+
+a, b, both = display_interactions(cylinder_set, central_cylinder)
+
+hull_box = make_box(length=4, width=2, height=10,
+                                        offset_x=0, offset_y=-2)
+hull = show_structure(hull_box, 'Hull of a1', color=(255,255,0), transparency=75,
+                   display_as='Flat Lines',
+                   line_style='Dotted', line_color=(0,0,0))
+hull_box_2 = make_box(length=4.4, width=2, height=10,
+                                        offset_x=0, offset_y=0)
+rotation = (App.Vector(0, 0, 1), 65.4)
+placement = App.Placement(App.Vector(0, -2, 0), App.Rotation(*rotation))
+#hull_box_2 = hull_box_2.rotate(App.Vector(0, -2, 0), *rotation)
+hull_box_2.Placement = placement
+#hull_box_2 = hull_box_2.applyTranslation(App.Vector(0, 0, 1))
+hull2 = show_structure(hull_box_2, 'Hull of a2', color=(255,255,0), transparency=75,
+                   display_as='Flat Lines',
+                   line_style='Dotted', line_color=(0,0,0))
+
+
+doc.recompute()
+hull_box_3 = make_box(length=4.4, width=2, height=10,
+                                        offset_x=0, offset_y=0)
+rotation = (App.Vector(0, 0, 1), -65.4)
+#placement = App.Placement(App.Vector(0, 0, 0), App.Rotation(*rotation))
+hull_box_3 = hull_box_3.rotate(App.Vector(0, -2, 0), *rotation)
+hull3 = show_structure(hull_box_3, 'Hull of a2', color=(255,255,0), transparency=75,
+                   display_as='Flat Lines',
+                   line_style='Dotted', line_color=(0,0,0))
+#hull_box_3.Placement = placement
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
+#plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
+plane_0 = add_slice_plane([outer_cylinder], slice_position=0.0,
+                          display_style='Flat Lines', scale_factor=1.1)
+
+crop_box = crop_half([a, b, both], quadrant='+Z')
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
