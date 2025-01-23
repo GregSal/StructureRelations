@@ -215,33 +215,6 @@ Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
 
 
-# %% Make Concentric Sheltered cylinder
-file_name = 'Sheltered cylinder'
-image_file_path = IMAGE_PATH + "//" + file_name + ".png"
-fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
-doc = App.newDocument(fcad_file_path)
-
-outer_cylinder = make_vertical_cylinder(radius=6, length=10)
-cylinder_hole = make_vertical_cylinder(radius=5, length=10)
-primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
-
-surrounded_cylinder = make_vertical_cylinder(radius=3, length=6)
-
-a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
-doc.recompute()
-Gui.activeDocument().activeView().viewIsometric()
-Gui.SendMsgToActiveView("ViewFit")
-Gui.ActiveDocument.ActiveView.setAxisCross(True)
-
-#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
-plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
-plane_3 = add_slice_plane([outer_cylinder], slice_position=-3.0, display_style='Flat Lines')
-
-#crop_box = crop_quarter([a, b, both], quarter = (1,-1,-1))
-
-Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
-App.activeDocument().saveAs(fcad_file_path)
-
 
 # %% Make Concentric Sheltered horizontal cylinder
 file_name = 'Sheltered Horizontal cylinder'
@@ -267,6 +240,36 @@ plane_0 = add_slice_plane([outer_cylinder], slice_position=0.0,
                           display_style='Flat Lines', scale_factor=1.1)
 
 crop_box = crop_half([a, b, both], quadrant='+Z')
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+
+
+# %% Make Concentric Sheltered cylinder
+file_name = 'Sheltered cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=6, length=10)
+cylinder_hole = make_vertical_cylinder(radius=5, length=10)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_vertical_cylinder(radius=3, length=6)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
+plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
+plane_3 = add_slice_plane([outer_cylinder], slice_position=-3.0, display_style='Flat Lines')
+
+crop_box = crop_quarter([a, b, both], quarter = (1,-1,-1))
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
