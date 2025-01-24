@@ -132,3 +132,24 @@ contours.**
   Regions class.
 - The StructureSlice class will still be needed to generate the Regions Graph,
    but the slice table will become redundant.
+
+
+## Related Disjoint Issue
+
+- Disjoint Relations are always overridden by other relation.
+- A hollow cylindrical shell with an interior cylinder ending inside the shell should be reported as **Shelters**
+- In the above example, if the interior cylinder extends beyond the outer cylinder's hole, then the relation should be **Disjoint**.
+
+![Extended Inner Cylinder](<Images/FreeCAD Images/Extended Inner cylinder.png>)
+
+- Similar to the above issue with the Convex Hull, the **Disjoint** relation will only be identified correctly if the hole on the plane is recognized as *exterior* to the structure.
+
+- The same issue occurs for a concentric hollow cylinder surrounding one of two smaller cylinders, where the Second cylinder is **Disjoint**.
+- The relationship is **Disjoint** because the Second cylinder is outside of the First Structure.
+- However, the Disjoint relation is being overridden by the **Surrounds** relation.
+
+<table><tr><td>
+<img src="Images/FreeCAD Images/Disjoint Parallel Cylinders.png">
+</td><td>
+<img src="Images/FreeCAD Images/Disjoint Axial Cylinders.png" alt="shelters">
+</td></tr></table>

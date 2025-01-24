@@ -246,7 +246,6 @@ App.activeDocument().saveAs(fcad_file_path)
 
 
 
-
 # %% Make Concentric Sheltered cylinder
 file_name = 'Sheltered cylinder'
 image_file_path = IMAGE_PATH + "//" + file_name + ".png"
@@ -335,6 +334,109 @@ doc.recompute()
 Gui.activeDocument().activeView().viewTop()
 Gui.ActiveDocument.ActiveView.setAxisCross(False)
 Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Disjoint Boxes
+file_name = 'Disjoint Boxes'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+left_cube = make_box(width=2, offset_x=-3, offset_y=0, offset_z=0)
+right_cube = make_box(width=2, offset_x=3, offset_y=0, offset_z=0)
+a, b, both = display_interactions(left_cube, right_cube)
+a.ViewObject.Transparency = 0
+b.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Extended Inner cylinder
+file_name = 'Extended Inner cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=6, length=10)
+cylinder_hole = make_vertical_cylinder(radius=5, length=10)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_vertical_cylinder(radius=3, length=12)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+a.ViewObject.Transparency = 20
+b.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Make Disjoint Parallel Cylinders
+file_name = 'Disjoint Parallel Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=6, length=10)
+cylinder_hole = make_vertical_cylinder(radius=5, length=8)
+primary_structure = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_vertical_cylinder(radius=3, length=6)
+disjoint_cylinder = make_vertical_cylinder(radius=3, length=6, offset_x=10)
+secondary_structure = merge_parts([surrounded_cylinder, disjoint_cylinder])
+
+a, b, both = display_interactions(primary_structure, secondary_structure)
+b.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+crop_box = crop_quarter([a], quarter = (1,-1,-1))
+doc.recompute()
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Disjoint Axial Cylinders
+file_name = 'Disjoint Axial Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=6, length=10)
+cylinder_hole = make_vertical_cylinder(radius=5, length=8)
+primary_structure = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_vertical_cylinder(radius=3, length=6)
+disjoint_cylinder = make_vertical_cylinder(radius=3, length=6, offset_z=12)
+secondary_structure = merge_parts([surrounded_cylinder, disjoint_cylinder])
+
+a, b, both = display_interactions(primary_structure, secondary_structure)
+b.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+crop_box = crop_quarter([a], quarter = (1,-1,-1))
+doc.recompute()
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
