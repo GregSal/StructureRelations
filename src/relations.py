@@ -19,7 +19,6 @@ from types_and_classes import ROI_Type, RegionNode, SliceIndexType, SliceNeighbo
 from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
 from utilities import calculate_new_slice_index, interpolate_polygon
 from structure_slice import ContourType, StructureSlice, empty_structure
-from structure_set import generate_region_graph, select_slices
 
 
 # Global Settings
@@ -872,7 +871,7 @@ def merged_relations(relations):
 
 
 def find_relations(slice_table, regions, selected_roi):
-    selected_slices = select_slices(slice_table, selected_roi)
+    selected_slices = slice_table[selected_roi].dropna(how='all')
     # Send all slices with both Primary and Secondary contours for standard
     # relation testing
     mid_relations = list(selected_slices.agg(relate_structures,

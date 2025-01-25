@@ -166,28 +166,3 @@ def generate_region_graph(slice_table: pd.DataFrame) -> RegionGraph:
     create_edges(graph)
     generate_interpolated_boundaries(graph)
     return graph
-
-
-
-#%% Select Slices and neighbours
-def select_slices(slice_table: pd.DataFrame,
-                  selected_roi: StructurePairType) -> pd.DataFrame:
-    '''Select the slices that have either of the structures.
-
-    Select all slices that have either of the structures.
-
-    Args:
-        slice_table (pd.DataFrame): A table of StructureSlice data with
-            SliceIndex as the index, ROI_Num for columns and StructureSlice or
-            NaN as the values.
-        selected_roi (StructurePairType): A tuple of two ROI_Num to select.
-
-    Returns:
-        pd.DataFrame:  A subset of slice_table with the two selected_roi as the
-            columns and the range of slices hat have either of the structures as
-            the index.
-    '''
-    start = SliceIndexType(slice_table[selected_roi].first_valid_index())
-    end = SliceIndexType(slice_table[selected_roi].last_valid_index())
-    structure_slices = slice_table.loc[start:end, selected_roi]
-    return structure_slices
