@@ -234,8 +234,6 @@ Gui.activeDocument().activeView().viewIsometric()
 Gui.SendMsgToActiveView("ViewFit")
 Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
-#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
-#plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
 plane_0 = add_slice_plane([outer_cylinder], slice_position=0.0,
                           display_style='Flat Lines', scale_factor=1.1)
 
@@ -264,7 +262,6 @@ Gui.activeDocument().activeView().viewIsometric()
 Gui.SendMsgToActiveView("ViewFit")
 Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
-#plane_5 = add_slice_plane([outer_cylinder], slice_position=-5.0)
 plane_4 = add_slice_plane([outer_cylinder], slice_position=-4.0, display_style='Flat Lines')
 plane_3 = add_slice_plane([outer_cylinder], slice_position=-3.0, display_style='Flat Lines')
 
@@ -345,8 +342,8 @@ image_file_path = IMAGE_PATH + "//" + file_name + ".png"
 fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
 doc = App.newDocument(fcad_file_path)
 
-left_cube = make_box(width=2, offset_x=-3, offset_y=0, offset_z=0)
-right_cube = make_box(width=2, offset_x=3, offset_y=0, offset_z=0)
+left_cube = make_box(width=2, offset_x=-2, offset_y=0, offset_z=0)
+right_cube = make_box(width=2, offset_x=2, offset_y=0, offset_z=0)
 a, b, both = display_interactions(left_cube, right_cube)
 a.ViewObject.Transparency = 0
 b.ViewObject.Transparency = 0
@@ -437,6 +434,114 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
 crop_box = crop_quarter([a], quarter = (1,-1,-1))
 doc.recompute()
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Make Disjoint Concentric Cylinders
+file_name = 'Disjoint Concentric Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=3, length=8)
+
+bordering_cylinder1 = make_vertical_cylinder(radius=2, length=2, offset_z=7)
+bordering_cylinder2 = make_vertical_cylinder(radius=2, length=2, offset_z=-7)
+secondary_structure = merge_parts([bordering_cylinder1, bordering_cylinder2])
+
+a, b, both = display_interactions(primary_cylinder, secondary_structure)
+b.ViewObject.Transparency = 0
+plane_6 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=6.0, display_style='Flat Lines')
+plane_5 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=5.0, display_style='Flat Lines')
+plane_4 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=4.0, display_style='Flat Lines')
+plane_6i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-6.0, display_style='Flat Lines')
+plane_5i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-5.0, display_style='Flat Lines')
+plane_4i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-4.0, display_style='Flat Lines')
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Bordering Concentric Cylinders
+file_name = 'Bordering Concentric Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=3, length=8)
+
+bordering_cylinder1 = make_vertical_cylinder(radius=2, length=2, offset_z=6)
+bordering_cylinder2 = make_vertical_cylinder(radius=2, length=2, offset_z=-6)
+secondary_structure = merge_parts([bordering_cylinder1, bordering_cylinder2])
+
+a, b, both = display_interactions(primary_cylinder, secondary_structure)
+b.ViewObject.Transparency = 0
+plane_5 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=5.0, display_style='Flat Lines')
+plane_4 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=4.0, display_style='Flat Lines')
+plane_5i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-5.0, display_style='Flat Lines')
+plane_4i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-4.0, display_style='Flat Lines')
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Bordering Boxes
+file_name = 'Bordering Boxes'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+left_cube = make_box(width=2, offset_x=-1, offset_y=0, offset_z=0)
+right_cube = make_box(width=2, offset_x=1, offset_y=0, offset_z=0)
+a, b, both = display_interactions(left_cube, right_cube)
+a.ViewObject.Transparency = 10
+b.ViewObject.Transparency = 10
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+
+
+# %% Make Overlapping Concentric Cylinders
+file_name = 'Overlapping Concentric Cylinders'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=3, length=8)
+
+overlapping_cylinder1 = make_vertical_cylinder(radius=2, length=2, offset_z=5)
+overlapping_cylinder2 = make_vertical_cylinder(radius=2, length=2, offset_z=-5)
+secondary_structure = merge_parts([overlapping_cylinder1, overlapping_cylinder2])
+
+a, b, both = display_interactions(primary_cylinder, secondary_structure)
+b.ViewObject.Transparency = 0
+plane_4 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=4.0, display_style='Flat Lines')
+plane_4i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-4.0, display_style='Flat Lines')
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
