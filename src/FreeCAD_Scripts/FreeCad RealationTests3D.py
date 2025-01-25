@@ -518,6 +518,30 @@ Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
 
 
+# %% Bordering Boxes With Disjoint Box
+file_name = 'Bordering Boxes With Disjoint Box'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+left_cube = make_box(width=2, offset_x=-1, offset_y=0, offset_z=0)
+right_cube = make_box(width=2, offset_x=1, offset_y=0, offset_z=0)
+disjoint_cube = make_box(width=2, offset_x=-4, offset_y=0, offset_z=0)
+secondary_structure = merge_parts([right_cube, disjoint_cube])
+
+a, b, both = display_interactions(left_cube, secondary_structure)
+a.ViewObject.Transparency = 0
+b.ViewObject.Transparency = 10
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
 # %% Make Bordering Concentric Cylinder SUP Offset
 file_name = 'Bordering Concentric Cylinder SUP Offset'
 image_file_path = IMAGE_PATH + "//" + file_name + ".png"

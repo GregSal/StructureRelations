@@ -482,3 +482,25 @@ class TestBorders:
         relation = find_relations(slice_table, regions, selected_roi)
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.BORDERS
+
+    def test_lateral_borders_two_boxes(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=20, offset_z=0,
+                                    spacing=slice_spacing)
+        # embedded boxes
+        left_cube = make_box(roi_num=1, width=2, offset_x=-1,
+                            spacing=slice_spacing)
+        right_cube = make_box(roi_num=2, width=2, offset_x=1,
+                            spacing=slice_spacing)
+        disjoint_cube = make_box(roi_num=2, width=2, offset_x=-2,
+                            spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([left_cube, right_cube, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.BORDERS
