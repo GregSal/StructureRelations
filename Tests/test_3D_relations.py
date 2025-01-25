@@ -461,3 +461,24 @@ class TestBorders:
         relation = find_relations(slice_table, regions, selected_roi)
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.BORDERS
+
+    def test_concentric_cylinders_sup_offset(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                      offset_z=-0.5, spacing=slice_spacing)
+        # Two concentric cylinders different z offsets
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=0.2,
+                                                  length=0.4,  offset_z=-0.5,
+                                                  spacing=slice_spacing)
+        sup_cylinder = make_vertical_cylinder(roi_num=2, radius=0.2, length=0.4,
+                                              offset_z=0, spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, sup_cylinder])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.BORDERS

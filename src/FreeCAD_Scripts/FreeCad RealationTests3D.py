@@ -518,6 +518,29 @@ Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
 
 
+# %% Make Bordering Concentric Cylinder SUP Offset
+file_name = 'Bordering Concentric Cylinder SUP Offset'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=0.2, length=0.4, offset_z=-0.5)
+secondary_structure = make_vertical_cylinder(radius=0.2, length=0.4, offset_z=0)
+
+a, b, both = display_interactions(primary_cylinder, secondary_structure)
+b.ViewObject.Transparency = 20
+b.ViewObject.Transparency = 20
+plane_2 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-0.2, display_style='Flat Lines')
+plane_3 = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-0.3, display_style='Flat Lines')
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
 
 
 # %% Make Overlapping Concentric Cylinders
