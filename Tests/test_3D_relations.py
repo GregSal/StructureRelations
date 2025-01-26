@@ -504,3 +504,78 @@ class TestBorders:
         relation = find_relations(slice_table, regions, selected_roi)
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.BORDERS
+
+class TestConfines:
+    def test_confined_bordering_boxes(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                      spacing=slice_spacing)
+        # embedded boxes
+        box6 = make_box(roi_num=1, width=6, spacing=slice_spacing)
+        hole4 = make_box(roi_num=1, width=4,  spacing=slice_spacing)
+        Box4 = make_box(roi_num=2, width=4,  spacing=slice_spacing)
+
+        # combine the contours
+        slice_data = pd.concat([body, box6, hole4, Box4])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.CONFINES
+
+    def test_confines_cylinder(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.1, offset_z=-0.5,
+                                    spacing=slice_spacing)
+        # Centred cylinder with two embedded cylinders
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5, length=0.7,
+                                                offset_z=-0.3,
+                                                spacing=slice_spacing)
+        left_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.5,
+                                        offset_x=-2.5, offset_z=-0.2,
+                                        spacing=slice_spacing)
+        right_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.5,
+                                        offset_x=2.5, offset_z=-0.2,
+                                        spacing=slice_spacing)
+        # cylinder with interior borders
+        confines_cylinder = make_vertical_cylinder(roi_num=2, radius=1, length=0.5,
+                                                offset_x=2.5, offset_z=-0.2,
+                                                spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, left_hole, right_hole,
+                                confines_cylinder])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.CONFINES
+
+    def test_embedded_cylinder(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1, offset_z=-0.6,
+                                    spacing=slice_spacing)
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=4, length=0.8,
+                                                offset_z=-0.3,
+                                                spacing=slice_spacing)
+        center_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.6,
+                                            offset_z=-0.2, spacing=slice_spacing)
+        # Two concentric cylinders different z offsets
+        middle_cylinder = make_vertical_cylinder(roi_num=2, radius=1, length=0.6,
+                                                offset_z=-0.2,
+                                                spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, center_hole, middle_cylinder])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.CONFINES

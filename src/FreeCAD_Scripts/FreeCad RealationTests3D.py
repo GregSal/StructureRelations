@@ -548,6 +548,13 @@ image_file_path = IMAGE_PATH + "//" + file_name + ".png"
 fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
 doc = App.newDocument(fcad_file_path)
 
+left_cube = make_box(width=2, offset_x=-1, offset_y=0, offset_z=0)
+right_cube = make_box(width=2, offset_x=1, offset_y=0, offset_z=0)
+a, b, both = display_interactions(left_cube, right_cube)
+a.ViewObject.Transparency = 10
+b.ViewObject.Transparency = 10
+
+
 primary_cylinder = make_vertical_cylinder(radius=0.2, length=0.4, offset_z=-0.5)
 secondary_structure = make_vertical_cylinder(radius=0.2, length=0.4, offset_z=0)
 
@@ -585,6 +592,62 @@ plane_4 = add_slice_plane([primary_cylinder, secondary_structure], slice_positio
 plane_4i = add_slice_plane([primary_cylinder, secondary_structure], slice_position=-4.0, display_style='Flat Lines')
 
 doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Confines Bordering Boxes
+file_name = 'Confines Bordering Boxes'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6, offset_x=0, offset_y=0, offset_z=0)
+box4 = make_box(width=4, offset_x=0, offset_y=0, offset_z=0)
+primary_structure = merge_parts([box6, box4])
+
+a, b, both = display_interactions(primary_structure, box4)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a], quarter = (1,-1,1))
+b.ViewObject.Transparency = 0
+cropped_list[0].ViewObject.Transparency = 25
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Confines Embedded Cylinder
+file_name = 'Confines Embedded Cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outside_cylinder = make_vertical_cylinder(radius=4, length=8)
+center_hole = make_vertical_cylinder(radius=2, length=6)
+primary_structure = merge_parts([outside_cylinder, center_hole])
+
+middle_cylinder = make_vertical_cylinder(radius=1, length=6)
+
+a, b, both = display_interactions(primary_structure, middle_cylinder)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a], quarter = (1,-1,1))
+b.ViewObject.Transparency = 0
+cropped_list[0].ViewObject.Transparency = 25
+doc.recompute()
+
 Gui.activeDocument().activeView().viewIsometric()
 Gui.SendMsgToActiveView("ViewFit")
 Gui.ActiveDocument.ActiveView.setAxisCross(True)
