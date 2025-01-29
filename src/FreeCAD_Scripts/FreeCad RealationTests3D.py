@@ -655,3 +655,98 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Confines Embedded Spheres
+file_name = 'Confines Embedded Spheres'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+sphere12 = make_sphere(radius=6, offset_x=0, offset_y=0, offset_z=0)
+hole10 = make_sphere(radius=5, offset_x=0, offset_y=0, offset_z=0)
+sphere8 = make_sphere(radius=4, offset_x=0, offset_y=0, offset_z=0)
+primary_structure = merge_parts([sphere12, hole10, sphere8])
+
+sphere10 = make_sphere(radius=5, offset_x=0, offset_y=0, offset_z=0)
+hole8 = make_sphere(radius=4, offset_x=0, offset_y=0, offset_z=0)
+secondary_structure = merge_parts([sphere10, hole8])
+
+a, b, both = display_interactions(primary_structure, secondary_structure)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a, b], quarter = (1,-1,1))
+cropped_list[0].ViewObject.Transparency = 0
+cropped_list[1].ViewObject.Transparency = 0
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Confines Box in Box on z surface
+file_name = 'Confines Box in Box on z surface'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6)
+hole4 = make_box(width=4)
+
+primary_structure = merge_parts([box6, hole4])
+
+secondary_structure = make_box(width=2, offset_z=1)
+
+a, b, both = display_interactions(primary_structure, secondary_structure)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a], quarter = (1,-1,1))
+cropped_list[0].ViewObject.Transparency = 0
+b.ViewObject.Transparency = 0
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Confines Box in Box on y surface
+file_name = 'Confines Box in Box on y surface'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6)
+hole4 = make_box(width=4)
+
+primary_structure = merge_parts([box6, hole4])
+
+secondary_structure = make_box(width=2, offset_y=1)
+
+a, b, both = display_interactions(primary_structure, secondary_structure)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a], quarter = (1,-1,1))
+cropped_list[0].ViewObject.Transparency = 0
+b.ViewObject.Transparency = 0
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
