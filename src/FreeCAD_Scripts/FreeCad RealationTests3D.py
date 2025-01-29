@@ -750,3 +750,77 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Partition Box in Box on y surface
+file_name = 'Partition Box in Box on y surface'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6)
+box6_3 = make_box(width=3, length=6, height=6, offset_y=1.5)
+a, b, both = display_interactions(box6, box6_3)
+a.ViewObject.Transparency = 20
+both.ViewObject.Transparency = 20
+
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Partition Box in Box on z surface
+file_name = 'Partition Box in Box on z surface'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6)
+box6_3 = make_box(width=6, length=6, height=3, offset_z=1.5)
+a, b, both = display_interactions(box6, box6_3)
+a.ViewObject.Transparency = 20
+both.ViewObject.Transparency = 20
+
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Partition Sphere Island
+file_name = 'Partition Sphere Island'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+sphere12 = make_sphere(radius=6, offset_x=0, offset_y=0, offset_z=0)
+hole8 = make_sphere(radius=4, offset_x=0, offset_y=0, offset_z=0)
+sphere4 = make_sphere(radius=2, offset_x=0, offset_y=0, offset_z=0)
+primary_structure = merge_parts([sphere12, hole8, sphere4])
+
+a, b, both = display_interactions(primary_structure, sphere4)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a, b], quarter = (1,-1,1))
+cropped_list[0].ViewObject.Transparency = 0
+cropped_list[1].ViewObject.Transparency = 0
+both.ViewObject.Transparency = 20
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
