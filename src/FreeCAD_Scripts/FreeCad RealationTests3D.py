@@ -824,3 +824,131 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
+
+# %% Overlapping Spheres
+file_name = 'Overlapping Spheres'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+right_sphere6 = make_sphere(radius=6, offset_x=-2.0, offset_y=0, offset_z=0)
+left_sphere6 = make_sphere(radius=6, offset_x=2.0, offset_y=0, offset_z=0)
+
+a, b, both = display_interactions(right_sphere6, left_sphere6)
+a.ViewObject.DisplayMode = "Shaded"
+b.ViewObject.DisplayMode = "Shaded"
+both.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewFront()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Overlapping Boxes in Y direction
+file_name = 'Overlapping Boxes in Y direction'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=0.6)
+box6_y = make_box(width=0.6, offset_y=0.2)
+a, b, both = display_interactions(box6, box6_y)
+both.ViewObject.Transparency = 20
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Overlapping Boxes in Z direction
+file_name = 'Overlapping Boxes in Z direction'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=0.6)
+box6_y = make_box(width=0.6, offset_z=0.3)
+a, b, both = display_interactions(box6, box6_y)
+both.ViewObject.Transparency = 20
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Stacked Boxes
+file_name = 'Stacked Boxes'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=0.6)
+box6_y = make_box(width=0.6, offset_z=0.6)
+a, b, both = display_interactions(box6, box6_y)
+both.ViewObject.Transparency = 20
+doc.recompute()
+
+box8 = make_box(width=0.8)
+plane_3 = add_slice_plane([box8], slice_position=0.3, display_style='Flat Lines')
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Overlapping Cubes INF RT
+file_name = 'Overlapping Cubes INF RT'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+box6 = make_box(width=6)
+box6_y = make_box(width=6, offset_z=-3, offset_x=3)
+a, b, both = display_interactions(box6, box6_y)
+both.ViewObject.Transparency = 20
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+# %% Make Overlapping Extended Cylinder
+file_name = 'Overlapping Extended Cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+primary_cylinder = make_vertical_cylinder(radius=3, length=8)
+
+primary_cylinder = make_vertical_cylinder(radius=5, length=7)
+overlapping_cylinder = make_vertical_cylinder(radius=3, length=9)
+
+a, b, both = display_interactions(primary_cylinder, overlapping_cylinder)
+b.ViewObject.Transparency = 0
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)

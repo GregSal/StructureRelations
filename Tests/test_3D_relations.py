@@ -640,3 +640,317 @@ class TestConfines:
         relation = find_relations(slice_table, regions, selected_roi)
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.CONFINES
+
+
+class TestPartition:
+    def test_partition_embedded_box_on_y_surface(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=30, spacing=slice_spacing)
+        # embedded boxes    # 6 cm x 6 cm box
+        box6 = make_box(roi_num=1, width=6, spacing=slice_spacing)
+        box6_3 = make_box(roi_num=2, width=6, length=3, height=6, offset_y=1.5,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([box6, box6_3, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_partition_embedded_box_on_z_surface(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=30,
+                                    spacing=slice_spacing)
+        # embedded boxes    # 6 cm x 6 cm box
+        box6 = make_box(roi_num=1, width=6, spacing=slice_spacing)
+        box6_3 = make_box(roi_num=2, width=6, length=6, height=3, offset_z=1.5,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([box6, box6_3, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+
+    def test_horizontal_cylinders(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_box(roi_num=0, width=6, length=6, height=8, offset_z=-4,
+                        spacing=slice_spacing)
+        cylinder2h = make_horizontal_cylinder(radius=2, length=5, roi_num=1,
+                                            spacing=slice_spacing)
+        cylinder1h = make_horizontal_cylinder(radius=1, length=5, roi_num=2,
+                                            spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, cylinder1h, cylinder2h])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_vertical_concentric_cylinders(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=30, offset_z=-15,
+                                    spacing=slice_spacing)
+        cylinder6 = make_vertical_cylinder(roi_num=1, radius=6, length=10,
+                                        spacing=slice_spacing)
+        cylinder4 = make_vertical_cylinder(roi_num=2, radius=4, length=10,
+                                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, cylinder6, cylinder4])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_concentric_cylinders_same_start(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # Concentric cylinders starting on the same slice
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=2, length=7,
+                                                offset_z=-3.5,
+                                                spacing=slice_spacing)
+        sup_partition = make_vertical_cylinder(roi_num=2, radius=1, length=3.0,
+                                            offset_z=-1.5,
+                                            spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, sup_partition])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_concentric_cylinders_same_end(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=10,
+                                    spacing=slice_spacing)
+        # Concentric cylinders ending on the same slice
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=2, length=7.0,
+                                                offset_z=3.5,
+                                                spacing=slice_spacing)
+        inf_partition = make_vertical_cylinder(roi_num=2, radius=1, length=4,
+                                            offset_z=2, spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, inf_partition])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_concentric_cylinders_same_start_end(self):
+        slice_spacing = 0.05
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # Concentric cylinders starting and ending on the same slice
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=2, length=0.7,
+                                                offset_z=0.0,
+                                                spacing=slice_spacing)
+        mid_partition = make_vertical_cylinder(roi_num=2, radius=1, length=0.7,
+                                            offset_z=-0.0, spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, mid_partition])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    def test_partition_sphere_island(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1, offset_z=-0.6,
+                                    spacing=slice_spacing)
+
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        hole8 = make_sphere(roi_num=1, radius=4, spacing=slice_spacing)
+        sphere4 = make_sphere(roi_num=1, radius=2, spacing=slice_spacing)
+
+        sphere4_2 = make_sphere(roi_num=2, radius=2, spacing=slice_spacing)
+
+        # combine the contours
+        slice_data = pd.concat([body, sphere12, hole8, sphere4, sphere4_2])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+
+class TestOverlaps:
+    def test_overlapping_spheres_example(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=10,
+                                    spacing=slice_spacing)
+
+        right_sphere6 = make_sphere(roi_num=1, radius=6, offset_x=-2,
+                                    spacing=slice_spacing)
+        left_sphere6 = make_sphere(roi_num=2, radius=6, offset_x=2,
+                                    spacing=slice_spacing)
+
+        # combine the contours
+        slice_data = pd.concat([body, right_sphere6, left_sphere6])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlapping_boxes_y(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # overlapping boxes    # 6 cm x 6 cm box
+        box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        box6_y = make_box(roi_num=2, width=0.6, offset_y=0.2,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([box6, box6_y, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlapping_boxes_z(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # overlapping boxes    # 6 cm x 6 cm box
+        box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        box6_y = make_box(roi_num=2, width=0.6, offset_z=0.3,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([box6, box6_y, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_stacked_boxes(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # overlapping boxes    # 6 cm x 6 cm box
+        box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        box6_y = make_box(roi_num=2, width=0.6, offset_z=0.6,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([box6, box6_y, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlapping_concentric_cylinders_example(self):
+        slice_spacing = 1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=10,
+                                    spacing=slice_spacing)
+        # Centred cylinder with two embedded cylinders
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=3, length=8,
+                                                offset_z=0,
+                                                spacing=slice_spacing)
+        # cylinder overlapping primary cylinder
+        overlapping_cylinder1 = make_vertical_cylinder(roi_num=2, radius=1, length=2,
+                                                offset_z=5,
+                                                spacing=slice_spacing)
+        # cylinder overlapping primary cylinder
+        overlapping_cylinder2 = make_vertical_cylinder(roi_num=2, radius=1, length=2,
+                                                offset_z=-5,
+                                                spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, overlapping_cylinder1,
+                                overlapping_cylinder2])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlapping_cubes_inf_rt(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=30, offset_z=-15,
+                                    spacing=slice_spacing)
+        #
+        cube6 = make_box(roi_num=1, width=6, spacing=slice_spacing)
+        cube6_inf_rt = make_box(roi_num=2, width=6, offset_z=3, offset_x=3,
+                                offset_y=3, spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([body, cube6, cube6_inf_rt])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS
+
+    def test_overlapping_extended_cylinder(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.1, offset_z=-0.5,
+                                    spacing=slice_spacing)
+        # Centred cylinder with two embedded cylinders
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5, length=0.7,
+                                                spacing=slice_spacing)
+        # cylinder with interior borders
+        overlapping_cylinder = make_vertical_cylinder(roi_num=2, radius=3,
+                                                    length=0.9,
+                                                    spacing=slice_spacing)
+
+        # combine the contours
+        slice_data = pd.concat([body, primary_cylinder, overlapping_cylinder])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.OVERLAPS

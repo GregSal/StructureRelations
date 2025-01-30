@@ -12,6 +12,7 @@ from BOPTools import BOPFeatures
 SCRIPT_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD_Scripts"
 IMAGE_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
 
+Gui.activateWorkbench("PartWorkbench")
 
 # %% Part Functions
 def make_sphere(radius: float,
@@ -222,9 +223,9 @@ def crop_quarter(feature_list: List[Part.Feature],
     crop_box = show_structure(quarter_crop, 'Crop Lines', color=(255,255,255),
                               display_as='Wireframe',
                               line_style='Dotted', line_color= (255,0,0))
-    quarter_box = show_structure(quarter_box, 'Crop Lines', color=(255,255,255),
-                              display_as='Wireframe',
-                              line_style='Dotted', line_color= (255,0,0))
+    #quarter_box = show_structure(quarter_box, 'Crop Lines', color=(255,255,255),
+    #                          display_as='Wireframe',
+    #                          line_style='Dotted', line_color= (255,0,0))
     return cropped_list, crop_box
 
 
