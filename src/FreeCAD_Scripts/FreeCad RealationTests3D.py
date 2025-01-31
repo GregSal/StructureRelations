@@ -216,6 +216,34 @@ App.activeDocument().saveAs(fcad_file_path)
 
 
 
+# %% Make Concentric Single Sided Sheltered horizontal cylinder
+file_name = 'Horizontal Sheltered Cylinder Single Sided'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_horizontal_cylinder(radius=6, length=10)
+cylinder_hole = make_horizontal_cylinder(radius=5, length=10, offset_x=2)
+primary_cylinder = merge_parts([outer_cylinder, cylinder_hole])
+
+surrounded_cylinder = make_horizontal_cylinder(radius=3, length=6, offset_x=1)
+
+a, b, both = display_interactions(primary_cylinder, surrounded_cylinder)
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+a_cropped, b_cropped, both_cropped = crop_half([a, b, both], quadrant='+Z')
+a_cropped.ViewObject.Transparency = 20
+b_cropped.ViewObject.Transparency = 0
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
+
+
 # %% Make Concentric Sheltered horizontal cylinder
 file_name = 'Sheltered Horizontal cylinder'
 image_file_path = IMAGE_PATH + "//" + file_name + ".png"

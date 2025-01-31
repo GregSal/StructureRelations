@@ -1,10 +1,13 @@
 import pandas as pd
 import pytest
 
+import shapely
+
 from structure_set import generate_region_graph, make_slice_table
 from relations import RelationshipType, find_relations
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
-from debug_tools import make_sphere, make_box
+from debug_tools import make_sphere, make_box, box_points
+from utilities import poly_round
 
 
 class TestContains:
@@ -935,15 +938,16 @@ class TestOverlaps:
     def test_overlapping_extended_cylinder(self):
         slice_spacing = 0.1
         # Body structure defines slices in use
-        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.1, offset_z=-0.5,
-                                    spacing=slice_spacing)
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.1,
+                                      spacing=slice_spacing)
         # Centred cylinder with two embedded cylinders
-        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5, length=0.7,
-                                                spacing=slice_spacing)
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5,
+                                                  length=0.7,
+                                                  spacing=slice_spacing)
         # cylinder with interior borders
         overlapping_cylinder = make_vertical_cylinder(roi_num=2, radius=3,
-                                                    length=0.9,
-                                                    spacing=slice_spacing)
+                                                      length=0.9,
+                                                      spacing=slice_spacing)
 
         # combine the contours
         slice_data = pd.concat([body, primary_cylinder, overlapping_cylinder])
@@ -954,3 +958,79 @@ class TestOverlaps:
         relation = find_relations(slice_table, regions, selected_roi)
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
+
+
+class TestEquals:
+    def test_equal_spheres(self):
+        slice_spacing = 0.5
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=20, length=10,
+                                    spacing=slice_spacing)
+
+        a_sphere6 = make_sphere(roi_num=1, radius=6,
+                                    spacing=slice_spacing)
+        b_sphere6 = make_sphere(roi_num=2, radius=6,
+                                    spacing=slice_spacing)
+
+        # combine the contours
+        slice_data = pd.concat([body, a_sphere6, b_sphere6])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.EQUALS
+
+    def test_equal_boxes(self):
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        # overlapping boxes    # 6 cm x 6 cm box
+        a_box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        b_box6 = make_box(roi_num=2, width=0.6, spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([a_box6, b_box6, body])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.EQUALS
+
+    def test_equal_boxes_by_crop(self):
+        def apply_crop(p):
+            # polygon made from offset boxed resulting in a 4x4 square hole in the
+            # middle.
+            left_xy_points = box_points(width=0.8, offset_x=0.6, offset_y=0)
+            left_crop = shapely.Polygon(left_xy_points)
+            right_xy_points = box_points(width=0.8, offset_x=-0.6, offset_y=0)
+            right_crop = shapely.Polygon(right_xy_points)
+            up_xy_points = box_points(width=0.8, offset_x=0, offset_y=0.6)
+            up_crop = shapely.Polygon(up_xy_points)
+            down_xy_points = box_points(width=0.8, offset_x=0, offset_y=-0.6)
+            down_crop = shapely.Polygon(down_xy_points)
+            crop_poly = shapely.union_all([left_crop, right_crop,
+                                        up_crop, down_crop])
+            cropped = p - crop_poly
+            return poly_round(cropped)
+
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
+                                    spacing=slice_spacing)
+        box8 = make_box(roi_num=1, width=0.8, spacing=slice_spacing)
+        box4 = make_box(roi_num=2, width=0.4, spacing=slice_spacing)
+
+        poly_a = box8.loc[(slice(None), slice(-0.2, 0.2)), :].copy()
+        poly_a.Contour = poly_a.Contour.apply(apply_crop)
+        slice_data = pd.concat([poly_a, box4, body])
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.EQUALS

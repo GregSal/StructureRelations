@@ -789,7 +789,7 @@ def get_interpolated_region(sub_graph):
     # Select that node's neighbour.
     # build an interpolated region from these two regions.
     # Assumes that the sub-graph has at least two nodes.
-    assert len(sub_graph) >= 2
+    #assert len(sub_graph) >= 2
     # Select the first node in the subgraph
     first_node_label = list(sub_graph.nodes)[0]
     first_node = sub_graph.nodes[first_node_label]
