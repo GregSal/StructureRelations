@@ -267,10 +267,13 @@ def box_points(width: float, height: float = None, offset_x: float = 0,
     x1_unit = width / 2
     if x1_unit == 0:
         x1_unit = 10**(-precision)
-    if not height:
+    if height is None:
         y1_unit = x1_unit
     else:
-        y1_unit = height / 2
+        if height == 0:
+            y1_unit = 10**(-precision)
+        else:
+            y1_unit = height / 2
     coords = [
         ( x1_unit + offset_x,  y1_unit + offset_y),
         ( x1_unit + offset_x, -y1_unit + offset_y),
@@ -308,7 +311,7 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
     # Generate circle for each slices
     slice_data = {}
     for slice_idx, r in r_coord:
-        slice_points = box_points(r, length, offset_x, offset_y, precision)
+        slice_points = box_points(length, r, offset_x, offset_y, precision)
         slice_data[SliceIndexType(slice_idx)] = slice_points
     return slice_data
 
