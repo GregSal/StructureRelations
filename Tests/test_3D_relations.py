@@ -340,7 +340,6 @@ class TestDisjoint:
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.DISJOINT
 
-    @pytest.mark.xfail
     def test_extended_inner_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -363,7 +362,29 @@ class TestDisjoint:
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.DISJOINT
 
-    @pytest.mark.xfail
+    def test_disjoint_horizontal_cylinder(self):
+        slice_spacing = 1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=16, offset_z=0,
+                                    spacing=slice_spacing)
+        outer_cylinder = make_horizontal_cylinder(roi_num=1, radius=6, length=10,
+                                                spacing=slice_spacing)
+        cylinder_hole = make_horizontal_cylinder(roi_num=1, radius=5, length=10,
+                                                spacing=slice_spacing)
+        surrounded_cylinder = make_horizontal_cylinder(roi_num=2, radius=3,
+                                                    length=12,
+                                                    spacing=slice_spacing)
+        # combine the contours
+        slice_data = pd.concat([outer_cylinder, cylinder_hole,
+                                surrounded_cylinder])
+        # convert contour slice data into a table of slices and structures
+        slice_table = make_slice_table(slice_data, ignore_errors=True)
+        regions = generate_region_graph(slice_table)
+        selected_roi = [1, 2]
+        relation = find_relations(slice_table, regions, selected_roi)
+        relation_type = relation.identify_relation()
+        assert relation_type == RelationshipType.DISJOINT
+
     def test_parallel_disjoint_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -389,7 +410,6 @@ class TestDisjoint:
         relation_type = relation.identify_relation()
         assert relation_type == RelationshipType.DISJOINT
 
-    @pytest.mark.xfail
     def test_axial_disjoint_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use

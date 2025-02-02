@@ -1,4 +1,5 @@
 import shapely
+import pytest
 
 from structure_slice import StructureSlice
 from relations import DE27IM, RelationshipType
@@ -224,6 +225,19 @@ class TestPartition:
         cropped_ring = poly_round(shapely.difference(ring, box6_offset))
         a = StructureSlice([circle6, circle4])
         b = StructureSlice([cropped_ring])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RelationshipType.PARTITION
+
+    @pytest.mark.xfail
+    def test_partition_embedded_circle(self):
+        # This test exposes a known bug that is likely related to rounding errors.
+        # Rounding required because of floating point inaccuracies.
+        circle6 = poly_round(shapely.Polygon(circle_points(3)))
+        circle4_offset = shapely.Polygon(circle_points(2, offset_x=2))
+        cropped_circle = poly_round(shapely.intersection(circle6,
+                                                         circle4_offset))
+        a = StructureSlice([circle6])
+        b = StructureSlice([cropped_circle])
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
