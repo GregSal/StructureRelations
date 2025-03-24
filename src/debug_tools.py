@@ -18,9 +18,10 @@ import shapely
 from shapely.plotting import plot_polygon, plot_line
 
 from types_and_classes import PRECISION, SliceIndexType
+from types_and_classes import ContourPoints
 
 from structure_slice import StructureSlice
-from utilities import poly_round
+from utilities import poly_round, points_to_polygon
 
 
 # %% Tuples to Strings
@@ -318,7 +319,7 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
 
 def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3, roi_num=0)->pd.DataFrame:
+                precision=3, roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a sphere.
 
     The center of the sphere is at (offset_x, offset_y, offset_z). The
@@ -340,28 +341,22 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
         roi_num (int, optional): Thr structure index number. Defaults to 0.
 
     Returns:
-        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
-            with 'ROI Num' and 'Slice Index' as the levels.
-            There is only one column 'Contour' which contains shapely Polygons.
+        List[ContourPoints]: A list of dictionaries containing the roi,
+            slice index and list of points delimiting the sphere on that slice.
     '''
     slice_list = []
     points_dict = sphere_points(radius, spacing, num_points,
                                 offset_x, offset_y, offset_z, precision)
     for slice_idx, xy_points in points_dict.items():
-        slice_contour = shapely.Polygon(xy_points)
-        roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndexType(slice_idx),
-                     'Contour': slice_contour}
+        roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
-    slice_contours = pd.DataFrame(slice_list)
-    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_contours
+    return slice_list
 
 
 def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
                            num_points: int = 16, offset_x: float = 0,
                            offset_y: float = 0, offset_z: float = 0,
-                           precision=PRECISION, roi_num=0)->pd.DataFrame:
+                           precision=PRECISION, roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a vertical cylinder.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -384,30 +379,24 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
         roi_num (int, optional): Thr structure index number. Defaults to 0.
 
     Returns:
-        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
-            with 'ROI Num' and 'Slice Index' as the levels.
-            There is only one column 'Contour' which contains shapely Polygons.
+        List[ContourPoints]: A list of dictionaries containing the roi,
+            slice index and list of points delimiting the cylinder on that slice.
     '''
     starting_z = offset_z - length / 2
     z_coord = make_slice_list(height=length, spacing=spacing, start=starting_z,
                               precision=precision)
     xy_points = circle_points(radius, offset_x, offset_y, num_points, precision)
-    contour = shapely.Polygon(xy_points)
     slice_list = []
     for slice_idx in z_coord:
-        roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndexType(slice_idx),
-                     'Contour': contour}
+        roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
-    slice_contours = pd.DataFrame(slice_list)
-    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_contours
+    return slice_list
 
 
 def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
                              offset_x: float = 0, offset_y: float = 0,
                              offset_z: float = 0, precision=PRECISION,
-                             roi_num=0)->pd.DataFrame:
+                             roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a horizontal cylinder.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -430,28 +419,22 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
         roi_num (int, optional): Thr structure index number. Defaults to 0.
 
     Returns:
-        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
-            with 'ROI Num' and 'Slice Index' as the levels.
-            There is only one column 'Contour' which contains shapely Polygons.
+        List[ContourPoints]: A list of dictionaries containing the roi,
+            slice index and list of points delimiting the cylinder on that slice.
     '''
     slice_list = []
     points_dict = cylinder_points(radius, length, spacing,
                                    offset_x, offset_y, offset_z, precision)
     for slice_idx, xy_points in points_dict.items():
-        slice_contour = shapely.Polygon(xy_points)
-        roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndexType(slice_idx),
-                     'Contour': slice_contour}
+        roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
-    slice_contours = pd.DataFrame(slice_list)
-    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_contours
+    return slice_list
 
 
 def make_box(width: float, length: float = None, height: float = None,
              offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
              spacing: float = 0.1, precision=PRECISION,
-             roi_num=0)->pd.DataFrame:
+             roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a rectangular prism cylinder.
 
     The center of the box is at (offset_x, offset_y, offset_z). The
@@ -475,9 +458,8 @@ def make_box(width: float, length: float = None, height: float = None,
         roi_num (int, optional): Thr structure index number. Defaults to 0.
 
     Returns:
-        pd.DataFrame: A table of slice contours.  The index is a MultiIndex
-            with 'ROI Num' and 'Slice Index' as the levels.
-            There is only one column 'Contour' which contains shapely Polygons.
+        List[ContourPoints]: A list of dictionaries containing the roi,
+            slice index and list of points delimiting the box on that slice.
     '''
     if not height:
         if height == 0:
@@ -488,32 +470,8 @@ def make_box(width: float, length: float = None, height: float = None,
     z_coord = make_slice_list(height=height, spacing=spacing, start=starting_z,
                               precision=precision)
     xy_points = box_points(width, length, offset_x, offset_y, precision)
-    contour = shapely.Polygon(xy_points)
     slice_list = []
     for slice_idx in z_coord:
-        roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndexType(slice_idx),
-                     'Contour': contour}
+        roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
-    slice_contours = pd.DataFrame(slice_list)
-    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_contours
-
-
-def make_contour_slices(shape: shapely.Polygon, spacing: float = 0.1,
-                        height: float = None, number_slices: int = None,
-                        offset_z: float = 0, precision=PRECISION,
-                        roi_num=0)->pd.DataFrame:
-    z_coord = make_slice_list(height=height, number_slices=number_slices,
-                              spacing=spacing, start=offset_z,
-                              precision=precision)
-    contour = poly_round(shape, precision)
-    slice_list = []
-    for slice_idx in z_coord:
-        roi_slice = {'ROI Num': roi_num,
-                     'Slice Index': SliceIndexType(slice_idx),
-                     'Contour': contour}
-        slice_list.append(roi_slice)
-    slice_contours = pd.DataFrame(slice_list)
-    slice_contours.set_index(['ROI Num', 'Slice Index'], inplace=True)
-    return slice_contours
+    return slice_list

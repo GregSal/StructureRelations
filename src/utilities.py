@@ -7,8 +7,9 @@ from typing import Dict, Tuple, List, Union
 # Shared Packages
 import numpy as np
 import shapely
+from shapely.geometry import Polygon
 
-from types_and_classes import PRECISION, SliceIndexType
+from types_and_classes import PRECISION, SliceIndexType, InvalidContour
 
 slice_sequence = Union[List[SliceIndexType],
                        Tuple[SliceIndexType, SliceIndexType],
@@ -183,3 +184,20 @@ def interpolate_polygon(slices: slice_sequence, p1: shapely.Polygon,
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
+
+def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
+    '''Convert a list of points to a Shapely polygon and validate it.
+
+    Args:
+        points (List[Tuple[float, float]]): A list of tuples containing 2D or 3D points.
+
+    Raises:
+        InvalidContour: If the points cannot form a valid polygon.
+
+    Returns:
+        Polygon: A valid Shapely polygon.
+    '''
+    polygon = Polygon(points)
+    if not polygon.is_valid:
+        raise InvalidContour("Invalid polygon created from points.")
+    return polygon

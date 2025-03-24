@@ -20,7 +20,7 @@ class TestContains:
         sphere6 = make_sphere(roi_num=1, radius=3, spacing=slice_spacing)
         sphere3 = make_sphere(roi_num=2, radius=1.5, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([sphere6, sphere3, body])
+        slice_data = sphere6 + sphere3 + body
         # convert contour slice data into a table of slices and structures
         slice_table = make_slice_table(slice_data, ignore_errors=True)
         regions = generate_region_graph(slice_table)
