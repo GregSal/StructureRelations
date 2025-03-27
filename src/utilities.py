@@ -197,6 +197,8 @@ def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
     Returns:
         Polygon: A valid Shapely polygon.
     '''
+    if not points:
+        return Polygon()
     polygon = Polygon(points)
     if not polygon.is_valid:
         raise InvalidContour("Invalid polygon created from points.")

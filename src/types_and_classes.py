@@ -26,6 +26,13 @@ SliceIndexType = NewType('SliceIndexType', float)
 # A list of contour points.
 ContourPointsType = NewType('ContourPointsType', List[tuple[float]])
 
+# The index for an individual contour.
+# The index is a tuple of:
+#   - The Region's ROI number,
+#   - The Region's The slice index,
+#   - An indexer value to force unique nodes.
+ContourIndex = NewType('ContourIndex', Tuple[ROI_Type, SliceIndexType, int])
+
 # The reference numbers for two different structures to be compared.
 StructurePairType = NewType('StructurePairType', Tuple[ROI_Type, ROI_Type])
 
@@ -115,8 +122,7 @@ class ContourPoints(dict):
 
     @staticmethod
     def validate_points(points: ContourPointsType,
-                       roi: ROI_Type,
-                       slice_index: SliceIndexType = None
+                        slice_index: SliceIndexType = None
                        )-> tuple[ContourPointsType, ROI_Type, SliceIndexType]:
         '''Validate the contour points and add a z coordinate if necessary.
 
@@ -144,8 +150,9 @@ class ContourPoints(dict):
         point_dim = None
         for point in points:
             # Verify that each point is a tuple of float.
-            if not isinstance(point, tuple) or not all(
-                    isinstance(coord, (float, int)) for coord in point):
+            if not isinstance(point, tuple):
+                raise InvalidContour("Points must be tuples of floats.")
+            if not all(isinstance(coord, (float, int)) for coord in point):
                 raise InvalidContour("Points must be tuples of floats.")
             # Verify that each point is a tuple of length 2 or 3.
             this_point_dim = len(point)
@@ -341,3 +348,83 @@ class RegionNode:
         self.is_hole: bool = False
         self.is_boundary: bool = False
         self.is_interpolated: bool = False
+
+
+class Contour:
+    '''Class representing a contour with associated metadata.
+
+    Attributes:
+        polygon (shapely.Polygon): The polygon generated from the contour.
+        slice_index (SliceIndexType): The slice index of the contour.
+        contour_index (int): Auto-incremented contour index.
+        is_hole (bool): Whether the contour is a hole.
+        hole_reference (int): If is_hole is True, contains the index of the
+            smallest non-hole contour that contains this hole.
+            If is_hole is False, hole_reference is None.
+        hole_type (str): If is_hole is True, the type of the hole. One of:
+            Open,
+            Closed, or
+            Unknown.
+            If is_hole is False, hole_type is None.
+        thickness (float): The thickness of the contour.  Defaults to
+            Contour.default_thickness (0.0).
+        is_boundary (bool): Whether the contour is a boundary.
+            Defaults to False.
+        is_interpolated (bool): Whether the contour is interpolated.
+            Defaults to False.
+        region_index (int): The region index of the contour.
+            Defaults to None until regions are assigned.
+        index (ContourIndex): A tuple representing (ROI, SliceIndex, ContourIndex).
+    '''
+    counter = 0
+    default_thickness = 0.0
+
+    def __init__(self, slice_index: SliceIndexType, polygon: shapely.Polygon,
+                 contours: List['Contour']) -> None:
+        self.slice_index = slice_index
+        self.polygon = polygon
+        self.thickness = self.default_thickness
+        self.is_hole = False
+        self.hole_reference = None
+        self.hole_type = None
+        self.is_boundary = False
+        self.is_interpolated = False
+        self.region_index = None
+        self.contour_index = Contour.counter
+        Contour.counter += 1
+        self.validate_polygon()
+        self.compare_with_existing_contours(contours)
+
+    @property
+    def index(self) -> ContourIndex:
+        '''Return a tuple representing (RegionIndex, SliceIndex, ContourIndex).'''
+        return (self.region_index, self.slice_index, self.contour_index)
+
+    def compare_with_existing_contours(self, contours: List['Contour']) -> None:
+        '''Compare the polygon to each existing Contour in the list.'''
+        for existing_contour in reversed(contours):
+            if existing_contour.is_hole:
+                # If the existing contour is a hole, the new contour cannot be its hole
+                continue
+            if self.polygon.within(existing_contour.polygon):
+                # New contour is completely within the existing contour
+                self.is_hole = True
+                self.hole_reference = existing_contour.contour_index
+                self.hole_type = "Unknown"
+                break  # Stop checking once a containing contour is found
+            if self.polygon.overlaps(existing_contour.polygon):
+                # New contour overlaps an existing contour, raise an error
+                raise InvalidContour("New contour overlaps an existing contour.")
+
+    def validate_polygon(self) -> None:
+        '''Validate the polygon to ensure it is valid.'''
+        if not self.polygon.is_valid:
+            raise InvalidContour("Invalid polygon provided for the contour.")
+
+    def area(self) -> float:
+        '''Calculate the area of the contour polygon.'''
+        return self.polygon.area
+
+    def centroid(self) -> Tuple[float, float]:
+        '''Calculate the centroid of the contour polygon.'''
+        return self.polygon.centroid.coords[0]
