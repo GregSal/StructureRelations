@@ -10,7 +10,7 @@ from math import ceil, sin, cos, radians, sqrt
 
 
 # Shared Packages
-from matplotlib.pylab import f
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,8 +20,7 @@ from shapely.plotting import plot_polygon, plot_line
 from types_and_classes import PRECISION, SliceIndexType
 from types_and_classes import ContourPoints
 
-from structure_slice import StructureSlice
-from utilities import poly_round, points_to_polygon
+
 
 
 # %% Tuples to Strings
@@ -154,30 +153,6 @@ def plot_roi(slice_table, roi_list: List[int]):
         ax.plot(data[:,0], data[:,1], data[:,2], linestyle='none', marker='.',
                 color=color_list[i])
     plt.show()
-
-
-def c_type(obj):
-    if isinstance(obj, StructureSlice):
-        n = str(type(obj.contour))
-        s = n.replace('shapely.geometry.', '')
-    else:
-        s = str(type(obj))
-    s = s.replace('<class ', '')
-    s = s.replace('>', '')
-    return s
-
-
-def type_table(sr):
-    def f(ss):
-        if isinstance(ss, StructureSlice):
-            obj_str = c_type(ss.contour)
-            type_str = '\n'.join(c_type(poly) for poly in ss.contour.geoms)
-            return type_str
-        return c_type(ss)
-
-    type_str = sr.map(f)
-    lbl_dict = {idx: type_lbl for idx, type_lbl in type_str.items()}
-    return lbl_dict
 
 
 
