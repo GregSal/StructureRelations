@@ -18,7 +18,7 @@ import shapely
 from shapely.plotting import plot_polygon, plot_line
 
 from types_and_classes import PRECISION, SliceIndexType
-from types_and_classes import ContourPoints
+from contours import ContourPoints
 
 
 

@@ -1,19 +1,15 @@
 '''Utility Functions'''
 # %% Imports
 # Type imports
-from dataclasses import asdict, dataclass
-from typing import Dict, Tuple, List, Union
+from typing import List
 
 # Shared Packages
 import numpy as np
 import shapely
-from shapely.geometry import Polygon
 
-from types_and_classes import PRECISION, SliceIndexType, InvalidContour
+from types_and_classes import PRECISION, SliceIndexSequenceType
 
-slice_sequence = Union[List[SliceIndexType],
-                       Tuple[SliceIndexType, SliceIndexType],
-                       SliceIndexType]
+
 # %% Rounding Functions
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
     '''Round the coordinates of a shapley point to the specified precision.
@@ -76,12 +72,13 @@ def poly_round(polygon: shapely.Polygon,
 
 
 #%% Interpolation Functions
-def calculate_new_slice_index(slices: slice_sequence,
+def calculate_new_slice_index(slices: SliceIndexSequenceType,
                               precision=PRECISION) -> float:
     '''Calculate the new z value based on the given slices.
 
     Args:
-        slices (Union[List[SliceIndexType], SliceIndexType]): The slices to calculate the new z value from.
+        slices (Union[List[SliceIndexType], SliceIndexType]): The slices to
+            calculate the new z value from.
 
     Returns:
         float: The calculated new z value.
@@ -93,8 +90,36 @@ def calculate_new_slice_index(slices: slice_sequence,
         return slices
 
 
-def interpolate_polygon(slices: slice_sequence, p1: shapely.Polygon,
+def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
                         p2: shapely.Polygon = None) -> shapely.Polygon:
+    '''Interpolate a polygon between two polygons based on the given slices.
+
+    This function takes two polygons and interpolates a new polygon based on
+    the given slices. The new polygon is created by interpolating the
+    coordinates of the two polygons,
+
+    **any holes of the first polygon are also interpolated.**
+
+    The new polygon is then assigned a z value based on the given slices.
+    The function also handles the case where one of the polygons
+    is empty. The function raises a ValueError if either of the polygons are
+    multi-polygons.
+    The function also raises a ValueError if the first polygon is empty and no
+    second polygon is given.
+    Args:
+        slices (SliceIndexSequenceType): _description_
+        p1 (shapely.Polygon): _description_
+        p2 (shapely.Polygon, optional): _description_. Defaults to None.
+
+    Raises:
+        ValueError: When either of the polygons are multi-polygons
+        ValueError: When the first polygon is empty and no second polygon is
+            given.
+    Returns:
+        shapely.Polygon: _description_
+    '''
+    # FIXME This function expects the polygon to contain holes, but it
+    # contours currently store holes separately
     def match_boundaries(p1, p2):
         if p1.is_empty:
             boundary1 = None
@@ -184,22 +209,3 @@ def interpolate_polygon(slices: slice_sequence, p1: shapely.Polygon,
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
-
-def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
-    '''Convert a list of points to a Shapely polygon and validate it.
-
-    Args:
-        points (List[Tuple[float, float]]): A list of tuples containing 2D or 3D points.
-
-    Raises:
-        InvalidContour: If the points cannot form a valid polygon.
-
-    Returns:
-        Polygon: A valid Shapely polygon.
-    '''
-    if not points:
-        return Polygon()
-    polygon = Polygon(points)
-    if not polygon.is_valid:
-        raise InvalidContour("Invalid polygon created from points.")
-    return polygon
