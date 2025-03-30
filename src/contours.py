@@ -526,7 +526,7 @@ def add_boundary_contours(contour_graph: nx.Graph,
         contour_match = ContourMatch(contour, interpolated_contour)
         contour_graph.add_edge(original_boundary, interpolated_label,
                                match=contour_match)
-        return contour_graph, slice_sequence
+    return contour_graph, slice_sequence
 
 
 def build_contour_graph(contour_table, slice_sequence: SliceSequence,
@@ -560,4 +560,10 @@ def build_contour_graph(contour_table, slice_sequence: SliceSequence,
     # Add the edges to the graph
     contour_graph = add_graph_edges(contour_graph, contour_lookup,
                                     slice_sequence)
+    # Add the boundary contours to the graph
+    contour_graph, slice_sequence = add_boundary_contours(contour_graph,
+                                                      slice_sequence)
+    # Re-build the Graph indexer
+    contour_lookup = build_contour_lookup(contour_graph)
+
     return contour_graph, contour_lookup
