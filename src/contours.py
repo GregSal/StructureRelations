@@ -191,7 +191,7 @@ class Contour:
         self.hole_type = 'None'
         self.is_boundary = False
         self.is_interpolated = False
-        self.region_index = None
+        self.region_index = ""  # Default to an empty string
         self.contour_index = Contour.counter
         Contour.counter += 1
         self.validate_polygon()
@@ -205,6 +205,7 @@ class Contour:
     @property
     def exterior(self)-> shapely.Polygon:
         '''The solid exterior Polygon.
+
 
         Returns:
             shapely.Polygon: The contour Polygon with all holes
@@ -384,9 +385,9 @@ def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
     Args:
         contour_graph (nx.Graph): A Contour Graph object containing contour
             information. Each node in the graph should represent a contour and
-
             should have a 'contour' attribute that is an instance of the
             Contour class.
+
     Returns:
         pd.DataFrame: A DataFrame containing the contour lookup table.
             The DataFrame includes the following columns:
@@ -395,7 +396,8 @@ def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
                 - HoleType,
                 - Interpolated,
                 - Boundary,
-                - ContourIndex, and
+                - ContourIndex,
+                - RegionIndex, and
                 - Label.
     '''
     lookup_list = []
@@ -404,17 +406,18 @@ def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
         lookup_list.append({
             'ROI': contour.roi,
             'SliceIndex': contour.slice_index,
-            'HoleType': contour.hole_type ,
+            'HoleType': contour.hole_type,
             'Interpolated': contour.is_interpolated,
             'Boundary': contour.is_boundary,
             'ContourIndex': contour.contour_index,
+            'RegionIndex': contour.region_index,
             'Label': contour.index
-            })
+        })
     contour_lookup = pd.DataFrame(lookup_list)
     contour_lookup.HoleType = contour_lookup.HoleType.astype('category')
     contour_lookup.HoleType.cat.set_categories(['Open', 'Closed',
                                                 'Unknown', 'None'])
-    contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'],  inplace=True)
+    contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'], inplace=True)
     return contour_lookup
 
 
@@ -567,3 +570,40 @@ def build_contour_graph(contour_table, slice_sequence: SliceSequence,
     contour_lookup = build_contour_lookup(contour_graph)
 
     return contour_graph, contour_lookup
+
+
+def build_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
+    '''Create EnclosedRegion SubGraphs and assign RegionIndex to contours.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        List[nx.Graph]: A list of SubGraphs, each representing an enclosed region.
+    '''
+    enclosed_regions = {}
+    region_counter = 0
+    region_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    # Find connected contours in the contour graph
+    for region_nodes in nx.connected_components(contour_graph):
+        # Create a SubGraph for the connected component
+        enclosed_region = contour_graph.subgraph(region_nodes)
+        # Extract the ROI from the first node in the SubGraph
+        # The ROI is the same for all nodes in the Graph
+        roi = enclosed_region.nodes[list(region_nodes)[0]]['contour'].roi
+        if region_counter > len(region_labels):
+            prefix = str(region_counter // len(region_labels) - 1)
+        else:
+            prefix = ''
+        # Create a label for the enclosed region
+        region_label = f'{roi}{prefix}{region_labels[region_counter]}'
+        enclosed_regions[region_label] = enclosed_region
+        # Assign a unique RegionIndex (uppercase letter) to each contour in the SubGraph
+        for node in enclosed_region.nodes:
+            contour = enclosed_region.nodes[node]['contour']
+            contour.region_index = region_label
+            # Reflect the change in the main graph
+            # Should happen by default if copy is not used
+            # contour_graph.nodes[node]['contour'] = contour
+        region_counter += 1
+    return enclosed_regions
