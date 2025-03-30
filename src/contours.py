@@ -3,7 +3,6 @@
 from collections import defaultdict
 from typing import List, Tuple
 
-from networkx import Graph
 import pandas as pd
 import networkx as nx
 import shapely
@@ -13,6 +12,7 @@ from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
 from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
 from types_and_classes import SliceSequence
+from utilities import interpolate_polygon
 
 
 class ContourPoints(dict):
@@ -165,7 +165,7 @@ class Contour:
                 Open,
                 Closed, or
                 Unknown (Default).
-            If is_hole is False, hole_type is None.
+            If is_hole is False, hole_type is 'None'.
 
       boundary information:
         is_boundary (bool): Whether the contour is a boundary.
@@ -188,7 +188,7 @@ class Contour:
         self.thickness = self.default_thickness
         self.is_hole = False
         self.hole_reference = None
-        self.hole_type = None
+        self.hole_type = 'None'
         self.is_boundary = False
         self.is_interpolated = False
         self.region_index = None
@@ -248,16 +248,17 @@ class Contour:
                 # New contour is completely within the existing contour
                 self.is_hole = True
                 self.hole_reference = existing_contour.contour_index
-                self.hole_type = "Unknown"
+                self.hole_type = 'Unknown'
                 break  # Stop checking once a containing contour is found
             if self.polygon.overlaps(existing_contour.polygon):
                 # New contour overlaps an existing contour, raise an error
-                raise InvalidContour("New contour overlaps an existing contour.")
+                raise InvalidContour('New contour overlaps an existing contour.')
+
 
     def validate_polygon(self) -> None:
         '''Validate the polygon to ensure it is valid.'''
         if not self.polygon.is_valid:
-            raise InvalidContour("Invalid polygon provided for the contour.")
+            raise InvalidContour('Invalid polygon provided for the contour.')
 
     def area(self) -> float:
         '''Calculate the area of the contour polygon.'''
@@ -373,26 +374,43 @@ def build_contours(contour_table, roi):
     return contour_by_slice
 
 
-def build_contour_lookup(label_list) -> pd.DataFrame:
+def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
     '''Build a lookup table for contours.
 
     This function creates a DataFrame that serves as a lookup table for contours.
-    It includes information about the slice index, contour index, and hole type.
     The hole type is categorized into 'Open', 'Closed', 'Unknown', and 'None'.
     The DataFrame is sorted by slice index and contour index.
 
     Args:
-        label_list (list): A list of dictionaries containing contour
-            information. Each dictionary should have keys
-                - 'SliceIndex',
-                - 'ContourIndex', and
-                - 'HoleType'.
+        contour_graph (nx.Graph): A Contour Graph object containing contour
+            information. Each node in the graph should represent a contour and
 
+            should have a 'contour' attribute that is an instance of the
+            Contour class.
     Returns:
         pd.DataFrame: A DataFrame containing the contour lookup table.
+            The DataFrame includes the following columns:
+                - ROI,
+                - SliceIndex,
+                - HoleType,
+                - Interpolated,
+                - Boundary,
+                - ContourIndex, and
+                - Label.
     '''
-    contour_lookup = pd.DataFrame(label_list)
-    contour_lookup.HoleType = contour_lookup.HoleType.fillna('None')
+    lookup_list = []
+    for _, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        lookup_list.append({
+            'ROI': contour.roi,
+            'SliceIndex': contour.slice_index,
+            'HoleType': contour.hole_type ,
+            'Interpolated': contour.is_interpolated,
+            'Boundary': contour.is_boundary,
+            'ContourIndex': contour.contour_index,
+            'Label': contour.index
+            })
+    contour_lookup = pd.DataFrame(lookup_list)
     contour_lookup.HoleType = contour_lookup.HoleType.astype('category')
     contour_lookup.HoleType.cat.set_categories(['Open', 'Closed',
                                                 'Unknown', 'None'])
@@ -439,6 +457,78 @@ def add_graph_edges(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
     return contour_graph
 
 
+def add_boundary_contours(contour_graph: nx.Graph,
+                          slice_sequence: SliceSequence) -> None:
+    '''Add interpolated boundary contours to the graph.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+        slice_sequence (SliceSequence): The slice sequence object containing
+            the slice indices and their neighbors.
+
+    Returns:
+        tuple: A tuple containing the updated contour graph and slice sequence.
+            contour_graph (nx.Graph): The updated graph representation of the
+                contours with interpolated boundary contours added.
+            slice_sequence (SliceSequence): The updated slice sequence object
+                with the interpolated slice indices added.
+    '''
+    # Select all nodes with only one edge (degree=1)
+    boundary_nodes = [node for node, degree in contour_graph.degree()
+                      if degree == 1]
+    for original_boundary in boundary_nodes:
+        # Get the contour and its slice index
+        contour = contour_graph.nodes[original_boundary]['contour']
+        this_slice = contour.slice_index
+        # Determine the neighbor slice not linked with an edge
+        neighbors = slice_sequence.get_neighbors(this_slice)
+        # Get the slice index of the neighbouring contour.
+        neighbouring_nodes = contour_graph.adj[original_boundary].keys()
+        # Because degree=1, there should only be one neighbouring node.
+        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
+        # Get in slice index to use for interpolating (not_neighbour) and the
+        # neighbouring slice references for the interpolated slice.
+        if neighbors.previous_slice == neighbour_slice:
+            slice_ref = {'PreviousSlice': this_slice,
+                        'NextSlice': None}
+            not_neighbour = neighbors.next_slice
+        else:
+            slice_ref = {'PreviousSlice': None,
+                        'NextSlice': this_slice}
+            not_neighbour = neighbors.previous_slice
+
+        # Calculate the interpolated slice index
+        interpolated_slice = (this_slice + not_neighbour) / 2
+        slice_ref['ThisSlice'] = interpolated_slice
+        slice_ref['Original'] = False
+
+        # Generate the interpolated boundary contour
+        interpolated_polygon = interpolate_polygon([this_slice, not_neighbour],
+                                                   contour.polygon)
+        interpolated_contour = Contour(
+            roi=contour.roi,
+            slice_index=interpolated_slice,
+            polygon=interpolated_polygon,
+            contours=[]
+            )
+        interpolated_contour.is_interpolated = True
+        interpolated_contour.is_boundary = True
+        interpolated_contour.is_hole = contour.is_hole
+
+        # Add the interpolated slice index to the slice sequence
+        slice_sequence.add_slice(**slice_ref)
+
+        # Add the interpolated contour to the graph
+        interpolated_label = interpolated_contour.index
+        contour_graph.add_node(interpolated_label, contour=interpolated_contour)
+
+        # Add a ContourMatch edge between the original and interpolated contours
+        contour_match = ContourMatch(contour, interpolated_contour)
+        contour_graph.add_edge(original_boundary, interpolated_label,
+                               match=contour_match)
+        return contour_graph, slice_sequence
+
+
 def build_contour_graph(contour_table, slice_sequence: SliceSequence,
                         roi: ROI_Type) -> Tuple[nx.Graph, pd.DataFrame]:
     '''Build a graph of contours for the specified ROI.
@@ -460,23 +550,13 @@ def build_contour_graph(contour_table, slice_sequence: SliceSequence,
     contour_by_slice = build_contours(contour_table, roi)
     # Create an empty graph
     contour_graph = nx.Graph()
-    label_list = []
-
     # Add nodes to the graph
     for contour_data in contour_by_slice.values():
         for contour in contour_data:
             contour_label = contour.index
             contour_graph.add_node(contour_label, contour=contour)
-            roi, slice_index, idx = contour_label
-            label_list.append({
-                'ROI': roi,
-                'SliceIndex': slice_index,
-                'HoleType': contour.hole_type,
-                'ContourIndex': idx,
-                'Label': contour_label
-                })
     # Create the Graph indexer
-    contour_lookup = build_contour_lookup(label_list)
+    contour_lookup = build_contour_lookup(contour_graph)
     # Add the edges to the graph
     contour_graph = add_graph_edges(contour_graph, contour_lookup,
                                     slice_sequence)

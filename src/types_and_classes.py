@@ -5,6 +5,7 @@
 # Type imports
 from typing import List, NewType, Union, Tuple
 from dataclasses import dataclass
+import warnings
 
 # Shared Packages
 import pandas as pd
@@ -127,18 +128,27 @@ class SliceSequence:
         '''Return a list of all slice indices in the sequence.'''
         return self.sequence['ThisSlice'].tolist()
 
-    def add_slice(self, slice_index: SliceIndexType) -> None:
-        '''Add a slice index to the sequence.'''
+    def add_slice(self, **slice_ref) -> None:
+        '''Add a slice index to the sequence.
+
+        Args:
+            slice_ref (dict): A dictionary containing the slice reference
+                information. Must contain the following keys:
+                    - 'ThisSlice'
+                    - 'PreviousSlice'
+                    - 'NextSlice'.
+                If 'Original' is not provided, it will be set to False.
+        '''
+        slice_index = slice_ref['ThisSlice']
+        if 'Original' not in slice_ref:
+            slice_ref['Original'] = False
+        # Check if the slice index is already in the sequence
         if slice_index not in self.sequence.index:
-            new_row = pd.DataFrame({
-                'ThisSlice': [slice_index],
-                'NextSlice': [None],
-                'PreviousSlice': [None],
-                'Original': [False]
-            }).set_index('ThisSlice', drop=False)
-            self.sequence = pd.concat([self.sequence, new_row]).sort_index()
-            self.sequence['NextSlice'] = self.sequence['ThisSlice'].shift(-1)
-            self.sequence['PreviousSlice'] = self.sequence['ThisSlice'].shift(1)
+            new_row = pd.DataFrame([{**slice_ref}])
+            new_row.set_index('ThisSlice', drop=False, inplace=True)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                self.sequence = pd.concat([self.sequence, new_row]).sort_index()
 
     def remove_slice(self, slice_index: SliceIndexType) -> None:
         '''Remove a slice index from the sequence.'''

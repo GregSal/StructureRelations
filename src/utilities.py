@@ -118,8 +118,7 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     Returns:
         shapely.Polygon: _description_
     '''
-    # FIXME This function expects the polygon to contain holes, but it
-    # contours currently store holes separately
+    # TODO Use shapely.affinity.scale to interpolate polygons
     def match_boundaries(p1, p2):
         if p1.is_empty:
             boundary1 = None
@@ -186,6 +185,7 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             ptn = ln.interpolate(0.5, normalized=True)
             new_cords.append(ptn)
         return new_cords
+
     # Use the new function
     new_z = calculate_new_slice_index(slices)
     # If either of the polygons are multi-polygons, raise an error.
