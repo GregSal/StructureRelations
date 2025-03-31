@@ -88,6 +88,10 @@ class SliceNeighbours:
         '''Calculate the gaps between slices.'''
         return abs(self.next_slice - self.previous_slice) / 2
 
+    def neighbour_list(self) -> List[SliceIndexType]:
+        '''Return a list of neighbours, excluding the current slice.'''
+        return [self.previous_slice, self.next_slice]
+
 
 class SliceSequence:
     '''An ordered list of all slice indexes in use.

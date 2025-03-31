@@ -495,26 +495,26 @@ def add_boundary_contours(contour_graph: nx.Graph,
         neighbouring_nodes = contour_graph.adj[original_boundary].keys()
         # Because degree=1, there should only be one neighbouring node.
         neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
-        # Get in slice index to use for interpolating (not_neighbour) and the
+        # Get in slice index to use for interpolating (slice_beyond) and the
         # neighbouring slice references for the interpolated slice.
         if neighbors.previous_slice == neighbour_slice:
             # The next slice is the neighbour for interpolation
-            not_neighbour = neighbors.next_slice
+            slice_beyond = neighbors.next_slice
             # The current boundary slice is the previous slice for the
             # interpolated slice.
             slice_ref['PreviousSlice'] = this_slice
         else:
             # The previous slice is the neighbour for interpolation
-            not_neighbour = neighbors.previous_slice
+            slice_beyond = neighbors.previous_slice
             # The current boundary slice is the next slice for the
             # interpolated slice.
             slice_ref['NextSlice'] = this_slice
         # Calculate the interpolated slice index
-        interpolated_slice = (this_slice + not_neighbour) / 2
+        interpolated_slice = (this_slice + slice_beyond) / 2
         slice_ref['ThisSlice'] = interpolated_slice
         slice_ref['Original'] = False
         # Generate the interpolated boundary contour
-        interpolated_polygon = interpolate_polygon([this_slice, not_neighbour],
+        interpolated_polygon = interpolate_polygon([this_slice, slice_beyond],
                                                    contour.polygon)
         interpolated_contour = Contour(
             roi=contour.roi,
@@ -618,9 +618,9 @@ def build_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
     return enclosed_regions
 
 
-def check_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
+def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
                     slice_sequence: SliceSequence) -> None:
-    '''Determine whether each enclosed region that is a hole is 'Open' or 'Closed'.
+    '''Determine whether the regions that are holes are 'Open' or 'Closed'.
 
     Args:
         enclosed_regions (dict): A dictionary of enclosed regions, where each key
@@ -639,37 +639,33 @@ def check_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
         boundary_contour = contour_graph.nodes[boundary_label]['contour']
         # Get the slice index of the boundary contour
         this_slice = boundary_contour.slice_index
+        # Determine the slice index just beyond the boundary contour.
+        neighbouring_nodes = contour_graph.adj[boundary_label].keys()
+        # Because it is a boundary contour, there should only be one
+        # neighbouring node.
+        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
+        # Get the slice index of the boundary contour
+        this_slice = boundary_contour.slice_index
         # Get the slice indexes of neighbouring contours
-        slice_ref = slice_sequence.get_neighbors(this_slice)
-
-        neighbouring_slices = contour_graph.adj[boundary_label].keys()
-        # Get the slice index of the neighbouring contours
-        # Get the slice sequence for the boundary contour
-        # Get the previous and next slices
-        previous_slice = slice_ref.previous_slice
-        next_slice = slice_ref.next_slice
-        neighbouring_contours = contour_lookup[contour_lookup.SliceIndex]
-        # Check for non-hole contours on the next slice that completely contain
-        # the hole boundary.
-        is_open = False
-        for _, boundary_row in boundary_contours.iterrows():
-            boundary_contour = region_graph.nodes[boundary_row['Label']]['contour']
-            next_slice = slice_sequence.get_neighbors(boundary_contour.slice_index).next_slice
-            if next_slice is None:
-                is_open = True
+        neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
+        # The slice that is not a neighbour of the boundary contour is the
+        # slice beyond the boundary contour.
+        slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
+        beyond = contour_lookup.SliceIndex==slice_beyond
+        contour_labels = list(contour_lookup.loc[beyond].Label)
+        for label in contour_labels:
+            # Get the contour from the graph
+            contour = contour_graph.nodes[label]['contour']
+            if contour.polygon.contains(boundary_contour.polygon):
+                # The hole is closed by the contour
+                hole_type = 'Closed'
                 break
-
-            # Find non-hole contours on the next slice
-            for _, contour_row in contour_lookup.iterrows():
-                if (contour_row['SliceIndex'] == next_slice and not contour_row['HoleType'] == 'Unknown'):
-                    non_hole_contour = region_graph.nodes[contour_row['Label']]['contour']
-                    if non_hole_contour.polygon.contains(boundary_contour.polygon):
-                        break
-            else:
-                is_open = True
-                break
-
-        # Set the hole_type for the region
-        hole_type = 'Open' if is_open else 'Closed'
-        for node, data in region_graph.nodes(data=True):
-            data['contour'].hole_type = hole_type
+        else:
+            # The hole is open if no contour contains the boundary contour
+            hole_type = 'Open'
+        # Set the hole type for the boundary contour
+        # FIXME Set the hole type for the entire region
+        # FIXME region is open if any boundary is open
+        # FIXME region is closed if all boundaries are closed
+        boundary_contour.hole_type = hole_type
+    return contour_graph, contour_lookup
