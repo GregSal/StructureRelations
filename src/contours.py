@@ -525,6 +525,7 @@ def add_boundary_contours(contour_graph: nx.Graph,
         interpolated_contour.is_interpolated = True
         interpolated_contour.is_boundary = True
         interpolated_contour.is_hole = contour.is_hole
+        interpolated_contour.hole_type = contour.hole_type
         # Add the interpolated slice index to the slice sequence
         slice_sequence.add_slice(**slice_ref)
         # Add the interpolated contour to the graph
