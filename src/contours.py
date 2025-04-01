@@ -3,6 +3,7 @@
 from collections import defaultdict
 from typing import List, Tuple
 
+import numpy as np
 import pandas as pd
 import networkx as nx
 import shapely
@@ -12,9 +13,149 @@ from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
 from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
 from types_and_classes import SliceSequence
-from utilities import interpolate_polygon
+from types_and_classes import PRECISION, SliceIndexSequenceType
 
 
+#%% Interpolation Functions
+def calculate_new_slice_index(slices: SliceIndexSequenceType,
+                              precision=PRECISION) -> float:
+    '''Calculate the new z value based on the given slices.
+
+    Args:
+        slices (Union[List[SliceIndexType], SliceIndexType]): The slices to
+            calculate the new z value from.
+
+    Returns:
+        float: The calculated new z value.
+    '''
+    if isinstance(slices, (list, tuple)):
+        new_slice = round(np.mean(slices), precision)
+        return new_slice
+    else:
+        return slices
+
+
+def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
+                        p2: shapely.Polygon = None) -> shapely.Polygon:
+    '''Interpolate a polygon between two polygons based on the given slices.
+
+    This function takes two polygons and interpolates a new polygon based on
+    the given slices. The new polygon is created by interpolating the
+    coordinates of the two polygons,
+
+    **any holes of the first polygon are also interpolated.**
+
+    The new polygon is then assigned a z value based on the given slices.
+    The function also handles the case where one of the polygons
+    is empty. The function raises a ValueError if either of the polygons are
+    multi-polygons.
+    The function also raises a ValueError if the first polygon is empty and no
+    second polygon is given.
+    Args:
+        slices (SliceIndexSequenceType): _description_
+        p1 (shapely.Polygon): _description_
+        p2 (shapely.Polygon, optional): _description_. Defaults to None.
+
+    Raises:
+        ValueError: When either of the polygons are multi-polygons
+        ValueError: When the first polygon is empty and no second polygon is
+            given.
+    Returns:
+        shapely.Polygon: _description_
+    '''
+    # TODO Use shapely.affinity.scale to interpolate polygons
+    def match_boundaries(p1, p2):
+        if p1.is_empty:
+            boundary1 = None
+        else:
+            boundary1 = p1.exterior
+        if p2 is None:
+            if boundary1:
+                boundary2 = p1.centroid
+            else:
+                raise ValueError('No second polygon given and first polygon is empty.')
+        else:
+            boundary2 = p2.exterior
+            if not boundary1:
+                boundary1 = p2.centroid
+        return boundary1, boundary2
+
+    def match_holes(p1, p2):
+        if p1.is_empty:
+            holes1 = []
+        else:
+            holes1 = list(p1.interiors)
+        # If no second polygon given, use the centroid of each first hole as the
+        # matching second hole boundary.
+        if p2 is None:
+            if holes1:
+                matched_holes = [(hole, hole.centroid) for hole in holes1]
+            else:
+                matched_holes = []
+            return matched_holes
+        # If the first polygon does not have any holes, and the second polygon
+        # does, use the centroid of the second hole as the matching first hole
+        # boundary.
+        holes2 =  list(p2.interiors)
+        if not holes1:
+            matched_holes = [(hole, hole.centroid) for hole in holes2]
+            return matched_holes
+        # If both polygons have holes, match the holes match the holes of the
+        # second polygon to the first polygon.
+        matched_holes = []
+        # set each second hole as not matched.
+        hole2_matched = {i: False for i in range(len(holes2))}
+        for hole1 in holes1:
+            matched1 = False  # set the first hole as not matched.
+            for idx, hole2 in enumerate(holes2):
+                if hole1.overlaps(hole2):
+                    matched_holes.append((hole1, hole2))
+                    matched1 = True # set the first hole as matched.
+                    hole2_matched[idx] = True  # set the second hole as matched.
+            # If the first hole is not matched, use the centroid of the first
+            # hole as the matching second hole boundary.
+            if not matched1:
+                matched_holes.append((hole1, hole1.centroid))
+        # Add any unmatched holes from the second polygon, using the centroid of
+        # the second hole as the matching first hole boundary.
+        for idx, hole2 in enumerate(holes2):
+            if not hole2_matched[idx]:
+                matched_holes.append((hole2, hole2.centroid))
+        return matched_holes
+
+    def interpolate_boundaries(boundary1, boundary2):
+        new_cords = []
+        for crd in boundary1.coords:
+            ln = shapely.shortest_line(shapely.Point(crd), boundary2)
+            ptn = ln.interpolate(0.5, normalized=True)
+            new_cords.append(ptn)
+        return new_cords
+
+    # Use the new function
+    new_z = calculate_new_slice_index(slices)
+    # If either of the polygons are multi-polygons, raise an error.
+    if isinstance(p1, shapely.MultiPolygon):
+        raise ValueError('Only single polygons are supported.')
+    if isinstance(p2, shapely.MultiPolygon):
+        raise ValueError('Only single polygons are supported.')
+
+    boundary1, boundary2 = match_boundaries(p1, p2)
+    # Interpolate the new polygon coordinates as half way between the p1
+    # boundary and boundary 2.
+    new_cords = interpolate_boundaries(boundary1, boundary2)
+    # Add the holes to the new polygon.
+    new_holes = []
+    matched_holes = match_holes(p1, p2)
+    for hole1, hole2 in matched_holes:
+        new_hole = interpolate_boundaries(hole1, hole2)
+        new_holes.append(new_hole)
+    # Build the new polygon from the interpolated coordinates.
+    itp_poly = shapely.Polygon(new_cords, holes=new_holes)
+    # Add the z value to the polygon.
+    itp_poly = shapely.force_3d(itp_poly, new_z)
+    return itp_poly
+
+# %% Contour Classes
 class ContourPoints(dict):
     '''A dictionary of contour points.
 
@@ -287,7 +428,7 @@ class ContourMatch:
         self.combined_area = contour1.area() + contour2.area()
 
 
-# %% Contour Functions
+# %% Contour Graph Construction Functions
 def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
     '''Convert a list of points to a Shapely polygon and validate it.
 
@@ -538,6 +679,119 @@ def add_boundary_contours(contour_graph: nx.Graph,
     return contour_graph, slice_sequence
 
 
+def set_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
+    '''Create EnclosedRegion SubGraphs and assign RegionIndexes to the contours.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        List[nx.Graph]: A list of SubGraphs, each representing an enclosed region.
+    '''
+    region_counter = 0
+    region_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    # Find connected contours in the contour graph.
+    for region_nodes in nx.connected_components(contour_graph):
+        # Create a SubGraph for the connected component.
+        enclosed_region = contour_graph.subgraph(region_nodes)
+        # Assign a unique RegionIndex to each contour in the SubGraph.
+        # This index is composed of the ROI number, an uppercase letter and a
+        # suffix number (if needed).)
+        # Extract the ROI from the first node in the SubGraph.
+        # The ROI is the same for all nodes in the Graph.
+        roi = enclosed_region.nodes[list(region_nodes)[0]]['contour'].roi
+        # Check if the region_counter exceeds the length of region_labels
+        # If so, add a suffix to the label.
+        if region_counter > len(region_labels):
+            suffix = str(region_counter // len(region_labels) - 1)
+        else:
+            suffix = ''
+        # Create a label for the enclosed region.
+        region_label = f'{roi}{region_labels[region_counter]}{suffix}'
+        # Assign the label to each contour in the SubGraph.
+        for node in enclosed_region.nodes:
+            contour = enclosed_region.nodes[node]['contour']
+            contour.region_index = region_label
+        # Add the SubGraph to the dictionary.
+        region_counter += 1
+    return contour_graph
+
+
+def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
+                  slice_sequence: SliceSequence) -> None:
+    '''Determine whether the regions that are holes are 'Open' or 'Closed'.
+
+    Args:
+        enclosed_regions (dict): A dictionary of enclosed regions, where each key
+            is a region label and the value is a SubGraph of the contour graph.
+        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
+            for contours, including slice index, contour index, and hole type.
+        slice_sequence (SliceSequence): The slice sequence object containing
+            the slice indices and their neighbors.
+    '''
+    # Select boundary contours that are holes using contour_lookup
+    hole_boundaries = ((contour_lookup['Boundary']) &
+                       (contour_lookup['HoleType'] == 'Unknown'))
+    # Initialize the region hole type to 'Unknown'
+    # Get a list of the RegionIndexes that reference holes
+    hole_regions = contour_lookup.loc[hole_boundaries, 'RegionIndex']
+    hole_regions = list(hole_regions.drop_duplicates())
+    region_hole_type = {region: 'Unknown' for region in hole_regions}
+    # Iterate through each region and determine the hole type
+    boundary_contours = contour_lookup.loc[hole_boundaries, 'Label']
+    for boundary_label in boundary_contours:
+        # Get the contour from the graph
+        boundary_contour = contour_graph.nodes[boundary_label]['contour']
+        # Get the RegionIndex for the boundary contour
+        region_index = boundary_contour.region_index
+        # Get the slice index of the boundary contour
+        this_slice = boundary_contour.slice_index
+        # Determine the slice index just beyond the boundary contour.
+        neighbouring_nodes = contour_graph.adj[boundary_label].keys()
+        # Because it is a boundary contour, there should only be one
+        # neighbouring node.
+        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
+        # Get the slice index of the boundary contour
+        this_slice = boundary_contour.slice_index
+        # Get the slice indexes of neighbouring contours
+        neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
+        # The slice that is not a neighbour of the boundary contour is the
+        # slice beyond the boundary contour.
+        slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
+        beyond = contour_lookup.SliceIndex==slice_beyond
+        contour_labels = list(contour_lookup.loc[beyond].Label)
+        # The boundary is open if no contour contains the boundary contour
+        boundary_closed = False
+        for label in contour_labels:
+            # Get the contour from the graph
+            contour = contour_graph.nodes[label]['contour']
+            if contour.polygon.contains(boundary_contour.polygon):
+                # The hole is closed by the contour
+                boundary_closed = True
+                break
+        if boundary_closed:
+            # The hole is closed by the contour
+            # Region is closed if all boundaries are closed
+            if region_hole_type[region_index] == 'Unknown':
+                region_hole_type[region_index] = 'Closed'
+        else:
+            # The hole is open by the contour
+            # Region is open if any boundary is open
+            region_hole_type[region_index] = 'Open'
+    # Set the hole type for the each region
+    for region, hole_type in region_hole_type.items():
+        # Get the contours in the region
+        region_contours = contour_lookup.RegionIndex == region
+        region_labels = list(contour_lookup.loc[region_contours, 'Label'])
+        # Set the hole type for each contour in the region
+        for label in region_labels:
+            # Get the contour from the graph
+            contour = contour_graph.nodes[label]['contour']
+            # Set the hole type for the contour
+            contour.hole_type = hole_type
+    return contour_graph
+
+
 def build_contour_graph(contour_table, slice_sequence: SliceSequence,
                         roi: ROI_Type) -> Tuple[nx.Graph, pd.DataFrame]:
     '''Build a graph of contours for the specified ROI.
@@ -571,101 +825,16 @@ def build_contour_graph(contour_table, slice_sequence: SliceSequence,
                                     slice_sequence)
     # Add the boundary contours to the graph
     contour_graph, slice_sequence = add_boundary_contours(contour_graph,
-                                                      slice_sequence)
+                                                          slice_sequence)
     # Re-build the Graph indexer
     contour_lookup = build_contour_lookup(contour_graph)
-
-    return contour_graph, contour_lookup
-
-
-def build_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
-    '''Create EnclosedRegion SubGraphs and assign RegionIndexes to the contours.
-
-    Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
-
-    Returns:
-        List[nx.Graph]: A list of SubGraphs, each representing an enclosed region.
-    '''
-    enclosed_regions = {}
-    region_counter = 0
-    region_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    # Find connected contours in the contour graph.
-    for region_nodes in nx.connected_components(contour_graph):
-        # Create a SubGraph for the connected component.
-        enclosed_region = contour_graph.subgraph(region_nodes)
-        # Assign a unique RegionIndex to each contour in the SubGraph.
-        # This index is composed of the ROI number, an uppercase letter and a
-        # suffix number (if needed).)
-        # Extract the ROI from the first node in the SubGraph.
-        # The ROI is the same for all nodes in the Graph.
-        roi = enclosed_region.nodes[list(region_nodes)[0]]['contour'].roi
-        # Check if the region_counter exceeds the length of region_labels
-        # If so, add a suffix to the label.
-        if region_counter > len(region_labels):
-            suffix = str(region_counter // len(region_labels) - 1)
-        else:
-            suffix = ''
-        # Create a label for the enclosed region.
-        region_label = f'{roi}{region_labels[region_counter]}{suffix}'
-        # Assign the label to each contour in the SubGraph.
-        for node in enclosed_region.nodes:
-            contour = enclosed_region.nodes[node]['contour']
-            contour.region_index = region_label
-        # Add the SubGraph to the dictionary.
-        enclosed_regions[region_label] = enclosed_region
-        region_counter += 1
-    return enclosed_regions
-
-
-def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
-                    slice_sequence: SliceSequence) -> None:
-    '''Determine whether the regions that are holes are 'Open' or 'Closed'.
-
-    Args:
-        enclosed_regions (dict): A dictionary of enclosed regions, where each key
-            is a region label and the value is a SubGraph of the contour graph.
-        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
-            for contours, including slice index, contour index, and hole type.
-        slice_sequence (SliceSequence): The slice sequence object containing
-            the slice indices and their neighbors.
-    '''
-    # Select boundary contours that are holes using contour_lookup
-    hole_boundaries = ((contour_lookup['Boundary']) &
-                       (contour_lookup['HoleType'] == 'Unknown'))
-    boundary_contours = contour_lookup.loc[hole_boundaries, 'Label']
-    for boundary_label in boundary_contours:
-        # Get the contour from the graph
-        boundary_contour = contour_graph.nodes[boundary_label]['contour']
-        # Get the slice index of the boundary contour
-        this_slice = boundary_contour.slice_index
-        # Determine the slice index just beyond the boundary contour.
-        neighbouring_nodes = contour_graph.adj[boundary_label].keys()
-        # Because it is a boundary contour, there should only be one
-        # neighbouring node.
-        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
-        # Get the slice index of the boundary contour
-        this_slice = boundary_contour.slice_index
-        # Get the slice indexes of neighbouring contours
-        neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
-        # The slice that is not a neighbour of the boundary contour is the
-        # slice beyond the boundary contour.
-        slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
-        beyond = contour_lookup.SliceIndex==slice_beyond
-        contour_labels = list(contour_lookup.loc[beyond].Label)
-        for label in contour_labels:
-            # Get the contour from the graph
-            contour = contour_graph.nodes[label]['contour']
-            if contour.polygon.contains(boundary_contour.polygon):
-                # The hole is closed by the contour
-                hole_type = 'Closed'
-                break
-        else:
-            # The hole is open if no contour contains the boundary contour
-            hole_type = 'Open'
-        # Set the hole type for the boundary contour
-        # FIXME Set the hole type for the entire region
-        # FIXME region is open if any boundary is open
-        # FIXME region is closed if all boundaries are closed
-        boundary_contour.hole_type = hole_type
-    return contour_graph, contour_lookup
+    # Identify the distinct regions in the graph
+    # and assign the region index to each contour
+    contour_graph = set_enclosed_regions(contour_graph)
+    # Re-build the Graph indexer
+    contour_lookup = build_contour_lookup(contour_graph)
+    # Set the hole type for the regions
+    contour_graph = set_hole_type(contour_graph, contour_lookup, slice_sequence)
+    # Re-build the Graph indexer
+    #contour_lookup = build_contour_lookup(contour_graph)
+    return contour_graph, slice_sequence
