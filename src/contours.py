@@ -929,3 +929,116 @@ def build_contour_graph(contour_table, slice_sequence: SliceSequence,
     # Re-build the Graph indexer
     #contour_lookup = build_contour_lookup(contour_graph)
     return contour_graph, slice_sequence
+
+
+def build_region_table(contour_graph: nx.Graph, contour_lookup: pd.DataFrame) -> pd.DataFrame:
+    '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table for contours.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing RegionSlices with the following columns:
+            - RegionIndex
+            - SliceIndex
+            - RegionSlice
+    '''
+    enclosed_region_data = []
+
+    # Iterate through each unique combination of RegionIndex and SliceIndex
+    for region_index in contour_lookup['RegionIndex'].unique():
+        region_slices = contour_lookup[contour_lookup['RegionIndex'] == region_index]['SliceIndex'].unique()
+        for slice_index in region_slices:
+            # Create a RegionSlice for the given RegionIndex and SliceIndex
+            region_slice = RegionSlice(contour_graph, contour_lookup, region_index, slice_index)
+            # Add the RegionSlice to the DataFrame
+            enclosed_region_data.append({
+                'RegionIndex': region_index,
+                'SliceIndex': slice_index,
+                'RegionSlice': region_slice
+            })
+
+    # Create the enclosed_region DataFrame
+    enclosed_region_table = pd.DataFrame(enclosed_region_data)
+    return enclosed_region_table
+
+
+def calculate_physical_volume(contour_graph: nx.Graph) -> float:
+    '''Calculate the physical volume of a structure.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        float: The physical volume of the structure.
+    '''
+    total_volume = 0.0
+    for _, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        area = contour.polygon.area
+        total_area = 0.0
+        combined_thickness = 0.0
+        for _, _, edge_data in contour_graph.edges(data=True):
+            combined_area = edge_data['match'].combined_area
+            weighted_thickness = edge_data['match'].thickness * combined_area
+            total_area += combined_area
+            combined_thickness += weighted_thickness
+        thickness = combined_thickness / total_area if total_area else 0.0
+        slice_volume = area * thickness
+        if contour.is_hole:
+            slice_volume *= -1
+        total_volume += slice_volume
+    return total_volume
+
+
+def calculate_exterior_volume(contour_graph: nx.Graph) -> float:
+    '''Calculate the exterior volume of a structure.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        float: The exterior volume of the structure.
+    '''
+    total_volume = 0.0
+    for _, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        area = contour.polygon.area
+        total_area = 0.0
+        combined_thickness = 0.0
+        for _, _, edge_data in contour_graph.edges(data=True):
+            combined_area = edge_data['match'].combined_area
+            weighted_thickness = edge_data['match'].thickness * combined_area
+            total_area += combined_area
+            combined_thickness += weighted_thickness
+        thickness = combined_thickness / total_area if total_area else 0.0
+        slice_volume = area * thickness
+        if contour.is_hole:
+            if contour.hole_type == 'Open':
+                slice_volume *= -1
+            elif contour.hole_type == 'Closed':
+                slice_volume = 0
+        total_volume += slice_volume
+    return total_volume
+
+
+def calculate_hull_volume(enclosed_region_table: pd.DataFrame) -> float:
+    '''Calculate the hull volume of a structure.
+
+    Args:
+        enclosed_region_table (pd.DataFrame): The table of enclosed regions.
+
+    Returns:
+        float: The hull volume of the structure.
+    '''
+    total_volume = 0.0
+    for _, row in enclosed_region_table.iterrows():
+        region_slice = row['RegionSlice']
+        if region_slice.is_empty():
+            continue
+        area = region_slice.Polygon.convex_hull.area
+        thickness = region_slice.thickness
+        slice_volume = area * thickness
+        total_volume += slice_volume
+    return total_volume
