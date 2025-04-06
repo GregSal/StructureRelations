@@ -417,8 +417,10 @@ def make_box(width: float, length: float = None, height: float = None,
 
     Args:
         width (float): The x dimension of the box.
-        length (float): The y dimension of the box.
-        height (float): The z dimension of the box.
+        length (float): The y dimension of the box. If length is not supplied,
+            length=width.
+        height (float): The z dimension of the box.  If height is not supplied,
+            height=width.
         spacing (float, optional): The spacing of the slices. Defaults to 0.1.
         num_points (int, optional): The number of points to use for each contour
             (polygon). Defaults to 16.

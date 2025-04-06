@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import warnings
 
 # Shared Packages
+import numpy as np
 import pandas as pd
 
 # %% Type definitions and Globals
@@ -80,13 +81,32 @@ class SliceNeighbours:
         self.previous_slice = SliceIndexType(float(self.previous_slice))
         self.next_slice = SliceIndexType(float(self.next_slice))
 
+    def gap(self, absolute=True) -> Union[int, float]:
+        '''Calculate the gaps between slices.
+
+        If one of the two neighbours is None, then calculate the gap based on
+        the distance between the current slice and the other slice. if absolute
+        is True, return the absolute value of the gap. If both neighbours are
+        None, return NaN.
+
+        Returns:
+            Union[int, float]: The gap between slices.
+        '''
+        if pd.isna(self.previous_slice) and pd.isna(self.next_slice):
+            return np.NaN
+        if pd.isna(self.previous_slice):
+            gap = self.next_slice - self.this_slice
+        elif pd.isna(self.next_slice):
+            gap = self.this_slice - self.previous_slice
+        else:
+            gap = (self.next_slice - self.previous_slice) / 2
+        if absolute:
+            return abs(gap)
+        return gap
+
     def is_neighbour(self, other_slice: SliceIndexType) -> bool:
         '''Check if another slice index is a neighbour.'''
         return self.previous_slice <= other_slice <= self.next_slice
-
-    def gaps(self) -> Union[int, float]:
-        '''Calculate the gaps between slices.'''
-        return abs(self.next_slice - self.previous_slice) / 2
 
     def neighbour_list(self) -> List[SliceIndexType]:
         '''Return a list of neighbours, excluding the current slice.'''

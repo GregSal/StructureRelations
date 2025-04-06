@@ -727,17 +727,25 @@ def add_boundary_contours(contour_graph: nx.Graph,
         neighbouring_nodes = contour_graph.adj[original_boundary].keys()
         # Because degree=1, there should only be one neighbouring node.
         neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
-        # Get in slice index to use for interpolating (slice_beyond) and the
+        # Get slice index to use for interpolating (slice_beyond) and the
         # neighbouring slice references for the interpolated slice.
         if neighbors.previous_slice == neighbour_slice:
             # The next slice is the neighbour for interpolation
             slice_beyond = neighbors.next_slice
+            # If the next slice is not set, use the gap to estimate the next
+            # slice index.
+            if pd.isna(slice_beyond):
+                slice_beyond = this_slice + neighbors.gap(absolute=False)
             # The current boundary slice is the previous slice for the
             # interpolated slice.
             slice_ref['PreviousSlice'] = this_slice
         else:
             # The previous slice is the neighbour for interpolation
             slice_beyond = neighbors.previous_slice
+            # If the next slice is not set, use the gap to estimate the previous
+            # slice index.
+            if pd.isna(slice_beyond):
+                slice_beyond = this_slice - neighbors.gap(absolute=False)
             # The current boundary slice is the next slice for the
             # interpolated slice.
             slice_ref['NextSlice'] = this_slice
