@@ -419,6 +419,8 @@ class ContourMatch:
         contour2 (Contour): The second contour.
         thickness (float): Half the difference between the two slice indices.
         combined_area (float): The sum of the areas of the two contours.
+        direction (int): 1 if the difference between the slice_index of the
+            first and second contours is positive, -1 otherwise.
     '''
 
     def __init__(self, contour1: Contour, contour2: Contour) -> None:
@@ -426,6 +428,7 @@ class ContourMatch:
         self.contour2 = contour2
         self.thickness = abs(contour1.slice_index - contour2.slice_index) / 2
         self.combined_area = contour1.area() + contour2.area()
+        self.direction = 1 if contour2.slice_index > contour1.slice_index else -1
 
 
 class RegionSlice:
