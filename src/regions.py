@@ -1,6 +1,7 @@
 '''Contour Classes and related Functions
 '''
 
+import re
 import pandas as pd
 import networkx as nx
 from shapely.geometry import MultiPolygon
@@ -79,24 +80,6 @@ class RegionSlice:
         self.boundaries = combined_boundaries
         self.external_holes = combined_external_holes
 
-        # Calculate thickness from edges between contours
-        # The RegionSlice thickness is required for calculating Hull volumes.
-        # The best estimate of the thickness is by weighting the thickness of
-        # the edge with the areas of the contours at the other end of the edge.
-        # If one of new neighbouring Contours is a boundary, the thickness
-        # assigned to that edge will be half that of the other edges.
-        # Otherwise the thickness values will all be identical.
-        total_area = 0.0
-        combined_thickness = 0.0
-        for contour_label in contour_labels:
-            edges = list(contour_graph.edges(contour_label, data=True))
-            for edge in edges:
-                combined_area = edge[2]['match'].combined_area
-                weighted_thickness = edge[2]['match'].thickness * combined_area
-                total_area += combined_area
-                combined_thickness += weighted_thickness
-        self.thickness = combined_thickness / total_area
-
 
 def build_region_table(contour_graph: nx.Graph, contour_lookup: pd.DataFrame) -> pd.DataFrame:
     '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
@@ -131,81 +114,57 @@ def build_region_table(contour_graph: nx.Graph, contour_lookup: pd.DataFrame) ->
     return enclosed_region_table
 
 
+def calculate_node_volume(node, edges):
+    '''Calculate a volume for a node based on its edges.
+
+    Args:
+        node (Contour): The contour node for which the volume is calculated.
+        edges (List[Tuple]): A list of edges connected to the node. Each edge
+            contains the edge data with a 'match' attribute of type
+            ContourMatch.
+
+    Returns:
+        float: The calculated volume for the node.
+    '''
+    # Separate edges by direction
+    positive_edges = [edge for edge in edges if edge[2]['match'].direction > 0]
+    negative_edges = [edge for edge in edges if edge[2]['match'].direction < 0]
+
+    def calculate_volume(edges):
+        if not edges:
+            return 0.0
+        num_edges = len(edges)
+        total_combined_area = sum(edge[2]['match'].combined_area
+                                  for edge in edges)
+        node_area = node.polygon.area
+        for edge in edges:
+            neighbour_area = edge[2]['match'].combined_area / node_area
+            thickness = edge[2]['match'].thickness
+            area_weight = ((num_edges + 3) * node_area) / total_combined_area + 1
+            pseudo_volume = (area_weight * neighbour_area * thickness) / 4
+        return pseudo_volume
+
+    node_volume = (calculate_volume(positive_edges) +
+                   calculate_volume(negative_edges))
+    return node_volume
+
+
 def calculate_physical_volume(contour_graph: nx.Graph) -> float:
-    '''Calculate the physical volume of a structure.
+    '''Calculate the physical volume of a ContourGraph.
 
     Args:
         contour_graph (nx.Graph): The graph representation of the contours.
 
     Returns:
-        float: The physical volume of the structure.
+        float: The total physical volume of the ContourGraph.
     '''
     total_volume = 0.0
-    for _, data in contour_graph.nodes(data=True):
+
+    for node, data in contour_graph.nodes(data=True):
         contour = data['contour']
-        area = contour.polygon.area
-        total_area = 0.0
-        combined_thickness = 0.0
-        for _, _, edge_data in contour_graph.edges(data=True):
-            combined_area = edge_data['match'].combined_area
-            weighted_thickness = edge_data['match'].thickness * combined_area
-            total_area += combined_area
-            combined_thickness += weighted_thickness
-        thickness = combined_thickness / total_area if total_area else 0.0
-        slice_volume = area * thickness
+        node_volume = calculate_node_volume(contour, list(contour_graph.edges(node, data=True)))
         if contour.is_hole:
-            slice_volume *= -1
-        total_volume += slice_volume
-    return total_volume
+            node_volume = -node_volume
+        total_volume += node_volume
 
-
-def calculate_exterior_volume(contour_graph: nx.Graph) -> float:
-    '''Calculate the exterior volume of a structure.
-
-    Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
-
-    Returns:
-        float: The exterior volume of the structure.
-    '''
-    total_volume = 0.0
-    for _, data in contour_graph.nodes(data=True):
-        contour = data['contour']
-        area = contour.polygon.area
-        total_area = 0.0
-        combined_thickness = 0.0
-        for _, _, edge_data in contour_graph.edges(data=True):
-            combined_area = edge_data['match'].combined_area
-            weighted_thickness = edge_data['match'].thickness * combined_area
-            total_area += combined_area
-            combined_thickness += weighted_thickness
-        thickness = combined_thickness / total_area if total_area else 0.0
-        slice_volume = area * thickness
-        if contour.is_hole:
-            if contour.hole_type == 'Open':
-                slice_volume *= -1
-            elif contour.hole_type == 'Closed':
-                slice_volume = 0
-        total_volume += slice_volume
-    return total_volume
-
-
-def calculate_hull_volume(enclosed_region_table: pd.DataFrame) -> float:
-    '''Calculate the hull volume of a structure.
-
-    Args:
-        enclosed_region_table (pd.DataFrame): The table of enclosed regions.
-
-    Returns:
-        float: The hull volume of the structure.
-    '''
-    total_volume = 0.0
-    for _, row in enclosed_region_table.iterrows():
-        region_slice = row['RegionSlice']
-        if region_slice.is_empty():
-            continue
-        area = region_slice.Polygon.convex_hull.area
-        thickness = region_slice.thickness
-        slice_volume = area * thickness
-        total_volume += slice_volume
     return total_volume

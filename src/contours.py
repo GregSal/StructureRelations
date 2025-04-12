@@ -452,6 +452,9 @@ class ContourMatch:
         self.contour2 = contour2
         self.thickness = abs(contour1.slice_index - contour2.slice_index) / 2
         self.combined_area = contour1.area() + contour2.area()
+        # FIXME direction is relative to the current node
+        # direction must become a method that take a node as an argument.
+        # the node must be one of the two contours.
         self.direction = 1 if contour2.slice_index > contour1.slice_index else -1
 
 
@@ -791,7 +794,8 @@ def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
         else:
             # The hole is open by the contour
             # Region is open if any boundary is open
-            region_hole_type[region_index] = 'Open'
+            if region_hole_type[region_index] == 'Unknown':
+                region_hole_type[region_index] = 'Open'
     # Set the hole type for the each region
     for region, hole_type in region_hole_type.items():
         # Get the contours in the region
