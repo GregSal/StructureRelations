@@ -2,10 +2,12 @@
 '''
 
 import re
+from typing import List, Tuple
 import pandas as pd
 import networkx as nx
 from shapely.geometry import MultiPolygon
 
+from contours import Contour
 from types_and_classes import SliceIndexType
 
 
@@ -114,7 +116,7 @@ def build_region_table(contour_graph: nx.Graph, contour_lookup: pd.DataFrame) ->
     return enclosed_region_table
 
 
-def calculate_node_volume(node, edges):
+def calculate_node_volume(node: Contour, edges: List[Tuple]) -> float:
     '''Calculate a volume for a node based on its edges.
 
     Args:
@@ -127,21 +129,27 @@ def calculate_node_volume(node, edges):
         float: The calculated volume for the node.
     '''
     # Separate edges by direction
-    positive_edges = [edge for edge in edges if edge[2]['match'].direction > 0]
-    negative_edges = [edge for edge in edges if edge[2]['match'].direction < 0]
+    positive_edges = []
+    negative_edges = []
+    for edge in edges:
+        if edge[2]['match'].direction(node) > 0:
+            positive_edges.append(edge)
+        else:
+            negative_edges.append(edge)
 
     def calculate_volume(edges):
         if not edges:
             return 0.0
         num_edges = len(edges)
-        total_combined_area = sum(edge[2]['match'].combined_area
-                                  for edge in edges)
         node_area = node.polygon.area
+        area_ratio = sum(edge[2]['match'].combined_area / node_area
+                         for edge in edges) - num_edges
+        area_factor = (3 / area_ratio + 1)
+        pseudo_volume = 0.0
         for edge in edges:
-            neighbour_area = edge[2]['match'].combined_area / node_area
+            neighbour_area = edge[2]['match'].combined_area - node_area
             thickness = edge[2]['match'].thickness
-            area_weight = ((num_edges + 3) * node_area) / total_combined_area + 1
-            pseudo_volume = (area_weight * neighbour_area * thickness) / 4
+            pseudo_volume += (area_factor * neighbour_area * thickness) / 4
         return pseudo_volume
 
     node_volume = (calculate_volume(positive_edges) +

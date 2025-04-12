@@ -455,7 +455,26 @@ class ContourMatch:
         # FIXME direction is relative to the current node
         # direction must become a method that take a node as an argument.
         # the node must be one of the two contours.
-        self.direction = 1 if contour2.slice_index > contour1.slice_index else -1
+
+    def direction(self, node: Contour) -> int:
+        '''Get the direction of the contour match.
+
+        Args:
+            node (Contour): The contour node.
+
+        Returns:
+            int: The direction of the match.
+        '''
+        if node.index == self.contour1.index:
+            offset = self.contour2.slice_index - node.slice_index
+            direction = 1 if offset > 0 else -1
+            return direction
+        elif node.index == self.contour2.index:
+           offset = self.contour1.slice_index - node.slice_index
+           direction = 1 if offset > 0 else -1
+           return direction
+        else:
+            raise ValueError('Node is not part of the match.')
 
 
 # %% Contour Table Construction
