@@ -116,7 +116,8 @@ def build_region_table(contour_graph: nx.Graph, contour_lookup: pd.DataFrame) ->
     return enclosed_region_table
 
 
-def calculate_node_volume(node: Contour, edges: List[Tuple]) -> float:
+def calculate_node_volume(node: Contour, edges: List[Tuple],
+                          use_hull=False) -> float:
     '''Calculate a volume for a node based on its edges.
 
     Args:
@@ -124,6 +125,8 @@ def calculate_node_volume(node: Contour, edges: List[Tuple]) -> float:
         edges (List[Tuple]): A list of edges connected to the node. Each edge
             contains the edge data with a 'match' attribute of type
             ContourMatch.
+        use_hull (bool): If True, use the convex hull area for calculations.
+            If False, use the actual area of the contour.
 
     Returns:
         float: The calculated volume for the node.
@@ -137,23 +140,62 @@ def calculate_node_volume(node: Contour, edges: List[Tuple]) -> float:
         else:
             negative_edges.append(edge)
 
-    def calculate_volume(edges):
+    def calculate_area_factor(node: Contour, edges: List[Tuple],
+                              use_hull=False):
+        node_index = node.index
+        total_neighbour_area = 0.0
+        for edge in edges:
+            contour_match = edge[2]['match']
+            index1 = contour_match.contour1.index
+            index2 = contour_match.contour2.index
+            if index2 == node_index:
+                neighbor_contour = contour_match.contour1
+            elif index1 == node_index:
+                neighbor_contour = contour_match.contour2
+            else:
+                raise ValueError("Edge does not connect to the node.")
+            if use_hull:
+                neighbour_area = neighbor_contour.polygon.convex_hull.area
+            else:
+                neighbour_area = neighbor_contour.polygon.area
+            total_neighbour_area += neighbour_area
+        if total_neighbour_area == 0:
+            return 0.0
+        if use_hull:
+            node_area = node.polygon.convex_hull.area
+        else:
+            node_area = node.polygon.area
+
+        area_factor = (3 * node_area / total_neighbour_area + 1) / 4
+        return area_factor
+
+    def calculate_volume(node: Contour, edges: List[Tuple],
+                         use_hull=False):
         if not edges:
             return 0.0
-        num_edges = len(edges)
-        node_area = node.polygon.area
-        area_ratio = sum(edge[2]['match'].combined_area / node_area
-                         for edge in edges) - num_edges
-        area_factor = (3 / area_ratio + 1)
+        node_index = node.index
+        area_factor = calculate_area_factor(node, edges, use_hull)
         pseudo_volume = 0.0
         for edge in edges:
-            neighbour_area = edge[2]['match'].combined_area - node_area
+            contour_match = edge[2]['match']
             thickness = edge[2]['match'].thickness
-            pseudo_volume += (area_factor * neighbour_area * thickness) / 4
+            index1 = contour_match.contour1.index
+            index2 = contour_match.contour2.index
+            if index2 == node_index:
+                neighbor_contour = contour_match.contour1
+            elif index1 == node_index:
+                neighbor_contour = contour_match.contour2
+            else:
+                raise ValueError("Edge does not connect to the node.")
+            if use_hull:
+                neighbour_area = neighbor_contour.polygon.convex_hull.area
+            else:
+                neighbour_area = neighbor_contour.polygon.area
+            pseudo_volume += (area_factor * neighbour_area * thickness)
         return pseudo_volume
 
-    node_volume = (calculate_volume(positive_edges) +
-                   calculate_volume(negative_edges))
+    node_volume = (calculate_volume(node, positive_edges, use_hull) +
+                   calculate_volume(node, negative_edges, use_hull))
     return node_volume
 
 
@@ -167,12 +209,56 @@ def calculate_physical_volume(contour_graph: nx.Graph) -> float:
         float: The total physical volume of the ContourGraph.
     '''
     total_volume = 0.0
-
     for node, data in contour_graph.nodes(data=True):
         contour = data['contour']
-        node_volume = calculate_node_volume(contour, list(contour_graph.edges(node, data=True)))
+        edges = list(contour_graph.edges(node, data=True))
+        node_volume = calculate_node_volume(contour, edges)
         if contour.is_hole:
             node_volume = -node_volume
         total_volume += node_volume
+    return total_volume
 
+
+def calculate_exterior_volume(contour_graph: nx.Graph) -> float:
+    '''Calculate the exterior volume of a ContourGraph.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        float: The total exterior volume of the ContourGraph.
+    '''
+    total_volume = 0.0
+    for node, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        edges = list(contour_graph.edges(node, data=True))
+        node_volume = calculate_node_volume(contour, edges)
+        if contour.is_hole:
+            if contour.hole_type == 'Open':
+                node_volume = -node_volume
+            elif contour.hole_type == 'Closed':
+                node_volume = 0.0
+        total_volume += node_volume
+    return total_volume
+
+
+def calculate_hull_volume(contour_graph: nx.Graph) -> float:
+    '''Calculate the hull volume of an EnclosedRegionTable.
+
+    Note: this is not a true convex hull volume, but rather a volume based on
+    the convex hulls in the xy plane.
+
+    Args:
+        contour_graph (nx.Graph): The graph representation of the contours.
+
+    Returns:
+        float: The total hull volume of the EnclosedRegionTable.
+    '''
+    total_volume = 0.0
+    for node, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        if not contour.is_hole:
+            edges = list(contour_graph.edges(node, data=True))
+            node_volume = calculate_node_volume(contour, edges, use_hull=True)
+            total_volume += node_volume
     return total_volume

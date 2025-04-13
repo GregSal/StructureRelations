@@ -451,10 +451,6 @@ class ContourMatch:
         self.contour1 = contour1
         self.contour2 = contour2
         self.thickness = abs(contour1.slice_index - contour2.slice_index) / 2
-        self.combined_area = contour1.area() + contour2.area()
-        # FIXME direction is relative to the current node
-        # direction must become a method that take a node as an argument.
-        # the node must be one of the two contours.
 
     def direction(self, node: Contour) -> int:
         '''Get the direction of the contour match.
