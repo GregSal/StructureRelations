@@ -216,7 +216,7 @@ def calculate_physical_volume(contour_graph: nx.Graph) -> float:
         if contour.is_hole:
             node_volume = -node_volume
         total_volume += node_volume
-        print(f'Node\t{contour.index}\tVolume\t{node_volume}')
+        #print(f'Node\t{contour.index}\tVolume\t{node_volume}')
     return total_volume
 
 

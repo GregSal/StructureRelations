@@ -1,6 +1,6 @@
 python==3.11.10
 networkx==3.2.1
-shapely==2.0.5
+shapely==2.1.0
 pygraphviz==1.9
 pandas==2.2.2
 matplotlib==3.9.2
