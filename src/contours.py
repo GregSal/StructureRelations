@@ -356,7 +356,7 @@ class Contour:
         self.hole_type = 'None'
         self.is_boundary = False
         self.is_interpolated = False
-        self.region_index = ""  # Default to an empty string
+        self.region_index = ''  # Default to an empty string
         self.contour_index = Contour.counter
         Contour.counter += 1
         self.validate_polygon()
@@ -466,9 +466,9 @@ class ContourMatch:
             direction = 1 if offset > 0 else -1
             return direction
         elif node.index == self.contour2.index:
-           offset = self.contour1.slice_index - node.slice_index
-           direction = 1 if offset > 0 else -1
-           return direction
+            offset = self.contour1.slice_index - node.slice_index
+            direction = 1 if offset > 0 else -1
+            return direction
         else:
             raise ValueError('Node is not part of the match.')
 
