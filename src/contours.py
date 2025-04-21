@@ -825,7 +825,8 @@ def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
     return contour_graph
 
 
-def build_contour_graph(contour_table, slice_sequence: SliceSequence,
+def build_contour_graph(contour_table: pd.DataFrame,
+                        slice_sequence: SliceSequence,
                         roi: ROI_Type) -> Tuple[nx.Graph, pd.DataFrame]:
     '''Build a graph of contours for the specified ROI.
 
