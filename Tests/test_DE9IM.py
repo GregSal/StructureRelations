@@ -1,7 +1,7 @@
 import pytest
 import shapely
 
-from structure_slice import StructureSlice
+from region_slice import RegionSlice
 
 from relations import DE9IM
 from debug_tools import box_points, circle_points
@@ -79,8 +79,8 @@ def test_island():
     circle4 = shapely.Polygon(circle_points(2))
     circle2 = shapely.Polygon(circle_points(1))
     circle3 = shapely.Polygon(circle_points(1.5))
-    a = StructureSlice([circle6, circle4, circle2])
-    b = StructureSlice([circle3])
+    a = RegionSlice([circle6, circle4, circle2])
+    b = RegionSlice([circle3])
     relation = DE9IM(b.contour, a.contour)
     relation_string = '212FF1212'
     matrix = '\n'.join([
@@ -96,8 +96,8 @@ def test_transpose_island():
     circle4 = shapely.Polygon(circle_points(2))
     circle2 = shapely.Polygon(circle_points(1))
     circle3 = shapely.Polygon(circle_points(1.5))
-    a = StructureSlice([circle6, circle4, circle2])
-    b = StructureSlice([circle3])
+    a = RegionSlice([circle6, circle4, circle2])
+    b = RegionSlice([circle3])
     relation = DE9IM(b.contour, a.contour)
     transpose_relation = relation.transpose()
     relation_string = '2F21F1212'

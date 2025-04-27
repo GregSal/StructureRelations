@@ -18,7 +18,7 @@ import networkx as nx
 from types_and_classes import ROI_Type, RegionNode, SliceIndexType, SliceNeighbours, StructurePairType
 from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
 from utilities import calculate_new_slice_index, interpolate_polygon
-from structure_slice import ContourType, StructureSlice, empty_structure
+from region_slice import ContourType, RegionSlice, empty_structure
 
 
 # Global Settings
@@ -587,8 +587,8 @@ class DE27IM():
                 ])) from err
         return relation_int
 
-    def relate_contours(self, contour_a: StructureSlice,
-                        contour_b: StructureSlice,
+    def relate_contours(self, contour_a: RegionSlice,
+                        contour_b: RegionSlice,
                         adjustments: List[str] = None)->str:
         '''Get the 27 bit relationship for two structures on a given slice.
         Possible adjustments are:
@@ -604,8 +604,8 @@ class DE27IM():
         '''
         # If contour_a and contour_b are both StructureSlices, then get the
         # full 27 bit relationship.
-        if isinstance(contour_a, StructureSlice):
-            if isinstance(contour_b, StructureSlice):
+        if isinstance(contour_a, RegionSlice):
+            if isinstance(contour_b, RegionSlice):
                 contour = DE9IM(contour_a.contour, contour_b.contour)
                 external = DE9IM(contour_a.exterior, contour_b.contour)
                 convex_hull = DE9IM(contour_a.hull, contour_b.contour)

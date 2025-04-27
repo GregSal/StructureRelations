@@ -14,14 +14,14 @@ import shapely
 # Local packages
 from types_and_classes import PRECISION
 
-from structure_slice import StructureSlice
+from region_slice import RegionSlice
 
 from utilities import find_intersection, generate_orthogonal_lines
 
 
 # %% Distance Functions
-def calculate_orthogonal_distances(primary: StructureSlice,
-                                   secondary: StructureSlice,
+def calculate_orthogonal_distances(primary: RegionSlice,
+                                   secondary: RegionSlice,
                                    coverage: str,
                                    use_centre: str,
                                    precision: int = PRECISION
