@@ -352,11 +352,12 @@ class Contour:
         self.polygon = polygon
         self.thickness = self.default_thickness
         self.is_hole = False
-        self.hole_reference = None
+        self.related_contours = []
         self.hole_type = 'None'
         self.is_boundary = False
         self.is_interpolated = False
         self.region_index = ''  # Default to an empty string
+        self.related_regions = []
         self.contour_index = Contour.counter
         Contour.counter += 1
         self.validate_polygon()
@@ -399,27 +400,33 @@ class Contour:
         If the polygon overlaps an existing contour, raise an error.
 
         Args:
-            contours (List['Contour']): A list of existing contours.
+            contours (List['Contour']): An ordered list of existing contours
+                from largest area to smallest area.
 
         Raises:
             InvalidContour: Raised if the new contour overlaps an existing
                 contour in the list.
         '''
         for existing_contour in reversed(contours):
-            if existing_contour.is_hole:
-                # If the existing contour is a hole, the new contour cannot be
-                # its hole
-                continue
+            # starting from the largest contour and working down to the smallest
             if self.polygon.within(existing_contour.polygon):
-                # New contour is completely within the existing contour
-                self.is_hole = True
-                self.hole_reference = existing_contour.contour_index
-                self.hole_type = 'Unknown'
-                break  # Stop checking once a containing contour is found
-            if self.polygon.overlaps(existing_contour.polygon):
+                if existing_contour.is_hole:
+                    # If the existing contour is a hole, the new contour cannot
+                    # be its hole, but it could be an island and should be
+                    # recorded as an embedded contour.
+                    self.related_contours.append(existing_contour.contour_index)
+                    existing_contour.related_contours.append(self.contour_index)
+                else:
+                    # New contour is completely within the existing contour
+                    self.is_hole = True
+                     # Set the hole reference to the existing contour index
+                    self.related_contours.append(existing_contour.contour_index)
+                    existing_contour.related_contours.append(self.contour_index)
+                    self.hole_type = 'Unknown'
+
+            elif self.polygon.overlaps(existing_contour.polygon):
                 # New contour overlaps an existing contour, raise an error
                 raise InvalidContour('New contour overlaps an existing contour.')
-
 
     def validate_polygon(self) -> None:
         '''Validate the polygon to ensure it is valid.'''
@@ -477,13 +484,13 @@ class ContourMatch:
 def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
                                                                   SliceSequence]:
     '''Build a contour table from a list of Contour objects.
+
     The table contains the following columns:
         ROI, Slice, Points, Polygon, Area
-        The Polygon column contains the polygons generated from the points.
-        The Area column contains the area of the polygons.
-        The table is sorted by ROI, Slice and Area.
-        The slice sequence is generated from the Slice column.
-        The slice sequence is a list of slices in the order they are encountered.
+    The Polygon column contains the polygons generated from the points. The Area
+    column contains the area of the polygons. The table is sorted by ROI, Slice
+    and by descending area. The slice sequence is generated from the Slice
+    column.
 
     Args:
         slice_data (List[ContourPoints]): A list of Contour objects.
@@ -491,15 +498,16 @@ def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
     Returns:
         tuple: A tuple containing the contour table and the slice sequence.
             contour_table (pd.DataFrame): The contour table.
-            slice_sequence (SliceSequence): The slice sequence.
+        slice_sequence (SliceSequence): An ordered list of all slice indexes in
+            use and their neighbours.
     '''
     contour_table = pd.DataFrame(slice_data)
     # Convert the contours points to polygons and calculate their areas
     contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
     contour_table['Area'] = contour_table['Polygon'].apply(lambda poly: poly.area)
     # Sort the contours by ROI, Slice and decreasing Area
-    # Decreasing area is important because that an earlier contour cannot be inside
-    # a later one.
+    # Decreasing area is important because that an earlier contour cannot be
+    # inside a later one.
     contour_table.sort_values(by=['ROI', 'Slice', 'Area'],
                         ascending=[True, True, False],
                         inplace=True)
@@ -522,7 +530,8 @@ def build_contours(contour_table, roi):
 
     Returns:
         dict: A dictionary where keys are slice indices and values are lists of
-              Contour objects for that slice.
+              Contour objects for that slice. Each list of contours is sorted
+              by area in order of descending area.
     '''
     # Filter the contour table for the specified ROI
     contour_set = contour_table[contour_table.ROI == roi]
@@ -536,7 +545,9 @@ def build_contours(contour_table, roi):
         contours_on_slice = contour_by_slice[slice_index]
         new_contour = Contour(roi, slice_index, contour, contours_on_slice)
         contour_by_slice[slice_index].append(new_contour)
-
+    # Sort the contours on each slice by area in order of descending area
+    for slice_index in contour_by_slice:
+        contour_by_slice[slice_index].sort(key=lambda c: c.area, reverse=True)
     return contour_by_slice
 
 
@@ -744,7 +755,14 @@ def set_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
         for node in enclosed_region.nodes:
             contour = enclosed_region.nodes[node]['contour']
             contour.region_index = region_label
-        # Add the SubGraph to the dictionary.
+            # Add the region label to the related_regions
+            # get the related_contours for the contour
+            related_contours_list = contour.related_contours
+            # Find all contours where the contour_index is in the
+            # related_contours list.
+            for related_contour in contour_graph.nodes.data('contour').values():
+                if related_contour.contour_index in related_contours_list:
+                    related_contour.related_regions.append(region_label)
         region_counter += 1
     return contour_graph
 
@@ -754,8 +772,7 @@ def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
     '''Determine whether the regions that are holes are 'Open' or 'Closed'.
 
     Args:
-        enclosed_regions (dict): A dictionary of enclosed regions, where each key
-            is a region label and the value is a SubGraph of the contour graph.
+        contour_graph (nx.Graph): The graph representation of the contours.
         contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
             for contours, including slice index, contour index, and hole type.
         slice_sequence (SliceSequence): The slice sequence object containing
@@ -836,6 +853,9 @@ def build_contour_graph(contour_table: pd.DataFrame,
 
     Args:
         contour_table (pd.DataFrame): The contour table containing contour data.
+            The table must be sorted by descending area, or holes will not be identified properly.
+        slice_sequence (SliceSequence): The slice sequence object containing
+            the slice indices and their neighbors.
         roi (int): The ROI number to filter contours.
 
     Returns:
