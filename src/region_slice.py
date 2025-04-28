@@ -14,36 +14,51 @@ import pandas as pd
 import networkx as nx
 import shapely
 
-from contours import Contour
-from types_and_classes import SliceIndexType
-
 # Local packages
-
+from contours import Contour, build_contour_lookup
+from types_and_classes import SliceIndexType
 
 
 # %% StructureSlice Class
 class RegionSlice():
-    '''Class representing a slice of an enclosed region.
+    '''Class representing all regions of a structure on a specific slice.
 
-    *** This text need fixing***
-    Iteratively create a shapely MultiPolygon from a list of shapely Polygons.
-    polygons that are contained within the already formed MultiPolygon are
-    treated as holes and subtracted from the MultiPolygon.  Polygons
-    overlapping with the already formed MultiPolygon are rejected. Polygons that
-    are disjoint with the already formed MultiPolygon are combined with a union.
+    The class contains multiple lists of Shapley MultiPolygons. The lists
+    are:
+        - regions: Each MultiPolygon defines the polygons on the slice that
+            are part of a unique contiguous 3D region (A contiguous 3D region
+            may have multiple polygons on a given slice that converge on a
+            different slice). The Polygons also include any holes (voids) in the
+            region.
+        - boundaries: Each MultiPolygon includes the polygons on the slice that
+            are part of the related 3D region but are local boundaries of that
+            region.  The boundaries are kept distinct from the regions to allow
+            for corrections to relationship tests for the structure.
+        - open_holes: Each MultiPolygon includes the polygons on the slice that
+            define holes in the related  region which are open to the exterior
+            of the structure. In other words, holes that describe concave
+            portions of the 3D region, which appear as interior holes on the
+            particular slice. The holes are not part of the region.  The holes
+            are kept distinct from the regions to allow for accurate
+            identification of the exterior surface of the 3D region.
 
-    Two custom properties exterior and hull are defined. Exterior returns the
-    equivalent with all holes filled in.  Hull returns a MultiPolygon that is
-    the convex hull surrounding the entire MultiPolygon.
-    		○ For each slice:
-			§ For each region on the slice
-				□ Select all contours with the specified region on the slice
-				□ Select all contours from related regions that are on the same slice
-				□ Sort the selected contours in order of descending size.
-			§ Subtract any holes on the slice
-			§ Holes and contours must be subtracted in size order or islands will be lost.
-			§ Combine all exterior holes on the slice and assign to the holes attribute
-			§ If contour is a boundary assign it to the boundary attribute. ,
+    The RegionSlice is constructed from the structure's contour_graph. The
+    contour_graph is a NetworkX graph that contains all the contours of the
+    structure. The nodes of the graph contain Contour objects and the edges link
+    to matching contours on the previous and next slices. Each contour in the
+    graph contains an index identifying which unique region it belongs to. The
+    contour also contains information regarding the type of contour/regions it
+    defines: a boundary, an open or closed hole, or a regular part of the region.
+
+    The custom properties exterior and hull are defined:
+        - Exterior: Returns the equivalent list of MultiPolygon regions with all
+            closed (internal) holes filled in.
+        - Hull: Returns an equivalent list of MultiPolygons, representing the
+            convex hulls of each region.
+
+    The is_empty property is defined to check if the slice is empty. The slice is
+        considered empty if all the regions and boundaries are empty.
+    The __bool__ method uses the is_empty function in a boolean context.
 
 
     Args:
@@ -69,16 +84,23 @@ class RegionSlice():
             holes filled in.
         hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
             surrounding the contour MultiPolygon.
+        is_empty (bool): True if the slice is empty, False otherwise.
     '''
 
-    def __init__(self, contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
-                 slice_index: SliceIndexType) -> None:
+    def __init__(self, contour_graph: nx.Graph, slice_index: SliceIndexType) -> None:
         '''Iteratively create a list of regions for the specified slice, from a
         contour graph.
 
         Args:
-            contours (List[shapely.Polygon]): A list of polygons to be merged
-            into a single MultiPolygon.
+            contour_graph (nx.Graph): A NetworkX graph that contains all the
+                contours of the structure. The nodes of the graph contain
+                a 'contour' data item which is a Contour object.  The edges of
+                the graph link to matching contours on the previous and next
+                slices. Each Contour object in the graph contains an index
+                identifying which unique region it belongs to. The Contour
+                object also contains information regarding the type of
+                contour/regions it defines: a boundary, an open or closed hole,
+                or a regular part of the region.
         '''
         def get_region_contours(contour_reference: pd.DataFrame,
                                 related_regions: List[str])->List[Contour]:
@@ -90,6 +112,7 @@ class RegionSlice():
             return region_contours
 
         self.slice_index = slice_index
+        contour_lookup = build_contour_lookup(contour_graph)
         # Filter contours by SliceIndex and contour type
         # Only contours that are not interpolated, holes or boundaries are
         # used to select the regions.
@@ -119,19 +142,18 @@ class RegionSlice():
             related_regions = {region_index}
             for contour in region_contours:
                 related_regions.update(set(contour['related_regions']))
-            # Modify region_selection to include all related regions
-            region_selection = contour_reference['RegionIndex'].isin(related_regions)
-            region_reference = contour_reference.loc[region_selection]
-            contour_labels = region_reference['Label'].tolist()
-            region_contours = contour_graph.nodes.data('contour')[contour_labels]
+            # Modify region_contours to include all related regions
+            region_contours = get_region_contours(contour_reference,
+                                                  list(related_regions))
             # Sort the contours by area in descending order
             region_contours = sorted(region_contours, key=lambda x: x[1].area,
                                      reverse=True)
+            # Initialize region, boundary and open holes with empty MultiPolygons.
             region = shapely.MultiPolygon()
             boundary = shapely.MultiPolygon()
             open_hole = shapely.MultiPolygon()
             contour_labels = []
-            # Combine the contours into the appropriate MultiPolygons
+            # Add the contours into the appropriate MultiPolygons
             for contour in region_contours:
                 contour_labels.append(contour.index)
                 # Check whether the contour is a boundary
@@ -152,7 +174,12 @@ class RegionSlice():
                         open_hole = open_hole.union(contour.polygon)
                 else:
                     region = region.union(contour.polygon)
-            # Assign attributes
+            # Add the MultiPolygons into the appropriate lists.  An empty
+            # MultiPolygon is added to the list if there are no appropriate
+            # contours in the regions.  As a result the lengths of the lists
+            # will be the same and the region, boundary and open holes
+            # MultiPolygons will match one-to-one. The contour_indexes and
+            # region_indexes reference lists will also match.
             self.regions.append(region)
             self.boundaries.append(boundary)
             self.open_holes.append(open_hole)
@@ -300,7 +327,7 @@ def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:
 
 
 def build_region_table(contour_graph: nx.Graph,
-                       contour_lookup: pd.DataFrame) -> pd.DataFrame:
+                       slice_sequence: pd.DataFrame) -> pd.DataFrame:
     '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
 
     ***This Text needs Correcting***
@@ -319,13 +346,14 @@ def build_region_table(contour_graph: nx.Graph,
     enclosed_region_data = []
 
     # Iterate through each unique combination of RegionIndex and SliceIndex
-    for slice_index in contour_lookup['SliceIndex'].unique():
+    for slice_index in slice_sequence.slices():
         # Create a RegionSlice for the given SliceIndex
-        region_slice = RegionSlice(contour_graph, contour_lookup, slice_index)
+        region_slice = RegionSlice(contour_graph, slice_index)
         # Add the RegionSlice to the DataFrame
         enclosed_region_data.append({
             'SliceIndex': slice_index,
-            'RegionSlice': region_slice
+            'RegionSlice': region_slice,
+            'Empty': region_slice.is_empty
         })
 
     # Create the enclosed_region DataFrame

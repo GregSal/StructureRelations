@@ -1,14 +1,13 @@
 '''Contains the structure class.
 '''
 
-import re
 from typing import List, Tuple
+
 import pandas as pd
 import networkx as nx
-from shapely import Polygon
-from shapely.geometry import MultiPolygon
 
-from contours import Contour, ContourMatch, build_contour_graph, build_contour_lookup, interpolate_polygon
+from contours import Contour, ContourMatch, build_contour_graph
+from contours import build_contour_lookup, interpolate_polygon
 from types_and_classes import ROI_Type, ContourIndex, SliceIndexType
 from types_and_classes import SliceSequence
 
