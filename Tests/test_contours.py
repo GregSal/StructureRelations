@@ -1,0 +1,242 @@
+import unittest
+import shapely
+from shapely.geometry import Polygon
+from src.contours import (
+    points_to_polygon, calculate_new_slice_index, interpolate_polygon,
+    ContourPoints, Contour, ContourMatch, build_contour_table,
+    build_contours, build_contour_lookup, add_graph_edges,
+    add_boundary_contours, set_enclosed_regions, set_hole_type,
+    build_contour_graph
+)
+from src.types_and_classes import InvalidContour, ROI_Type, SliceIndexType
+import pandas as pd
+import networkx as nx
+
+class TestPointsToPolygon(unittest.TestCase):
+    '''Test the points_to_polygon function.'''
+    def test_valid_polygon(self):
+        '''Test that a valid set of points creates a valid polygon.'''
+        points = [(0, 0), (1, 0), (1, 1), (0, 1)]
+        polygon = points_to_polygon(points)
+        self.assertTrue(polygon.is_valid)
+
+    def test_invalid_polygon(self):
+        '''Test that an invalid set of points raises an InvalidContour error.'''
+        points = [(0, 0), (1, 0), (0, 1), (0, 0)]  # Self-intersecting
+        with self.assertRaises(InvalidContour):
+            points_to_polygon(points)
+
+class TestCalculateNewSliceIndex(unittest.TestCase):
+    def test_single_slice(self):
+        '''Test that a single slice index is returned correctly.'''
+        self.assertEqual(calculate_new_slice_index(5.0), 5.0)
+
+    def test_multiple_slices(self):
+        '''Test that two slice indices return the correct average.'''
+        self.assertEqual(calculate_new_slice_index([1.0, 2.0]), 1.5)
+
+    def test_precision_parameter(self):
+        '''Test that the precision parameter rounds the slice index correctly.
+        '''
+        slices = [1.12345, 1.12355]
+        result = calculate_new_slice_index(slices, precision=4)
+        self.assertEqual(result, 1.1235)
+
+    def test_precision_parameter_with_excessive_rounding(self):
+        '''Test that the precision parameter raises an error when the
+        calculated slice is out of bounds.
+        '''
+        slices = [1.12345, 1.12355]
+        with self.assertRaises(ValueError):
+            calculate_new_slice_index(slices, precision=0)
+
+class TestInterpolatePolygon(unittest.TestCase):
+    '''Test the interpolate_polygon function.'''
+    def test_interpolation_offset(self):
+        '''Test that interpolation between two identical sized, but shifted
+        polygons returns a correct interpolation.
+
+        First polygon is 2x2 centred on 0,0 and the second is 2x2 centred on 1,1.
+        The expected result is a 1x1 polygon centred on 0.5,0.5.
+        '''
+        p1 = Polygon([(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)])
+        p2 = Polygon([(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)])
+        expected_polygon = Polygon([(0, 0), (1, 0),
+                                    (1, 1), (0, 1)])
+        interpolated = interpolate_polygon([0, 1], p1, p2)
+        self.assertTrue(interpolated.is_valid)
+        self.assertTrue(interpolated.equals(expected_polygon))
+
+    def test_interpolation_scale(self):
+        '''Test that interpolation between two polygons returns a valid
+        polygon.
+
+        First polygon is 1x1 centred on 0,0 and the second is 1x1 centred on 1,1.
+        The expected result is a 1x1 polygon centred on 0.5,0.5.
+        '''
+        p1 = Polygon([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])
+        p2 = Polygon([(0.5, 0.5), (1.5, 0.5), (1.5, 1.5), (0.5, 1.5)])
+        expected_polygon = Polygon([(0.5, 0.5), (1.5, 0.5),
+                                    (1.5, 1.5), (0.5, 1.5)])
+        interpolated = interpolate_polygon([0, 1], p1, p2)
+        self.assertTrue(interpolated.is_valid)
+        self.assertTrue(interpolated.equals(expected_polygon))
+
+    def test_identical_polygons(self):
+        '''Test that interpolation of two identical polygons returns the same
+        polygon.
+        '''
+        p1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        p2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        interpolated = interpolate_polygon([0, 1], p1, p2)
+        self.assertTrue(interpolated.equals(p1))
+        self.assertTrue(interpolated.equals(p2))
+
+    def test_single_polygon_half_size(self):
+        '''Test that interpolation with a single polygon returns a polygon with
+        the same shape, but half the size.
+        '''
+        p1 = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
+        interpolated = interpolate_polygon([0], p1)
+        shape_difference = shapely.affinity.scale(p1, 0.5, 0.5)  - interpolated
+        self.assertAlmostEqual(interpolated.area, p1.area / 4)
+        self.assertAlmostEqual(shape_difference.area, 0.0)
+
+    def test_polygon_with_hole(self):
+        '''Test that interpolation works for a polygon with a hole.
+
+        Test interpolation of a constant outer polygon with a hole in the
+        first polygon.
+        '''
+        exterior = [(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)]
+        hole = [(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)]
+        p1 = Polygon(shell=exterior, holes=[hole])
+        p2 = Polygon(shell=exterior)
+        interpolated = interpolate_polygon([0, 1], p1, p2)
+        poly_hole = Polygon(hole)
+        interp_hole = Polygon(interpolated.interiors[0])
+        shape_difference = shapely.affinity.scale(interp_hole, 0.5, 0.5)  - interp_hole
+        self.assertAlmostEqual(shape_difference.area, 0.0)
+        self.assertAlmostEqual(interp_hole.area, poly_hole.area / 4)
+
+class TestContourPoints(unittest.TestCase):
+    '''Test the ContourPoints class.'''
+    def test_initialization(self):
+        '''Test that the ContourPoints class initializes correctly.'''
+        points = [(0, 0, 0.5), (1, 0, 0.5), (1, 1, 0.5)]
+        contour_points = ContourPoints(points, roi=1)
+        self.assertEqual(contour_points['ROI'], 1)
+        self.assertEqual(contour_points['Slice'], 0.5)
+        self.assertEqual(len(contour_points['Points']), 3)
+
+    def test_error_when_no_slice_index_and_invalid_points(self):
+        '''Test that ContourPoints raises an error when points are 2D and
+        slice_index is not provided.
+        '''
+        points = [(0, 0), (1, 0), (1, 1)]  # 2D points
+        with self.assertRaises(InvalidContour):
+            ContourPoints(points, roi=1)
+
+    def test_error_when_z_coordinate_not_constant(self):
+        '''Test that ContourPoints raises an error when the z-coordinate
+        is not constant.
+        '''
+        points = [(0, 0, 0), (1, 0, 1), (1, 1, 0)]  # Non-constant z-coordinates
+        with self.assertRaises(InvalidContour):
+            ContourPoints(points, roi=1)
+
+class TestContour(unittest.TestCase):
+    def test_initialization(self):
+        '''Test that the Contour class initializes correctly.'''
+        polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        contour = Contour(roi=1, slice_index=0.0, polygon=polygon, contours=[])
+        self.assertEqual(contour.roi, 1)
+        self.assertEqual(contour.slice_index, 0.0)
+
+    def test_sequential_contour_index(self):
+        '''Test that contour_index is assigned sequentially for each new
+        Contour instance.'''
+        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        contour2 = Contour(roi=1, slice_index=1.0, polygon=polygon1, contours=[])
+        self.assertEqual(contour1.contour_index + 1, contour2.contour_index)
+
+    def test_identify_holes(self):
+        '''Test that the Contour class correctly identifies holes.
+        '''
+        outer_polygon = Polygon([(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)])
+        hole_polygon = Polygon([(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)])
+
+        # Create the outer contour first
+        outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
+                                contours=[])
+        # Create the hole contour and pass the outer contour in the contours list
+        hole_contour = Contour(roi=1, slice_index=0.0, polygon=hole_polygon,
+                               contours=[outer_contour])
+        # Check that the hole contour is identified correctly
+        self.assertTrue(hole_contour.is_hole)
+        # Check that related_contours are set correctly for both contours
+        self.assertEqual(hole_contour.related_contours,
+                         [outer_contour.contour_index])
+        self.assertEqual(outer_contour.related_contours,
+                         [hole_contour.contour_index])
+
+    def test_identify_islands(self):
+        '''Test that the Contour class correctly identifies islands.
+        '''
+        outer_polygon = Polygon([(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)])
+        hole_polygon = Polygon([(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)])
+        hole_polygon = Polygon([(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)])
+
+        # Create the outer contour first
+        outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
+                                contours=[])
+        # Create the hole contour and pass the outer contour in the contours list
+        hole_contour = Contour(roi=1, slice_index=0.0, polygon=hole_polygon,
+                               contours=[outer_contour])
+        # Check that the hole contour is identified correctly
+        self.assertTrue(hole_contour.is_hole)
+        # Check that related_contours are set correctly for both contours
+        self.assertEqual(hole_contour.related_contours,
+                         [outer_contour.contour_index])
+        self.assertEqual(outer_contour.related_contours,
+                         [hole_contour.contour_index])
+
+
+class TestBuildContourTable(unittest.TestCase):
+    def test_table_creation(self):
+        slice_data = [
+            ContourPoints([(0, 0, 0), (1, 0, 0), (1, 1, 0)], roi=1),
+            ContourPoints([(0, 0, 1), (1, 0, 1), (1, 1, 1)], roi=1)
+        ]
+        table, sequence = build_contour_table(slice_data)
+        self.assertEqual(len(table), 2)
+
+class TestBuildContours(unittest.TestCase):
+    def test_contour_building(self):
+        contour_table = pd.DataFrame({
+            'ROI': [1, 1],
+            'Slice': [0.0, 1.0],
+            'Points': [[(0, 0, 0), (1, 0, 0), (1, 1, 0)],
+                       [(0, 0, 1), (1, 0, 1), (1, 1, 1)]]
+        })
+        contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
+        contours = build_contours(contour_table, roi=1)
+        self.assertIn(0.0, contours)
+        self.assertIn(1.0, contours)
+
+class TestBuildContourGraph(unittest.TestCase):
+    def test_graph_building(self):
+        contour_table = pd.DataFrame({
+            'ROI': [1, 1],
+            'Slice': [0.0, 1.0],
+            'Points': [[(0, 0, 0), (1, 0, 0), (1, 1, 0)],
+                       [(0, 0, 1), (1, 0, 1), (1, 1, 1)]]
+        })
+        contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
+        slice_sequence = pd.Series([0.0, 1.0])
+        graph, _ = build_contour_graph(contour_table, slice_sequence, roi=1)
+        self.assertIsInstance(graph, nx.Graph)
+
+if __name__ == '__main__':
+    unittest.main()

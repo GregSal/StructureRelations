@@ -53,6 +53,10 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
     '''
     if isinstance(slices, (list, tuple)):
         new_slice = round(np.mean(slices), precision)
+        min_slice = round(min(slices), precision)
+        max_slice = round(max(slices), precision)
+        if not (min_slice <= new_slice <= max_slice):
+            raise ValueError("Calculated slice is out of bounds after rounding.")
         return new_slice
     else:
         return slices
@@ -242,7 +246,7 @@ class ContourPoints(dict):
             if len(points[0]) == 3:
                 slice_index = points[0][2]
             else:
-                slice_index = 0.0
+                raise InvalidContour("Slice index not provided and points are 2D.")
         else:
             # Verify that the slice is a float or integer
             try:
@@ -295,6 +299,11 @@ class ContourPoints(dict):
             else:
                 if point_dim != this_point_dim:
                     raise InvalidContour("All points must have the same length.")
+                # If points are 3D, verify that all z coordinates match the
+                # slice index
+                if this_point_dim == 3 and point[2] != slice_index:
+                    raise InvalidContour('All 3D points must have the same z '
+                                         'coordinate (slice index).')
             # If points are 2D, add slice as the z-coordinate.
             if this_point_dim == 2:
                 point = point + (slice_index,)
