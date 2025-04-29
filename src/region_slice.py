@@ -244,15 +244,14 @@ class RegionSlice():
         hull_regions = []
         for region in self.regions:
             if region.is_empty:
-                continue
-            solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                      for poly in region.geoms]
-            solid = shapely.unary_union(solids)
-            if isinstance(solid, shapely.MultiPolygon):
-                hull_poly = shapely.MultiPolygon(solid)
+                hull_regions.append(region)
             else:
-                hull_poly = shapely.MultiPolygon([solid])
-            hull_regions.append(hull_poly)
+                hull = region.convex_hull
+                if isinstance(hull, shapely.MultiPolygon):
+                    hull_poly = shapely.MultiPolygon(hull)
+                else:
+                    hull_poly = shapely.MultiPolygon([hull])
+                hull_regions.append(hull_poly)
         return hull_regions
 
     @property
