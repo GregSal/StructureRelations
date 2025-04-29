@@ -17,6 +17,7 @@ import shapely
 # Local packages
 from contours import Contour, build_contour_lookup
 from types_and_classes import SliceIndexType
+from utilities import make_multi
 
 
 # %% StructureSlice Class
@@ -189,9 +190,9 @@ class RegionSlice():
             # will be the same and the region, boundary and open holes
             # MultiPolygons will match one-to-one. The contour_indexes and
             # region_indexes reference lists will also match.
-            self.regions.append(region)
-            self.boundaries.append(boundary)
-            self.open_holes.append(open_hole)
+            self.regions.append(make_multi(region))
+            self.boundaries.append(make_multi(boundary))
+            self.open_holes.append(make_multi(open_hole))
             self.contour_indexes.append(contour_labels)
             self.region_indexes.append(related_regions)
         # Label the RegionSlice as Interpolated if all contours on the slice are
@@ -217,10 +218,7 @@ class RegionSlice():
             solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
                       for poly in region.geoms]
             solid = shapely.unary_union(solids)
-            if isinstance(solid, shapely.MultiPolygon):
-                ext_poly = shapely.MultiPolygon(solid)
-            else:
-                ext_poly = shapely.MultiPolygon([solid])
+            ext_poly = make_multi(solid)
             # Subtract open holes
             if not hole.is_empty:
                 ext_poly = ext_poly = ext_poly - hole
@@ -247,10 +245,7 @@ class RegionSlice():
                 hull_regions.append(region)
             else:
                 hull = region.convex_hull
-                if isinstance(hull, shapely.MultiPolygon):
-                    hull_poly = shapely.MultiPolygon(hull)
-                else:
-                    hull_poly = shapely.MultiPolygon([hull])
+                hull_poly = make_multi(hull)
                 hull_regions.append(hull_poly)
         return hull_regions
 

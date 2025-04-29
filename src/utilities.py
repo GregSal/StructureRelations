@@ -1,7 +1,7 @@
 '''Utility Functions'''
 # %% Imports
 # Type imports
-from typing import List
+from typing import List, Union
 
 # Shared Packages
 import shapely
@@ -68,3 +68,19 @@ def poly_round(polygon: shapely.Polygon,
         raise ValueError(f"Invalid coordinate dimension: {dim}")
     clean_poly = shapely.Polygon(polygon_points)
     return clean_poly
+
+# %% Polygon Functions
+def make_multi(poly: Union[shapely.Polygon, shapely.MultiPolygon]
+               ) -> shapely.MultiPolygon:
+    '''Convert a polygon to a multipolygon.
+    Args:
+        poly (Union[shapely.Polygon, shapely.MultiPolygon]): The polygon to
+            convert.
+    Returns:
+        shapely.MultiPolygon: The converted multipolygon.
+    '''
+    if isinstance(poly, shapely.MultiPolygon):
+        multi_poly = shapely.MultiPolygon(poly)
+    else:
+        multi_poly = shapely.MultiPolygon([poly])
+    return multi_poly
