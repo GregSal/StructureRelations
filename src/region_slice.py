@@ -85,6 +85,8 @@ class RegionSlice():
         hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
             surrounding the contour MultiPolygon.
         is_empty (bool): True if the slice is empty, False otherwise.
+        is_interpolated (bool): True if all contours in the slice are
+            interpolated, False otherwise.
     '''
 
     def __init__(self, contour_graph: nx.Graph, slice_index: SliceIndexType) -> None:
@@ -108,7 +110,8 @@ class RegionSlice():
             region_selection = contour_reference['RegionIndex'].isin(related_regions)
             region_reference = contour_reference.loc[region_selection]
             contour_labels = region_reference['Label'].tolist()
-            region_contours = contour_graph.nodes.data('contour')[contour_labels]
+            contour_data = dict(contour_graph.nodes.data('contour'))
+            region_contours = [contour_data[label] for label in contour_labels]
             return region_contours
 
         self.slice_index = slice_index
@@ -121,16 +124,18 @@ class RegionSlice():
                              'HoleType', 'Interpolated', 'Boundary']
         contour_reference = contour_lookup.loc[selected_contours,
                                                reference_columns]
-        regular_contours = (~contour_reference['Boundary'] &
-                            ~contour_reference['Interpolated'] &
-                            (contour_reference['HoleType'] == 'None'))
-        region_set = set(contour_reference.loc[regular_contours, 'RegionIndex'])
+        #regular_contours = (~contour_reference['Boundary'] &
+        #                    ~contour_reference['Interpolated'] &
+        #                    (contour_reference['HoleType'] == 'None'))
+        #region_set = set(contour_reference.loc[regular_contours, 'RegionIndex'])
+        region_set = set(contour_reference.RegionIndex)
         # Initialize the region lists
         self.region_indexes = []
         self.contour_indexes = []
         self.regions = []
         self.boundaries = []
         self.open_holes = []
+        interpolated_contours = []
         # Iterate through the regions on the slice
         while len(region_set) > 0:
             # Get the contours for the selected region.
@@ -141,12 +146,14 @@ class RegionSlice():
             # on the slice.
             related_regions = {region_index}
             for contour in region_contours:
-                related_regions.update(set(contour['related_regions']))
+                related_regions.update(set(contour.related_regions))
+            # Remove the regions that have already been processed.
+            region_set = region_set - related_regions
             # Modify region_contours to include all related regions
             region_contours = get_region_contours(contour_reference,
                                                   list(related_regions))
             # Sort the contours by area in descending order
-            region_contours = sorted(region_contours, key=lambda x: x[1].area,
+            region_contours = sorted(region_contours, key=lambda x: x.area(),
                                      reverse=True)
             # Initialize region, boundary and open holes with empty MultiPolygons.
             region = shapely.MultiPolygon()
@@ -156,6 +163,8 @@ class RegionSlice():
             # Add the contours into the appropriate MultiPolygons
             for contour in region_contours:
                 contour_labels.append(contour.index)
+                # record whether the contour is interpolated
+                interpolated_contours.append(contour.is_interpolated)
                 # Check whether the contour is a boundary
                 if contour.is_boundary:
                     if contour.is_hole:
@@ -185,6 +194,9 @@ class RegionSlice():
             self.open_holes.append(open_hole)
             self.contour_indexes.append(contour_labels)
             self.region_indexes.append(related_regions)
+        # Label the RegionSlice as Interpolated if all contours on the slice are
+        # interpolated.
+        self.is_interpolated = all(interpolated_contours)
 
     @property
     def exterior(self)-> List[shapely.MultiPolygon]:
@@ -259,7 +271,7 @@ class RegionSlice():
                                 for boundary in self.boundaries)
         else:
             no_boundaries = True
-        return no_regions | no_boundaries
+        return no_regions & no_boundaries
 
     def __bool__(self) -> bool:
         '''Check if the slice is empty.
@@ -346,14 +358,15 @@ def build_region_table(contour_graph: nx.Graph,
     enclosed_region_data = []
 
     # Iterate through each unique combination of RegionIndex and SliceIndex
-    for slice_index in slice_sequence.slices():
+    for slice_index in slice_sequence.slices:
         # Create a RegionSlice for the given SliceIndex
         region_slice = RegionSlice(contour_graph, slice_index)
         # Add the RegionSlice to the DataFrame
         enclosed_region_data.append({
             'SliceIndex': slice_index,
             'RegionSlice': region_slice,
-            'Empty': region_slice.is_empty
+            'Empty': region_slice.is_empty,
+            'Interpolated': region_slice.is_interpolated
         })
 
     # Create the enclosed_region DataFrame

@@ -547,7 +547,7 @@ def build_contours(contour_table, roi):
         contour_by_slice[slice_index].append(new_contour)
     # Sort the contours on each slice by area in order of descending area
     for slice_index in contour_by_slice:
-        contour_by_slice[slice_index].sort(key=lambda c: c.area, reverse=True)
+        contour_by_slice[slice_index].sort(key=lambda c: c.area(), reverse=True)
     return contour_by_slice
 
 
@@ -760,7 +760,8 @@ def set_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
             related_contours_list = contour.related_contours
             # Find all contours where the contour_index is in the
             # related_contours list.
-            for related_contour in contour_graph.nodes.data('contour').values():
+            node_data = dict(contour_graph.nodes.data('contour'))
+            for related_contour in node_data.values():
                 if related_contour.contour_index in related_contours_list:
                     related_contour.related_regions.append(region_label)
         region_counter += 1
