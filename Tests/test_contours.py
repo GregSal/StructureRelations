@@ -71,13 +71,13 @@ class TestInterpolatePolygon(unittest.TestCase):
         '''Test that interpolation between two polygons returns a valid
         polygon.
 
-        First polygon is 1x1 centred on 0,0 and the second is 1x1 centred on 1,1.
-        The expected result is a 1x1 polygon centred on 0.5,0.5.
+        First polygon is 1x1 centred on 0,0 and the second is 3x3 centred on 0,0.
+        The expected result is a 2x2 polygon centred on 0,0.
         '''
         p1 = Polygon([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])
-        p2 = Polygon([(0.5, 0.5), (1.5, 0.5), (1.5, 1.5), (0.5, 1.5)])
-        expected_polygon = Polygon([(0.5, 0.5), (1.5, 0.5),
-                                    (1.5, 1.5), (0.5, 1.5)])
+        p2 = Polygon([(-1.5, -1.5), (1.5, -1.5), (1.5, 1.5), (-1.5, 1.5)])
+        expected_polygon = Polygon([(-1.0, -1.0), (1.0, -1.0),
+                                    (1.0, 1.0), (-1.0, 1.0)])
         interpolated = interpolate_polygon([0, 1], p1, p2)
         self.assertTrue(interpolated.is_valid)
         self.assertTrue(interpolated.equals(expected_polygon))
