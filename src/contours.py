@@ -92,19 +92,12 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     '''
     # TODO Use shapely.affinity.scale to interpolate polygons
     def match_boundaries(p1, p2):
-        if p1.is_empty:
-            boundary1 = None
-        else:
-            boundary1 = p1.exterior
-        if p2 is None:
-            if boundary1:
-                boundary2 = p1.centroid
-            else:
-                raise ValueError('No second polygon given and first polygon is empty.')
+        if boundary1:
+            boundary2 = p1.centroid
         else:
             boundary2 = p2.exterior
-            if not boundary1:
-                boundary1 = p2.centroid
+        if not boundary1:
+            boundary1 = p2.centroid
         return boundary1, boundary2
 
     def match_holes(p1, p2):
@@ -158,13 +151,44 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             new_cords.append(ptn)
         return new_cords
 
-    # Use the new function
-    new_z = calculate_new_slice_index(slices)
     # If either of the polygons are multi-polygons, raise an error.
     if isinstance(p1, shapely.MultiPolygon):
         raise ValueError('Only single polygons are supported.')
     if isinstance(p2, shapely.MultiPolygon):
         raise ValueError('Only single polygons are supported.')
+    if p1.is_empty & (p2 is None):
+        # Cannot interpolate two empty polygons.
+        raise ValueError('No second polygon given and first polygon is empty.')
+    # If only one polygon is given, scale the polygon to half its size.
+    if p2 is None:
+        itp_poly = shapely.affinity.scale(p1, xfact=0.5, yfact=0.5)
+    elif p1.is_empty:
+        itp_poly = shapely.affinity.scale(p2, xfact=0.5, yfact=0.5)
+    # Align and scale the polygons to the same centre and size.
+    else:
+        # Get the point between the centroid of the first and second polygons.
+        mid_point = (p2.centroid.x - p1.centroid.x,
+                     p2.centroid.y - p1.centroid.y)
+        # Shift the two polygons to the same mid point.
+        ctr_poly1 = shapely.affinity.translate(p1,
+                                               xoff=mid_point[0],
+                                               yoff=mid_point[1])
+        ctr_poly2 = shapely.affinity.translate(p2,
+                                               xoff=-mid_point[0],
+                                               yoff=-mid_point[1])
+        # get the scaling factors for the two polygons.
+        x_size1 = (p1.bounds[2] - p1.bounds[0])
+        y_size1 = p1.bounds[3] - p1.bounds[1]
+        x_size2 = p2.bounds[2] - p2.bounds[0]
+        y_size2 = p2.bounds[3] - p2.bounds[1]
+        mid_size = (x_size2 / x_size1), y_size1 / y_size2)
+
+
+
+        scale_poly1 = shapely.affinity.scale(ctr_poly1, xfact=0.5, yfact=0.5)
+
+    # Get the z value for the new polygon.
+    new_z = calculate_new_slice_index(slices)
 
     boundary1, boundary2 = match_boundaries(p1, p2)
     # Interpolate the new polygon coordinates as half way between the p1
