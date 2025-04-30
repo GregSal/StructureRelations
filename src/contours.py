@@ -90,7 +90,6 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     Returns:
         shapely.Polygon: _description_
     '''
-    # TODO Use shapely.affinity.scale to interpolate polygons
     def align_polygons(p1, p2):
         # Get the point between the centroid of the first and second polygons.
         cm_shift = ((p2.centroid.x - p1.centroid.x) / 2,
