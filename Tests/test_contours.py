@@ -5,6 +5,7 @@ import pandas as pd
 import networkx as nx
 from shapely.geometry import Polygon
 
+from debug_tools import box_points
 from types_and_classes import InvalidContour
 from contours import *
 
@@ -23,7 +24,9 @@ class TestPointsToPolygon():
         with pytest.raises(InvalidContour):
             points_to_polygon(points)
 
+
 class TestCalculateNewSliceIndex():
+    '''Test the calculate_new_slice_index function.'''
     def test_single_slice(self):
         '''Test that a single slice index is returned correctly.'''
         assert calculate_new_slice_index(5.0) ==5.0
@@ -46,6 +49,7 @@ class TestCalculateNewSliceIndex():
         slices = [1.12345, 1.12355]
         with pytest.raises(ValueError):
             calculate_new_slice_index(slices, precision=0)
+
 
 class TestInterpolatePolygon():
     '''Test the interpolate_polygon function.'''
@@ -118,6 +122,7 @@ class TestInterpolatePolygon():
         assert shape_difference.area == approx(0.0, rel=1e-9)
         assert interp_hole.area == approx(poly_hole.area / 4, rel=1e-9)
 
+
 class TestContourPoints():
     '''Test the ContourPoints class.'''
     def test_initialization(self):
@@ -144,7 +149,54 @@ class TestContourPoints():
         with pytest.raises(InvalidContour):
             ContourPoints(points, roi=1)
 
+
+class TestBuildContourTable():
+    '''Test the build_contour_table function.'''
+    def test_table_creation(self):
+        '''Test that build_contour_table creates a table with the correct
+        columns and values.'''
+        box1 = box_points(width=1)
+        slice_data = [ContourPoints(box1, roi=1, slice_index= 0.0)]
+        table, _ = build_contour_table(slice_data)
+        assert len(table) == 1
+        assert table['ROI'][0] == 1
+        assert table['Slice'][0] == 0.0
+        assert table['Points'][0] == box1
+        assert table['Area'][0] == 1.0  # Area of the box is 1.0
+
+    def test_sorting_by_roi_slice_area(self):
+        '''Test that build_contour_table sorts by ROI, Slice, and
+        descending Area .'''
+        box1 = box_points(width=1)
+        box2 = box_points(width=2)
+        box3 = box_points(width=3)
+        slice_data = [
+            ContourPoints(box1, roi=2, slice_index=0.0),  # ROI 2, Area 4
+            ContourPoints(box1, roi=2, slice_index=1.0),  # ROI 2, Area 1
+            ContourPoints(box2, roi=2, slice_index=1.0),  # ROI 2, Area 4
+            ContourPoints(box3, roi=1, slice_index=1.0),  # ROI 1, Area 9
+            ContourPoints(box3, roi=1, slice_index=2.0),  # ROI 1, Area 9
+            ]
+        table, sequence = build_contour_table(slice_data)
+        # Check sorting by ROI, then Slice, then Area descending
+        rois = list(table['ROI'])
+        slices = list(table['Slice'])
+        areas = list(table['Area'])
+        slice_sequence = list(sequence['ThisSlice'])
+        # Should be sorted:
+        #   - ROI 1, Slice 1.0, Area 9;
+        #   - ROI 1, Slice 2.0, Area 9;
+        #   - ROI 2, Slice 0.0, Area 4;
+        #   - ROI 2, Slice 1.0, Area 4;
+        #   - ROI 2, Slice 1.0, Area 1;
+        assert rois == [1, 1, 2, 2, 2]
+        assert slices == [1.0, 2.0, 0.0, 1.0, 1.0]
+        assert slice_sequence == [0.0, 1.0, 2, 0]
+        assert areas[3] > areas[4]  # Area 4 > Area 1 for ROI 1, Slice 1.0
+
+
 class TestContour():
+    '''Test the Contour class.'''
     def test_initialization(self):
         '''Test that the Contour class initializes correctly.'''
         polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
@@ -196,16 +248,14 @@ class TestContour():
         assert hole_contour.related_contours == [outer_contour.contour_index]
         assert outer_contour.related_contours == [hole_contour.contour_index]
 
+    def test_error_on_overlapping_contours(self):
+        '''Test that an error is raised if a contour overlaps with an existing contour.'''
+        polygon1 = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
+        polygon2 = Polygon([(1, 1), (3, 1), (3, 3), (1, 3)])  # Overlaps with polygon1
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        with pytest.raises(InvalidContour):
+            Contour(roi=1, slice_index=0.0, polygon=polygon2, contours=[contour1])
 
-class TestBuildContourTable():
-    def test_table_creation(self):
-        slice_data = [
-            ContourPoints([(0, 0, 0), (1, 0, 0), (1, 1, 0)], roi=1),
-            ContourPoints([(0, 0, 1), (1, 0, 1), (1, 1, 1)], roi=1)
-        ]
-        table, sequence = build_contour_table(slice_data)
-        assert len(table) == 2
-        assert sequence == [0, 1]
 
 class TestBuildContours():
     def test_contour_building(self):
@@ -219,6 +269,41 @@ class TestBuildContours():
         contours = build_contours(contour_table, roi=1)
         assert 0.0 in contours
         assert 1.0 in contours
+
+
+class TestContourMatch():
+    '''Test the ContourMatch class.'''
+    def test_initialization_and_thickness(self):
+        '''Test ContourMatch initialization and thickness calculation.'''
+        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
+        match = ContourMatch(contour1, contour2)
+        assert match.gap == 2.0
+
+    def test_direction(self):
+        '''Test the direction method of ContourMatch.'''
+        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
+        match = ContourMatch(contour1, contour2)
+        assert match.direction(contour1) == 1
+        assert match.direction(contour2) == -1
+
+    def test_direction_invalid_node(self):
+        '''Test that direction raises ValueError for a node not in the match.'''
+        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        polygon3 = Polygon([(2, 2), (3, 2), (3, 3), (2, 3)])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
+        contour3 = Contour(roi=1, slice_index=4.0, polygon=polygon3, contours=[])
+        match = ContourMatch(contour1, contour2)
+        with pytest.raises(ValueError):
+            match.direction(contour3)
+
 
 class TestBuildContourGraph():
     def test_graph_building(self):
