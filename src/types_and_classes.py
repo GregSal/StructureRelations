@@ -52,6 +52,7 @@ class InvalidContour(ValueError, StructuresException):
 class InvalidContourRelation(ValueError, StructuresException):
     '''Exception raised for invalid contour relationship data.'''
 
+# TODO Everything after this should probably go into the Contours.py file
 @dataclass
 class SliceNeighbours:
     '''A class to represent the neighbours of a slice.
