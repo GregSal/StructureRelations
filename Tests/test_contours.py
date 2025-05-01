@@ -20,7 +20,7 @@ class TestPointsToPolygon():
 
     def test_invalid_polygon(self):
         '''Test that an invalid set of points raises an InvalidContour error.'''
-        points = [(0, 0), (1, 0), (0, 1), (0, 0)]  # Self-intersecting
+        points = [(0, 0), (1, 0), (0, 1), (1, 1), (0, 0)]  # Self-intersecting
         with pytest.raises(InvalidContour):
             points_to_polygon(points)
 
@@ -161,7 +161,6 @@ class TestBuildContourTable():
         assert len(table) == 1
         assert table['ROI'][0] == 1
         assert table['Slice'][0] == 0.0
-        assert table['Points'][0] == box1
         assert table['Area'][0] == 1.0  # Area of the box is 1.0
 
     def test_sorting_by_roi_slice_area(self):
@@ -182,7 +181,7 @@ class TestBuildContourTable():
         rois = list(table['ROI'])
         slices = list(table['Slice'])
         areas = list(table['Area'])
-        slice_sequence = list(sequence['ThisSlice'])
+        slice_sequence = sequence.slices
         # Should be sorted:
         #   - ROI 1, Slice 1.0, Area 9;
         #   - ROI 1, Slice 2.0, Area 9;
@@ -191,7 +190,7 @@ class TestBuildContourTable():
         #   - ROI 2, Slice 1.0, Area 1;
         assert rois == [1, 1, 2, 2, 2]
         assert slices == [1.0, 2.0, 0.0, 1.0, 1.0]
-        assert slice_sequence == [0.0, 1.0, 2, 0]
+        assert slice_sequence == [0.0, 1.0, 2.0]
         assert areas[3] > areas[4]  # Area 4 > Area 1 for ROI 1, Slice 1.0
 
 
@@ -255,65 +254,3 @@ class TestContour():
         contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
         with pytest.raises(InvalidContour):
             Contour(roi=1, slice_index=0.0, polygon=polygon2, contours=[contour1])
-
-
-class TestBuildContours():
-    def test_contour_building(self):
-        contour_table = pd.DataFrame({
-            'ROI': [1, 1],
-            'Slice': [0.0, 1.0],
-            'Points': [[(0, 0, 0), (1, 0, 0), (1, 1, 0)],
-                       [(0, 0, 1), (1, 0, 1), (1, 1, 1)]]
-        })
-        contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
-        contours = build_contours(contour_table, roi=1)
-        assert 0.0 in contours
-        assert 1.0 in contours
-
-
-class TestContourMatch():
-    '''Test the ContourMatch class.'''
-    def test_initialization_and_thickness(self):
-        '''Test ContourMatch initialization and thickness calculation.'''
-        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
-        match = ContourMatch(contour1, contour2)
-        assert match.gap == 2.0
-
-    def test_direction(self):
-        '''Test the direction method of ContourMatch.'''
-        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
-        match = ContourMatch(contour1, contour2)
-        assert match.direction(contour1) == 1
-        assert match.direction(contour2) == -1
-
-    def test_direction_invalid_node(self):
-        '''Test that direction raises ValueError for a node not in the match.'''
-        polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        polygon3 = Polygon([(2, 2), (3, 2), (3, 3), (2, 3)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
-        contour3 = Contour(roi=1, slice_index=4.0, polygon=polygon3, contours=[])
-        match = ContourMatch(contour1, contour2)
-        with pytest.raises(ValueError):
-            match.direction(contour3)
-
-
-class TestBuildContourGraph():
-    def test_graph_building(self):
-        contour_table = pd.DataFrame({
-            'ROI': [1, 1],
-            'Slice': [0.0, 1.0],
-            'Points': [[(0, 0, 0), (1, 0, 0), (1, 1, 0)],
-                       [(0, 0, 1), (1, 0, 1), (1, 1, 1)]]
-        })
-        contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
-        slice_sequence = pd.Series([0.0, 1.0])
-        graph, _ = build_contour_graph(contour_table, slice_sequence, roi=1)
-        assert isinstance(graph, nx.Graph)

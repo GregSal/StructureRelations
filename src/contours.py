@@ -53,8 +53,8 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
     '''
     if isinstance(slices, (list, tuple)):
         new_slice = round(np.mean(slices), precision)
-        min_slice = round(min(slices), precision)
-        max_slice = round(max(slices), precision)
+        min_slice = min(slices)
+        max_slice = max(slices)
         if not (min_slice <= new_slice <= max_slice):
             raise ValueError("Calculated slice is out of bounds after rounding.")
         return new_slice
@@ -530,6 +530,7 @@ def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
 
 
 # %% Contour Graph Construction Functions
+# TODO Everything after this should probably go in a contour_graph.py file.
 def build_contours(contour_table, roi):
     '''Build contours for a given ROI from the contour table.
 
