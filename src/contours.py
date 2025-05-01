@@ -350,14 +350,12 @@ class Contour:
         roi (ROI_Type): The ROI number of the contour.
         slice_index (SliceIndexType): The slice index of the contour.
         contour_index (int): Auto-incremented contour index.
-        region_index (int): The region index of the contour.
+        region_index (str): The region index of the contour.
             Defaults to None until regions are assigned.
         index (ContourIndex): A tuple of (ROI, SliceIndex, ContourIndex).
             This is a read-only property.
       shape:
         polygon (shapely.Polygon): The polygon generated from the contour.
-        exterior (shapely.Polygon): The solid exterior polygon of the contour.
-        hull (shapely.Polygon): The convex hull of the contour.
         thickness (float): The thickness of the contour.  Defaults to
             Contour.default_thickness (0.0).
 
@@ -408,31 +406,6 @@ class Contour:
         '''Return a tuple representing (ROI, SliceIndex, ContourIndex).'''
         return (self.roi, self.slice_index, self.contour_index)
 
-    @property
-    def exterior(self)-> shapely.Polygon:
-        '''The solid exterior Polygon.
-
-
-        Returns:
-            shapely.Polygon: The contour Polygon with all holes
-                filled in.
-        '''
-        ext_poly = shapely.Polygon(shapely.get_exterior_ring(self.polygon))
-        return ext_poly
-
-    @property
-    def hull(self)-> shapely.Polygon:
-        '''A bounding contour generated from the entire contour Polygon.
-
-        A convex hull can be pictures as an elastic band stretched around the
-        external contour.
-
-        Returns:
-            shapely.Polygon: The bounding contour for the entire contour.
-        '''
-        hull = shapely.convex_hull(self.polygon)
-        return hull
-
     def compare_with_existing_contours(self, contours: List['Contour']) -> None:
         '''Compare the polygon to each existing Contour in the list.
 
@@ -479,7 +452,7 @@ class Contour:
 
     def centroid(self) -> Tuple[float, float]:
         '''Calculate the centroid of the contour polygon.'''
-        return self.polygon.centroid.coords[0]
+        return self.polygon.centroid.coords
 
 
 class ContourMatch:
@@ -488,7 +461,7 @@ class ContourMatch:
     Attributes:
         contour1 (Contour): The first contour.
         contour2 (Contour): The second contour.
-        thickness (float): Half the difference between the two slice indices.
+        gap (float): Half the difference between the two slice indices.
         combined_area (float): The sum of the areas of the two contours.
         direction (int): 1 if the difference between the slice_index of the
             first and second contours is positive, -1 otherwise.
@@ -497,7 +470,7 @@ class ContourMatch:
     def __init__(self, contour1: Contour, contour2: Contour) -> None:
         self.contour1 = contour1
         self.contour2 = contour2
-        self.thickness = abs(contour1.slice_index - contour2.slice_index) / 2
+        self.gap = abs(contour1.slice_index - contour2.slice_index)
 
     def direction(self, node: Contour) -> int:
         '''Get the direction of the contour match.
