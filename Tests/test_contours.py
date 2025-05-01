@@ -1,13 +1,82 @@
+import math
+
 import pytest
 from pytest import approx
-import shapely
 import pandas as pd
 import networkx as nx
+import shapely
 from shapely.geometry import Polygon
 
 from debug_tools import box_points
 from types_and_classes import InvalidContour
-from contours import *
+from types_and_classes import SliceNeighbours, SliceSequence
+from contours import points_to_polygon, calculate_new_slice_index
+from contours import interpolate_polygon, ContourPoints, build_contour_table
+from contours import Contour
+
+
+class TestSliceNeighbours():
+    '''Test the SliceNeighbours class.'''
+    def test_initialization_and_types(self):
+        '''Test that the SliceNeighbours class initializes correctly and
+        that the slice indices are of the correct type.'''
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
+        assert isinstance(sn.this_slice, float)
+        assert isinstance(sn.previous_slice, float)
+        assert isinstance(sn.next_slice, float)
+
+    def test_gap(self):
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
+        assert sn.gap() == 1.0
+        sn2 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=7.0)
+        assert sn2.gap() == 2.0
+        sn3 = SliceNeighbours(this_slice=5.0, previous_slice=3.0, next_slice=None)
+        assert sn3.gap() == 2.0
+        sn4 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=None)
+        assert math.isnan(sn4.gap())
+
+    def test_is_neighbour(self):
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
+        assert sn.is_neighbour(4.0)
+        assert sn.is_neighbour(6.0)
+        assert not sn.is_neighbour(7.0)
+
+    def test_neighbour_list(self):
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
+        assert sn.neighbour_list() == [4.0, 6.0]
+
+
+class TestSliceSequence():
+    def test_initialization_and_slices(self):
+        ss = SliceSequence([1.0, 2.0, 3.0])
+        assert ss.slices == [1.0, 2.0, 3.0]
+        assert len(ss) == 3
+        assert 2.0 in ss
+        assert 4.0 not in ss
+
+    def test_add_and_remove_slice(self):
+        ss = SliceSequence([1.0, 2.0])
+        ss.add_slice(ThisSlice=3.0, PreviousSlice=2.0, NextSlice=None)
+        assert 3.0 in ss
+        ss.remove_slice(2.0)
+        assert 2.0 not in ss
+
+    def test_get_nearest_slice(self):
+        ss = SliceSequence([1.0, 2.0, 3.0])
+        assert ss.get_nearest_slice(2.1) == 2.0
+        assert ss.get_nearest_slice(2.9) == 3.0
+
+    def test_get_neighbors(self):
+        ss = SliceSequence([1.0, 2.0, 3.0])
+        sn = ss.get_neighbors(2.0)
+        assert sn.this_slice == 2.0
+        assert sn.previous_slice == 1.0
+        assert sn.next_slice == 3.0
+
+    def test_iter_and_getitem(self):
+        ss = SliceSequence([1.0, 2.0, 3.0])
+        assert list(iter(ss)) == [1.0, 2.0, 3.0]
+        assert ss[1] == 2.0
 
 
 class TestPointsToPolygon():

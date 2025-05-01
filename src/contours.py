@@ -38,7 +38,6 @@ def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
     return polygon
 
 
-
 #%% Interpolation Functions
 def calculate_new_slice_index(slices: SliceIndexSequenceType,
                               precision=PRECISION) -> float:

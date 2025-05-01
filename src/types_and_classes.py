@@ -93,13 +93,18 @@ class SliceNeighbours:
         Returns:
             Union[int, float]: The gap between slices.
         '''
+        # If both neighbours are None, return NaN
         if pd.isna(self.previous_slice) and pd.isna(self.next_slice):
             return np.NaN
+        # If one of the neighbours is None, calculate the gap based on the
+        # distance between the current slice and the other slice.
         if pd.isna(self.previous_slice):
             gap = self.next_slice - self.this_slice
         elif pd.isna(self.next_slice):
             gap = self.this_slice - self.previous_slice
         else:
+            # Calculate the gap between the previous and next slice
+            # and divide by 2 to get the average gap.
             gap = (self.next_slice - self.previous_slice) / 2
         if absolute:
             return abs(gap)
