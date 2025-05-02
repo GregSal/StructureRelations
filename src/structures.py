@@ -9,7 +9,7 @@ import networkx as nx
 from contours import Contour, ContourMatch, build_contour_graph
 from contours import build_contour_lookup, interpolate_polygon
 from types_and_classes import ROI_Type, ContourIndex, SliceIndexType
-from types_and_classes import SliceSequence
+from contours import SliceSequence
 
 
 def calculate_node_volume(node: Contour, edges: List[Tuple],

@@ -1,6 +1,6 @@
 import shapely
 
-from types_and_classes import RegionNode, SliceNeighbours
+from contours import RegionNode, SliceNeighbours
 
 from relations import DE27IM, DE9IM
 from debug_tools import circle_points

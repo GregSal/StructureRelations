@@ -17,7 +17,8 @@ import networkx as nx
 
 # Local packages
 from region_slice import merge_contours
-from types_and_classes import SliceIndexType, SliceNeighbours, StructurePairType
+from types_and_classes import SliceIndexType
+from contours import SliceNeighbours, StructurePairType
 from types_and_classes import RegionNode, RegionGraph, RegionIndexType
 from utilities import calculate_new_slice_index, interpolate_polygon
 

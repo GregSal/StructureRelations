@@ -15,7 +15,8 @@ import shapely
 import networkx as nx
 
 # Local packages
-from types_and_classes import ROI_Type, RegionNode, SliceIndexType, SliceNeighbours, StructurePairType
+from types_and_classes import ROI_Type, RegionNode, SliceIndexType, StructurePairType
+from contours import SliceNeighbours
 from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
 from utilities import calculate_new_slice_index, interpolate_polygon
 from region_slice import ContourType, RegionSlice, empty_structure

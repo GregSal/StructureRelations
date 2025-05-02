@@ -9,7 +9,7 @@ from shapely.geometry import Polygon
 
 from debug_tools import box_points
 from types_and_classes import InvalidContour
-from types_and_classes import SliceNeighbours, SliceSequence
+from contours import SliceNeighbours, SliceSequence
 from contours import points_to_polygon, calculate_new_slice_index
 from contours import interpolate_polygon, ContourPoints, build_contour_table
 from contours import Contour
@@ -73,6 +73,7 @@ class TestSliceNeighbours():
 
 
 class TestSliceSequence():
+    '''Test the SliceSequence class.'''
     def test_initialization_and_slices(self):
         '''Test that the SliceSequence class initializes correctly and that
         the slices are of the correct type.'''
@@ -125,12 +126,14 @@ class TestSliceSequence():
         assert ss[3.0]['ThisSlice'] == 3.0
 
     def test_get_nearest_slice(self):
+        '''Test that the get_nearest_slice method works correctly.'''
         # get_nearest_slice is currently not used
         ss = SliceSequence([1.0, 2.0, 3.0])
         assert ss.get_nearest_slice(2.1) == 2.0
         assert ss.get_nearest_slice(2.9) == 3.0
 
     def test_get_neighbors(self):
+        '''Test that the get_neighbors method works correctly.'''
         ss = SliceSequence([1.0, 2.0, 3.0])
         sn = ss.get_neighbors(2.0)
         assert sn.this_slice == 2.0

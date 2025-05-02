@@ -1,13 +1,11 @@
-import pytest
-from pytest import approx
-import shapely
-import pandas as pd
 import networkx as nx
+import pandas as pd
+import pytest
+
 from shapely.geometry import Polygon
 
-from debug_tools import box_points
-from types_and_classes import InvalidContour
-from contours import *
+from contours import Contour, ContourMatch, points_to_polygon
+from contour_graph import *
 
 
 class TestBuildContours():
