@@ -3,7 +3,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import List, NewType, Union, Tuple
+from typing import Any, Dict, List, NewType, Union, Tuple
 from dataclasses import dataclass
 import warnings
 
@@ -78,6 +78,12 @@ class SliceNeighbours:
         '''Ensure the slice indices are of the correct type.'''
         # Convert to float and then to SliceIndexType
         # to ensure they are of the correct type.
+        if self.this_slice is None:
+            self.this_slice = np.NaN
+        if self.previous_slice is None:
+            self.previous_slice = np.NaN
+        if self.next_slice is None:
+            self.next_slice = np.NaN
         self.this_slice = SliceIndexType(float(self.this_slice))
         self.previous_slice = SliceIndexType(float(self.previous_slice))
         self.next_slice = SliceIndexType(float(self.next_slice))
@@ -158,18 +164,37 @@ class SliceSequence:
         '''Return a list of all slice indices in the sequence.'''
         return self.sequence['ThisSlice'].tolist()
 
-    def add_slice(self, **slice_ref) -> None:
+    def add_slice(self, slice_index: SliceIndexType = None,
+                  **slice_ref) -> None:
         '''Add a slice index to the sequence.
 
         Args:
+            slice_index (SliceIndexType, optional): The slice index to add.
+                If None, the slice index will be taken from 'ThisSlice' in the
+                slice_ref dictionary. Defaults to None.
             slice_ref (dict): A dictionary containing the slice reference
-                information. Must contain the following keys:
+                information. It should contain some or all of the following
+                keys:
                     - 'ThisSlice'
                     - 'PreviousSlice'
-                    - 'NextSlice'.
-                If 'Original' is not provided, it will be set to False.
+                    - 'NextSlice'
+                    - 'Original'
+                If slice_index is None, the slice index will be taken from
+                'ThisSlice' in the slice_ref dictionary. If 'PreviousSlice' or
+                'NextSlice' are not provided, they will be set to None. If
+                dictionary. If 'Original' is not provided, it will be set to
+                False.
+
+        Raises:
+            - ValueError: If slice_index is None and 'ThisSlice' is not in
+                slice_ref.
         '''
-        slice_index = slice_ref['ThisSlice']
+        if slice_index is None:
+            slice_index = slice_ref.get('ThisSlice')
+            if slice_index is None:
+                raise ValueError('slice_index must be provided or "ThisSlice" '
+                                  'must be in slice_ref.')
+        slice_ref['ThisSlice'] = slice_index
         if 'Original' not in slice_ref:
             slice_ref['Original'] = False
         # Check if the slice index is already in the sequence
@@ -189,7 +214,8 @@ class SliceSequence:
 
     def get_nearest_slice(self, value: float) -> SliceIndexType:
         '''Find the nearest slice index to a given value.'''
-        return self.sequence.index[(self.sequence.index - value).abs().argmin()]
+        distance = abs(self.sequence.index - value)
+        return self.sequence.index[distance.argmin()]
 
     def get_neighbors(self, slice_index: SliceIndexType) -> Union[SliceNeighbours, None]:
         '''Return a SliceNeighbours object for a given SliceIndex.
@@ -213,10 +239,11 @@ class SliceSequence:
     def __len__(self) -> int:
         return len(self.sequence)
 
-    def __getitem__(self, index: int) -> SliceIndexType:
-        return self.sequence.iloc[index]['ThisSlice']
+    def __getitem__(self, index: SliceIndexType) -> Dict[str, Any]:
+        return self.sequence.loc[index, :].to_dict()
 
     def __iter__(self):
+        # TODO evaluate this function.  Is it returning the appropriate value?
         return iter(self.sequence['ThisSlice'])
 
     def __contains__(self, slice_index: SliceIndexType) -> bool:

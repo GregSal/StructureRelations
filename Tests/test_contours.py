@@ -1,9 +1,9 @@
+'''Test for the contours.py module.'''
 import math
 
+import numpy as np
 import pytest
 from pytest import approx
-import pandas as pd
-import networkx as nx
 import shapely
 from shapely.geometry import Polygon
 
@@ -25,43 +25,107 @@ class TestSliceNeighbours():
         assert isinstance(sn.previous_slice, float)
         assert isinstance(sn.next_slice, float)
 
-    def test_gap(self):
+    def test_gap_two_neighbours(self):
+        '''Test that the gap is calculated correctly when both neighbours are
+        present.'''
         sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
         assert sn.gap() == 1.0
-        sn2 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=7.0)
+
+    def test_gap_one_neighbour(self):
+        '''Test that the gap is calculated correctly when only one neighbour is
+        present.'''
+        sn2 = SliceNeighbours(this_slice=5.0, previous_slice=None,
+                              next_slice=7.0)
         assert sn2.gap() == 2.0
-        sn3 = SliceNeighbours(this_slice=5.0, previous_slice=3.0, next_slice=None)
+        sn3 = SliceNeighbours(this_slice=5.0, previous_slice=3.0,
+                              next_slice=None)
         assert sn3.gap() == 2.0
-        sn4 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=None)
+
+    def test_gap_no_neighbour(self):
+        '''Test that the gap is NaN when no neighbours are present.'''
+        sn4 = SliceNeighbours(this_slice=5.0, previous_slice=None,
+                              next_slice=None)
         assert math.isnan(sn4.gap())
 
+    def test_gap_negative(self):
+        '''Test that the gap is negative if previous_slice > next_slice.'''
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=6.0, next_slice=4.0)
+        assert sn.gap(absolute=False) == -1.0
+
+    def test_gap_abs(self):
+        '''Test that the gap is forced to be positive if absolute=True.'''
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=6.0, next_slice=4.0)
+        assert sn.gap(absolute=True) == 1.0
+
+
     def test_is_neighbour(self):
+        '''Test that the is_neighbour method works correctly.'''
         sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
         assert sn.is_neighbour(4.0)
         assert sn.is_neighbour(6.0)
         assert not sn.is_neighbour(7.0)
 
     def test_neighbour_list(self):
+        '''Test that the neighbour_list method returns the correct list of
+        neighbours.'''
         sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
         assert sn.neighbour_list() == [4.0, 6.0]
 
 
 class TestSliceSequence():
     def test_initialization_and_slices(self):
+        '''Test that the SliceSequence class initializes correctly and that
+        the slices are of the correct type.'''
         ss = SliceSequence([1.0, 2.0, 3.0])
         assert ss.slices == [1.0, 2.0, 3.0]
         assert len(ss) == 3
         assert 2.0 in ss
         assert 4.0 not in ss
 
-    def test_add_and_remove_slice(self):
+    def test_drop_duplicate_slices(self):
+        '''Test that the SliceSequence class drops duplicates.'''
+        ss = SliceSequence([1.0, 2.0, 2.0, 3.0])
+        assert ss.slices == [1.0, 2.0, 3.0]
+        assert len(ss) == 3
+
+    def test_neighbour_slices(self):
+        '''Test that the SliceSequence class contains the correct neighbour
+        slices.'''
+        ss = SliceSequence([1.0, 2.0, 3.0, 4.0])
+        # Test the neighbours of the first slice
+        # Drop the nan values from the NextSlice and PreviousSlice lists
+        # because np.nan is not equal to any number.
+        assert list(ss.sequence.NextSlice.dropna()) == [2.0, 3.0, 4.0]
+        assert list(ss.sequence.PreviousSlice.dropna()) == [1.0, 2.0, 3.0]
+
+    def test_add_slice_from_dict(self):
+        '''Test that the add_slice method works correctly when adding a slice
+        from a dictionary.'''
         ss = SliceSequence([1.0, 2.0])
-        ss.add_slice(ThisSlice=3.0, PreviousSlice=2.0, NextSlice=None)
+        slice_ref = {'ThisSlice': 3.0,
+                     'NextSlice': np.nan,
+                     'PreviousSlice': 2.0,
+                     'Original': True}
+        ss.add_slice(**slice_ref)
         assert 3.0 in ss
-        ss.remove_slice(2.0)
-        assert 2.0 not in ss
+        assert ss[3.0]['Original'] is True
+        assert np.isnan(ss[3.0]['NextSlice'])
+        assert ss[3.0]['PreviousSlice'] == 2.0
+        assert ss[3.0]['ThisSlice'] == 3.0
+
+    def test_add_slice_defaults(self):
+        '''Test that the add_slice method works correctly when adding a slice
+        with default values.'''
+        ss = SliceSequence([1.0, 2.0])
+        ss.add_slice(3.0)
+        assert 3.0 in ss
+        assert np.isnan(ss[3.0]['NextSlice'])
+        assert np.isnan(ss[3.0]['PreviousSlice'])
+        assert ss[3.0]['Original'] is False
+        assert ss[3.0]['ThisSlice'] == 3.0
 
     def test_get_nearest_slice(self):
+        # get_nearest_slice is currently not used
         ss = SliceSequence([1.0, 2.0, 3.0])
         assert ss.get_nearest_slice(2.1) == 2.0
         assert ss.get_nearest_slice(2.9) == 3.0
@@ -72,11 +136,6 @@ class TestSliceSequence():
         assert sn.this_slice == 2.0
         assert sn.previous_slice == 1.0
         assert sn.next_slice == 3.0
-
-    def test_iter_and_getitem(self):
-        ss = SliceSequence([1.0, 2.0, 3.0])
-        assert list(iter(ss)) == [1.0, 2.0, 3.0]
-        assert ss[1] == 2.0
 
 
 class TestPointsToPolygon():
