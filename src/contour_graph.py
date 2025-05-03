@@ -43,7 +43,7 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
         contour_by_slice[slice_index].append(new_contour)
     # Sort the contours on each slice by area in order of descending area
     for slice_index in contour_by_slice:
-        contour_by_slice[slice_index].sort(key=lambda c: c.area(), reverse=True)
+        contour_by_slice[slice_index].sort(key=lambda c: c.area, reverse=True)
     return contour_by_slice
 
 

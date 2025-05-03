@@ -155,7 +155,7 @@ class RegionSlice():
             region_contours = get_region_contours(contour_reference,
                                                   list(related_regions))
             # Sort the contours by area in descending order
-            region_contours = sorted(region_contours, key=lambda x: x.area(),
+            region_contours = sorted(region_contours, key=lambda x: x.area,
                                      reverse=True)
             # Initialize region, boundary and open holes with empty MultiPolygons.
             region = shapely.MultiPolygon()

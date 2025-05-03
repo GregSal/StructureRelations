@@ -602,6 +602,21 @@ class Contour:
         '''Return a tuple representing (ROI, SliceIndex, ContourIndex).'''
         return (self.roi, self.slice_index, self.contour_index)
 
+    @property
+    def area(self) -> float:
+        '''Calculate the area of the contour polygon.'''
+        return self.polygon.area
+
+    @property
+    def centroid(self) -> Tuple[float, float]:
+        '''Calculate the centroid of the contour polygon.'''
+        return self.polygon.centroid.coords
+
+    @property
+    def hull(self) -> Polygon:
+        '''Calculate the convex hull of the contour polygon.'''
+        return self.polygon.convex_hull
+
     def compare_with_existing_contours(self, contours: List['Contour']) -> None:
         '''Compare the polygon to each existing Contour in the list.
 
@@ -641,14 +656,6 @@ class Contour:
         '''Validate the polygon to ensure it is valid.'''
         if not self.polygon.is_valid:
             raise InvalidContour('Invalid polygon provided for the contour.')
-
-    def area(self) -> float:
-        '''Calculate the area of the contour polygon.'''
-        return self.polygon.area
-
-    def centroid(self) -> Tuple[float, float]:
-        '''Calculate the centroid of the contour polygon.'''
-        return self.polygon.centroid.coords
 
 
 class ContourMatch:
