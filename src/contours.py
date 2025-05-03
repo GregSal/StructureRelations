@@ -42,11 +42,11 @@ class SliceNeighbours:
         # Convert to float and then to SliceIndexType
         # to ensure they are of the correct type.
         if self.this_slice is None:
-            self.this_slice = np.NaN
+            self.this_slice = np.nan
         if self.previous_slice is None:
-            self.previous_slice = np.NaN
+            self.previous_slice = np.nan
         if self.next_slice is None:
-            self.next_slice = np.NaN
+            self.next_slice = np.nan
         self.this_slice = SliceIndexType(float(self.this_slice))
         self.previous_slice = SliceIndexType(float(self.previous_slice))
         self.next_slice = SliceIndexType(float(self.next_slice))
@@ -57,14 +57,14 @@ class SliceNeighbours:
         If one of the two neighbours is None, then calculate the gap based on
         the distance between the current slice and the other slice. if absolute
         is True, return the absolute value of the gap. If both neighbours are
-        None, return NaN.
+        None, return nan.
 
         Returns:
             Union[int, float]: The gap between slices.
         '''
-        # If both neighbours are None, return NaN
+        # If both neighbours are None, return nan
         if pd.isna(self.previous_slice) and pd.isna(self.next_slice):
-            return np.NaN
+            return np.nan
         # If one of the neighbours is None, calculate the gap based on the
         # distance between the current slice and the other slice.
         if pd.isna(self.previous_slice):
