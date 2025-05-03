@@ -6,8 +6,9 @@ from typing import List, Tuple
 import pandas as pd
 import networkx as nx
 
-from contours import Contour, ContourMatch, build_contour_graph
-from contours import build_contour_lookup, interpolate_polygon
+from contours import Contour, ContourMatch
+from contour_graph import build_contour_graph, build_contour_lookup
+from contours import interpolate_polygon
 from types_and_classes import ROI_Type, ContourIndex, SliceIndexType
 from contours import SliceSequence
 
