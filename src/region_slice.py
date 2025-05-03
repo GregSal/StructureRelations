@@ -15,7 +15,8 @@ import networkx as nx
 import shapely
 
 # Local packages
-from contours import Contour, build_contour_lookup
+from contours import Contour
+from contour_graph import build_contour_lookup
 from types_and_classes import SliceIndexType
 from utilities import make_multi
 

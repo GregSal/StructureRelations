@@ -9,12 +9,11 @@ import pandas as pd
 import networkx as nx
 
 from contours import SliceSequence, Contour, ContourMatch, interpolate_polygon
-from types_and_classes import ROI_Type
-
+from types_and_classes import ROI_Type, SliceIndexType, ContourGraph
 
 
 # %% Contour Graph Construction Functions
-def build_contours(contour_table, roi):
+def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contour]]:
     '''Build contours for a given ROI from the contour table.
 
     This function filters the contour table for the specified ROI and creates
@@ -48,7 +47,7 @@ def build_contours(contour_table, roi):
     return contour_by_slice
 
 
-def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
+def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
     '''Build a lookup table for contours.
 
     This function creates a DataFrame that serves as a lookup table for contours.
@@ -56,7 +55,7 @@ def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
     The DataFrame is sorted by slice index and contour index.
 
     Args:
-        contour_graph (nx.Graph): A Contour Graph object containing contour
+        contour_graph (ContourGraph): A Contour Graph object containing contour
             information. Each node in the graph should represent a contour and
             should have a 'contour' attribute that is an instance of the
             Contour class.
@@ -94,25 +93,24 @@ def build_contour_lookup(contour_graph: nx.Graph) -> pd.DataFrame:
     return contour_lookup
 
 
-def add_graph_edges(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
-                    slice_sequence: SliceSequence) -> nx.Graph:
+def add_graph_edges(contour_graph: ContourGraph,
+                    slice_sequence: SliceSequence) -> ContourGraph:
     '''Add edges to link Contour Neighbours.
 
     Edges are added between contours that are neighbours in the slice sequence
     and have the same hole type.  Matching contours are identified by the
     intersection of the contours' convex hulls.
-    convex hulls.
 
     Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
-        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
-            for contours, including slice index, contour index, and hole type.
+        contour_graph (ContourGraph): The graph representation of the contours.
         slice_sequence (SliceSequence): The slice sequence object containing
             the slice indices and their neighbors.
 
     Returns:
         nx.Graph: The updated contour graph with edges added.
     '''
+    # Create the Graph indexer
+    contour_lookup = build_contour_lookup(contour_graph)
     # Iterate through each contour reference in the lookup table
     for contour_ref in contour_lookup.itertuples(index=False):
         # Get the contour reference
@@ -133,19 +131,20 @@ def add_graph_edges(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
     return contour_graph
 
 
-def add_boundary_contours(contour_graph: nx.Graph,
-                          slice_sequence: SliceSequence) -> None:
+def add_boundary_contours(contour_graph: ContourGraph,
+                          slice_sequence: SliceSequence) -> Tuple[ContourGraph,
+                                                                  SliceSequence]:
     '''Add interpolated boundary contours to the graph.
 
     Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
+        contour_graph (ContourGraph): The graph representation of the contours.
         slice_sequence (SliceSequence): The slice sequence object containing
             the slice indices and their neighbors.
 
     Returns:
-        tuple: A tuple containing the updated contour graph and slice sequence.
-            contour_graph (nx.Graph): The updated graph representation of the
-                contours with interpolated boundary contours added.
+        tuple: A tuple containing the updated contour graph and slice sequence:
+            contour_graph (ContourGraph): The updated graph representation of
+                the contours with interpolated boundary contours added.
             slice_sequence (SliceSequence): The updated slice sequence object
                 with the interpolated slice indices added.
     '''
@@ -219,14 +218,15 @@ def add_boundary_contours(contour_graph: nx.Graph,
     return contour_graph, slice_sequence
 
 
-def set_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
+def set_enclosed_regions(contour_graph: ContourGraph) -> List[ContourGraph]:
     '''Create EnclosedRegion SubGraphs and assign RegionIndexes to the contours.
 
     Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
+        contour_graph (ContourGraph): The graph representation of the contours.
 
     Returns:
-        List[nx.Graph]: A list of SubGraphs, each representing an enclosed region.
+        List[ContourGraph]: A list of SubGraphs, each representing an enclosed
+            region.
     '''
     region_counter = 0
     region_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -265,17 +265,20 @@ def set_enclosed_regions(contour_graph: nx.Graph) -> List[nx.Graph]:
     return contour_graph
 
 
-def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
-                  slice_sequence: SliceSequence) -> None:
+def set_hole_type(contour_graph: ContourGraph,
+                  slice_sequence: SliceSequence)->ContourGraph:
     '''Determine whether the regions that are holes are 'Open' or 'Closed'.
 
     Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
-        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
-            for contours, including slice index, contour index, and hole type.
+        contour_graph (ContourGraph): The graph representation of the contours.
         slice_sequence (SliceSequence): The slice sequence object containing
             the slice indices and their neighbors.
+    Returns:
+        ContourGraph: The updated contour graph with hole types assigned to
+            the holes in each region.
     '''
+    # Create the Graph indexer
+    contour_lookup = build_contour_lookup(contour_graph)
     # Select boundary contours that are holes using contour_lookup
     hole_boundaries = ((contour_lookup['Boundary']) &
                        (contour_lookup['HoleType'] == 'Unknown'))
@@ -342,25 +345,35 @@ def set_hole_type(contour_graph: nx.Graph, contour_lookup: pd.DataFrame,
 
 def build_contour_graph(contour_table: pd.DataFrame,
                         slice_sequence: SliceSequence,
-                        roi: ROI_Type) -> Tuple[nx.Graph, pd.DataFrame]:
+                        roi: ROI_Type) -> Tuple[ContourGraph, SliceSequence]:
     '''Build a graph of contours for the specified ROI.
 
-    This function creates a graph representation of the contours for a given
-    ROI. Each contour is represented as a node in the graph, and edges are
-    created based on the relationships between the contours.
+    This is the primary outward facing function of this module.  It creates a
+    graph representation of the contours for a given ROI. Each contour is
+    represented as a node in the graph, and edges indicate matching contours on
+    the previous and next slices.
+
+    Matching contours are on neighbouring slices (based on the slice sequence),
+    have the same hole type, and have intersecting convex hulls.
+
+    Interpolated boundary contours are added to the graph, and the hole type for
+    the regions is determined based on the contours in the graph.
 
     Args:
         contour_table (pd.DataFrame): The contour table containing contour data.
-            The table must be sorted by descending area, or holes will not be identified properly.
+            The table must be sorted by descending area, or holes will not be
+            identified properly.
         slice_sequence (SliceSequence): The slice sequence object containing
             the slice indices and their neighbors.
-        roi (int): The ROI number to filter contours.
+        roi (ROI_Type): The ROI number to filter contours.
 
     Returns:
         tuple: A tuple containing the contour graph and a lookup table.
-            contour_graph (nx.Graph): The graph representation of the contours.
-            contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
-                for contours, including slice index, contour index, and hole type.
+            contour_graph (ContourGraph): The graph representation of the
+                contours.
+            contour_lookup (SliceSequence): A DataFrame serving as a lookup
+                table for contours, including slice index, contour index, and
+                hole type.
     '''
     contour_by_slice = build_contours(contour_table, roi)
     # Create an empty graph
@@ -370,23 +383,14 @@ def build_contour_graph(contour_table: pd.DataFrame,
         for contour in contour_data:
             contour_label = contour.index
             contour_graph.add_node(contour_label, contour=contour)
-    # Create the Graph indexer
-    contour_lookup = build_contour_lookup(contour_graph)
     # Add the edges to the graph
-    contour_graph = add_graph_edges(contour_graph, contour_lookup,
-                                    slice_sequence)
+    contour_graph = add_graph_edges(contour_graph, slice_sequence)
     # Add the boundary contours to the graph
     contour_graph, slice_sequence = add_boundary_contours(contour_graph,
                                                           slice_sequence)
-    # Re-build the Graph indexer
-    contour_lookup = build_contour_lookup(contour_graph)
     # Identify the distinct regions in the graph
     # and assign the region index to each contour
     contour_graph = set_enclosed_regions(contour_graph)
-    # Re-build the Graph indexer
-    contour_lookup = build_contour_lookup(contour_graph)
     # Set the hole type for the regions
-    contour_graph = set_hole_type(contour_graph, contour_lookup, slice_sequence)
-    # Re-build the Graph indexer
-    #contour_lookup = build_contour_lookup(contour_graph)
+    contour_graph = set_hole_type(contour_graph, slice_sequence)
     return contour_graph, slice_sequence
