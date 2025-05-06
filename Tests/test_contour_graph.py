@@ -1,3 +1,4 @@
+from random import uniform
 import networkx as nx
 import pandas as pd
 import pytest
@@ -11,10 +12,43 @@ from debug_tools import box_points
 from contour_graph import *
 
 
-def make_test_contour_table():
+def basic_contour_table():
+    '''Create a contour table for testing the build_contours and add_graph_edges
+    functions.
+
+    The test table contains the following data:
+        ROI 1:
+            slices, 1.0, 2.0,
+            1 contour per slice with area 9.0.
+        ROI 2:
+            slices, 0.0, 1.0,
+                2 contours on slice 0.0 with areas 1.0, 4.0
+                4 contours on slice 1.0,
+                two with area 1.0, and
+                two with area 4.0.
+    '''
+    box1_left = box_points(width=1, offset_x=1.5)
+    box1_right = box_points(width=1, offset_x=-1.5)
+    box2_left = box_points(width=2, offset_x=1.5)
+    box2_right = box_points(width=2, offset_x=-1.5)
+    box3_right = box_points(width=3, offset_x=-1.5)
+    slice_data = [
+        ContourPoints(box1_left, roi=2, slice_index=0.0),   # ROI 2, Area 1
+        ContourPoints(box2_left, roi=2, slice_index=0.0),   # ROI 2, Area 4
+        ContourPoints(box1_left, roi=2, slice_index=1.0),   # ROI 2, Area 1
+        ContourPoints(box1_right, roi=2, slice_index=1.0),  # ROI 2, Area 1
+        ContourPoints(box2_left, roi=2, slice_index=1.0),   # ROI 2, Area 4
+        ContourPoints(box2_right, roi=2, slice_index=1.0),  # ROI 2, Area 4
+        ContourPoints(box3_right, roi=1, slice_index=1.0),  # ROI 1, Area 9
+        ContourPoints(box3_right, roi=1, slice_index=2.0),  # ROI 1, Area 9
+        ]
+    contour_table, slice_sequence = build_contour_table(slice_data)
+    return contour_table, slice_sequence
+
+def boundary_test_contour_table():
     '''Create a test contour table.
 
-    Create a contour table for testing build_contours function.
+    Create a contour table for testing add_boundary_contours function.
     The contour table contains the following columns:
         ROI, Slice, Points, Polygon, Area.
     The table is sorted by ROI, Slice and by descending area.
@@ -34,30 +68,75 @@ def make_test_contour_table():
                 two with area 4.0.
     '''
     box1= box_points(width=1)
-    box1_left = box_points(width=1, offset_x=1.5)
-    box1_right = box_points(width=1, offset_x=-1.5)
-    box2_left = box_points(width=2, offset_x=1.5)
-    box2_right = box_points(width=2, offset_x=-1.5)
     box3_right = box_points(width=3, offset_x=-1.5)
     slice_data = [
-        ContourPoints(box1, roi=0, slice_index=0.0),  # ROI 0, Area 1
-        ContourPoints(box1, roi=0, slice_index=1.0),  # ROI 0, Area 1
-        ContourPoints(box1, roi=0, slice_index=2.0),  # ROI 0, Area 1
-        ContourPoints(box1, roi=0, slice_index=3.0),  # ROI 0, Area 1
-        ContourPoints(box1_left, roi=2, slice_index=0.0),  # ROI 2, Area 1
-        ContourPoints(box2_left, roi=2, slice_index=0.0),  # ROI 2, Area 4
-        ContourPoints(box1_left, roi=2, slice_index=1.0),  # ROI 2, Area 1
-        ContourPoints(box1_right, roi=2, slice_index=1.0),  # ROI 2, Area 1
-        ContourPoints(box2_left, roi=2, slice_index=1.0),  # ROI 2, Area 4
-        ContourPoints(box2_right, roi=2, slice_index=1.0),  # ROI 2, Area 4
+        ContourPoints(box1, roi=0, slice_index=0.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=1.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=2.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=3.0),        # ROI 0, Area 1
         ContourPoints(box3_right, roi=1, slice_index=1.0),  # ROI 1, Area 9
         ContourPoints(box3_right, roi=1, slice_index=2.0),  # ROI 1, Area 9
         ]
     contour_table, slice_sequence = build_contour_table(slice_data)
     return contour_table, slice_sequence
 
+def region_test_contour_table():
+    '''Create a contour table for testing set_enclosed_regions function.
 
-def make_bare_networks_graph_for_testing(contour_table: pd.DataFrame,
+    The test table contains the following data:
+        ROI 0: The background region that defines the set of all slice indexes.
+            slices, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0
+        ROI 1:  Simple region with 2 slices and 1 contour per slice.
+        ROI 2: 2 contours and one hole on slices 1.0 to 4.0,
+            results in 3 regions
+        ROI 3: 2 contours on slices 1.0 to 3.0,
+               1 large contour on slice 4.0 that matches with both contours
+               on slice 3.0,
+               results in a single region.
+    '''
+    box1= box_points(width=1)
+    box3_right = box_points(width=3, offset_x=-1.5)
+    box1_right = box_points(width=1, offset_x=-1.5)
+    box2_left = box_points(width=2, offset_x=1.5)
+    box2_right = box_points(width=2, offset_x=-1.5)
+    box3_right = box_points(width=3, offset_x=-1.5)
+    box4= box_points(width=4)
+    slice_data = [
+        ContourPoints(box1, roi=0, slice_index=0.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=1.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=2.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=3.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=4.0),        # ROI 0, Area 1
+        ContourPoints(box1, roi=0, slice_index=5.0),        # ROI 0, Area 1
+
+        ContourPoints(box3_right, roi=1, slice_index=1.0),  # ROI 1, Area 1
+        ContourPoints(box3_right, roi=1, slice_index=2.0),  # ROI 1, Area 1
+
+        ContourPoints(box2_right, roi=2, slice_index=1.0),  # ROI 2, Area 4
+        ContourPoints(box1_right, roi=2, slice_index=1.0),  # ROI 2, Hole
+        ContourPoints(box2_left,  roi=2, slice_index=1.0),  # ROI 2, Area 4
+        ContourPoints(box2_right, roi=2, slice_index=2.0),  # ROI 2, Area 4
+        ContourPoints(box1_right, roi=2, slice_index=2.0),  # ROI 2, Hole
+        ContourPoints(box2_left,  roi=2, slice_index=2.0),  # ROI 2, Area 4
+        ContourPoints(box2_right, roi=2, slice_index=3.0),  # ROI 2, Area 4
+        ContourPoints(box1_right, roi=2, slice_index=3.0),  # ROI 2, Hole
+        ContourPoints(box2_left,  roi=2, slice_index=3.0),  # ROI 2, Area 4
+        ContourPoints(box2_right, roi=2, slice_index=4.0),  # ROI 2, Area 4
+        ContourPoints(box1_right, roi=2, slice_index=4.0),  # ROI 2, Hole
+        ContourPoints(box2_left,  roi=2, slice_index=4.0),  # ROI 2, Area 4
+
+        ContourPoints(box2_right, roi=3, slice_index=1.0),  # ROI 4, Area 4
+        ContourPoints(box2_left,  roi=3, slice_index=1.0),  # ROI 4, Area 4
+        ContourPoints(box2_right, roi=3, slice_index=2.0),  # ROI 4, Area 4
+        ContourPoints(box2_left,  roi=3, slice_index=2.0),  # ROI 4, Area 4
+        ContourPoints(box2_right, roi=3, slice_index=3.0),  # ROI 4, Area 4
+        ContourPoints(box2_left,  roi=3, slice_index=3.0),  # ROI 4, Area 4
+        ContourPoints(box4,       roi=3, slice_index=4.0),  # ROI 4, Area 16
+        ]
+    contour_table, slice_sequence = build_contour_table(slice_data)
+    return contour_table, slice_sequence
+
+def contour_graph_for_testing(contour_table: pd.DataFrame,
                                          roi: ROI_Type) -> ContourGraph:
     contour_by_slice = build_contours(contour_table, roi)
     # Create an empty graph
@@ -76,7 +155,10 @@ class TestBuildContours():
         '''Test the build_contours function with a simple example.
 
         '''
-        contour_table, _ = make_test_contour_table()
+        box3_right = box_points(width=3, offset_x=-1.5)
+        slice_data = [ContourPoints(box3_right, roi=1, slice_index=1.0),
+                      ContourPoints(box3_right, roi=1, slice_index=2.0)]
+        contour_table, _ = build_contour_table(slice_data)
         contours = build_contours(contour_table, roi=1)
         assert list(contours.keys()) == [1.0, 2.0]
 
@@ -84,7 +166,7 @@ class TestBuildContours():
         '''Verify that the build_contours function sorts the contours by
         decreasing area.
         '''
-        contour_table, _ = make_test_contour_table()
+        contour_table, _ = basic_contour_table()
         contours = build_contours(contour_table, roi=2)
         assert list(contours.keys()) == [0.0, 1.0]
         first_slice = contours[0.0]
@@ -100,28 +182,26 @@ class TestBuildContours():
 
 
 class TestAddGraphEdges():
-    '''Test the add_graph_edges function.'''
+    '''Test the add_graph_edges function.
+    '''
     def test_add_graph_edges(self):
         '''Test the add_graph_edges function generates the correct number of
         edges.'''
-        contour_table, slice_sequence = make_test_contour_table()
-        contour_graph = make_bare_networks_graph_for_testing(contour_table,
-                                                             roi=1)
+        contour_table, slice_sequence = basic_contour_table()
+        contour_graph = contour_graph_for_testing(contour_table, roi=1)
         contour_graph = add_graph_edges(contour_graph, slice_sequence)
         # Check that the graph for ROI 1 has a single edge between the two
         # slices.
         assert contour_graph.number_of_edges() == 1
-        contour_graph = make_bare_networks_graph_for_testing(contour_table,
-                                                             roi=2)
+        contour_graph = contour_graph_for_testing(contour_table, roi=2)
         contour_graph = add_graph_edges(contour_graph, slice_sequence)
         # Check that the graph for ROI 2 has two edges between the two slices.
         assert contour_graph.number_of_edges() == 2
 
     def test_edge_match(self):
         '''Test the match data is correct for an edge.'''
-        contour_table, slice_sequence = make_test_contour_table()
-        contour_graph = make_bare_networks_graph_for_testing(contour_table,
-                                                             roi=1)
+        contour_table, slice_sequence = basic_contour_table()
+        contour_graph = contour_graph_for_testing(contour_table, roi=1)
         contour_graph = add_graph_edges(contour_graph, slice_sequence)
         # Check that the polygons in the match are correct.
         contour1_selection = ((contour_table['ROI'] == 1) &
@@ -131,8 +211,8 @@ class TestAddGraphEdges():
         polygon1 = contour_table[contour1_selection].Polygon.tolist()[0]
         polygon2 = contour_table[contour2_selection].Polygon.tolist()[0]
         contour_match = list(contour_graph.edges.data('match'))[0][2]
-        assert polygon1 == contour_match.contour1.polygon
-        assert polygon2 == contour_match.contour2.polygon
+        assert (polygon1 - contour_match.contour1.polygon).is_empty
+        assert (polygon2 - contour_match.contour2.polygon).is_empty
         assert contour_match.gap == 1.0
 
 class TestBoundaryContourGeneration():
@@ -159,11 +239,13 @@ class TestBoundaryContourGeneration():
         '''
     # pylint: disable=attribute-defined-outside-init
     def setup_method(self):
-        self.contour_table, self.slice_sequence = make_test_contour_table()
-        self.contour_graph = make_bare_networks_graph_for_testing(self.contour_table, roi=1)
-        self.contour_graph = add_graph_edges(self.contour_graph, self.slice_sequence)
-        self.contour_graph, self.slice_sequence = add_boundary_contours(self.contour_graph, self.slice_sequence)
-
+        contour_table, slice_sequence = boundary_test_contour_table()
+        contour_graph = contour_graph_for_testing(contour_table, roi=1)
+        contour_graph = add_graph_edges(contour_graph, slice_sequence)
+        contour_graph, slice_sequence = add_boundary_contours(contour_graph,
+                                                              slice_sequence)
+        self.contour_graph = contour_graph
+        self.slice_sequence = slice_sequence
 
     def test_interpolated_boundary_contour_properties(self):
         # Find two interpolated boundary contours
@@ -231,11 +313,9 @@ class TestBoundaryContourGeneration():
                 (match1.contour2 == intp_contour1))
         assert ((match2.contour1 == intp_contour2) or
                 (match2.contour2 == intp_contour2))
-        # Verify that the match gap is half the distance between the two slices.
+        # Verify that the match gap is the distance between the two slices.
         expected_gap = abs(orig_contour_1.slice_index -
-                           intp_contour1.slice_index) / 2.0
-        assert ((match1.contour1 == orig_contour_1) or
-                (match1.contour2 == orig_contour_2))
+                           intp_contour1.slice_index)
         assert abs(match1.gap - expected_gap) < 1e-6
         assert abs(match2.gap - expected_gap) < 1e-6
 
@@ -297,9 +377,61 @@ class TestBuildContourGraph():
     '''Test the build_contour_graph function.'''
     @pytest.mark.xfail
     def test_add_graph_nodes(self):
-        contour_table, slice_sequence = make_test_contour_table()
+        contour_table, slice_sequence = basic_contour_table()
         contours = build_contours(contour_table, roi=1)
         contour_indices = [cn.index for cl in contours.values() for cn in cl]
         graph, slice_sequence = build_contour_graph(contour_table,
                                                     slice_sequence, roi=1)
         assert contour_indices == list(graph.nodes())
+
+
+class TestRegionIdentification():
+    '''Test the region identification function.
+
+    - Verify that all nodes in ContourGraph that have a path between them have
+        the same RegionIndex.
+    - Verify that all nodes in ContourGraph that are not connected by a path
+        have different RegionIndexes.
+    - Verify that changes to the Contour nodes are reflected in the nodes of
+        the ContourGraph.
+
+
+
+    '''
+    # pylint: disable=attribute-defined-outside-init
+    def region_graph_prep(self, roi):
+        contour_table, slice_sequence = region_test_contour_table()
+        contour_graph = contour_graph_for_testing(contour_table, roi=roi)
+        contour_graph = add_graph_edges(contour_graph, slice_sequence)
+        contour_graph = set_enclosed_regions(contour_graph)
+        self.slice_sequence = slice_sequence
+        return contour_graph
+
+
+    def test_uniform_region_identification(self):
+        '''Test that all nodes in ContourGraph that have a path between them
+        have the same RegionIndex.
+        '''
+        # ROI 1:  Single region with 2 slices and 1 contour per slice.
+        contour_graph = self.region_graph_prep(roi=1)
+        contours_data = dict(contour_graph.nodes.data('contour'))
+        region_indexes = {contour.region_index
+                          for contour in contours_data.values()}
+        assert len(region_indexes) == 1
+
+        # ROI 2 has 2 contours and one hole on slices 1.0 to 4.0, which results
+        # in 3 regions.
+        contour_graph = self.region_graph_prep(roi=2)
+        contours_data = dict(contour_graph.nodes.data('contour'))
+        region_indexes = {contour.region_index
+                          for contour in contours_data.values()}
+        assert len(region_indexes) == 3
+
+        # ROI 3 has 2 contours on slices 1.0 to 3.0, and 1 large contour on
+        # slice 4.0 that matches with both contours on slice 3.0, which results
+        # in a single region.
+        contour_graph = self.region_graph_prep(roi=3)
+        contours_data = dict(contour_graph.nodes.data('contour'))
+        region_indexes = {contour.region_index
+                          for contour in contours_data.values()}
+        assert len(region_indexes) == 1
