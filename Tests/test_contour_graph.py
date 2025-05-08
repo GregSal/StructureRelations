@@ -95,7 +95,6 @@ def region_test_contour_table():
                results in a single region.
     '''
     box1= box_points(width=1)
-    box3_right = box_points(width=3, offset_x=-1.5)
     box1_right = box_points(width=1, offset_x=-1.5)
     box2_left = box_points(width=2, offset_x=1.5)
     box2_right = box_points(width=2, offset_x=-1.5)
@@ -135,6 +134,65 @@ def region_test_contour_table():
         ]
     contour_table, slice_sequence = build_contour_table(slice_data)
     return contour_table, slice_sequence
+
+
+def hole_test_contour_table():
+    '''Create a contour table for testing set_enclosed_regions function.
+
+    The test table contains the following data:
+        ROI 0: The background region that defines the set of all slice indexes.
+            slices, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0
+        ROI 1: 1 contour with an embedded hole on slices 1.0 to 4.0,
+            results in open hole
+        ROI 2: 1 contour on slices 1.0 to 4.0,
+               an embedded hole on slices 2.0 and 3.0,
+               results in a closed hole.
+        ROI 3: 1 contour on slices 1.0 to 4.0,
+               an embedded hole on slices 1.0 and 3.0,
+               results in a open hole.
+    '''
+    box1= box_points(width=1)
+    box3_right = box_points(width=3, offset_x=-1.5)
+    box1_right = box_points(width=1, offset_x=-1.5)
+    box3_left = box_points(width=3, offset_x=1.5)
+    box1_left = box_points(width=1, offset_x=1.5)
+    box3_ant = box_points(width=3, offset_y=1.5)
+    box1_ant = box_points(width=1, offset_y=1.5)
+    slice_data = [
+       ContourPoints(box1, roi=0, slice_index=0.0),        # ROI 0, Area 1
+       ContourPoints(box1, roi=0, slice_index=1.0),        # ROI 0, Area 1
+       ContourPoints(box1, roi=0, slice_index=2.0),        # ROI 0, Area 1
+       ContourPoints(box1, roi=0, slice_index=3.0),        # ROI 0, Area 1
+       ContourPoints(box1, roi=0, slice_index=4.0),        # ROI 0, Area 1
+       ContourPoints(box1, roi=0, slice_index=5.0),        # ROI 0, Area 1
+
+       ContourPoints(box3_right, roi=1, slice_index=1.0),  # ROI 1, Area 4
+       ContourPoints(box1_right, roi=1, slice_index=1.0),  # ROI 1, Hole
+       ContourPoints(box3_right, roi=1, slice_index=2.0),  # ROI 1, Area 4
+       ContourPoints(box1_right, roi=1, slice_index=2.0),  # ROI 1, Hole
+       ContourPoints(box3_right, roi=1, slice_index=3.0),  # ROI 1, Area 4
+       ContourPoints(box1_right, roi=1, slice_index=3.0),  # ROI 1, Hole
+       ContourPoints(box3_right, roi=1, slice_index=4.0),  # ROI 1, Area 4
+       ContourPoints(box1_right, roi=1, slice_index=4.0),  # ROI 1, Hole
+
+       ContourPoints(box3_left, roi=2, slice_index=1.0),  # ROI 2, Area 4
+       ContourPoints(box3_left, roi=2, slice_index=2.0),  # ROI 2, Area 4
+       ContourPoints(box1_left, roi=2, slice_index=2.0),  # ROI 2, Hole
+       ContourPoints(box3_left, roi=2, slice_index=3.0),  # ROI 2, Area 4
+       ContourPoints(box1_left, roi=2, slice_index=3.0),  # ROI 2, Hole
+       ContourPoints(box3_left, roi=2, slice_index=4.0),  # ROI 2, Area 4
+
+       ContourPoints(box3_ant, roi=3, slice_index=1.0),  # ROI 3, Area 4
+       ContourPoints(box1_ant, roi=3, slice_index=1.0),  # ROI 3, Hole
+       ContourPoints(box3_ant, roi=3, slice_index=2.0),  # ROI 3, Area 4
+       ContourPoints(box1_ant, roi=3, slice_index=2.0),  # ROI 3, Hole
+       ContourPoints(box3_ant, roi=3, slice_index=3.0),  # ROI 3, Area 4
+       ContourPoints(box1_ant, roi=3, slice_index=3.0),  # ROI 3, Hole
+       ContourPoints(box3_ant, roi=3, slice_index=4.0),  # ROI 3, Area 4
+    ]
+    contour_table, slice_sequence = build_contour_table(slice_data)
+    return contour_table, slice_sequence
+
 
 def contour_graph_for_testing(contour_table: pd.DataFrame,
                                          roi: ROI_Type) -> ContourGraph:
@@ -435,3 +493,31 @@ class TestRegionIdentification():
         region_indexes = {contour.region_index
                           for contour in contours_data.values()}
         assert len(region_indexes) == 1
+
+class TestHoleType():
+    '''Test the hole type identification.
+
+    Test that 'Open' and 'Closed' regions that are holes are identified
+    correctly.
+
+    Define two structures. One that has an 'Open' hole and the other that
+    has a 'Closed' hole.
+    '''
+    # pylint: disable=attribute-defined-outside-init
+    def setup_method(self):
+        self.contour_table, self.slice_sequence = hole_test_contour_table()
+
+
+    def test_hole_type(self):
+        '''Test that the hole type of contours is set correctly.'''
+        contour_graph = contour_graph_for_testing(self.contour_table, roi=2)
+        contour_graph = add_graph_edges(contour_graph, self.slice_sequence)
+        contour_graph = set_enclosed_regions(contour_graph)
+        # Find contours with holes
+        hole_contours = [node for node, data in contour_graph.nodes.data('contour')
+                         if data.is_hole]
+        assert len(hole_contours) == 4
+        # Check that the hole type is set correctly
+        for node in hole_contours:
+            contour = contour_graph.nodes[node]['contour']
+            assert contour.is_hole is True
