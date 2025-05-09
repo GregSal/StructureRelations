@@ -206,6 +206,7 @@ def add_boundary_contours(contour_graph: ContourGraph,
         interpolated_contour.is_boundary = True
         interpolated_contour.is_hole = contour.is_hole
         interpolated_contour.hole_type = contour.hole_type
+        interpolated_contour.region_index = contour.region_index
         # Add the interpolated slice index to the slice sequence
         slice_sequence.add_slice(**slice_ref)
         # Add the interpolated contour to the graph
@@ -277,40 +278,70 @@ def set_hole_type(contour_graph: ContourGraph,
         ContourGraph: The updated contour graph with hole types assigned to
             the holes in each region.
     '''
+    # Hole Type identification process:
+    # 1. Select boundary contours that are holes.
+    # 2. Get the RegionIndexes of those holes.
+    # 3. initialize a dictionary to hold the hole type for each region.
+    # 4. Iterate through each boundary contour and update the dictionary based
+    #    on the status to the hole boundary:
+    #     1. Determine the slice index that is just beyond the boundary contour.
+    #         1. Get the slice index of the boundary contour.
+    #         2. Get the slice index of the neighbouring contour.
+    #            (Because it is a boundary contour, there should only be one
+    #            neighbouring node.)
+    #         3. Use slice_sequence to get the neighbouring slice indexes and
+    #            select the one that is not a neighbour of the boundary contour.
+    #     2. Get the contours in the slice beyond the boundary contour.
+    #     3. Check if any of those contours can contain the boundary contour.
+    #     4. If so, that boundary is "closed".  If that region is not already
+    #        marked as "open", set the status to "closed"
+    #     5. If none of the contours contain the boundary contour, that
+    #        boundary is "open".  Set the status of that region to "open".
+    #        ("open" always overrides "closed".)
+    # 5. Use the region hole type dictionary to set the hole type for each
+    #    region.
+
+    ### 1. Select boundary contours that are holes. ###
     # Create the Graph indexer
     contour_lookup = build_contour_lookup(contour_graph)
     # Select boundary contours that are holes using contour_lookup
     hole_boundaries = ((contour_lookup['Boundary']) &
                        (contour_lookup['HoleType'] == 'Unknown'))
-    # Initialize the region hole type to 'Unknown'
-    # Get a list of the RegionIndexes that reference holes
+    boundary_contours = contour_lookup.loc[hole_boundaries, 'Label']
+
+    ### 2. Get the RegionIndexes of those holes. ###
     hole_regions = contour_lookup.loc[hole_boundaries, 'RegionIndex']
+    # Make a list of the RegionIndexes that reference holes
     hole_regions = list(hole_regions.drop_duplicates())
+
+    ### 3. Initialize the region hole type to 'Unknown' ###
+    # Get a list of the RegionIndexes that reference holes
     region_hole_type = {region: 'Unknown' for region in hole_regions}
-    # Iterate through each region and determine the hole type
+
+    ### 4. Iterate through each region and determine the hole type ###
     boundary_contours = contour_lookup.loc[hole_boundaries, 'Label']
     for boundary_label in boundary_contours:
+        # 4.1. Determine the slice index that is just beyond the boundary contour. #
         # Get the contour from the graph
         boundary_contour = contour_graph.nodes[boundary_label]['contour']
-        # Get the RegionIndex for the boundary contour
-        region_index = boundary_contour.region_index
-        # Get the slice index of the boundary contour
+        # 4.1.1 Get the slice index of the boundary contour
         this_slice = boundary_contour.slice_index
-        # Determine the slice index just beyond the boundary contour.
+        # 4.1.2 Get the slice index of the neighbouring contour.
         neighbouring_nodes = contour_graph.adj[boundary_label].keys()
         # Because it is a boundary contour, there should only be one
         # neighbouring node.
         neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
-        # Get the slice index of the boundary contour
-        this_slice = boundary_contour.slice_index
-        # Get the slice indexes of neighbouring contours
+        # 4.1.3. Use slice_sequence to get the neighbouring slice indexes and
+        #        select the one that is not a neighbour of the boundary contour.
         neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
         # The slice that is not a neighbour of the boundary contour is the
         # slice beyond the boundary contour.
         slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
         beyond = contour_lookup.SliceIndex==slice_beyond
+        # 4.2. Get the contours in the slice beyond the boundary contour.
         contour_labels = list(contour_lookup.loc[beyond].Label)
-        # The boundary is open if no contour contains the boundary contour
+        # 4.3. Check if any of those contours can contain the boundary contour.
+        # The boundary is closed if any contour can contain the boundary contour.
         boundary_closed = False
         for label in contour_labels:
             # Get the contour from the graph
@@ -319,17 +350,21 @@ def set_hole_type(contour_graph: ContourGraph,
                 # The hole is closed by the contour
                 boundary_closed = True
                 break
+        # Get the RegionIndex for the boundary contour
+        region_index = boundary_contour.region_index
         if boundary_closed:
             # The hole is closed by the contour
             # Region is closed if all boundaries are closed
-            if region_hole_type[region_index] == 'Unknown':
+            if not region_hole_type[region_index] == 'Open':
+                # 4.4 Set the Region status to "closed"
                 region_hole_type[region_index] = 'Closed'
         else:
             # The hole is open by the contour
             # Region is open if any boundary is open
-            if region_hole_type[region_index] == 'Unknown':
-                region_hole_type[region_index] = 'Open'
-    # Set the hole type for the each region
+            # 4.5 Set the Region status to "open"
+            region_hole_type[region_index] = 'Open'
+
+    ### 5. Use Set the hole type for each contour in the region. ###
     for region, hole_type in region_hole_type.items():
         # Get the contours in the region
         region_contours = contour_lookup.RegionIndex == region

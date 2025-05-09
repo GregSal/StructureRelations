@@ -332,6 +332,9 @@ class TestBoundaryContourGeneration():
         # verify that is_hole matches original
         assert intp_contour1.is_hole == orig_contour_1.is_hole
         assert intp_contour2.is_hole == orig_contour_2.is_hole
+        # verify that region_index matches original
+        assert intp_contour1.region_index == orig_contour_1.region_index
+        assert intp_contour2.region_index == orig_contour_2.region_index
         # Area is less than original
         assert intp_contour1.area < orig_contour_1.area
         assert intp_contour2.area < orig_contour_2.area
