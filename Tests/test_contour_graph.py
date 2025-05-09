@@ -1,11 +1,7 @@
-from random import uniform
 import networkx as nx
 import pandas as pd
 import pytest
 
-from shapely.geometry import Polygon
-
-from contours import Contour, ContourMatch, SliceSequence, points_to_polygon
 from contours import ContourPoints, build_contour_table
 from debug_tools import box_points
 
@@ -45,6 +41,7 @@ def basic_contour_table():
     contour_table, slice_sequence = build_contour_table(slice_data)
     return contour_table, slice_sequence
 
+
 def boundary_test_contour_table():
     '''Create a test contour table.
 
@@ -79,6 +76,7 @@ def boundary_test_contour_table():
         ]
     contour_table, slice_sequence = build_contour_table(slice_data)
     return contour_table, slice_sequence
+
 
 def region_test_contour_table():
     '''Create a contour table for testing set_enclosed_regions function.
@@ -273,6 +271,7 @@ class TestAddGraphEdges():
         assert (polygon2 - contour_match.contour2.polygon).is_empty
         assert contour_match.gap == 1.0
 
+
 class TestBoundaryContourGeneration():
     '''Test the add_boundary_contours function.
         Test the boundary contour:
@@ -434,17 +433,6 @@ class TestBoundaryContourGeneration():
         assert orig_contour_1.slice_index in linked_slices1
         assert orig_contour_2.slice_index in linked_slices2
 
-class TestBuildContourGraph():
-    '''Test the build_contour_graph function.'''
-    @pytest.mark.xfail
-    def test_add_graph_nodes(self):
-        contour_table, slice_sequence = basic_contour_table()
-        contours = build_contours(contour_table, roi=1)
-        contour_indices = [cn.index for cl in contours.values() for cn in cl]
-        graph, slice_sequence = build_contour_graph(contour_table,
-                                                    slice_sequence, roi=1)
-        assert contour_indices == list(graph.nodes())
-
 
 class TestRegionIdentification():
     '''Test the region identification function.
@@ -455,9 +443,6 @@ class TestRegionIdentification():
         have different RegionIndexes.
     - Verify that changes to the Contour nodes are reflected in the nodes of
         the ContourGraph.
-
-
-
     '''
     # pylint: disable=attribute-defined-outside-init
     def region_graph_prep(self, roi):
@@ -497,30 +482,159 @@ class TestRegionIdentification():
                           for contour in contours_data.values()}
         assert len(region_indexes) == 1
 
+
 class TestHoleType():
     '''Test the hole type identification.
 
-    Test that 'Open' and 'Closed' regions that are holes are identified
+    Test that "Open" and "Closed" regions that are holes are identified
     correctly.
 
-    Define two structures. One that has an 'Open' hole and the other that
-    has a 'Closed' hole.
+    ROI 1 has a hole that is "Open" at both ends.
+    ROI 2 has a "closed" hole.
+    ROI 3 has a  hole that is "Open" at one end.
     '''
     # pylint: disable=attribute-defined-outside-init
     def setup_method(self):
+        '''Create a contour table for testing the hole type identification.'''
         self.contour_table, self.slice_sequence = hole_test_contour_table()
 
+    def contour_graph_prep(self, roi):
+        '''Create a contour graph for testing the hole type identification.
+        1. Build the initial graph from the contour table.
+        2. Add edges between the contours.
+        3. Set the enclosed regions.
+        4. Add the boundary contours.
+        '''
+        contour_graph = contour_graph_for_testing(self.contour_table, roi=roi)
+        contour_graph = add_graph_edges(contour_graph, self.slice_sequence)
+        contour_graph = set_enclosed_regions(contour_graph)
+        contour_graph, slice_sequence = add_boundary_contours(contour_graph,
+                                                          self.slice_sequence)
+        return contour_graph, slice_sequence
 
     def test_hole_type(self):
         '''Test that the hole type of contours is set correctly.'''
-        contour_graph = contour_graph_for_testing(self.contour_table, roi=2)
-        contour_graph = add_graph_edges(contour_graph, self.slice_sequence)
-        contour_graph = set_enclosed_regions(contour_graph)
+        # roi 1 should have an "open" hole
+        contour_graph, slice_sequence = self.contour_graph_prep(roi=1)
+        contour_graph = set_hole_type(contour_graph, slice_sequence)
         # Find contours with holes
-        hole_contours = [node for node, data in contour_graph.nodes.data('contour')
-                         if data.is_hole]
-        assert len(hole_contours) == 4
-        # Check that the hole type is set correctly
-        for node in hole_contours:
-            contour = contour_graph.nodes[node]['contour']
-            assert contour.is_hole is True
+        contours = dict(contour_graph.nodes.data('contour'))
+        hole_types = {contour.hole_type for contour in contours.values()}
+        assert hole_types == {'None', 'Open'}
+
+        # roi 2 should have a "closed" hole
+        contour_graph, slice_sequence = self.contour_graph_prep(roi=2)
+        contour_graph = set_hole_type(contour_graph, slice_sequence)
+        # Find contours with holes
+        contours = dict(contour_graph.nodes.data('contour'))
+        hole_types = {contour.hole_type for contour in contours.values()}
+        assert hole_types == {'None', 'Closed'}
+
+        # roi 3 should have an "open" hole at one end
+        contour_graph, slice_sequence = self.contour_graph_prep(roi=3)
+        contour_graph = set_hole_type(contour_graph, slice_sequence)
+        # Find contours with holes
+        contours = dict(contour_graph.nodes.data('contour'))
+        hole_types = {contour.hole_type for contour in contours.values()}
+        assert hole_types == {'None', 'Open'}
+
+
+class TestBuildContourLookup():
+    '''Test the build_contour_lookup function.
+
+    Test that the build_contour_lookup function generates a lookup table with the
+    correct mapping of contour indices to their corresponding structures.
+                The DataFrame includes the following columns:
+                - ROI,
+                - SliceIndex,
+                - HoleType,
+                - Interpolated,
+                - Boundary,
+                - ContourIndex,
+                - RegionIndex, and
+                - Label.
+    '''
+    def test_build_contour_lookup(self):
+        # use the hole_test_contour_table function since it is the most complete.
+        contour_table, slice_sequence = hole_test_contour_table()
+        # Test for ROI 1
+        contour_graph, slice_sequence = build_contour_graph(contour_table, slice_sequence, roi=1)
+        lookup = build_contour_lookup(contour_graph)
+        # Check columns
+        required_columns = [
+            'ROI', 'SliceIndex', 'HoleType', 'Interpolated', 'Boundary',
+            'ContourIndex', 'RegionIndex', 'Label'
+        ]
+        for col in required_columns:
+            assert col in lookup.columns
+
+        # ROI should have the same value for the entire column
+        assert lookup['ROI'].nunique() == 1
+        assert (lookup['ROI'] == 1).all()
+
+        # SliceIndex should be sorted in ascending order
+        assert lookup['SliceIndex'].is_monotonic_increasing
+
+        # Should have integer and half-integer values for boundaries
+        slice_indices = lookup['SliceIndex'].tolist()
+        assert any(float(x).is_integer() for x in slice_indices)
+        assert any((x * 2) % 1 == 0.0 and not float(x).is_integer() for x in slice_indices)
+
+        # Contours that are boundaries should also be interpolated
+        boundary_flags = lookup['Boundary']
+        interpolated_flags = lookup['Interpolated']
+        assert all(interpolated_flags[boundary_flags].values)
+
+        # The hole type should be "None" for all contours that are not holes
+        non_hole_types = lookup.loc[lookup['HoleType'] != 'Unknown', 'HoleType']
+        assert all(ht in ['None', 'Open', 'Closed'] for ht in non_hole_types)
+
+        # Label should be a tuple of the ROI, the SliceIndex and the ContourIndex
+        for label, roi, slice_idx, contour_idx in zip(
+            lookup['Label'], lookup['ROI'], lookup['SliceIndex'], lookup['ContourIndex']
+        ):
+            assert isinstance(label, tuple)
+            assert label[0] == roi
+            assert label[1] == slice_idx
+            assert label[2] == contour_idx
+
+        # ROI 1 should have boundaries on slice 0.5 and 4.5
+        boundary_slices = lookup.loc[lookup['Boundary'], 'SliceIndex'].tolist()
+        assert 0.5 in boundary_slices and 4.5 in boundary_slices
+
+        # The hole region should be "Open"
+        assert 'Open' in lookup['HoleType'].values
+
+        # It should have two regions (background and hole)
+        assert lookup['RegionIndex'].nunique() == 2
+
+        # Test for ROI 2
+        contour_graph, slice_sequence = build_contour_graph(contour_table, slice_sequence, roi=2)
+        lookup = build_contour_lookup(contour_graph)
+        # ROI should have the same value for the entire column
+        assert lookup['ROI'].nunique() == 1
+        assert (lookup['ROI'] == 2).all()
+        # Boundaries on 0.5, 1.5, 3.5, 4.5
+        boundary_slices = lookup.loc[lookup['Boundary'], 'SliceIndex'].tolist()
+        for s in [0.5, 1.5, 3.5, 4.5]:
+            assert s in boundary_slices
+        # The hole region should be "Closed"
+        assert 'Closed' in lookup['HoleType'].values
+        # It should have two regions
+        assert lookup['RegionIndex'].nunique() == 2
+
+
+class TestBuildContourGraph():
+    '''Test the build_contour_graph function.
+
+    Test that the build_contour_graph function generates a graph with the
+    correct number of nodes and edges.
+    '''
+    @pytest.mark.xfail
+    def test_add_graph_nodes(self):
+        contour_table, slice_sequence = basic_contour_table()
+        contours = build_contours(contour_table, roi=1)
+        contour_indices = [cn.index for cl in contours.values() for cn in cl]
+        graph, slice_sequence = build_contour_graph(contour_table,
+                                                    slice_sequence, roi=1)
+        assert contour_indices == list(graph.nodes())
