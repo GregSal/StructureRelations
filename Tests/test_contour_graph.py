@@ -1,3 +1,5 @@
+from collections import Counter
+
 import networkx as nx
 import pandas as pd
 import pytest
@@ -558,7 +560,9 @@ class TestBuildContourLookup():
         # use the hole_test_contour_table function since it is the most complete.
         contour_table, slice_sequence = hole_test_contour_table()
         # Test for ROI 1
-        contour_graph, slice_sequence = build_contour_graph(contour_table, slice_sequence, roi=1)
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
         lookup = build_contour_lookup(contour_graph)
         # Check columns
         required_columns = [
@@ -578,7 +582,8 @@ class TestBuildContourLookup():
         # Should have integer and half-integer values for boundaries
         slice_indices = lookup['SliceIndex'].tolist()
         assert any(float(x).is_integer() for x in slice_indices)
-        assert any((x * 2) % 1 == 0.0 and not float(x).is_integer() for x in slice_indices)
+        assert any((x * 2) % 1 == 0.0 and not float(x).is_integer()
+                   for x in slice_indices)
 
         # Contours that are boundaries should also be interpolated
         boundary_flags = lookup['Boundary']
@@ -591,7 +596,8 @@ class TestBuildContourLookup():
 
         # Label should be a tuple of the ROI, the SliceIndex and the ContourIndex
         for label, roi, slice_idx, contour_idx in zip(
-            lookup['Label'], lookup['ROI'], lookup['SliceIndex'], lookup['ContourIndex']
+            lookup['Label'], lookup['ROI'], lookup['SliceIndex'],
+            lookup['ContourIndex']
         ):
             assert isinstance(label, tuple)
             assert label[0] == roi
@@ -609,7 +615,9 @@ class TestBuildContourLookup():
         assert lookup['RegionIndex'].nunique() == 2
 
         # Test for ROI 2
-        contour_graph, slice_sequence = build_contour_graph(contour_table, slice_sequence, roi=2)
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=2)
         lookup = build_contour_lookup(contour_graph)
         # ROI should have the same value for the entire column
         assert lookup['ROI'].nunique() == 1
@@ -629,12 +637,30 @@ class TestBuildContourGraph():
 
     Test that the build_contour_graph function generates a graph with the
     correct number of nodes and edges.
+
+    This just tests the combined functionality of the other functions used to
+    assemble a complete contour graph.  Each individual function is tested
+    separately.
     '''
-    @pytest.mark.xfail
-    def test_add_graph_nodes(self):
-        contour_table, slice_sequence = basic_contour_table()
-        contours = build_contours(contour_table, roi=1)
-        contour_indices = [cn.index for cl in contours.values() for cn in cl]
-        graph, slice_sequence = build_contour_graph(contour_table,
-                                                    slice_sequence, roi=1)
-        assert contour_indices == list(graph.nodes())
+    def test_build_contour_graph(self):
+        # use the hole_test_contour_table function since it is the most complete.
+        contour_table, slice_sequence = hole_test_contour_table()
+        # Test for ROI 1
+        contour_graph, _ = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=0)
+        degrees = Counter(dict(contour_graph.degree).values())
+        assert degrees[1] == 2
+        assert degrees[2] == 6
+        contour_graph, _ = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+        degrees = Counter(dict(contour_graph.degree).values())
+        assert degrees[1] == 4
+        assert degrees[2] == 8
+        contour_graph, _ = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=3)
+        degrees = Counter(dict(contour_graph.degree).values())
+        assert degrees[1] == 4
+        assert degrees[2] == 7
