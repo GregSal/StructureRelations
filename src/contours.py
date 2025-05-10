@@ -10,7 +10,7 @@ import shapely
 from shapely.geometry import Polygon
 
 from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
-from types_and_classes import ContourIndex
+from types_and_classes import ContourIndex, RegionIndex
 from types_and_classes import InvalidContour
 from types_and_classes import PRECISION, SliceIndexSequenceType
 
@@ -586,12 +586,11 @@ class Contour:
         self.polygon = polygon
         self.thickness = self.default_thickness
         self.is_hole = False
-        self.related_contours = []
+        self.related_contours: List[ContourIndex] = []
         self.hole_type = 'None'
         self.is_boundary = False
         self.is_interpolated = False
-        self.region_index = ''  # Default to an empty string
-        self.related_regions = []
+        self.region_index: RegionIndex = ''  # Default to an empty string
         self.contour_index = Contour.counter
         Contour.counter += 1
         self.validate_polygon()

@@ -37,6 +37,9 @@ ContourPointsType = NewType('ContourPointsType', List[tuple[float]])
 #   - An indexer value to force unique nodes.
 ContourIndex = NewType('ContourIndex', Tuple[ROI_Type, SliceIndexType, int])
 
+# The index of a a unique contiguous 3D region.
+RegionIndex = NewType('RegionIndex', str)
+
 # A Networkx Graph object containing contour information.
 # Each node in the graph represents a contour and has a 'contour' attribute
 # that is an instance of the contours.Contour class.  The node labels are
