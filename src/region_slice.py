@@ -25,24 +25,34 @@ from utilities import make_multi
 class RegionSlice():
     '''Class representing all regions of a structure on a specific slice.
 
-    The class contains multiple lists of Shapley MultiPolygons. The lists
+    The class contains multiple dictionaries of Shapley MultiPolygons. The
+    keys of each dictionary are RegionIndexes. the values of the dictionaries
     are:
-        - regions: Each MultiPolygon defines the polygons on the slice that
-            are part of a unique contiguous 3D region (A contiguous 3D region
-            may have multiple polygons on a given slice that converge on a
-            different slice). The Polygons also include any holes (voids) in the
-            region.
-        - boundaries: Each MultiPolygon includes the polygons on the slice that
-            are part of the related 3D region but are local boundaries of that
-            region.  The boundaries are kept distinct from the regions to allow
-            for corrections to relationship tests for the structure.
+        - regions: Each item is a MultiPolygon that defines the polygons on the
+            slice that are part of a unique contiguous 3D region (A contiguous
+            3D region may have multiple polygons on a given slice that converge
+            on a different slice). The Polygons also include any holes (voids)
+            in the region.
+        - boundaries: Each item is a MultiPolygon that includes the polygons on
+            the slice that are part of the related 3D region but are local
+            boundaries of that region.  The boundaries are kept distinct from
+            the regions to allow for corrections to relationship tests for the
+            structure.
         - open_holes: Each MultiPolygon includes the polygons on the slice that
-            define holes in the related  region which are open to the exterior
+            define holes in the related 3D region which are open to the exterior
             of the structure. In other words, holes that describe concave
             portions of the 3D region, which appear as interior holes on the
             particular slice. The holes are not part of the region.  The holes
             are kept distinct from the regions to allow for accurate
             identification of the exterior surface of the 3D region.
+        - region_holes: Each item is a list of Contours that are holes for the
+            given region index and slice index.  This is used to retain
+            references to the hole regions, because the holes are merged into
+            the region MultiPolygons.  (Holes have their own region index.)
+        - embedded_regions: Each item is a list of Contours that are embedded
+            within the given region index and slice index.  This is used to
+            retain references to the embedded regions, because the RegionIndex
+            is lost when it is merged into the region MultiPolygons.
 
     The RegionSlice is constructed from the structure's contour_graph. The
     contour_graph is a NetworkX graph that contains all the contours of the
@@ -62,7 +72,6 @@ class RegionSlice():
         considered empty if all the regions and boundaries are empty.
     The __bool__ method uses the is_empty function in a boolean context.
 
-
     Args:
         contour_graph (nx.Graph): The graph representation of the contours.
         contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
@@ -71,21 +80,29 @@ class RegionSlice():
 
     Attributes:
         slice_index (SliceIndexType): The slice index of the regions.
-        contour_indexes (List[List[str]]): The indexes of the contours combined
-            within each region, in the same order as the list of regions.
-        region_indexes (List[List[str]]): The indexes of the merged regions in
-            the same order as the list of regions.
-        regions (shapely.MultiPolygon): The MultiPolygons created by combining
-            the contours on a given region and slice, along with the contours
-            for all related regions (holes and islands).
-        boundaries (shapely.MultiPolygon): The MultiPolygons that are the
-            combination of all related boundary polygons on the slice.
-        open_holes (List[shapely.Polygon]): A list of the holes in the contour
-            that connect to the exterior of the contour.
-        exterior (shapely.MultiPolygon): The contour MultiPolygon with all
-            holes filled in.
-        hull (shapely.MultiPolygon): The MultiPolygon that is the convex hull
-            surrounding the contour MultiPolygon.
+        regions (Dict[RegionIndex, shapely.MultiPolygon]): The
+            MultiPolygons created by combining the contours on a given region
+            and slice, along with the contours for all related regions
+            (holes and islands).
+        boundaries (Dict[RegionIndex, shapely.MultiPolygon]): The
+            MultiPolygons that are the boundaries of the regions.
+        open_holes (Dict[RegionIndex, shapely.MultiPolygon]): A list of
+            the holes in the contour that connect to the exterior of the
+            contour.
+        exterior (Dict[RegionIndex, shapely.MultiPolygon]): The regions'
+            MultiPolygons with all non-open holes filled in.
+        hull (Dict[RegionIndex, shapely.MultiPolygon]): The regions'
+            MultiPolygons that are the convex hulls of each region.
+        contour_indexes (Dict[RegionIndex, List[ContourIndex]]): The indexes of
+            the contours combined within each region.
+        region_holes (Dict[RegionIndex, List[Contour]]) The Contours that are
+            the holes in the regions.  The RegionIndex keys match the keys in
+            the regions dictionary.  The value will be an empty list if there
+            are no holes in the region.
+        embedded_regions (Dict[RegionIndex, List[Contour]]) The Contours that
+            are embedded within the regions.  The RegionIndex keys match the
+            keys in the regions dictionary.  The value will be an empty list if
+            there are no embedded regions within the region.
         is_empty (bool): True if the slice is empty, False otherwise.
         is_interpolated (bool): True if all contours in the slice are
             interpolated, False otherwise.
@@ -131,12 +148,13 @@ class RegionSlice():
         #                    (contour_reference['HoleType'] == 'None'))
         #region_set = set(contour_reference.loc[regular_contours, 'RegionIndex'])
         region_set = set(contour_reference.RegionIndex)
-        # Initialize the region lists
-        self.region_indexes = []
-        self.contour_indexes = []
-        self.regions = []
-        self.boundaries = []
-        self.open_holes = []
+        # Initialize the region dictionaries
+        self.regions = {}
+        self.boundaries = {}
+        self.open_holes = {}
+        self.region_holes = {}
+        self.embedded_regions = {}
+        self.contour_indexes = {}
         interpolated_contours = []
         # Iterate through the regions on the slice
         while len(region_set) > 0:
@@ -144,7 +162,7 @@ class RegionSlice():
             region_index = region_set.pop()
             region_contours = get_region_contours(contour_reference,
                                                   [region_index])
-            # Get expand the initial selection to include all related regions
+            # Expand the initial selection to include all related regions
             # on the slice.
             related_regions = {region_index}
             for contour in region_contours:
@@ -157,10 +175,14 @@ class RegionSlice():
             # Sort the contours by area in descending order
             region_contours = sorted(region_contours, key=lambda x: x.area,
                                      reverse=True)
+            # Get the region index for the contours
+            region_index = region_contours[0].region_index
             # Initialize region, boundary and open holes with empty MultiPolygons.
             region = shapely.MultiPolygon()
             boundary = shapely.MultiPolygon()
             open_hole = shapely.MultiPolygon()
+            region_holes = []
+            embedded_regions = []
             contour_labels = []
             # Add the contours into the appropriate MultiPolygons
             for contour in region_contours:
@@ -178,6 +200,8 @@ class RegionSlice():
                         # Add the boundary to the region
                         boundary = boundary.union(contour.polygon)
                 elif contour.is_hole:
+                    # add the hole to the region
+                    region_holes.append(contour)
                     # Subtract the hole from the region
                     region = region - contour.polygon
                     if contour.hole_type == 'Open':
@@ -185,17 +209,21 @@ class RegionSlice():
                         open_hole = open_hole.union(contour.polygon)
                 else:
                     region = region.union(contour.polygon)
-            # Add the MultiPolygons into the appropriate lists.  An empty
-            # MultiPolygon is added to the list if there are no appropriate
-            # contours in the regions.  As a result the lengths of the lists
-            # will be the same and the region, boundary and open holes
-            # MultiPolygons will match one-to-one. The contour_indexes and
-            # region_indexes reference lists will also match.
-            self.regions.append(make_multi(region))
-            self.boundaries.append(make_multi(boundary))
-            self.open_holes.append(make_multi(open_hole))
-            self.contour_indexes.append(contour_labels)
-            self.region_indexes.append(related_regions)
+                    if contour.region_index != region_index:
+                        # If the contour is not part of the region, add it to the
+                        # embedded regions list.
+                        embedded_regions.append(contour)
+            # Add the MultiPolygons to the appropriate dictionaries.  An empty
+            # MultiPolygon is added if there are no appropriate
+            # contours in the regions.  As a result the dictionary keys will
+            # match for all of the dictionaries.
+            self.regions[region_index] = make_multi(region)
+            self.boundaries[region_index] = make_multi(boundary)
+            self.open_holes[region_index] = make_multi(open_hole)
+            self.contour_indexes[region_index] = contour_labels
+            self.embedded_regions[region_index] = embedded_regions
+            self.region_holes[region_index] = region_holes
+
         # Label the RegionSlice as Interpolated if all contours on the slice are
         # interpolated.
         self.is_interpolated = all(interpolated_contours)
@@ -209,21 +237,23 @@ class RegionSlice():
         because these are not considered to be part of the solid exterior.
 
         Returns:
-            List[shapely.MultiPolygon]: The region MultiPolygons with all holes
-                filled in.
+            Dict[RegionIndex, shapely.MultiPolygon]: The region MultiPolygons
+                with all closed holes filled in.
         '''
-        exterior_regions = []
-        for region, hole in zip(self.regions, self.open_holes):
+        exterior_regions = {}
+        for region_index, region in self.regions.items():
             if region.is_empty:
+                exterior_regions[region_index] = region
                 continue
+            # Create a MultiPolygon from the region
             solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
                       for poly in region.geoms]
             solid = shapely.unary_union(solids)
             ext_poly = make_multi(solid)
             # Subtract open holes
-            if not hole.is_empty:
-                ext_poly = ext_poly = ext_poly - hole
-            exterior_regions.append(ext_poly)
+            if not self.open_holes[region_index].is_empty:
+                ext_poly = ext_poly - self.open_holes[region_index]
+            exterior_regions[region_index] = ext_poly
         return exterior_regions
 
     @property
@@ -238,16 +268,17 @@ class RegionSlice():
         will consist of one elastic bands stretched around each external
         polygon that is part of the region.
         Returns:
-            List[shapely.MultiPolygon]: The convex hulls for each region.
+            Dict[RegionIndex, shapely.MultiPolygon]: The convex hulls for each
+                region.
         '''
-        hull_regions = []
-        for region in self.regions:
+        hull_regions = {}
+        for region_index, region in self.regions.items():
             if region.is_empty:
-                hull_regions.append(region)
+                hull_regions[region_index] = region
             else:
                 hull = region.convex_hull
                 hull_poly = make_multi(hull)
-                hull_regions.append(hull_poly)
+                hull_regions[region_index] = hull_poly
         return hull_regions
 
     @property
@@ -258,12 +289,13 @@ class RegionSlice():
             bool: True if the slice is empty, False otherwise.
         '''
         if self.regions:
-            no_regions = all(region.is_empty for region in self.regions)
+            no_regions = all(region.is_empty
+                             for region in self.regions.values())
         else:
             no_regions = True
         if self.boundaries:
             no_boundaries = all(boundary.is_empty
-                                for boundary in self.boundaries)
+                                for boundary in self.boundaries.values())
         else:
             no_boundaries = True
         return no_regions & no_boundaries
