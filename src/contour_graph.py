@@ -207,6 +207,9 @@ def add_boundary_contours(contour_graph: ContourGraph,
         interpolated_contour.is_hole = contour.is_hole
         interpolated_contour.hole_type = contour.hole_type
         interpolated_contour.region_index = contour.region_index
+        # FIXME related contour references need to be generated correctly.
+        # Need to create interpolated contour for all contour references at the
+        # same time so that the related contours are set correctly.
         # Add the interpolated slice index to the slice sequence
         slice_sequence.add_slice(**slice_ref)
         # Add the interpolated contour to the graph
@@ -261,7 +264,7 @@ def set_enclosed_regions(contour_graph: ContourGraph) -> List[ContourGraph]:
             node_data = dict(contour_graph.nodes.data('contour'))
             for related_contour in node_data.values():
                 if related_contour.contour_index in related_contours_list:
-                    related_contour.related_regions.append(region_label)
+                    related_contour.related_contours.append(region_label)
         region_counter += 1
     return contour_graph
 

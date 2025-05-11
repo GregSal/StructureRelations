@@ -166,7 +166,7 @@ class RegionSlice():
             # on the slice.
             related_regions = {region_index}
             for contour in region_contours:
-                related_regions.update(set(contour.related_regions))
+                related_regions.update(set(contour.related_contours))
             # Remove the regions that have already been processed.
             region_set = region_set - related_regions
             # Modify region_contours to include all related regions
@@ -191,6 +191,7 @@ class RegionSlice():
                 interpolated_contours.append(contour.is_interpolated)
                 # Check whether the contour is a boundary
                 if contour.is_boundary:
+                    # FIXME holes are note being subtracted
                     if contour.is_hole:
                         # Subtract the hole from the region
                         boundary = boundary - contour.polygon
