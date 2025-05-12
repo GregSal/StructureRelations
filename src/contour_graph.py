@@ -152,7 +152,21 @@ def add_boundary_contours(contour_graph: ContourGraph,
     boundary_nodes = [node for node, degree in contour_graph.degree()
                       if degree == 1]
     for original_boundary in boundary_nodes:
+        # FIXME related contour references need to be generated correctly.
+        # Need to create interpolated contour for all contour references at the
+        # same time so that the related contours are set correctly.
         # Get the contour and its slice index
+        # - interpolated slice index can be obtained from the interpolated
+        #   contour.
+        # - Combine code from structures.generate_interpolated_contours() and
+        # contour_graph.add_boundary_contours() to create a generic function to
+        # identify the relevant neighbouring slices for interpolation.
+        # - add a get_contour function that takes a ContourGraph and a contour
+        # index and returns the contour object.
+        # - Combine code from structures.generate_interpolated_contours() and
+        # contour_graph.add_boundary_contours() to create a generic function to
+        # add an interpolated contour to the graph.
+
         contour = contour_graph.nodes[original_boundary]['contour']
         this_slice = contour.slice_index
         # Determine the neighbor slice not linked with an edge
@@ -207,9 +221,6 @@ def add_boundary_contours(contour_graph: ContourGraph,
         interpolated_contour.is_hole = contour.is_hole
         interpolated_contour.hole_type = contour.hole_type
         interpolated_contour.region_index = contour.region_index
-        # FIXME related contour references need to be generated correctly.
-        # Need to create interpolated contour for all contour references at the
-        # same time so that the related contours are set correctly.
         # Add the interpolated slice index to the slice sequence
         slice_sequence.add_slice(**slice_ref)
         # Add the interpolated contour to the graph

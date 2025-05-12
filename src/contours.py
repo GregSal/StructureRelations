@@ -251,7 +251,7 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
         new_slice = round(np.mean(slices), precision)
         min_slice = min(slices)
         max_slice = max(slices)
-        if not (min_slice <= new_slice <= max_slice):
+        if not min_slice <= new_slice <= max_slice:
             raise ValueError("Calculated slice is out of bounds after rounding.")
         return new_slice
     else:
