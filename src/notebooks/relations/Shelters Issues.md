@@ -8,7 +8,7 @@
 <td class="d" colspan="2">
 <span class="a">a</span> and <span class="b">b</span> have no points in common, but the Convex Hull of <span class="a">a</span> contains <span class="b">b</span>.
 </td></tr><tr><td colspan="2">
-<img src="Images/Relationships/shelters.png" alt="shelters">
+<img src="../../Images/Relationships/shelters.png" alt="shelters">
 </td></tr></table>
 
 - This relation is intended to identify structure relations base on an expansion margin followed by a crop.
@@ -29,7 +29,7 @@ middle.
 the "C" shape contains the circle.</li>
 <li> When the cut-plane is approximately perpendicular to the slice plane, this method of identifying shelters works.</li></ul></td>
 <td width="250px">
-<img src="Images/FreeCAD Images/Sheltered Horizontal cylinder End On View.png" alt="shelters">
+<img src="../../Images/FreeCAD Images/Sheltered Horizontal cylinder End On View.png" alt="shelters">
 </td></tr>
 <tr><td width="350">
 As soon as the cut-plane is no longer perpendicular to the slice plane, the difficulties begin.<br><br>
@@ -39,17 +39,17 @@ As soon as the cut-plane is no longer perpendicular to the slice plane, the diff
 </td></tr>
 <tr><td width="350">
 <ul><li>If the information is limited to the slice plane, then using the basic relation definitions, the hollow cylinder should be classified as <b>"Surrounding"</b> the inner cylinder.</li>
-<li> The hollow cylinder appears as a ring around the inner circle on the slice, so in the 2D plane the ring encloses the circle.</li></ul></td><td width="250px"><img src="Images/FreeCAD Images/Sheltered cylinder Top View.png" alt="shelters"></td></tr>
+<li> The hollow cylinder appears as a ring around the inner circle on the slice, so in the 2D plane the ring encloses the circle.</li></ul></td><td width="250px"><img src="../../Images/FreeCAD Images/Sheltered cylinder Top View.png" alt="shelters"></td></tr>
 <tr><td width="350"><ul><li> However, the hollow cylinder does not <b>"Surround"</b> the inner cylinder in 3D space.</li>
 </ul></td>
 <td width="250px">
-<img src="Images/FreeCAD Images/Sheltered cylinder angled view.png" alt="shelters"
+<img src="../../Images/FreeCAD Images/Sheltered cylinder angled view.png" alt="shelters"
 ></td></tr>
 <tr><td width="350">
 To add another complication, if the same hollow cylinder with another cylinder inside it is rotated so that the cylinder axis is in the x-axis (horizontal on the slice plane), then the same geometry will be classified as <b>"Disjoint"</b>.</li>
 </ul></td>
 <td width="250px">
-<img src="Images/FreeCAD Images/Sheltered Horizontal cylinder Angled View.png" alt="shelters">
+<img src="../../Images/FreeCAD Images/Sheltered Horizontal cylinder Angled View.png" alt="shelters">
 </td></tr>
 <tr><td width="350">
 <ul><li>In the slice plane, the horizontal hollow cylinder and inner cylinder appear as two thin rectangles above and below a fatter rectangle.</li>
@@ -57,7 +57,7 @@ To add another complication, if the same hollow cylinder with another cylinder i
 </td>
 <td width="250px">
 <br><br>
-<img src="Images/FreeCAD Images/Sheltered Horizontal cylinder Top View.png"></td>
+<img src="../../Images/FreeCAD Images/Sheltered Horizontal cylinder Top View.png"></td>
 </tr>
 <tr><td width="350">
 My current definition of <i>Convex Hull</i> is actually the combined convex hulls of each distinct region in the contour. <br>
@@ -66,19 +66,19 @@ external contour, rather that one elastic band stretched around all external
 contours.  </li>
 <ul><li>Using this definition, The horizontal hollow cylinder with another
 cylinder inside it will be classified as <b>Disjoint</b></td>
-<td width="250px"><img src="Images/FreeCAD Images/Sheltered Horizontal cylinder Almost Top View.png" alt="shelters"></td>
+<td width="250px"><img src="../../Images/FreeCAD Images/Sheltered Horizontal cylinder Almost Top View.png" alt="shelters"></td>
 </tr>
 <tr><td width="350">
 If the convex hull is defined as "The smallest convex polygon that contains
 all the regions on the plane", then The horizontal hollow cylinder with another
 cylinder inside it will be correctly classified as <b>Shelters</b>.</td>
-<td width="250px"><img src="Images/FreeCAD Images/Sheltered Horizontal cylinder With Hull.png" alt="shelters"></td></tr>
+<td width="250px"><img src="../../Images/FreeCAD Images/Sheltered Horizontal cylinder With Hull.png" alt="shelters"></td></tr>
 <tr><td width="350">
 However this definition may result in spurious relationships being identified.
 <ul><li>For example, the convex hull of a set of distinct regions will contain
 the area between the regions.</ul></td>
 <td width="250px">
-<img src="Images/FreeCAD Images/Three Parallel Cylinders.png" alt="shelters"></td></tr>
+<img src="../../Images/FreeCAD Images/Three Parallel Cylinders.png" alt="shelters"></td></tr>
 </table>
 
 ## Hull Definition
@@ -140,7 +140,7 @@ contours.**
 - A hollow cylindrical shell with an interior cylinder ending inside the shell should be reported as **Shelters**
 - In the above example, if the interior cylinder extends beyond the outer cylinder's hole, then the relation should be **Disjoint**.
 
-![Extended Inner Cylinder](<Images/FreeCAD Images/Extended Inner cylinder.png>)
+![Extended Inner Cylinder](<../../Images/FreeCAD Images/Extended Inner cylinder.png>)
 
 - Similar to the above issue with the Convex Hull, the **Disjoint** relation will only be identified correctly if the hole on the plane is recognized as *exterior* to the structure.
 
@@ -149,7 +149,7 @@ contours.**
 - However, the Disjoint relation is being overridden by the **Surrounds** relation.
 
 <table><tr><td>
-<img src="Images/FreeCAD Images/Disjoint Parallel Cylinders.png">
+<img src="../../Images/FreeCAD Images/Disjoint Parallel Cylinders.png">
 </td><td>
-<img src="Images/FreeCAD Images/Disjoint Axial Cylinders.png" alt="shelters">
+<img src="../../Images/FreeCAD Images/Disjoint Axial Cylinders.png" alt="shelters">
 </td></tr></table>
