@@ -192,6 +192,8 @@ class RegionSlice():
                 # Check whether the contour is a boundary
                 if contour.is_boundary:
                     # FIXME holes are note being subtracted
+                    # FIXME Boundaries should not be combined.  They should be
+                    # added as a separate MultiPolygon.
                     if contour.is_hole:
                         # Subtract the hole from the region
                         boundary = boundary - contour.polygon
