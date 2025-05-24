@@ -7,7 +7,6 @@ from typing import List, LiteralString, Tuple, Union
 # Standard Libraries
 from enum import Enum, auto
 from dataclasses import dataclass, asdict
-from functools import partial
 
 # Shared Packages
 import pandas as pd
@@ -15,11 +14,11 @@ import shapely
 import networkx as nx
 
 # Local packages
-from types_and_classes import ROI_Type, RegionNode, SliceIndexType, StructurePairType
-from contours import SliceNeighbours
-from types_and_classes import RegionGraph, RegionNodeType, RegionIndexType
-from utilities import calculate_new_slice_index, interpolate_polygon
-from region_slice import ContourType, RegionSlice, empty_structure
+from types_and_classes import StructurePairType
+from types_and_classes import ContourGraph, ContourIndex
+from contours import Contour, SliceNeighbours, calculate_new_slice_index
+from contours import interpolate_polygon
+from region_slice import RegionSlice, empty_structure
 
 
 # Global Settings
@@ -291,7 +290,6 @@ class DE9IM():
             self.relation_str = shapely.relate(poly_a, poly_b)
         elif relation_str is not None:
             self.relation_str = relation_str
-
         else:
             raise ValueError(''.join([
                 'Must supply either polygons or a relationship string to ',
@@ -516,8 +514,8 @@ class DE27IM():
     # If only the B contour is supplied, then B is exterior to A
     exterior_b = 'F' * 3 + 'F' * 3 + '1' * 3  # 'FFFFFF111'
 
-    def __init__(self, contour_a: ContourType = None,
-                 contour_b: ContourType = None,
+    def __init__(self, contour_a: Contour = None,
+                 contour_b: Contour = None,
                  relation_str: str = None,
                  relation_int: int = None,
                  adjustments: List[str] = None):
@@ -618,7 +616,7 @@ class DE27IM():
                     f'{str(type(contour_b))}'
                     ]))
         else:
-            # If contour_a and contour_b are shapely Polygons or RegionNodeType
+            # If contour_a and contour_b are shapely Polygons or Contour
             # objects, then get the 9 bit DE9IM relationship and pad the other
             # 18 bits with 0s.
             if isinstance(contour_a, shapely.Polygon):
@@ -630,7 +628,7 @@ class DE27IM():
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
                         'or a combination of shapely Polygon objects and ',
-                        'RegionNodeType objects. contour_a input was: ',
+                        'Contour objects. contour_a input was: ',
                     f'{str(type(contour_a))}'
                     ])) from err
             if isinstance(contour_b, shapely.Polygon):
@@ -642,7 +640,7 @@ class DE27IM():
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
                         'or a combination of shapely Polygon objects and ',
-                        'RegionNodeType objects. contour_b input was: ',
+                        'Contour objects. contour_b input was: ',
                     f'{str(type(contour_b))}'
                     ])) from err
             contour = DE9IM(poly_a, poly_b)
@@ -777,8 +775,8 @@ def relate_structures(slice_structures: pd.DataFrame,
     return relation
 
 
-def set_adjustments(region1: RegionNodeType,
-                    region2: Union[RegionNodeType, None],
+def set_adjustments(region1: Contour,
+                    region2: Union[Contour, None],
                     selected_roi: StructurePairType):
     # The first region is always a boundary.
     adjustments = ['boundary_a']
@@ -800,8 +798,8 @@ def set_adjustments(region1: RegionNodeType,
 
 
 # %% Functions for boundary relations
-def node_selector(region_graph: RegionGraph, region: RegionNodeType,
-                  selected_roi: StructurePairType) -> List[RegionIndexType]:
+def node_selector(region_graph: ContourGraph, region: Contour,
+                  selected_roi: StructurePairType) -> List[ContourIndex]:
     # Select regions from the other ROI that are between region's
     # prev_slice and next_slice.
 
@@ -831,8 +829,8 @@ def node_selector(region_graph: RegionGraph, region: RegionNodeType,
     return selection
 
 
-def get_boundaries(graph: RegionGraph,
-                    selected_roi: StructurePairType)->List[RegionIndexType]:
+def get_boundaries(graph: ContourGraph,
+                    selected_roi: StructurePairType)->List[ContourIndex]:
     boundaries = []
     for node in graph.nodes:
         region = graph.nodes[node]
@@ -851,8 +849,8 @@ def drop_nodes(graph: nx.Graph, node):
         graph.remove_node(node)
 
 
-def get_relation(region1: RegionNodeType,
-                  region2: Union[RegionNodeType, None],
+def get_relation(region1: Contour,
+                  region2: Union[Contour, None],
                   selected_roi: StructurePairType):
     # Get the necessary adjustments for the relationship.
     adjustments = set_adjustments(region1, region2, selected_roi)
@@ -860,8 +858,8 @@ def get_relation(region1: RegionNodeType,
     return relation
 
 
-def get_matching_region(sub_graph: RegionGraph,
-                        region1: RegionNodeType)->Union[RegionNodeType, None]:
+def get_matching_region(sub_graph: ContourGraph,
+                        region1: Contour)->Union[Contour, None]:
     # if a region has the same slice index as the boundary, then return it.
     slice_index = region1['slice_index']
     sub_graph_slices = dict(sub_graph.nodes.data('slice_index'))
@@ -892,7 +890,8 @@ def get_interpolated_region(sub_graph):
     new_slice = calculate_new_slice_index(slices)
     new_neighbours = SliceNeighbours(new_slice, *slices)
     # Define a new node to store the interpolated region
-    intp_node = RegionNode(**second_node)
+    ## FIXME Temporary fix for the Contour
+    intp_node = Contour(**second_node)
     intp_node.is_interpolated = True
     intp_node.slice_index = new_slice
     intp_node.slice_neighbours = new_neighbours
@@ -910,7 +909,7 @@ def get_interpolated_region(sub_graph):
     return asdict(intp_node)
 
 
-def get_boundary_relations(region_graph: RegionGraph,
+def get_boundary_relations(region_graph: ContourGraph,
                            selected_roi: Tuple[int, int]) -> List[DE27IM]:
     '''Get boundary relations between regions in the graph for the selected ROIs.
 
