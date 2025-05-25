@@ -330,7 +330,7 @@ class TestContour():
     def test_initialization(self):
         '''Test that the Contour class initializes correctly.'''
         polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour = Contour(roi=1, slice_index=0.0, polygon=polygon, contours=[])
+        contour = Contour(roi=1, slice_index=0.0, polygon=polygon, existing_contours=[])
         assert contour.roi == 1
         assert contour.slice_index == 0.0
 
@@ -338,8 +338,8 @@ class TestContour():
         '''Test that contour_index is assigned sequentially for each new
         Contour instance.'''
         polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=1.0, polygon=polygon1, contours=[])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, existing_contours=[])
+        contour2 = Contour(roi=1, slice_index=1.0, polygon=polygon1, existing_contours=[])
         assert contour1.contour_index + 1 == contour2.contour_index
 
     def test_identify_holes(self):
@@ -350,10 +350,10 @@ class TestContour():
 
         # Create the outer contour first
         outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
-                                contours=[])
+                                existing_contours=[])
         # Create the hole contour and pass the outer contour in the contours list
         hole_contour = Contour(roi=1, slice_index=0.0, polygon=hole_polygon,
-                               contours=[outer_contour])
+                               existing_contours=[outer_contour])
         # Check that the hole contour is identified correctly
         assert hole_contour.is_hole
         # Check that related_contours are set correctly for both contours
@@ -368,10 +368,10 @@ class TestContour():
 
         # Create the outer contour first
         outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
-                                contours=[])
+                                existing_contours=[])
         # Create the hole contour and pass the outer contour in the contours list
         hole_contour = Contour(roi=1, slice_index=0.0, polygon=hole_polygon,
-                               contours=[outer_contour])
+                               existing_contours=[outer_contour])
         # Check that the hole contour is identified correctly
         assert hole_contour.is_hole
         # Check that related_contours are set correctly for both contours
@@ -382,9 +382,9 @@ class TestContour():
         '''Test that an error is raised if a contour overlaps with an existing contour.'''
         polygon1 = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
         polygon2 = Polygon([(1, 1), (3, 1), (3, 3), (1, 3)])  # Overlaps with polygon1
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, existing_contours=[])
         with pytest.raises(InvalidContour):
-            Contour(roi=1, slice_index=0.0, polygon=polygon2, contours=[contour1])
+            Contour(roi=1, slice_index=0.0, polygon=polygon2, existing_contours=[contour1])
 
 
 class TestContourMatch():
@@ -393,8 +393,8 @@ class TestContourMatch():
         '''Test ContourMatch initialization and thickness calculation.'''
         polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
         polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, existing_contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, existing_contours=[])
         match = ContourMatch(contour1, contour2)
         assert match.gap == 2.0
 
@@ -402,8 +402,8 @@ class TestContourMatch():
         '''Test the direction method of ContourMatch.'''
         polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
         polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, existing_contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, existing_contours=[])
         match = ContourMatch(contour1, contour2)
         assert match.direction(contour1) == 1
         assert match.direction(contour2) == -1
@@ -413,9 +413,9 @@ class TestContourMatch():
         polygon1 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
         polygon2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
         polygon3 = Polygon([(2, 2), (3, 2), (3, 3), (2, 3)])
-        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, contours=[])
-        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, contours=[])
-        contour3 = Contour(roi=1, slice_index=4.0, polygon=polygon3, contours=[])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=polygon1, existing_contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=polygon2, existing_contours=[])
+        contour3 = Contour(roi=1, slice_index=4.0, polygon=polygon3, existing_contours=[])
         match = ContourMatch(contour1, contour2)
         with pytest.raises(ValueError):
             match.direction(contour3)

@@ -51,6 +51,14 @@ class SliceNeighbours:
         self.previous_slice = SliceIndexType(float(self.previous_slice))
         self.next_slice = SliceIndexType(float(self.next_slice))
 
+    @property
+    def number_of_neighbours(self) -> int:
+        '''Return the number of neighbours.'''
+        # Count the number of neighbours that are not None and are not NaN
+        # `slice_index == slice_index` tests for NaN because NaN != NaN.
+        return sum(1 for slice_index in [self.previous_slice, self.next_slice]
+                   if (slice_index is not None) & (slice_index == slice_index))
+
     def gap(self, absolute=True) -> Union[int, float]:
         '''Calculate the gaps between slices.
 
@@ -70,7 +78,7 @@ class SliceNeighbours:
         if pd.isna(self.previous_slice):
             gap = self.next_slice - self.this_slice
         elif pd.isna(self.next_slice):
-            gap = self.this_slice - self.previous_slice
+            gap = self.previous_slice - self.this_slice
         else:
             # Calculate the gap between the previous and next slice
             # and divide by 2 to get the average gap.
@@ -79,13 +87,31 @@ class SliceNeighbours:
             return abs(gap)
         return gap
 
+    def neighbour_list(self) -> List[SliceIndexType]:
+        '''Return a list of neighbours, excluding the current slice and
+        None values.'''
+        all_neighbours = [self.previous_slice, self.next_slice]
+        valid_neighbours = [slice_index for slice_index in all_neighbours
+                           if (slice_index is not None) & (slice_index == slice_index)]
+        return valid_neighbours
+
     def is_neighbour(self, other_slice: SliceIndexType) -> bool:
         '''Check if another slice index is a neighbour.'''
-        return self.previous_slice <= other_slice <= self.next_slice
+        # Get valid neighbours and add the current slice to the list.
+        neighbourhood = self.neighbour_list()
+        neighbourhood.append(self.this_slice)
+        if neighbourhood:
+            return (min(neighbourhood) < other_slice < max(neighbourhood))
+        return False
 
-    def neighbour_list(self) -> List[SliceIndexType]:
-        '''Return a list of neighbours, excluding the current slice.'''
-        return [self.previous_slice, self.next_slice]
+    def nearest(self, other_slice: SliceIndexType) -> SliceIndexType:
+        '''Return the nearest neighbouring slice index to the given slice.'''
+        # Get valid neighbours and add the current slice to the list.
+        neighbourhood = self.neighbour_list()
+        if neighbourhood:
+            distance = abs(np.array(neighbourhood) - other_slice)
+            return neighbourhood[distance.argmin()]
+        return None
 
 
 class SliceSequence:
@@ -580,21 +606,47 @@ class Contour:
 
     def __init__(self, roi: ROI_Type, slice_index: SliceIndexType,
                  polygon: shapely.Polygon,
-                 contours: List['Contour']) -> None:
+                 existing_contours: List['Contour'],
+                 **contour_parameters) -> None:
         self.roi = roi
         self.slice_index = slice_index
         self.polygon = polygon
-        self.thickness = self.default_thickness
-        self.is_hole = False
-        self.related_contours: List[ContourIndex] = []
-        self.hole_type = 'None'
-        self.is_boundary = False
-        self.is_interpolated = False
-        self.region_index: RegionIndex = ''  # Default to an empty string
+        self.validate_polygon()
+        # Set the contour parameters
+        if 'thickness' in contour_parameters:
+            self.thickness = contour_parameters['thickness']
+        else:
+            self.thickness = Contour.default_thickness
+        if 'is_boundary' in contour_parameters:
+            self.is_boundary = contour_parameters['is_boundary']
+        else:
+            self.is_boundary = False
+        if 'is_interpolated' in contour_parameters:
+            self.is_interpolated = contour_parameters['is_interpolated']
+        else:
+            self.is_interpolated = False
+        if 'is_hole' in contour_parameters:
+            self.is_hole = contour_parameters['is_hole']
+        else:
+            self.is_hole = False
+        if 'hole_type' in contour_parameters:
+            self.hole_type = contour_parameters['hole_type']
+        else:
+            self.hole_type = 'None'
+        if 'related_contours' in contour_parameters:
+            self.related_contours = contour_parameters['related_contours']
+        else:
+            self.related_contours = []
+        if 'region_index' in contour_parameters:
+            self.region_index = contour_parameters['region_index']
+        else:
+            self.region_index = ''  # Default to an empty string
+        # check contour against existing contours on the same slice to identify holes
+        self.compare_with_existing_contours(existing_contours)
         self.contour_index = Contour.counter
         Contour.counter += 1
-        self.validate_polygon()
-        self.compare_with_existing_contours(contours)
+
+
 
     @property
     def index(self) -> ContourIndex:

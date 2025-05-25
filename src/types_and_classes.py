@@ -59,6 +59,9 @@ PRECISION = 3
 class StructuresException(Exception):
     '''Base class for exceptions in this module.'''
 
+class InvalidSlice(ValueError, StructuresException):
+    '''Exception raised for an invalid slice index.'''
+
 class InvalidContour(ValueError, StructuresException):
     '''Exception raised for invalid contour data.'''
 

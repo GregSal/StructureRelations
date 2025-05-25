@@ -272,7 +272,7 @@ class StructureShape():
                 roi=self.roi,
                 slice_index=intp_param.ThisSlice,
                 polygon=interpolated_polygon,
-                contours=[]
+                existing_contours=[]
                 )
             interpolated_contour.is_interpolated = True
             interpolated_contour.is_boundary = False
