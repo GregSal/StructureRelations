@@ -9,7 +9,6 @@ import pandas as pd
 import networkx as nx
 import shapely
 
-from Reference_Code.collected_tools import BaseGeometry
 from contours import InvalidContour, SliceSequence, Contour, ContourMatch, interpolate_polygon
 from types_and_classes import ContourIndex, InvalidSlice, ROI_Type, SliceIndexType, ContourGraph
 
@@ -112,7 +111,8 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
                                    slice_sequence: SliceSequence,
                                    starting_contour: ContourIndex,
                                    interpolated_slice: SliceIndexType = None,
-                                   **contour_parameters) -> ContourGraph:
+                                   **contour_parameters
+                                   ) -> Tuple[ContourGraph, SliceSequence, SliceSequence]:
     '''Generate an interpolated contour for a given starting contour in the
     contour graph.
 
@@ -139,10 +139,12 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
             slice).
 
     Returns:
-        nx.Graph: The updated contour graph with the interpolated contour added.
-        SliceSequence: The updated slice sequence with the interpolated slice
-            added.
-        ContourIndex: The index of the newly created interpolated contour.
+        tuple:  A tuple containing the updated contour graph and slice sequence:
+            contour_graph (ContourGraph): The updated graph with the
+                interpolated contour added.
+            SliceSequence: The updated slice sequence with the interpolated
+                slice added.
+            ContourIndex: The index of the newly created interpolated contour.
 
     '''
     # Generate the interpolated polygon
@@ -337,89 +339,49 @@ def add_boundary_contours(contour_graph: ContourGraph,
             slice_sequence (SliceSequence): The updated slice sequence object
                 with the interpolated slice indices added.
     '''
-    #FIXME this function should call generate_interpolated_contours
     # Select all nodes with only one edge (degree=1)
-    boundary_nodes = [node for node, degree in contour_graph.degree()
-                      if degree == 1]
-    for original_boundary in boundary_nodes:
-        # FIXME related contour references need to be generated correctly.
-        # Need to create interpolated contour for all contour references at the
-        # same time so that the related contours are set correctly.
-        # Get the contour and its slice index
-        # - interpolated slice index can be obtained from the interpolated
-        #   contour.
-        # - Combine code from structures.generate_interpolated_contours() and
-        # contour_graph.add_boundary_contours() to create a generic function to
-        # identify the relevant neighbouring slices for interpolation.
-        # - add a get_contour function that takes a ContourGraph and a contour
-        # index and returns the contour object.
-        # - Combine code from structures.generate_interpolated_contours() and
-        # contour_graph.add_boundary_contours() to create a generic function to
-        # add an interpolated contour to the graph.
-
+    boundary_nodes = {node for node, degree in contour_graph.degree()
+                      if degree == 1}
+    all_related_contours = set()
+    while boundary_nodes:
+        original_boundary = boundary_nodes.pop()
+        contour_parameters = {'contour_graph': contour_graph,
+                              'slice_sequence': slice_sequence,
+                              'starting_contour': original_boundary,
+                              'is_interpolated': True, 'is_boundary': True}
+        # Generate the interpolated contour
+        interpolation = generate_interpolated_contours(**contour_parameters)
+        # Unpack the interpolation result
+        contour_graph, slice_sequence, new_idx = interpolation
+        # generate interpolated contours for related contours
+        all_related_contours.add(new_idx)
         contour = contour_graph.nodes[original_boundary]['contour']
-        this_slice = contour.slice_index
-        # Determine the neighbor slice not linked with an edge
-        neighbors = slice_sequence.get_neighbors(this_slice)
-        # Get the slice index of the neighbouring contours.
-        # This is the starting point for the neighbours of the interpolated slice
-        slice_ref = {'PreviousSlice': neighbors.previous_slice,
-                     'NextSlice': neighbors.next_slice}
-        # Determine the slice index that is a neighbour of the original
-        # boundary contour, so that the other slice index can be used to
-        # interpolate the slice index of the interpolated contour.
-        neighbouring_nodes = contour_graph.adj[original_boundary].keys()
-        # Because degree=1, there should only be one neighbouring node.
-        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
-        # Get slice index to use for interpolating (slice_beyond) and the
-        # neighbouring slice references for the interpolated slice.
-        if neighbors.previous_slice == neighbour_slice:
-            # The next slice is the neighbour for interpolation
-            slice_beyond = neighbors.next_slice
-            # If the next slice is not set, use the gap to estimate the next
-            # slice index.
-            if pd.isna(slice_beyond):
-                slice_beyond = this_slice + neighbors.gap(absolute=False)
-            # The current boundary slice is the previous slice for the
-            # interpolated slice.
-            slice_ref['PreviousSlice'] = this_slice
-        else:
-            # The previous slice is the neighbour for interpolation
-            slice_beyond = neighbors.previous_slice
-            # If the next slice is not set, use the gap to estimate the previous
-            # slice index.
-            if pd.isna(slice_beyond):
-                slice_beyond = this_slice - neighbors.gap(absolute=False)
-            # The current boundary slice is the next slice for the
-            # interpolated slice.
-            slice_ref['NextSlice'] = this_slice
-        # Calculate the interpolated slice index
-        interpolated_slice = (this_slice + slice_beyond) / 2
-        slice_ref['ThisSlice'] = interpolated_slice
-        slice_ref['Original'] = False
-        # Generate the interpolated boundary contour
-        interpolated_polygon = interpolate_polygon([this_slice, slice_beyond],
-                                                   contour.polygon)
-        interpolated_contour = Contour(
-            roi=contour.roi,
-            slice_index=interpolated_slice,
-            polygon=interpolated_polygon,
-            existing_contours=[]
-            )
-        interpolated_contour.is_interpolated = True
-        interpolated_contour.is_boundary = True
-        interpolated_contour.is_hole = contour.is_hole
-        interpolated_contour.hole_type = contour.hole_type
-        interpolated_contour.region_index = contour.region_index
-        # Add the interpolated slice index to the slice sequence
-        slice_sequence.add_slice(**slice_ref)
-        # Add the interpolated contour to the graph
-        interpolated_label = interpolated_contour.index
-        contour_graph.add_node(interpolated_label, contour=interpolated_contour)
-        # Add a ContourMatch edge between the original and interpolated contours
-        contour_match = ContourMatch(contour, interpolated_contour)
-        contour_graph.add_edge(original_boundary, interpolated_label,
-                               match=contour_match)
+        new_contour = contour_graph.nodes[new_idx]['contour']
+        related_contours = contour.related_contours
+        for related_contour in related_contours:
+            if related_contour in boundary_nodes:
+                boundary_nodes.remove(related_contour)
+                is_boundary = True
+            else:
+                is_boundary = False
+            # Generate the interpolated contour for the related contour
+            related_parameters = {
+                'contour_graph': contour_graph,
+                'slice_sequence': slice_sequence,
+                'starting_contour': related_contour,
+                'interpolated_slice': new_contour.slice_index,
+                'is_interpolated': True,
+                'is_boundary': is_boundary
+            }
+            interpolation = generate_interpolated_contours(**related_parameters)
+            # Unpack the interpolation result
+            contour_graph, slice_sequence, related_idx = interpolation
+            # Add the new index to the list of interpolated contours
+            all_related_contours.add(related_idx)
+        # Update the related_contours for all new contours
+        for idx in all_related_contours:
+            contour = contour_graph.nodes[idx]['contour']
+            contour.related_contours = list(all_related_contours - {idx})
     return contour_graph, slice_sequence
 
 
@@ -625,9 +587,8 @@ def build_contour_graph(contour_table: pd.DataFrame,
     # Add the edges to the graph
     contour_graph = add_graph_edges(contour_graph, slice_sequence)
     # Add the boundary contours to the graph
-    #FIXME temporarily commented out for testing
-    #contour_graph, slice_sequence = add_boundary_contours(contour_graph,
-    #                                                      slice_sequence)
+    contour_graph, slice_sequence = add_boundary_contours(contour_graph,
+                                                          slice_sequence)
     # Identify the distinct regions in the graph
     # and assign the region index to each contour
     contour_graph = set_enclosed_regions(contour_graph)

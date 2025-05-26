@@ -10,7 +10,7 @@ import shapely
 from shapely.geometry import Polygon
 
 from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
-from types_and_classes import ContourIndex, RegionIndex
+from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
 from types_and_classes import PRECISION, SliceIndexSequenceType
 
