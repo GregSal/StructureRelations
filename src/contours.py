@@ -692,14 +692,14 @@ class Contour:
                     # If the existing contour is a hole, the new contour cannot
                     # be its hole, but it could be an island and should be
                     # recorded as an embedded contour.
-                    self.related_contours.append(existing_contour.contour_index)
-                    existing_contour.related_contours.append(self.contour_index)
+                    self.related_contours.append(existing_contour.index)
+                    existing_contour.related_contours.append(self.index)
                 else:
                     # New contour is completely within the existing contour
                     self.is_hole = True
                      # Set the hole reference to the existing contour index
-                    self.related_contours.append(existing_contour.contour_index)
-                    existing_contour.related_contours.append(self.contour_index)
+                    self.related_contours.append(existing_contour.index)
+                    existing_contour.related_contours.append(self.index)
                     self.hole_type = 'Unknown'
 
             elif self.polygon.overlaps(existing_contour.polygon):

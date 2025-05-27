@@ -351,35 +351,42 @@ class TestBoundaryContourGeneration():
         # Find interpolated boundary contour
         interpolated = [node for node, data in self.contour_graph.nodes.data('contour')
                         if data.is_interpolated and data.is_boundary]
-        intp_contour1 = self.contour_graph.nodes[interpolated[0]]['contour']
-        intp_contour2 = self.contour_graph.nodes[interpolated[1]]['contour']
+        intp_contour0 = self.contour_graph.nodes[interpolated[0]]['contour']
+        intp_contour1 = self.contour_graph.nodes[interpolated[1]]['contour']
+        # Find the edge between original and interpolated
+        # There should only be one edge for each interpolated contour.
+        edges0 = [edge[2] for edge in self.contour_graph.edges.data('match')
+                 if interpolated[0] in edge[:2]][0]
+        edges1 = [edge[2] for edge in self.contour_graph.edges.data('match')
+                 if interpolated[1] in edge[:2]][0]
+        match0_contours = [edges0.contour1, edges0.contour2]
+        match1_contours = [edges1.contour1, edges1.contour2]
+        # Check that the interpolated boundary contour is in the match.
+        assert intp_contour0 in match0_contours
+        assert intp_contour1 in match1_contours
         # Find original contours (should be two for ROI 1)
         originals = [node for node, data in self.contour_graph.nodes.data('contour')
-                        if not data.is_interpolated and not data.is_boundary]
-        orig_contour_1 = self.contour_graph.nodes[originals[0]]['contour']
-        orig_contour_2 = self.contour_graph.nodes[originals[1]]['contour']
-        # Find edge between original and interpolated
-        edges1 = [edge[2] for edge in self.contour_graph.edges.data('match')
-                 if interpolated[0] in edge[:2]]
-        match1 = edges1[0]
-        edges2 = [edge[2] for edge in self.contour_graph.edges.data('match')
-                 if interpolated[1] in edge[:2]]
-        match2 = edges2[0]
+                     if not data.is_interpolated and not data.is_boundary]
+        # Find the original contour for the interpolated contours
+        # Only one adjacent contour should be found (the original contour)
+        original0 = list(self.contour_graph.adj[interpolated[0]])[0]
+        original1 = list(self.contour_graph.adj[interpolated[1]])[0]
+        # Check that the original contours are in the list of originals.
+        assert original0 in originals
+        assert original1 in originals
+        # find the original contours
+        orig_contour0 = self.contour_graph.nodes[original0]['contour']
+        orig_contour1 = self.contour_graph.nodes[original1]['contour']
         # Check that the original boundary contour is in the match.
-        assert ((match1.contour1 == orig_contour_1) or
-                (match1.contour2 == orig_contour_1))
-        assert ((match2.contour1 == orig_contour_2) or
-                (match2.contour2 == orig_contour_2))
-        # Check that the interpolated boundary contour is in the match.
-        assert ((match1.contour1 == intp_contour1) or
-                (match1.contour2 == intp_contour1))
-        assert ((match2.contour1 == intp_contour2) or
-                (match2.contour2 == intp_contour2))
+        assert orig_contour0 in match0_contours
+        assert orig_contour1 in match1_contours
         # Verify that the match gap is the distance between the two slices.
-        expected_gap = abs(orig_contour_1.slice_index -
+        expected_gap0 = abs(orig_contour0.slice_index -
+                           intp_contour0.slice_index)
+        expected_gap1 = abs(orig_contour1.slice_index -
                            intp_contour1.slice_index)
-        assert abs(match1.gap - expected_gap) < 1e-6
-        assert abs(match2.gap - expected_gap) < 1e-6
+        assert abs(edges0.gap - expected_gap0) < 1e-6
+        assert abs(edges1.gap - expected_gap1) < 1e-6
 
     def test_slice_sequence_for_interpolated(self):
         '''Test the changes to the SliceSequence:
@@ -650,5 +657,6 @@ class TestBuildContourGraph():
                                                             slice_sequence,
                                                             roi=3)
         degrees = Counter(dict(contour_graph.degree).values())
-        assert degrees[1] == 4
-        assert degrees[2] == 7
+        assert degrees[1] == 5
+        assert degrees[2] == 6
+        assert degrees[3] == 1

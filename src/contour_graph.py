@@ -69,23 +69,27 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
                 if matched_slice == nearest_neighbour:
                     matched_contours.append(contour_graph.nodes[nbr]['contour'])
             interpolated_polygons = []
-            for matched_contour in matched_contours:
-                # Get the polygon for the matched contour
-                poly2 = matched_contour.polygon
-                # Interpolate the polygon using the matched contour
-                interpolated_polygons.append(interpolate_polygon(
-                    interpolation_slices,
-                    contour.polygon, poly2))
-            # Combine the interpolated polygons into a single polygon
-            interpolated_polygon = shapely.union_all(interpolated_polygons)
-            return interpolated_polygon
+            # If matched contours are found use them to generate the
+            # interpolated polygon. If not assume that it is a boundary contour.
+            if matched_contours:
+                for matched_contour in matched_contours:
+                    # Get the polygon for the matched contour
+                    poly2 = matched_contour.polygon
+                    # Interpolate the polygon using the matched contour
+                    interpolated_polygons.append(interpolate_polygon(
+                        interpolation_slices,
+                        contour.polygon, poly2))
+                # Combine the interpolated polygons into a single polygon
+                interpolated_polygon = shapely.union_all(interpolated_polygons)
+                return interpolated_polygon
 
     # if no interpolated slice is provided, or if the interpolated slice is not
-    # a neighbour of the starting contour (e.g. first or last slice), the
-    # contour should be a boundary contour.  Generate the interpolated slice
-    # index using the slice index of the neighbouring slice that is not matched
-    # to the boundary contour.  Generate the interpolated contour using only the
-    # boundary contour.
+    # a neighbour of the starting contour (e.g. first or last slice), or the
+    # contour does not have any matched contours on the relevant neighbouring
+    # slice, the contour should be a boundary contour.  Generate the
+    # interpolated slice index using the slice index of the neighbouring slice
+    # that is not matched to the boundary contour.  Generate the interpolated
+    # contour using only the boundary contour.
     if len(matched_slices) > 1:
         raise InvalidSlice("Without interpolated_slice, starting_contour "
                             "must reference a boundary slice.")
