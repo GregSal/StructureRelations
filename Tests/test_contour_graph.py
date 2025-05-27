@@ -327,8 +327,8 @@ class TestBoundaryContourGeneration():
         orig_contour_2 = self.contour_graph.nodes[originals[1]]['contour']
         # Check slice index is halfway between original and neighbor
         slice_indices = [orig_contour_1.slice_index, orig_contour_2.slice_index]
-        expected_slices = [slice_indices[0] - 0.5, slice_indices[1] + 0.5]
-        actual_slices = [intp_contour1.slice_index, intp_contour2.slice_index]
+        expected_slices = {slice_indices[0] - 0.5, slice_indices[1] + 0.5}
+        actual_slices = {intp_contour1.slice_index, intp_contour2.slice_index}
         assert actual_slices == expected_slices
         # verify that is_hole matches original
         assert intp_contour1.is_hole == orig_contour_1.is_hole
@@ -390,50 +390,38 @@ class TestBoundaryContourGeneration():
             - 'PreviousSlice' and 'NextSlice' of the original end contour do
                 not contain the interpolated slice index.
         '''
-        # Find interpolated boundary contour
+        # Find interpolated boundary contours
         interpolated = [node for node, data in self.contour_graph.nodes.data('contour')
                         if data.is_interpolated and data.is_boundary]
-        intp_contour1 = self.contour_graph.nodes[interpolated[0]]['contour']
-        intp_contour2 = self.contour_graph.nodes[interpolated[1]]['contour']
         # Find original contours (should be two for ROI 1)
         originals = [node for node, data in self.contour_graph.nodes.data('contour')
                         if not data.is_interpolated and not data.is_boundary]
-        orig_contour_1 = self.contour_graph.nodes[originals[0]]['contour']
-        orig_contour_2 = self.contour_graph.nodes[originals[1]]['contour']
+        interpolated_slices = {contour.slice_index
+                               for node, contour in self.contour_graph.nodes.data('contour')
+                               if node in interpolated}
+        original_slices = {contour.slice_index
+                               for node, contour in self.contour_graph.nodes.data('contour')
+                               if node in originals}
         # Check SliceSequence contains interpolated slice
-        slices = self.slice_sequence.slices
-        assert intp_contour1.slice_index in slices
-        assert intp_contour2.slice_index in slices
+        slices = set(self.slice_sequence.slices)
+        assert interpolated_slices.issubset(slices)
         # Check that interpolated contour slice indexes have 'Original' = False.
-        original_flag = self.slice_sequence.sequence.loc[[
-            intp_contour1.slice_index,
-            intp_contour2.slice_index],
+        original_flag = self.slice_sequence.sequence.loc[
+            list(interpolated_slices),
             'Original']
         assert all(original_flag == False)
         # Check that 'PreviousSlice' and 'NextSlice' of the original end
         # contour do not contain the interpolated slice index.
-        linked_slices1 = list(self.slice_sequence.sequence.loc[
-            orig_contour_1.slice_index,
-            ['PreviousSlice', 'NextSlice']
-            ])
-        linked_slices2 = list(self.slice_sequence.sequence.loc[
-            orig_contour_2.slice_index,
-            ['PreviousSlice', 'NextSlice']
-            ])
-        assert intp_contour1.slice_index not in linked_slices1
-        assert intp_contour2.slice_index not in linked_slices2
+        prv_linked = set(self.slice_sequence.sequence.PreviousSlice[list(original_slices)])
+        nxt_linked = set(self.slice_sequence.sequence.NextSlice[list(original_slices)])
+        orig_linked_slices = prv_linked.union(nxt_linked)
+        assert interpolated_slices.isdisjoint(orig_linked_slices)
         # Check that one of 'PreviousSlice' and 'NextSlice' are set to the
         # SliceIndex of the original end contour.
-        linked_slices1 = list(self.slice_sequence.sequence.loc[
-            intp_contour1.slice_index,
-            ['PreviousSlice', 'NextSlice']
-            ])
-        linked_slices2 = list(self.slice_sequence.sequence.loc[
-            intp_contour2.slice_index,
-            ['PreviousSlice', 'NextSlice']
-            ])
-        assert orig_contour_1.slice_index in linked_slices1
-        assert orig_contour_2.slice_index in linked_slices2
+        intp_prv_linked = set(self.slice_sequence.sequence.PreviousSlice[list(interpolated_slices)])
+        intp_nxt_linked = set(self.slice_sequence.sequence.NextSlice[list(interpolated_slices)])
+        intp_linked_slices = intp_prv_linked.union(intp_nxt_linked)
+        assert original_slices.issubset(intp_linked_slices)
 
 
 class TestRegionIdentification():

@@ -101,7 +101,7 @@ class SliceNeighbours:
         neighbourhood = self.neighbour_list()
         neighbourhood.append(self.this_slice)
         if neighbourhood:
-            return (min(neighbourhood) < other_slice < max(neighbourhood))
+            return (min(neighbourhood) <= other_slice <= max(neighbourhood))
         return False
 
     def nearest(self, other_slice: SliceIndexType) -> SliceIndexType:
@@ -406,10 +406,12 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     # If only one polygon is given, scale the polygon to half its size.
     if p2 is None:
         itp_poly = shapely.affinity.scale(p1, xfact=0.5, yfact=0.5)
+        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly
     elif p1.is_empty:
         itp_poly = shapely.affinity.scale(p2, xfact=0.5, yfact=0.5)
+        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly
 
@@ -613,6 +615,8 @@ class Contour:
         self.polygon = polygon
         self.validate_polygon()
         # Set the contour parameters
+        self.contour_index = Contour.counter
+        Contour.counter += 1
         if 'thickness' in contour_parameters:
             self.thickness = contour_parameters['thickness']
         else:
@@ -626,6 +630,7 @@ class Contour:
         else:
             self.is_interpolated = False
         if 'is_hole' in contour_parameters:
+
             self.is_hole = contour_parameters['is_hole']
         else:
             self.is_hole = False
@@ -643,8 +648,6 @@ class Contour:
             self.region_index = ''  # Default to an empty string
         # check contour against existing contours on the same slice to identify holes
         self.compare_with_existing_contours(existing_contours)
-        self.contour_index = Contour.counter
-        Contour.counter += 1
 
 
 
