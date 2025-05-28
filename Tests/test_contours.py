@@ -357,8 +357,8 @@ class TestContour():
         # Check that the hole contour is identified correctly
         assert hole_contour.is_hole
         # Check that related_contours are set correctly for both contours
-        assert hole_contour.related_contours == [outer_contour.contour_index]
-        assert outer_contour.related_contours == [hole_contour.contour_index]
+        assert hole_contour.related_contours == [outer_contour.index]
+        assert outer_contour.related_contours == [hole_contour.index]
 
     def test_identify_islands(self):
         '''Test that the Contour class correctly identifies islands.
@@ -375,8 +375,8 @@ class TestContour():
         # Check that the hole contour is identified correctly
         assert hole_contour.is_hole
         # Check that related_contours are set correctly for both contours
-        assert hole_contour.related_contours == [outer_contour.contour_index]
-        assert outer_contour.related_contours == [hole_contour.contour_index]
+        assert hole_contour.related_contours == [outer_contour.index]
+        assert outer_contour.related_contours == [hole_contour.index]
 
     def test_error_on_overlapping_contours(self):
         '''Test that an error is raised if a contour overlaps with an existing contour.'''

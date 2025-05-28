@@ -26,8 +26,15 @@ class RegionSlice():
     '''Class representing all regions of a structure on a specific slice.
 
     The class contains multiple dictionaries of Shapley MultiPolygons. The
-    keys of each dictionary are RegionIndexes. the values of the dictionaries
-    are:
+    keys of each dictionary are RegionIndexes. The number of items in each of
+    the dictionaries is the same, representing all regions on that slice. The
+    values of the dictionaries are MultiPolygons that represent the
+    contours on the slice that are part of the region (except for
+    region_holes, and embedded_regions, for which the values are lists of
+    Contours). The MultiPolygons are created by combining the relevant contours
+    with a given region, along with the contours for all related regions (holes
+    and islands). The dictionaries are:
+
         - regions: Each item is a MultiPolygon that defines the polygons on the
             slice that are part of a unique contiguous 3D region (A contiguous
             3D region may have multiple polygons on a given slice that converge
@@ -35,7 +42,7 @@ class RegionSlice():
             in the region.
         - boundaries: Each item is a MultiPolygon that includes the polygons on
             the slice that are part of the related 3D region but are local
-            boundaries of that region.  The boundaries are kept distinct from
+            boundaries of that region. The boundaries are kept distinct from
             the regions to allow for corrections to relationship tests for the
             structure.
         - open_holes: Each MultiPolygon includes the polygons on the slice that
