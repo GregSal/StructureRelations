@@ -193,43 +193,71 @@ class TestRegionSlice:
                 contour.hole_type = 'Open'
 
         region_slice = RegionSlice(contour_graph, slice_index=1.0)
-        # There should be a single region
-        assert len(region_slice.regions) == 1
+        # Regions should contain two MultiPolygons, one of which is empty.
+        assert len(region_slice.regions) == 2
+        non_empty_regions = [region for region in region_slice.regions.values()
+                             if not region.is_empty]
+        assert len(non_empty_regions) == 1
         # The region should be a MultiPolygon and not empty
-        for region in region_slice.regions.values():
-            assert isinstance(region, shapely.MultiPolygon)
-            assert not region.is_empty
-        # Boundaries should be an empty MultiPolygon
+        assert isinstance(non_empty_regions[0], shapely.MultiPolygon)
+        assert not non_empty_regions[0].is_empty
+        # Boundaries should contain two empty MultiPolygons
+        assert len(region_slice.boundaries) == 2
         for boundary in region_slice.boundaries.values():
             assert isinstance(boundary, shapely.MultiPolygon)
             assert boundary.is_empty
-        # Open holes should contain the hole as a MultiPolygon
-        for open_hole in region_slice.open_holes.values():
-            assert isinstance(open_hole, shapely.MultiPolygon)
-            assert not open_hole.is_empty
-            # Should be the same as the hole polygon
-            assert open_hole.geoms[0].area == pytest.approx(shapely.Polygon(hole).area)
+        # Open holes should contain the hole as a MultiPolygon plus an empty
+        #  MultiPolygon
+        open_holes = list(region_slice.open_holes.values())
+        assert len(open_holes) == 2
+        # One should be non-empty and match the hole, the other should be empty
+        non_empty = [oh for oh in open_holes if not oh.is_empty]
+        empty = [oh for oh in open_holes if oh.is_empty]
+        assert len(non_empty) == 1
+        assert len(empty) == 1
+        assert isinstance(non_empty[0], shapely.MultiPolygon)
+        assert non_empty[0].geoms[0].area == pytest.approx(shapely.Polygon(hole).area)
         # Exterior should be the same as the region
         # pylint: disable=consider-using-dict-items
         for region_index in region_slice.regions:
             region = region_slice.regions[region_index]
             exterior = region_slice.exterior[region_index]
             assert exterior.equals(region)
-        # Hull contains the larger contour as a MultiPolygon
-        for region_index in region_slice.regions:
-            region = region_slice.regions[region_index]
-            hull = region_slice.hull[region_index]
-            # Should be the convex hull of the region
-            assert hull.equals(region.convex_hull)
-        # Embedded regions should be empty lists
-        for embedded in region_slice.embedded_regions.values():
-            assert embedded == []
-        # Region holes should contain a single Contour
-        for holes in region_slice.region_holes.values():
-            assert len(holes) == 1
-        # Contour indexes should contain two ContourIndexes
+        # Hull contains the larger contour as a single MultiPolygon plus an
+        # empty MultiPolygon
+        hulls = list(region_slice.hull.values())
+        assert len(hulls) == 2
+        non_empty_hulls = [h for h in hulls if not h.is_empty]
+        empty_hulls = [h for h in hulls if h.is_empty]
+        assert len(non_empty_hulls) == 1
+        assert len(empty_hulls) == 1
+        # The non-empty hull should be the convex hull of the non-empty region
+        non_empty_regions = [region for region in region_slice.regions.values()
+                             if not region.is_empty]
+        assert non_empty_hulls[0].equals(non_empty_regions[0].convex_hull)
+        # Embedded regions should contain the hole as a single Contour and an
+        # empty list
+        embedded_lists = list(region_slice.embedded_regions.values())
+        assert len(embedded_lists) == 2
+        non_empty_embedded = [emb for emb in embedded_lists if len(emb) > 0]
+        empty_embedded = [emb for emb in embedded_lists if len(emb) == 0]
+        assert len(non_empty_embedded) == 1
+        assert len(empty_embedded) == 1
+        assert non_empty_embedded[0][0].polygon.area == pytest.approx(shapely.Polygon(hole).area)
+        # Region holes should contain the hole as a single Contour and an
+        # empty list
+        region_holes_lists = list(region_slice.region_holes.values())
+        assert len(region_holes_lists) == 2
+        non_empty_holes = [holes for holes in region_holes_lists if len(holes) == 1]
+        empty_holes = [holes for holes in region_holes_lists if len(holes) == 0]
+        assert len(non_empty_holes) == 1
+        assert len(empty_holes) == 1
+        assert non_empty_holes[0][0].polygon.area == pytest.approx(shapely.Polygon(hole).area)
+        # contour_indexes should contain two items, each a list containing a
+        # single ContourIndex
+        assert len(region_slice.contour_indexes) == 2
         for indexes in region_slice.contour_indexes.values():
-            assert len(indexes) == 2
+            assert len(indexes) == 1
 
     def test_region_slice_with_closed_hole(self):
         # Create a large box and a smaller box (hole) inside, both on the same slice
