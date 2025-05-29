@@ -506,6 +506,7 @@ def set_hole_type(contour_graph: ContourGraph,
         neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
         # The slice that is not a neighbour of the boundary contour is the
         # slice beyond the boundary contour.
+        # FIXME This will fail on forst or last slice
         slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
         beyond = contour_lookup.SliceIndex==slice_beyond
         # 4.2. Get the contours in the slice beyond the boundary contour.

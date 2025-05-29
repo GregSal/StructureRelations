@@ -17,7 +17,7 @@ import shapely
 # Local packages
 from contours import Contour
 from contour_graph import build_contour_lookup
-from types_and_classes import SliceIndexType
+from types_and_classes import RegionIndex, SliceIndexType
 from utilities import make_multi
 
 
@@ -131,7 +131,7 @@ class RegionSlice():
                 or a regular part of the region.
         '''
         def get_region_contours(contour_reference: pd.DataFrame,
-                                related_regions: List[str])->List[Contour]:
+                                related_regions: List[RegionIndex])->List[Contour]:
             '''Return the contours for the specified regions.'''
             region_selection = contour_reference['RegionIndex'].isin(related_regions)
             region_reference = contour_reference.loc[region_selection]
@@ -141,6 +141,7 @@ class RegionSlice():
             return region_contours
 
         self.slice_index = slice_index
+
         contour_lookup = build_contour_lookup(contour_graph)
         # Filter contours by SliceIndex and contour type
         # Only contours that are not interpolated, holes or boundaries are
@@ -150,11 +151,10 @@ class RegionSlice():
                              'HoleType', 'Interpolated', 'Boundary']
         contour_reference = contour_lookup.loc[selected_contours,
                                                reference_columns]
-        #regular_contours = (~contour_reference['Boundary'] &
-        #                    ~contour_reference['Interpolated'] &
-        #                    (contour_reference['HoleType'] == 'None'))
-        #region_set = set(contour_reference.loc[regular_contours, 'RegionIndex'])
+        # region_set is the set of all unique RegionIndexes on the slice that
+        # are not interpolated, holes, or boundaries.
         region_set = set(contour_reference.RegionIndex)
+
         # Initialize the region dictionaries
         self.regions = {}
         self.boundaries = {}
@@ -169,20 +169,29 @@ class RegionSlice():
             region_index = region_set.pop()
             region_contours = get_region_contours(contour_reference,
                                                   [region_index])
-            # Expand the initial selection to include all related regions
-            # on the slice.
-            related_regions = {region_index}
+            # Include all related regions on the slice.
+            related_contours_indexes = set()
             for contour in region_contours:
-                related_regions.update(set(contour.related_contours))
-            # Remove the regions that have already been processed.
+                related_contours_indexes.update(set(contour.related_contours))
+            related_regions = set(contour_reference.loc[
+                contour_reference.Label.isin(related_contours_indexes),
+                'RegionIndex'])
+            # Add the initial region index to the related regions.
+            # This is necessary to ensure that the initial region is included
+            # in the region contours.
+            related_regions.add(region_index)
+            # Remove the related regions that have been identified.
             region_set = region_set - related_regions
             # Modify region_contours to include all related regions
             region_contours = get_region_contours(contour_reference,
                                                   list(related_regions))
             # Sort the contours by area in descending order
+            # This ensures that the largest contour is first, which is
+            # necessary to have holes correctly subtracted from the region.
             region_contours = sorted(region_contours, key=lambda x: x.area,
                                      reverse=True)
-            # Get the region index for the contours
+            # Get the region index to use as the reference for the resulting
+            # MultiPolygons.
             region_index = region_contours[0].region_index
             # Initialize region, boundary and open holes with empty MultiPolygons.
             region = shapely.MultiPolygon()
@@ -198,18 +207,20 @@ class RegionSlice():
                 interpolated_contours.append(contour.is_interpolated)
                 # Check whether the contour is a boundary
                 if contour.is_boundary:
-                    # FIXME holes are note being subtracted
-                    # FIXME Boundaries should not be combined.  They should be
-                    # added as a separate MultiPolygon.
                     if contour.is_hole:
-                        # Subtract the hole from the region
-                        boundary = boundary - contour.polygon
+                        if boundary.is_empty:
+                            # If the boundary is empty, add the hole to the
+                            # boundary.
+                            boundary = contour.polygon
+                        else:
+                            # Subtract the hole from the region
+                            boundary = boundary - contour.polygon
                         # Holes on boundaries must be open holes
                         open_hole = open_hole.union(contour.polygon)
                     else:
                         # Add the boundary to the region
                         boundary = boundary.union(contour.polygon)
-                elif contour.is_hole:
+                if contour.is_hole:
                     # add the hole to the region
                     region_holes.append(contour)
                     # Subtract the hole from the region
@@ -217,11 +228,15 @@ class RegionSlice():
                     if contour.hole_type == 'Open':
                         # if the hole is open, add it to the open_hole list
                         open_hole = open_hole.union(contour.polygon)
+                    if contour.region_index != region_index:
+                        # If the contour is not part of the region, add it to
+                        # the embedded regions list.
+                        embedded_regions.append(contour)
                 else:
                     region = region.union(contour.polygon)
                     if contour.region_index != region_index:
-                        # If the contour is not part of the region, add it to the
-                        # embedded regions list.
+                        # If the contour is not part of the region, add it to
+                        # the embedded regions list.
                         embedded_regions.append(contour)
             # Add the MultiPolygons to the appropriate dictionaries.  An empty
             # MultiPolygon is added if there are no appropriate
@@ -233,7 +248,6 @@ class RegionSlice():
             self.contour_indexes[region_index] = contour_labels
             self.embedded_regions[region_index] = embedded_regions
             self.region_holes[region_index] = region_holes
-
         # Label the RegionSlice as Interpolated if all contours on the slice are
         # interpolated.
         self.is_interpolated = all(interpolated_contours)
