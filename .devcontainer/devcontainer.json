@@ -10,11 +10,6 @@
 		"ghcr.io/devcontainers/features/conda:1": {
 			"addCondaForge": true,
 			"version": "4.11.0"
-		},
-		"ghcr.io/devcontainers/features/python:1": {
-			"installTools": true,
-			"installJupyterlab": true,
-			"version": "3.11"
 		}
 	}
 
