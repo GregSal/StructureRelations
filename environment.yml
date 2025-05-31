@@ -1,0 +1,22 @@
+name: StructureRelations
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+  - conda-forge
+dependencies:
+  - ipympl
+  - jupyterlab
+  - matplotlib
+  - networkx
+  - numpy
+  - pandas
+  - pydicom
+  - pygraphviz
+  - pylint
+  - pyodbc
+  - pysimplegui
+  - pytest
+  - python=3.11
+  - scipy
+  - shapely
+prefix: /opt/conda/envs/base
