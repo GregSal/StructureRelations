@@ -420,41 +420,35 @@ class TestRegionSlice:
         contour_graph, slice_sequence = build_contour_graph(contour_table,
                                                             slice_sequence,
                                                             roi=1)
-        # Force the hole contour to be marked as an open hole
-        for node in contour_graph.nodes:
-            contour = contour_graph.nodes[node]['contour']
-            if contour.polygon.area < 10:
-                contour.is_hole = True
-                contour.hole_type = 'Open'
 
         # Find a boundary slice (should be at the interpolated boundary, e.g., 0.5 or 1.5)
         not_original = slice_sequence.sequence.Original == False
         interpolated_slice_indexes = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
         boundary_slice_index = interpolated_slice_indexes[0]
         region_slice = RegionSlice(contour_graph, slice_index=boundary_slice_index)
-        # There should be a single boundary
+        # There should be a single boundary containing the outer contour and the hole
         assert len(region_slice.boundaries) == 1
         for boundary in region_slice.boundaries.values():
             assert isinstance(boundary, shapely.MultiPolygon)
             assert not boundary.is_empty
-        # Regions should be empty
+        # Regions should be an empty MultiPolygon because all contours are boundaries
         for region in region_slice.regions.values():
             assert isinstance(region, shapely.MultiPolygon)
             assert region.is_empty
-        # Open holes should be empty
+        # Open holes should be a single MultiPolygon
         for open_hole in region_slice.open_holes.values():
             assert isinstance(open_hole, shapely.MultiPolygon)
-            assert open_hole.is_empty
+            assert not open_hole.is_empty
         # Embedded regions should contain a single Contour
         for embedded in region_slice.embedded_regions.values():
             assert len(embedded) == 1
             assert isinstance(embedded[0], Contour)
-        # Region holes should contain a single Contour
+        # Region holes should be empty lists
         for holes in region_slice.region_holes.values():
-            assert len(holes) == 1
-            assert isinstance(holes[0], Contour)
-        # Contour indexes should contain a single ContourIndex
+            assert holes == []
+        # Contour indexes should contain one item with two ContourIndexes
+        assert len(region_slice.contour_indexes) == 1
         for indexes in region_slice.contour_indexes.values():
-            assert len(indexes) == 1
+            assert len(indexes) == 2
         # is_interpolated should be True
         assert region_slice.is_interpolated is True

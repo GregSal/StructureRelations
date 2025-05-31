@@ -220,24 +220,21 @@ class RegionSlice():
                     else:
                         # Add the boundary to the region
                         boundary = boundary.union(contour.polygon)
-                if contour.is_hole:
-                    # add the hole to the region
-                    region_holes.append(contour)
-                    # Subtract the hole from the region
-                    region = region - contour.polygon
-                    if contour.hole_type == 'Open':
-                        # if the hole is open, add it to the open_hole list
-                        open_hole = open_hole.union(contour.polygon)
-                    if contour.region_index != region_index:
-                        # If the contour is not part of the region, add it to
-                        # the embedded regions list.
-                        embedded_regions.append(contour)
                 else:
-                    region = region.union(contour.polygon)
-                    if contour.region_index != region_index:
-                        # If the contour is not part of the region, add it to
-                        # the embedded regions list.
-                        embedded_regions.append(contour)
+                    if contour.is_hole:
+                        # add the hole to the list of hole contours
+                        region_holes.append(contour)
+                        # Subtract the hole from the region
+                        region = region - contour.polygon
+                        if contour.hole_type == 'Open':
+                            # if the hole is open, add it to the open_hole list
+                            open_hole = open_hole.union(contour.polygon)
+                    else:
+                        region = region.union(contour.polygon)
+                if contour.region_index != region_index:
+                    # If the contour is not part of the region, add it to
+                    # the embedded regions list.
+                    embedded_regions.append(contour)
             # Add the MultiPolygons to the appropriate dictionaries.  An empty
             # MultiPolygon is added if there are no appropriate
             # contours in the regions.  As a result the dictionary keys will

@@ -506,11 +506,17 @@ def set_hole_type(contour_graph: ContourGraph,
         neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
         # The slice that is not a neighbour of the boundary contour is the
         # slice beyond the boundary contour.
-        # FIXME This will fail on forst or last slice
-        slice_beyond = [nbr for nbr in neighbors if nbr != neighbour_slice][0]
-        beyond = contour_lookup.SliceIndex==slice_beyond
-        # 4.2. Get the contours in the slice beyond the boundary contour.
-        contour_labels = list(contour_lookup.loc[beyond].Label)
+        non_neighbour_slice = [nbr for nbr in neighbors
+                               if nbr != neighbour_slice]
+        if non_neighbour_slice:
+            # Use the non-neighbour slice as the slice beyond the boundary contour
+            slice_beyond = non_neighbour_slice[0]
+            beyond = contour_lookup.SliceIndex==slice_beyond
+            # 4.2. Get the contours in the slice beyond the boundary contour.
+            contour_labels = list(contour_lookup.loc[beyond].Label)
+        else:
+            # There is no non-neighbour slice, the boundary must be open.
+            contour_labels = []
         # 4.3. Check if any of those contours can contain the boundary contour.
         # The boundary is closed if any contour can contain the boundary contour.
         boundary_closed = False
