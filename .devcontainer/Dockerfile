@@ -8,7 +8,7 @@ RUN if [ -f "/tmp/conda-tmp/environment.yml" ]; then umask 0002 && /opt/conda/bi
     && rm -rf /tmp/conda-tmp
 RUN /opt/conda/bin/conda init
 # Copy default .env and settings.json if not present in workspace
-RUN cp -n /workspaces/StructureRelations/.devcontainer/.env /workspaces/StructureRelations/.env || true
+RUN cp -n /workspaces/StructureRelations/.devcontainer/DevCont.env /workspaces/StructureRelations/.env || true
 RUN mkdir -p /workspaces/StructureRelations/.vscode && \
     cp -n /workspaces/StructureRelations/.devcontainer/settings.json /workspaces/StructureRelations/.vscode/settings.json || true
 # [Optional] Uncomment this section to install additional OS packages.
