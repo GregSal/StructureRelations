@@ -13,3 +13,6 @@ conda create --name StructureRelations --file "C:\TEMP\StructureRelations_specfi
 
 conda env create --name StructureRelations --file="StructureRelations.yml"
 
+{
+  "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python"
+}
