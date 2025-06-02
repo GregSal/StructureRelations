@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/devcontainers/anaconda:1-3
 RUN /opt/conda/bin/conda config --append channels conda-forge
 RUN /opt/conda/bin/conda init
 # Install conda environment from the provided YAML file
-RUN conda env create --name StructureRelations --file="/workspaces/StructureRelations/.devcontainer/StructureRelations.yml"
+#RUN conda env create --name StructureRelations --file="/workspaces/StructureRelations/.devcontainer/StructureRelations.yml"
 # Copy default .env and settings.json if not present in workspace
 RUN cp -n /workspaces/StructureRelations/.devcontainer/DevCont.env /workspaces/StructureRelations/.env || true
 RUN mkdir -p /workspaces/StructureRelations/.vscode && \
