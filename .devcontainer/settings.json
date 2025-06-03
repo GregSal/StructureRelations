@@ -25,6 +25,7 @@
         "**/debug_tools.py",
         "**/FreeCAD_Scripts"
     ],
+    "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python",
     "python.terminal.activateEnvInCurrentTerminal": true,
     "notebook.diff.ignoreMetadata": true,
     "notebook.diff.ignoreOutputs": true,
