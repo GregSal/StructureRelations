@@ -433,6 +433,8 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
         new_holes.append(new_hole)
     # Build the new polygon from the interpolated coordinates.
     itp_poly = shapely.Polygon(new_cords, holes=new_holes)
+    # Strip the Z coordinate from the polygon so that is can be replaced with new_z
+    itp_poly = Polygon(shapely.get_coordinates(itp_poly))
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
