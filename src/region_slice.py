@@ -205,30 +205,30 @@ class RegionSlice():
                 contour_labels.append(contour.index)
                 # record whether the contour is interpolated
                 interpolated_contours.append(contour.is_interpolated)
-                # Check whether the contour is a boundary
-                if contour.is_boundary:
-                    if contour.is_hole:
+                if contour.is_hole:
+                    # add the hole to the list of hole contours
+                    region_holes.append(contour)
+                    # Subtract the hole from the region
+                    region = region - contour.polygon
+                    if contour.hole_type == 'Open':
+                        # if the hole is open, add it to the open_hole list
+                        open_hole = open_hole.union(contour.polygon)
+                    # Subtract the hole from the region
+                    region = region - contour.polygon
+                    # Check whether the contour is a boundary
+                    if contour.is_boundary:
                         if boundary.is_empty:
                             # If the boundary is empty, add the hole to the
                             # boundary.
-                            boundary = contour.polygon
+                            boundary = boundary.union(contour.polygon)
                         else:
-                            # Subtract the hole from the region
+                            # Subtract the hole from the boundary
                             boundary = boundary - contour.polygon
-                        # Holes on boundaries must be open holes
-                        open_hole = open_hole.union(contour.polygon)
-                    else:
-                        # Add the boundary to the region
-                        boundary = boundary.union(contour.polygon)
                 else:
-                    if contour.is_hole:
-                        # add the hole to the list of hole contours
-                        region_holes.append(contour)
-                        # Subtract the hole from the region
-                        region = region - contour.polygon
-                        if contour.hole_type == 'Open':
-                            # if the hole is open, add it to the open_hole list
-                            open_hole = open_hole.union(contour.polygon)
+                    # Check whether the contour is a boundary
+                    if contour.is_boundary:
+                        # Add the contour to the boundary
+                        boundary = boundary.union(contour.polygon)
                     else:
                         region = region.union(contour.polygon)
                 if contour.region_index != region_index:
