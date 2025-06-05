@@ -386,6 +386,16 @@ class TestContour():
         with pytest.raises(InvalidContour):
             Contour(roi=1, slice_index=0.0, polygon=polygon2, existing_contours=[contour1])
 
+    def test_related_contours(self):
+        '''Test that related_contours are set correctly when a contour is created.'''
+        outer_polygon = Polygon([(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)])
+        hole_polygon = Polygon([(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)])
+        contour1 = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
+                           existing_contours=[])
+        contour2 = Contour(roi=1, slice_index=2.0, polygon=hole_polygon,
+                           existing_contours=[contour1])
+        assert contour2.related_contours == [contour1.index]
+        assert contour1.related_contours == [contour2.index]
 
 class TestContourMatch():
     '''Test the ContourMatch class.'''
