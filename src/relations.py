@@ -514,15 +514,15 @@ class DE27IM():
     # If only the B contour is supplied, then B is exterior to A
     exterior_b = 'F' * 3 + 'F' * 3 + '1' * 3  # 'FFFFFF111'
 
-    def __init__(self, contour_a: Contour = None,
-                 contour_b: Contour = None,
+    def __init__(self, structure_a: RegionSlice = None,
+                 structure_b: RegionSlice = None,
                  relation_str: str = None,
                  relation_int: int = None,
                  adjustments: List[str] = None):
-        if not empty_structure(contour_a):
-            if not empty_structure(contour_b):
+        if not empty_structure(structure_a):
+            if not empty_structure(structure_b):
                 # If both contours are supplied, the relationship is calculated.
-                self.relation = self.relate_contours(contour_a, contour_b,
+                self.relation = self.relate_contours(structure_a, structure_b,
                                                      adjustments)
                 self.int = self.to_int(self.relation)
             else:
@@ -531,7 +531,7 @@ class DE27IM():
                 relation_group = tuple([DE9IM(relation_str=self.exterior_a)] * 3)
                 self.relation = self.combine_groups(relation_group, adjustments)
                 self.int = self.to_int(self.relation)
-        elif contour_b is not None:
+        elif structure_b is not None:
             # If only the B contour is supplied, the relationship is
             #   B is exterior to A
             relation_group = tuple([DE9IM(relation_str=self.exterior_b)] * 3)
@@ -550,7 +550,7 @@ class DE27IM():
             self.relation = self.to_str(relation_int)
         else:
             raise ValueError(''.join([
-                'Must supply either StructureSlices or a relationship string ',
+                'Must supply either Contours or a relationship string ',
                 'to create a DE27IM object.'
                 ]))
 
@@ -586,62 +586,68 @@ class DE27IM():
                 ])) from err
         return relation_int
 
-    def relate_contours(self, contour_a: RegionSlice,
-                        contour_b: RegionSlice,
+    def relate_contours(self, structure_a: RegionSlice,
+                        structure_b: RegionSlice,
                         adjustments: List[str] = None)->str:
         '''Get the 27 bit relationship for two structures on a given slice.
         Possible adjustments are:
             'transpose': Transpose the relationship matrix.
             'boundary_a': Adjust the relationship matrix for the boundary slice
-                of contour_a.
+                of structure_a.
             'boundary_b': Adjust the relationship matrix for the boundary slice
-                of contour_b.
+                of structure_b.
             'hole_a': Adjust the relationship matrix for the hole (negative space)
-                of contour_a.
+                of structure_a.
             'hole_b': Adjust the relationship matrix for the hole (negative space)
-                of contour_b.
+                of structure_b.
         '''
-        # If contour_a and contour_b are both StructureSlices, then get the
+        # If structure_a and structure_b are both RegionSlices, then get the
         # full 27 bit relationship.
-        if isinstance(contour_a, RegionSlice):
-            if isinstance(contour_b, RegionSlice):
-                contour = DE9IM(contour_a.contour, contour_b.contour)
-                external = DE9IM(contour_a.exterior, contour_b.contour)
-                convex_hull = DE9IM(contour_a.hull, contour_b.contour)
+        if isinstance(structure_a, RegionSlice):
+            if isinstance(structure_b, RegionSlice):
+                # FIXME a RegionSlice can contain multiple regions. All regions
+                # in structure_a need to be compared with all regions in structure_b
+                # In addition, the RegionSlice may contain boundaries.
+                # Boundaries need to be compared with each other and with all
+                # regions in the other structure.
+                # All of these comparisons need to be merges into a single DE27IM
+                contour = DE9IM(structure_a.contour, structure_b.contour)
+                external = DE9IM(structure_a.exterior, structure_b.contour)
+                convex_hull = DE9IM(structure_a.hull, structure_b.contour)
                 relation_group = (contour, external, convex_hull)
             else:
                 raise ValueError(''.join([
-                    'Both contours must either be StructureSlice objects or ',
+                    'Both contours must either be Contour objects or ',
                     'shapely Polygon objects. contour_b input was: ',
-                    f'{str(type(contour_b))}'
+                    f'{str(type(structure_b))}'
                     ]))
         else:
             # If contour_a and contour_b are shapely Polygons or Contour
             # objects, then get the 9 bit DE9IM relationship and pad the other
             # 18 bits with 0s.
-            if isinstance(contour_a, shapely.Polygon):
-                poly_a = contour_a
+            if isinstance(structure_a, shapely.Polygon):
+                poly_a = structure_a
             else:
                 try:
-                    poly_a = contour_a['polygon']
+                    poly_a = structure_a['polygon']
                 except AttributeError as err:
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
                         'or a combination of shapely Polygon objects and ',
                         'Contour objects. contour_a input was: ',
-                    f'{str(type(contour_a))}'
+                    f'{str(type(structure_a))}'
                     ])) from err
-            if isinstance(contour_b, shapely.Polygon):
-                poly_b = contour_b
+            if isinstance(structure_b, shapely.Polygon):
+                poly_b = structure_b
             else:
                 try:
-                    poly_b = contour_b['polygon']
+                    poly_b = structure_b['polygon']
                 except AttributeError as err:
                     raise ValueError(''.join([
                         'Both contours must either be StructureSlice objects ',
                         'or a combination of shapely Polygon objects and ',
                         'Contour objects. contour_b input was: ',
-                    f'{str(type(contour_b))}'
+                    f'{str(type(structure_b))}'
                     ])) from err
             contour = DE9IM(poly_a, poly_b)
             external = DE9IM(relation_str=self.padding)
