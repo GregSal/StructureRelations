@@ -79,9 +79,9 @@ def test_island():
     circle4 = shapely.Polygon(circle_points(2))
     circle2 = shapely.Polygon(circle_points(1))
     circle3 = shapely.Polygon(circle_points(1.5))
-    a = RegionSlice([circle6, circle4, circle2])
-    b = RegionSlice([circle3])
-    relation = DE9IM(b.contour, a.contour)
+    a = (circle6 - circle4).union(circle2)
+    b = circle3
+    relation = DE9IM(b, a)
     relation_string = '212FF1212'
     matrix = '\n'.join([
         '|111|',
@@ -96,9 +96,9 @@ def test_transpose_island():
     circle4 = shapely.Polygon(circle_points(2))
     circle2 = shapely.Polygon(circle_points(1))
     circle3 = shapely.Polygon(circle_points(1.5))
-    a = RegionSlice([circle6, circle4, circle2])
-    b = RegionSlice([circle3])
-    relation = DE9IM(b.contour, a.contour)
+    a = (circle6 - circle4).union(circle2)
+    b = circle3
+    relation = DE9IM(b, a)
     transpose_relation = relation.transpose()
     relation_string = '2F21F1212'
     matrix = '\n'.join([
