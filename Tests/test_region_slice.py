@@ -443,9 +443,65 @@ class TestRegionSlice:
         for embedded in region_slice.embedded_regions.values():
             assert len(embedded) == 1
             assert isinstance(embedded[0], Contour)
-        # Region holes should be empty lists
+        # Region holes should should contain an interpolated (smaller) Hole Contour
         for holes in region_slice.region_holes.values():
-            assert holes == []
+            assert len(holes) == 1
+            assert holes[0].area < shapely.Polygon(hole).area
+        # Contour indexes should contain one item with two ContourIndexes
+        assert len(region_slice.contour_indexes) == 1
+        for indexes in region_slice.contour_indexes.values():
+            assert len(indexes) == 2
+        # is_interpolated should be True
+        assert region_slice.is_interpolated is True
+
+    def test_boundary_slice_for_closed_hole(self):
+        # Create a large box and a smaller box (hole) inside, both on the same slice
+        outer = box_points(width=4)
+        hole = box_points(width=2)
+        slice_data = [
+            ContourPoints(outer, roi=1, slice_index=1.0),
+            ContourPoints(outer, roi=1, slice_index=2.0),
+            ContourPoints(outer, roi=1, slice_index=3.0),
+            ContourPoints(outer, roi=1, slice_index=4.0),
+            ContourPoints(hole, roi=1, slice_index=2.0),
+            ContourPoints(hole, roi=1, slice_index=3.0),
+            ]
+        contour_table, slice_sequence = build_contour_table(slice_data)
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+
+        # Find a boundary slice (should be at the interpolated boundary, e.g., 0.5 or 1.5)
+        not_original = slice_sequence.sequence.Original == False
+        interpolated_slice_indexes = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
+        assert 3.5 in interpolated_slice_indexes
+        region_slice = RegionSlice(contour_graph, slice_index=3.5)
+        # There should be a single boundary MultiPolygon containing with just
+        # the interpolated hole (since it is the only boundary)
+        assert len(region_slice.boundaries) == 1
+        for boundary in region_slice.boundaries.values():
+            assert isinstance(boundary, shapely.MultiPolygon)
+            # The boundary should be the interpolated hole, which is smaller
+            # than the original hole
+            assert boundary.area < shapely.Polygon(hole).area
+        # Regions should contain a MultiPolygon with both the exterior and the hole
+        for region in region_slice.regions.values():
+            assert isinstance(region, shapely.MultiPolygon)
+            # Since it includes the hole, the area should be less than the outer box
+            assert region.area < shapely.Polygon(outer).area
+        # Open holes should contain an empty MultiPolygon
+        for open_hole in region_slice.open_holes.values():
+            assert isinstance(open_hole, shapely.MultiPolygon)
+            assert open_hole.is_empty
+        # Embedded regions should contain the Hole Contour
+        for embedded in region_slice.embedded_regions.values():
+            assert len(embedded) == 1
+            assert isinstance(embedded[0], Contour)
+            assert embedded[0].area < shapely.Polygon(hole).area
+        # Region holes should should contain the Hole Contour
+        for holes in region_slice.region_holes.values():
+            assert len(holes) == 1
+            assert holes[0].area < shapely.Polygon(hole).area
         # Contour indexes should contain one item with two ContourIndexes
         assert len(region_slice.contour_indexes) == 1
         for indexes in region_slice.contour_indexes.values():
