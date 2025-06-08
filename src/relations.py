@@ -475,7 +475,7 @@ class DE9IM():
 
 
 class DE27IM():
-    '''Three DE-9IM relationship strings concatenated
+    '''Three DE-9IM relationship strings concatenated.
 
     The DE-27IM relationship is derived from three DE-9IM relationships.
     It provides a more comprehensive relationship between two polygons by including
@@ -526,6 +526,53 @@ class DE27IM():
     One of the value of the binary DE-27IM relationship is that the individual
     relationships between contours that define two 3D volumes can be merged
     using a logical OR to obtain the relationship between the 3D volumes.
+
+    Args:
+        structure_a (AllPolygonType): The first polygon structure.
+        structure_b (AllPolygonType): The second polygon structure.
+        relation_str (str): A DE-27IM relationship string.
+        relation_int (int): An integer representation of the DE-27IM
+            relationship.
+        adjustments (List[str]): A list of strings that define the adjustments
+            to be applied when structure_a and structure_b are not RegionSlices.
+            Possible adjustments are:
+            - 'transpose': Transpose the relationship matrix.
+            - 'boundary_a': Adjust the relationship matrix for the boundary
+                slice of structure_a.
+            - 'boundary_b': Adjust the relationship matrix for the boundary
+                slice of structure_b.
+            - 'hole_a': Adjust the relationship matrix for the hole (negative
+                space) of structure_a.
+            - 'hole_b': Adjust the relationship matrix for the hole (negative
+                space) of structure_b.
+    Raises:
+        ValueError: If the relationship cannot be determined.
+        ValueError: If neither contours nor a relationship string is supplied.
+
+    Attributes:
+        relation (str): The DE-27IM relationship string.
+        int (int): The integer representation of the DE-27IM relationship.
+        is_null (bool): A boolean property that indicates if the relationship
+            is null.
+
+    Class Attributes:
+        padding (DE9IM): A DE-9IM null object.
+        exterior_a (DE9IM): The DE-9IM relationship to use when only the
+            A contour is supplied.
+        exterior_b (DE9IM): The DE-9IM relationship to use when only the
+            B contour is supplied.
+        test_binaries (List[RelationshipTest]): The RelationshipTest objects
+            used to identify named relationships.
+
+    Methods:
+        to_str(relation_int: int)->str: A static method that converts a 27-bit
+            integer into a string.
+        to_int(relation_str: str)->int: A static method that converts a 27-bit
+            string into an integer.
+        relate_contours(structure_a: AllPolygonType, structure_b: AllPolygonType,
+                        adjustments: List[str] = None): A method that calculates
+            the 27-bit relationship for two structures on a given slice.
+
     '''
 
 
@@ -607,10 +654,12 @@ class DE27IM():
             self.int = relation_int
             self.relation = self.to_str(relation_int)
         else:
-            raise ValueError(''.join([
-                'Must supply either Contours or a relationship string ',
-                'to create a DE27IM object.'
-                ]))
+            # If neither contours nor a relationship string is supplied, the
+            # relationship is set to null.
+            self.int = 0
+            # Initialize the relationship with all padding.
+            relation_group = tuple([self.padding] * 3)
+            self.relation = self.combine_groups(relation_group)
 
     @property
     def is_null(self)->bool:
@@ -811,12 +860,11 @@ class DE27IM():
         relation_str = full_relation.replace('F','0').replace('2','1')
         return relation_str
 
-    def merge(self, other: Union['DE27IM', int])->'DE27IM':
+    def merge(self, other: Union['DE27IM', int]):
         '''Combine two DE27IM relationships.
-
-        Returns:
-            int: An integer corresponding to a 27 bit binary value
-                reflecting the combined relationships.
+        The other relationship can be either a DE27IM object or an integer.
+        The relationship is merged by performing a bitwise OR operation on the
+        integer representations of the relationships.
         '''
         if isinstance(other, DE27IM):
             other_rel = other.int
@@ -830,8 +878,8 @@ class DE27IM():
         # Use the self.to_int() rather than self.int, because self.int may not
         # be up to date.
         merged_rel = self.to_int(self.relation) | other_rel
-        self.__class__(relation_int = merged_rel)
-        return self.__class__(relation_int = merged_rel)
+        self.int = merged_rel
+        self.relation = self.to_str(merged_rel)
 
     def identify_relation(self) -> RelationshipType:
         '''Applies a collection of definitions for named relationships to a supplied
@@ -1076,9 +1124,9 @@ def get_boundary_relations(region_graph: ContourGraph,
 
 # %% Functions for finding relations
 def merged_relations(relations):
-    merged = DE27IM(relation_int=0)
+    merged = DE27IM()
     for relation in list(relations):
-        merged = merged.merge(relation)
+        merged.merge(relation)
     return merged
 
 
