@@ -24,8 +24,8 @@ SliceIndexType = NewType('SliceIndexType', float)
 # This can be a list of slice indexes, a tuple of two slice indexes, or a
 # single slice index.
 SliceIndexSequenceType = Union[List[SliceIndexType],
-                       Tuple[SliceIndexType, SliceIndexType],
-                       SliceIndexType]
+                               Tuple[SliceIndexType, SliceIndexType],
+                               SliceIndexType]
 
 # A list of contour points.
 ContourPointsType = NewType('ContourPointsType', List[tuple[float]])
