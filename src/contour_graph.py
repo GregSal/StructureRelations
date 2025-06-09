@@ -346,8 +346,9 @@ def add_boundary_contours(contour_graph: ContourGraph,
     # Select all nodes with only one edge (degree=1)
     boundary_nodes = {node for node, degree in contour_graph.degree()
                       if degree == 1}
-    all_related_contours = set()
+
     while boundary_nodes:
+        all_related_contours = set()
         original_boundary = boundary_nodes.pop()
         contour_parameters = {'contour_graph': contour_graph,
                               'slice_sequence': slice_sequence,

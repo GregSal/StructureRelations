@@ -10,17 +10,13 @@ class TestContains:
     def test_contains_centered(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
-        a = RegionSlice([circle6])
-        b = RegionSlice([circle4])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6, circle4).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
     def test_contains_offset_x(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle3_offset_x = shapely.Polygon(circle_points(1.5, offset_x=1.2))
-        a = RegionSlice([circle6])
-        b = RegionSlice([circle3_offset_x])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6, circle3_offset_x).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
     def test_contains_island(self):
@@ -28,9 +24,8 @@ class TestContains:
         circle4 = shapely.Polygon(circle_points(2))
         circle3 = shapely.Polygon(circle_points(1.5))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle4, circle3])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = (circle6 - circle4).union(circle3)
+        relation_type = DE27IM(a, circle2).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
     def test_contains_embedded_ring(self):
@@ -38,8 +33,8 @@ class TestContains:
         circle5 = shapely.Polygon(circle_points(2.5))
         circle3 = shapely.Polygon(circle_points(1.5))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle2])
-        b = RegionSlice([circle5, circle3])
+        a = (circle6 - circle2)
+        b = (circle5, circle3)
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
@@ -47,9 +42,7 @@ class TestContains:
         circle6_offset = shapely.Polygon(circle_points(3, offset_y=-1))
         circle3_offset = shapely.Polygon(circle_points(1.5, offset_x=0.5,
                                                        offset_y=-2))
-        a = RegionSlice([circle6_offset])
-        b = RegionSlice([circle3_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6_offset, circle3_offset).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
     def test_contains_multi_region(self):
@@ -61,8 +54,10 @@ class TestContains:
         circle2_up = shapely.Polygon(circle_points(1, offset_y=3))
         circle3_down = shapely.Polygon(circle_points(1.5, offset_y=-2.5))
         circle1_down = shapely.Polygon(circle_points(0.5, offset_y=-2))
-        a = RegionSlice([circle4_left, circle4_right, circle5_up, circle3_down])
-        b = RegionSlice([circle3_left, circle3_right, circle2_up, circle1_down])
+        a = shapely.union_all([circle4_left, circle4_right,
+                               circle5_up, circle3_down])
+        b = shapely.union_all([circle3_left, circle3_right,
+                               circle2_up, circle1_down])
         relation_type = DE27IM(a, b).identify_relation()
         print(relation_type)
         assert relation_type == RelationshipType.CONTAINS
@@ -72,9 +67,8 @@ class TestSurrounds:
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = circle6 - circle4
+        relation_type = DE27IM(a, circle2).identify_relation()
         assert relation_type == RelationshipType.SURROUNDS
 
     def test_surrounds_middle_ring(self):
@@ -83,8 +77,8 @@ class TestSurrounds:
         circle4 = shapely.Polygon(circle_points(2))
         circle3 = shapely.Polygon(circle_points(1.5))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle5, circle2])
-        b = RegionSlice([circle4, circle3])
+        a = (circle6 - circle5).union(circle2)
+        b = circle4 - circle3
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.SURROUNDS
 
@@ -95,10 +89,8 @@ class TestSurrounds:
         circle2_left = shapely.Polygon(circle_points(1, offset_x=-3,
                                                      offset_y=0.5))
         circle2_right = shapely.Polygon(circle_points(1, offset_x=3))
-        a = RegionSlice([box10x5, circle4_left, circle3_right,
-                            circle2_right])
-        b = RegionSlice([circle2_left])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = ((box10x5 - circle4_left) - circle3_right).union(circle2_right)
+        relation_type = DE27IM(a, circle2_left).identify_relation()
         assert relation_type == RelationshipType.SURROUNDS
 
 class TestShelters:

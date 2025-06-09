@@ -425,16 +425,15 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     boundary1 = aligned_poly1.exterior
     boundary2 = aligned_poly2.exterior
     new_cords = interpolate_boundaries(boundary1, boundary2)
-    # Add the holes to the new polygon.
-    new_holes = []
+    # Build the new polygon from the interpolated coordinates.
+    itp_poly = shapely.Polygon(new_cords)
+    # Strip the Z coordinate from the polygon so that is can be replaced with new_z
+    itp_poly = Polygon(shapely.get_coordinates(itp_poly))
+    # Subtract the holes from the new polygon.
     matched_holes = match_holes(p1, p2)
     for hole1, hole2 in matched_holes:
         new_hole = interpolate_boundaries(hole1, hole2)
-        new_holes.append(new_hole)
-    # Build the new polygon from the interpolated coordinates.
-    itp_poly = shapely.Polygon(new_cords, holes=new_holes)
-    # Strip the Z coordinate from the polygon so that is can be replaced with new_z
-    itp_poly = Polygon(shapely.get_coordinates(itp_poly))
+        itp_poly = itp_poly - Polygon(new_hole)
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
