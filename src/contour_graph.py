@@ -39,6 +39,7 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
             does not reference a graph node with only one neighbour (a boundary
             slice).
     '''
+    # FIXME build_contour_lookup called before being defined                                
     lookup = build_contour_lookup(contour_graph)
     if starting_contour not in set(lookup.Label):
         raise InvalidContour(f"Contour {starting_contour} was not found in the "
@@ -234,6 +235,7 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
     # Iterate over each slice and create Contour objects
     for slice_index, contour in contour_set.Polygon.items():
         contours_on_slice = contour_by_slice[slice_index]
+        # FIXME this only creates a contour for the first polygon
         new_contour = Contour(roi, slice_index, contour, contours_on_slice)
         contour_by_slice[slice_index].append(new_contour)
     # Sort the contours on each slice by area in order of descending area
