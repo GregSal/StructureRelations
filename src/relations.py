@@ -297,14 +297,14 @@ class DE9IM():
                  relation_str: str = None):
         if (poly_a is not None) & (poly_a is not None):
             if not isinstance(poly_a, (shapely.Polygon, shapely.MultiPolygon)):
-                poly_a = poly_a.getattr('polygon', None)
+                poly_a = getattr(poly_a, 'polygon', None)
                 if poly_a is None:
                     raise ValueError(''.join([
                         'poly_a must be a shapely Polygon, MultiPolygon, or ',
                         'Contour object.'
                         ]))
             if not isinstance(poly_b, (shapely.Polygon, shapely.MultiPolygon)):
-                poly_b = poly_b.getattr('polygon', None)
+                poly_b = getattr(poly_b, 'polygon', None)
                 if poly_b is None:
                     raise ValueError(''.join([
                         'poly_b must be a shapely Polygon, MultiPolygon, or ',
@@ -751,7 +751,7 @@ class DE27IM():
                         relation_str = self.combine_groups(relation_group)
                         # Merge the relationship into the DE27IM object.
                         self.merge(self.to_int(relation_str))
-                    for boundary_b in structure_b.boundaries:
+                    for boundary_b in structure_b.boundaries.values():
                         contour = DE9IM(region_a, boundary_b)
                         relation_group = (contour, self.padding, self.padding)
                         # Adjust for secondary boundaries.
@@ -777,7 +777,7 @@ class DE27IM():
                         self.merge(self.to_int(relation_str))
                     # Add the boundary_b adjustment to the existing 'boundary_a' adjustment.
                     adjustments.append('boundary_b')
-                    for boundary_b in structure_b.boundaries:
+                    for boundary_b in structure_b.boundaries.values():
                         contour = DE9IM(boundary_a, boundary_b)
                         relation_group = (contour, self.padding, self.padding)
                         # Adjust for primary and secondary boundaries.
