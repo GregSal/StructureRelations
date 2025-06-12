@@ -274,6 +274,8 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
     '''
     # Filter the contour table for the specified ROI
     contour_set = contour_table[contour_table.ROI == roi]
+    if contour_set.empty:
+        return None
     # sort the contour set by slice_index and area in descending order
     contour_set = contour_set.sort_values(by=['Slice', 'Area'],
                                           ascending=[True, False])
@@ -593,9 +595,13 @@ def build_contour_graph(contour_table: pd.DataFrame,
                 table for contours, including slice index, contour index, and
                 hole type.
     '''
-    contour_by_slice = build_contours(contour_table, roi)
     # Create an empty graph
     contour_graph = nx.Graph()
+    # Get the relevant contours
+    contour_by_slice = build_contours(contour_table, roi)
+    if not contour_by_slice:
+        # If not contours are found for the given ROI, return an empty graph.
+        return contour_graph, slice_sequence
     # Add nodes to the graph
     for contour_data in contour_by_slice.values():
         for contour in contour_data:
