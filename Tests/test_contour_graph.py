@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from contours import ContourPoints, build_contour_table
-from debug_tools import box_points
+from debug_tools import box_points, circle_points
 
 from contour_graph import *
 
@@ -238,6 +238,64 @@ class TestBuildContours():
         assert second_slice[2].area == 1.0
         assert second_slice[3].area == 1.0
 
+    def test_hole_identification(self):
+        '''Test that the build_contours function identifies holes correctly.'''
+        box10x5 = box_points(10,5)
+        circle4_left = circle_points(2, offset_x=-3)
+        slice_data = [
+            ContourPoints(box10x5, roi=0, slice_index=0.0),
+            ContourPoints(circle4_left, roi=0, slice_index=0.0)
+            ]
+        contour_table, _ = build_contour_table(slice_data)
+        contours = build_contours(contour_table, roi=0)
+        assert len(contours) == 1
+        slice_1 = contours[0.0]
+        assert len(slice_1) == 2
+        assert slice_1[0].is_hole is False
+        assert slice_1[1].is_hole is True
+
+    def test_two_hole_identification(self):
+        '''Test that the build_contours function identifies holes correctly.'''
+        box10x5 = box_points(10,5)
+        circle4_left = circle_points(2, offset_x=-3)
+        circle3_right = circle_points(1.5, offset_x=3)
+        slice_data = [
+            ContourPoints(box10x5, roi=0, slice_index=0.0),
+            ContourPoints(circle4_left, roi=0, slice_index=0.0),
+            ContourPoints(circle3_right, roi=0, slice_index=0.0)
+            ]
+        contour_table, _ = build_contour_table(slice_data)
+        contours = build_contours(contour_table, roi=0)
+        assert len(contours) == 1
+        slice_1 = contours[0.0]
+        assert len(slice_1) == 3
+        assert slice_1[0].is_hole is False
+        assert slice_1[1].is_hole is True
+        assert slice_1[2].is_hole is True
+
+    def test_island_identification(self):
+        '''Test that the build_contours function identifies holes & islands
+        correctly.'''
+        box10x5 = box_points(10,5)
+        circle4_left = circle_points(2, offset_x=-3)
+        circle3_right = circle_points(1.5, offset_x=3)
+        circle2_right = circle_points(1, offset_x=3)
+
+        slice_data = [
+            ContourPoints(box10x5, roi=0, slice_index=0.0),
+            ContourPoints(circle4_left, roi=0, slice_index=0.0),
+            ContourPoints(circle3_right, roi=0, slice_index=0.0),
+            ContourPoints(circle2_right, roi=0, slice_index=0.0)
+            ]
+        contour_table, _ = build_contour_table(slice_data)
+        contours = build_contours(contour_table, roi=0)
+        assert len(contours) == 1
+        slice_1 = contours[0.0]
+        assert len(slice_1) == 4
+        assert slice_1[0].is_hole is False
+        assert slice_1[1].is_hole is True
+        assert slice_1[2].is_hole is True
+        assert slice_1[3].is_hole is False
 
 class TestAddGraphEdges():
     '''Test the add_graph_edges function.

@@ -686,21 +686,22 @@ class Contour:
             InvalidContour: Raised if the new contour overlaps an existing
                 contour in the list.
         '''
-        for existing_contour in reversed(contours):
-            # starting from the largest contour and working down to the smallest
+        for existing_contour in contours:
+            # starting from the largest contour and working down to the smallest.
+            # If there is a sequence of concentric contours the result will be
+            # alternating holes and islands.
             if self.polygon.within(existing_contour.polygon):
+                # New contour is completely within the existing contour
+                self.related_contours.append(existing_contour.index)
+                existing_contour.related_contours.append(self.index)
                 if existing_contour.is_hole:
                     # If the existing contour is a hole, the new contour cannot
-                    # be its hole, but it could be an island and should be
-                    # recorded as an embedded contour.
-                    self.related_contours.append(existing_contour.index)
-                    existing_contour.related_contours.append(self.index)
+                    # be its hole, but it could be an island.
+                    self.is_hole = False
+                    self.hole_type = 'None'
                 else:
                     # New contour is completely within the existing contour
                     self.is_hole = True
-                     # Set the hole reference to the existing contour index
-                    self.related_contours.append(existing_contour.index)
-                    existing_contour.related_contours.append(self.index)
                     self.hole_type = 'Unknown'
 
             elif self.polygon.overlaps(existing_contour.polygon):

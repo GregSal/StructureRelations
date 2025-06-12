@@ -2,6 +2,7 @@
 The contour graph is a undirected graph where each node represents a contour
 and edges represent connect matched contours on the next and previous slice.
 '''
+# %% Setup
 from typing import List, Tuple
 from collections import defaultdict
 
@@ -12,7 +13,54 @@ import shapely
 from contours import InvalidContour, SliceSequence, Contour, ContourMatch, interpolate_polygon
 from types_and_classes import ContourIndex, InvalidSlice, ROI_Type, SliceIndexType, ContourGraph
 
-# %%% contour interpolation functions
+# %% Contour Lookup Table Function
+def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
+    '''Build a lookup table for contours.
+
+    This function creates a DataFrame that serves as a lookup table for contours.
+    The hole type is categorized into 'Open', 'Closed', 'Unknown', and 'None'.
+    The DataFrame is sorted by slice index and contour index.
+
+    Args:
+        contour_graph (ContourGraph): A Contour Graph object containing contour
+            information. Each node in the graph should represent a contour and
+            should have a 'contour' attribute that is an instance of the
+            Contour class.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the contour lookup table.
+            The DataFrame includes the following columns:
+                - ROI,
+                - SliceIndex,
+                - HoleType,
+                - Interpolated,
+                - Boundary,
+                - ContourIndex,
+                - RegionIndex, and
+                - Label.
+    '''
+    lookup_list = []
+    for _, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        lookup_list.append({
+            'ROI': contour.roi,
+            'SliceIndex': contour.slice_index,
+            'HoleType': contour.hole_type,
+            'Interpolated': contour.is_interpolated,
+            'Boundary': contour.is_boundary,
+            'ContourIndex': contour.contour_index,
+            'RegionIndex': contour.region_index,
+            'Label': contour.index
+        })
+    contour_lookup = pd.DataFrame(lookup_list)
+    contour_lookup.HoleType = contour_lookup.HoleType.astype('category')
+    contour_lookup.HoleType.cat.set_categories(['Open', 'Closed',
+                                                'Unknown', 'None'])
+    contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'], inplace=True)
+    return contour_lookup
+
+
+# %% contour interpolation functions
 def generate_interpolated_polygon(contour_graph: ContourGraph,
                                   slice_sequence: SliceSequence,
                                   starting_contour: ContourIndex,
@@ -39,7 +87,6 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
             does not reference a graph node with only one neighbour (a boundary
             slice).
     '''
-    # FIXME build_contour_lookup called before being defined                                
     lookup = build_contour_lookup(contour_graph)
     if starting_contour not in set(lookup.Label):
         raise InvalidContour(f"Contour {starting_contour} was not found in the "
@@ -227,6 +274,9 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
     '''
     # Filter the contour table for the specified ROI
     contour_set = contour_table[contour_table.ROI == roi]
+    # sort the contour set by slice_index and area in descending order
+    contour_set = contour_set.sort_values(by=['Slice', 'Area'],
+                                          ascending=[True, False])
     # Create a dictionary to hold contours by slice
     contour_by_slice = defaultdict(list)
     # Set the index to 'Slice' for easier access
@@ -235,59 +285,12 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
     # Iterate over each slice and create Contour objects
     for slice_index, contour in contour_set.Polygon.items():
         contours_on_slice = contour_by_slice[slice_index]
-        # FIXME this only creates a contour for the first polygon
         new_contour = Contour(roi, slice_index, contour, contours_on_slice)
         contour_by_slice[slice_index].append(new_contour)
     # Sort the contours on each slice by area in order of descending area
     for slice_index in contour_by_slice:
         contour_by_slice[slice_index].sort(key=lambda c: c.area, reverse=True)
     return contour_by_slice
-
-
-def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
-    '''Build a lookup table for contours.
-
-    This function creates a DataFrame that serves as a lookup table for contours.
-    The hole type is categorized into 'Open', 'Closed', 'Unknown', and 'None'.
-    The DataFrame is sorted by slice index and contour index.
-
-    Args:
-        contour_graph (ContourGraph): A Contour Graph object containing contour
-            information. Each node in the graph should represent a contour and
-            should have a 'contour' attribute that is an instance of the
-            Contour class.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the contour lookup table.
-            The DataFrame includes the following columns:
-                - ROI,
-                - SliceIndex,
-                - HoleType,
-                - Interpolated,
-                - Boundary,
-                - ContourIndex,
-                - RegionIndex, and
-                - Label.
-    '''
-    lookup_list = []
-    for _, data in contour_graph.nodes(data=True):
-        contour = data['contour']
-        lookup_list.append({
-            'ROI': contour.roi,
-            'SliceIndex': contour.slice_index,
-            'HoleType': contour.hole_type,
-            'Interpolated': contour.is_interpolated,
-            'Boundary': contour.is_boundary,
-            'ContourIndex': contour.contour_index,
-            'RegionIndex': contour.region_index,
-            'Label': contour.index
-        })
-    contour_lookup = pd.DataFrame(lookup_list)
-    contour_lookup.HoleType = contour_lookup.HoleType.astype('category')
-    contour_lookup.HoleType.cat.set_categories(['Open', 'Closed',
-                                                'Unknown', 'None'])
-    contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'], inplace=True)
-    return contour_lookup
 
 
 def add_graph_edges(contour_graph: ContourGraph,
