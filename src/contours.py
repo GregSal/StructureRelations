@@ -614,6 +614,7 @@ class Contour:
         self.roi = roi
         self.slice_index = slice_index
         self.polygon = polygon
+        self.polygon_with_holes = polygon
         self.validate_polygon()
         # Set the contour parameters
         self.contour_index = Contour.counter
@@ -703,7 +704,7 @@ class Contour:
                     # New contour is completely within the existing contour
                     self.is_hole = True
                     self.hole_type = 'Unknown'
-
+                    self.polygon_with_holes = self.polygon_with_holes - existing_contour.polygon
             elif self.polygon.overlaps(existing_contour.polygon):
                 # New contour overlaps an existing contour, raise an error
                 raise InvalidContour('New contour overlaps an existing contour.')
