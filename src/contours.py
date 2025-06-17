@@ -693,18 +693,22 @@ class Contour:
             # alternating holes and islands.
             if self.polygon.within(existing_contour.polygon):
                 # New contour is completely within the existing contour
+                # Add the existing contour to the related contours of the new
+                # contour and vice versa.
                 self.related_contours.append(existing_contour.index)
                 existing_contour.related_contours.append(self.index)
                 if existing_contour.is_hole:
                     # If the existing contour is a hole, the new contour cannot
-                    # be its hole, but it could be an island.
+                    # be its hole, which means that it is an island.
                     self.is_hole = False
                     self.hole_type = 'None'
                 else:
                     # New contour is completely within the existing contour
                     self.is_hole = True
                     self.hole_type = 'Unknown'
-                    self.polygon_with_holes = self.polygon_with_holes - existing_contour.polygon
+                    # Subtract the existing contour polygon from the new
+                    # contour polygon to get the polygon with holes.
+                    existing_contour.polygon_with_holes = existing_contour.polygon_with_holes - self.polygon
             elif self.polygon.overlaps(existing_contour.polygon):
                 # New contour overlaps an existing contour, raise an error
                 raise InvalidContour('New contour overlaps an existing contour.')
