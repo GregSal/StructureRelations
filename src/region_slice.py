@@ -16,7 +16,7 @@ import shapely
 
 # Local packages
 from contours import Contour
-from contour_graph import build_contour_lookup
+from contour_graph import build_contour_lookup, get_region_contours
 from types_and_classes import RegionIndex, SliceIndexType
 from utilities import make_multi
 
@@ -130,32 +130,8 @@ class RegionSlice():
                 contour/regions it defines: a boundary, an open or closed hole,
                 or a regular part of the region.
         '''
-        def get_region_contours(contour_reference: pd.DataFrame,
-                                related_regions: List[RegionIndex])->List[Contour]:
-            '''Return the contours for the specified regions.'''
-            region_selection = contour_reference['RegionIndex'].isin(related_regions)
-            region_reference = contour_reference.loc[region_selection]
-            contour_labels = region_reference['Label'].tolist()
-            contour_data = dict(contour_graph.nodes.data('contour'))
-            region_contours = [contour_data[label] for label in contour_labels]
-            return region_contours
-
         self.slice_index = slice_index
-
-        contour_lookup = build_contour_lookup(contour_graph)
-        # Filter contours by SliceIndex and contour type
-        # Only contours that are not interpolated, holes or boundaries are
-        # used to select the regions.
-        selected_contours = contour_lookup['SliceIndex'] == slice_index
-        reference_columns = ['Label', 'RegionIndex',
-                             'HoleType', 'Interpolated', 'Boundary']
-        contour_reference = contour_lookup.loc[selected_contours,
-                                               reference_columns]
-        # region_set is the set of all unique RegionIndexes on the slice that
-        # are not interpolated, holes, or boundaries.
-        region_set = set(contour_reference.RegionIndex)
-
-        # Initialize the region dictionaries
+        # Initialize the RegionSlice dictionary attributes.
         self.regions = {}
         self.boundaries = {}
         self.open_holes = {}
@@ -163,27 +139,69 @@ class RegionSlice():
         self.embedded_regions = {}
         self.contour_indexes = {}
         interpolated_contours = []
-        # Iterate through the regions on the slice
-        while len(region_set) > 0:
+
+        # Extract the a subset of the contour_lookup table limited to contours
+        # on the specified slice.
+        # All of these contours will be included in the RegionSlice.
+        contour_lookup = build_contour_lookup(contour_graph)
+        slice_selection = contour_lookup['SliceIndex'] == slice_index
+        slice_contours = contour_lookup[slice_selection]
+
+        # If there are no contours on the slice, return an empty RegionSlice.
+        if slice_contours.empty:
+            self.is_interpolated = False
+            return
+
+        # select the primary contours on the slice, which are those
+        # contours that are not interpolated, holes or boundaries.
+        # The RegionIndexes of the primary contours are used to
+        # identify the regions on the slice and are the keys of the
+        # RegionSlice dictionary attributes.
+        primary_contours = ((slice_contours['Interpolated'] == False) &
+                            (slice_contours['HoleType'] == 'None'))
+        reference_columns = ['Label', 'RegionIndex',
+                             'HoleType', 'Interpolated', 'Boundary']
+        contour_reference = slice_contours.loc[primary_contours,
+                                               reference_columns]
+        # primary_regions is the set of all unique RegionIndexes on the slice
+        # that are not interpolated, holes, or boundaries.
+        # The primary_region values are used as the keys of the RegionSlice
+        # dictionary attributes.  However, not all of the primary regions will
+        # become keys in the RegionSlice dictionaries.  Some of the primary
+        # regions may be related to other regions, for example as islands.
+        primary_regions = set(contour_reference.RegionIndex)
+        # FIXME WE still need to handle the case where there are no primary
+        # regions on the slice.  The non-primary contours still need to be included
+
+        # Iterate through the primary_regions on the slice
+        while len(primary_regions) > 0:
             # Get the contours for the selected region.
-            region_index = region_set.pop()
-            region_contours = get_region_contours(contour_reference,
+            region_index = primary_regions.pop()
+            region_contours = get_region_contours(contour_graph,
+                                                  slice_contours,
                                                   [region_index])
-            # Include all related regions on the slice.
-            related_contours_indexes = set()
+            # Get all regions on the slice that are related to the current
+            # region. This includes contours that are holes, boundaries, or
+            # interpolated.
+            # Get the list of related contours on the slice for each contour of
+            # the current the region.
+            related_contours_indexes = []
             for contour in region_contours:
-                related_contours_indexes.update(set(contour.related_contours))
-            related_regions = set(contour_reference.loc[
-                contour_reference.Label.isin(related_contours_indexes),
-                'RegionIndex'])
+                related_contours_indexes.extend(contour.related_contours)
+            # Remove duplicates from the list of related contours.
+            related_contours_indexes = set(related_contours_indexes)
+            # Get the RegionIndexes of the related contours.
+            rel_idx = contour_reference.Label.isin(related_contours_indexes)
+            related_regions = set(contour_reference.loc[rel_idx, 'RegionIndex'])
             # Add the initial region index to the related regions.
             # This is necessary to ensure that the initial region is included
             # in the region contours.
             related_regions.add(region_index)
             # Remove the related regions that have been identified.
-            region_set = region_set - related_regions
+            primary_regions = primary_regions - related_regions
             # Modify region_contours to include all related regions
-            region_contours = get_region_contours(contour_reference,
+            region_contours = get_region_contours(contour_graph,
+                                                  contour_reference,
                                                   list(related_regions))
             # Sort the contours by area in descending order
             # This ensures that the largest contour is first, which is

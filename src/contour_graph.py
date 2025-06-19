@@ -10,10 +10,14 @@ import pandas as pd
 import networkx as nx
 import shapely
 
-from contours import InvalidContour, SliceSequence, Contour, ContourMatch, interpolate_polygon
-from types_and_classes import ContourIndex, InvalidSlice, ROI_Type, SliceIndexType, ContourGraph
+from contours import SliceSequence, Contour, ContourMatch
+from contours import interpolate_polygon
+from types_and_classes import SliceIndexType, ContourIndex, RegionIndex
+from types_and_classes import ContourGraph
 
-# %% Contour Lookup Table Function
+from types_and_classes import InvalidSlice, ROI_Type, InvalidContour
+
+# %% Contour Lookup Table Functions
 def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
     '''Build a lookup table for contours.
 
@@ -58,6 +62,36 @@ def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
                                                 'Unknown', 'None'])
     contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'], inplace=True)
     return contour_lookup
+
+
+def get_region_contours(contour_graph: ContourGraph,
+                        contour_reference: pd.DataFrame,
+                        related_regions: List[RegionIndex])->List[Contour]:
+    '''Return the contours for the specified regions.
+
+    This function retrieves contours from the contour graph based on the
+    specified RegionIndexes. It uses a lookup table to find the contours.
+    The contours are returned as a list of Contour objects.  If no contours are
+    found for the specified regions, an empty list is returned.
+
+    Args:
+        contour_graph (ContourGraph): The contour graph.
+        contour_reference (pd.DataFrame): The contour lookup table.
+            This DataFrame should contain the columns 'RegionIndex' and 'Label'.
+            The 'RegionIndex' column should contain RegionIndexes, and the
+            'Label' should contain ContourIndexes (The labels for ContourGraph
+            nodes).
+        related_regions (List[RegionIndex]): A list of RegionIndexes for which
+            to retrieve contours.
+    Returns:
+        List[Contour]: A list of Contour objects for the specified regions.
+    '''
+    region_selection = contour_reference['RegionIndex'].isin(related_regions)
+    region_reference = contour_reference.loc[region_selection]
+    contour_labels = region_reference['Label'].tolist()
+    contour_data = dict(contour_graph.nodes.data('contour'))
+    region_contours = [contour_data[label] for label in contour_labels]
+    return region_contours
 
 
 # %% contour interpolation functions
