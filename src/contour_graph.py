@@ -419,7 +419,12 @@ def add_boundary_contours(contour_graph: ContourGraph,
                 'is_interpolated': True,
                 'is_boundary': is_boundary
             }
-            interpolation = generate_interpolated_contours(**related_parameters)
+            try:  # This is a temporary fix to handle incorrect boundary identification
+                # Generate the interpolated contour for the related contour
+                interpolation = generate_interpolated_contours(**related_parameters)
+            except InvalidSlice:
+                # If the contour is not found, skip it
+                continue
             # Unpack the interpolation result
             contour_graph, slice_sequence, related_idx = interpolation
             # Add the new index to the list of interpolated contours
