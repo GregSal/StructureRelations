@@ -166,14 +166,33 @@ class RegionSlice():
         # primary_regions is the set of all unique RegionIndexes on the slice
         # that are not interpolated, holes, or boundaries.
         # The primary_region values are used as the keys of the RegionSlice
-        # dictionary attributes.  However, not all of the primary regions will
-        # become keys in the RegionSlice dictionaries.  Some of the primary
-        # regions may be related to other regions, for example as islands.
-        primary_regions = set(contour_reference.RegionIndex)
-        # FIXME WE still need to handle the case where there are no primary
-        # regions on the slice.  The non-primary contours still need to be included
+        # dictionary attributes.
+        primary_regions = set(contour_reference['RegionIndex'].unique())
+        if not primary_regions:
+            # WE still need to handle the case where there are no primary
+            # regions on the slice.  The non-primary contours still need to be
+            # included.  In that case, we will use all contours on the slice
+            # as the primary contours.
+            contour_reference = slice_contours[reference_columns]
+            primary_regions = set(contour_reference['RegionIndex'].unique())
+        # Sort the primary_regions by area in ascending order
+        # This ensures that the largest contour is first, which is
+        # necessary to have holes correctly subtracted from the region.
+        # Ascending order is used because the pop operation will
+        # remove the last item in the list, which is the largest contour.
+        primary_region_contours = get_region_contours(contour_graph,
+                                                      contour_reference,
+                                                      primary_regions)
+        primary_region_contours = sorted(primary_region_contours,
+                                         key=lambda x: x.area,
+                                         reverse=False)
+        primary_regions = [contour.region_index
+                           for contour in primary_region_contours]
 
         # Iterate through the primary_regions on the slice
+        # Not all of the primary regions will become keys in the RegionSlice
+        # dictionaries.  Some of the primary regions may be related to other
+        # regions, for example as islands.
         while len(primary_regions) > 0:
             # Get the contours for the selected region.
             region_index = primary_regions.pop()
@@ -191,17 +210,19 @@ class RegionSlice():
             # Remove duplicates from the list of related contours.
             related_contours_indexes = set(related_contours_indexes)
             # Get the RegionIndexes of the related contours.
-            rel_idx = contour_reference.Label.isin(related_contours_indexes)
-            related_regions = set(contour_reference.loc[rel_idx, 'RegionIndex'])
+            rel_idx = slice_contours.Label.isin(related_contours_indexes)
+            related_regions = set(slice_contours.loc[rel_idx, 'RegionIndex'])
             # Add the initial region index to the related regions.
             # This is necessary to ensure that the initial region is included
             # in the region contours.
             related_regions.add(region_index)
             # Remove the related regions that have been identified.
-            primary_regions = primary_regions - related_regions
+            # Remove any related regions that are in primary_regions
+            primary_regions = [r for r in primary_regions
+                               if r not in related_regions]
             # Modify region_contours to include all related regions
             region_contours = get_region_contours(contour_graph,
-                                                  contour_reference,
+                                                  slice_contours,
                                                   list(related_regions))
             # Sort the contours by area in descending order
             # This ensures that the largest contour is first, which is
