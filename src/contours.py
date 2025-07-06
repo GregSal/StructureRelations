@@ -388,6 +388,7 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
         for crd in boundary1.coords:
             ln = shapely.shortest_line(shapely.Point(crd), boundary2)
             ptn = ln.interpolate(0.5, normalized=True)
+            ptn = shapely.force_2d(ptn)  # Ensure the point is 2D
             new_cords.append(ptn)
         return new_cords
 
