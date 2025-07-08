@@ -6,14 +6,40 @@ from typing import List, Tuple
 import pandas as pd
 import networkx as nx
 
-from contours import Contour, ContourMatch
-from contour_graph import build_contour_graph, build_contour_lookup
+from types_and_classes import ROI_Type, SliceIndexType
+from types_and_classes import ContourGraph, ContourIndex
+from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
-from types_and_classes import ROI_Type, ContourIndex, SliceIndexType
-from contours import SliceSequence
+from contour_graph import build_contour_graph, build_contour_lookup
 
 
-def calculate_node_volume(node: Contour, edges: List[Tuple],
+def separate_edges_by_direction(
+        node: ContourIndex,
+        edges: List[ContourIndex]
+        ) -> Tuple[List[ContourIndex], List[ContourIndex]]:
+    '''Separate edges into positive and negative direction with respect to the node.
+
+    Args:
+        node (ContourIndex): The index of the contour node for which the
+            edges are separated.
+        edges (List[ContourIndex]): A list of edges connected to the node.
+
+    Returns:
+        Tuple[List[ContourIndex], List[ContourIndex]]: Two lists of edges,
+            positive and negative.
+    '''
+    positive_edges = []
+    negative_edges = []
+    for edge in edges:
+        if edge[2]['match'].direction(node) > 0:
+            positive_edges.append(edge)
+        else:
+            negative_edges.append(edge)
+    return positive_edges, negative_edges
+
+
+def calculate_node_volume(contour_graph: ContourGraph,
+                          node: ContourIndex,
                           use_hull=False) -> float:
     '''Calculate a volume for a node based on its edges.
 
@@ -28,19 +54,41 @@ def calculate_node_volume(node: Contour, edges: List[Tuple],
     Returns:
         float: The calculated volume for the node.
     '''
-    # Separate edges by direction
-    positive_edges = []
-    negative_edges = []
-    for edge in edges:
-        if edge[2]['match'].direction(node) > 0:
-            positive_edges.append(edge)
-        else:
-            negative_edges.append(edge)
+    def calculate_area_factor(contour: Contour, edges: List[ContourIndex],
+                              use_hull)->float:
+        '''Calculate the area factor for a contour based on its neighbors.
 
-    def calculate_area_factor(node: Contour, edges: List[Tuple],
-                              use_hull=False):
-        node_index = node.index
+        This factor is used to adjust the volume calculation based on the
+        average area of neighboring contours.  The area factor is calculated
+        as follows:
+            $\bar{A_i} = \frac{3}{4}A_N + \frac{1}{4}A_i$
+
+        where:
+            - node_area is the area of the contour,
+            - total_neighbour_area is the sum of the areas of all neighboring
+              contours.
+        This factor gives a 75% weight to the node area and a 25% weight to the
+        average area of the neighboring contours. If there are no neighbors,
+        the area factor is set to 1.0, meaning the average area is equal to the
+        node area, and the volume will be equal to the node area multiplied by
+        the thickness.
+
+        Args:
+            contour (Contour): The contour for which the area factor is calculated.
+            edges (List[Tuple]): A list of edges connected to the contour.
+            use_hull (bool): If True, use the convex hull area for calculations.
+                If False, use the actual area of the contour.
+        Returns:
+            float: The area factor for the contour.
+        '''
+        node_index = contour.index
         total_neighbour_area = 0.0
+        if not edges:
+            # If there are no neighbors, return a factor of 1.0
+            # This means average area is equal to the node area
+            # and the volume will be equal to the node area * thickness.
+            return 1.0
+        # Get the total area of the neighbouring contours.
         for edge in edges:
             contour_match = edge[2]['match']
             index1 = contour_match.contour1.index
@@ -56,17 +104,17 @@ def calculate_node_volume(node: Contour, edges: List[Tuple],
             else:
                 neighbour_area = neighbor_contour.polygon.area
             total_neighbour_area += neighbour_area
-        if total_neighbour_area == 0:
-            return 0.0
         if use_hull:
-            node_area = node.polygon.convex_hull.area
+            node_area = contour.polygon.convex_hull.area
         else:
-            node_area = node.polygon.area
-
+            node_area = contour.polygon.area
+        if total_neighbour_area == 0:
+            raise ValueError("Total neighbour area is zero, "
+                             "cannot calculate area factor.")
         area_factor = (3 * node_area / total_neighbour_area + 1) / 4
         return area_factor
 
-    def calculate_volume(node: Contour, edges: List[Tuple],
+    def calculate_volume(contour: Contour, edges: List[Tuple],
                          use_hull=False):
         if not edges:
             return 0.0
@@ -91,8 +139,12 @@ def calculate_node_volume(node: Contour, edges: List[Tuple],
             pseudo_volume += (area_factor * neighbour_area * thickness)
         return pseudo_volume
 
-    node_volume = (calculate_volume(node, positive_edges, use_hull) +
-                   calculate_volume(node, negative_edges, use_hull))
+    edges = list(contour_graph.edges(node, data=True))
+    contour = contour_graph.nodes(data=True)[node]['contour']
+    positive_edges, negative_edges = separate_edges_by_direction(node, edges)
+
+    node_volume = (calculate_volume(contour, positive_edges, volume_type) +
+                   calculate_volume(contour, negative_edges, volume_type))
     return node_volume
 
 

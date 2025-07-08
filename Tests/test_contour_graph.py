@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import pytest
 
-from contours import ContourPoints, build_contour_table
+from contours import ContourPoints, build_contour_table, Contour
 from debug_tools import box_points, circle_points
 
 from contour_graph import *
@@ -718,3 +718,39 @@ class TestBuildContourGraph():
         assert degrees[1] == 5
         assert degrees[2] == 6
         assert degrees[3] == 1
+
+class TestSetThickness():
+    '''Test the set_thickness function.
+
+    Test that the set_thickness function assigns the correct thickness to
+    contour nodes based on their neighbors.
+    '''
+    def test_set_thickness_basic(self):
+        '''Test set_thickness assigns correct thickness for nodes with and without
+        neighbours.'''
+        # Create a simple graph with 3 nodes: A-B-C (A and C are endpoints)
+        contour_graph = nx.Graph()
+        a = Contour(1, 0.0, shapely.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), [])
+        b = Contour(1, 1.0, shapely.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), [])
+        c = Contour(1, 3.0, shapely.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), [])
+        contour_graph.add_node(a.index, contour=a)
+        contour_graph.add_node(b.index, contour=b)
+        contour_graph.add_node(c.index, contour=c)
+        contour_graph.add_edge(a.index, b.index)
+        contour_graph.add_edge(b.index, c.index)
+        set_thickness(contour_graph)
+        # A: neighbour at 1.0, thickness = 2*abs(0-1) = 2
+        assert a.thickness == 2
+        # B: neighbours at 0.0, 3.0, thickness = 2*((1+2)/2) = 3
+        assert b.thickness == 3
+        # C: neighbour at 1.0, thickness = 2*abs(3-1) = 4
+        assert c.thickness == 4
+
+    def test_set_thickness_no_neighbours(self):
+        '''Test set_thickness uses default_thickness if no neighbours.'''
+        contour_graph = nx.Graph()
+        a = Contour(1, 0.0, shapely.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), [])
+        Contour.default_thickness = 0.5
+        contour_graph.add_node(a.index, contour=a)
+        set_thickness(contour_graph)
+        assert a.thickness == 0.5

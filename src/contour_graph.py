@@ -605,6 +605,37 @@ def set_hole_type(contour_graph: ContourGraph,
     return contour_graph
 
 
+def set_thickness(contour_graph: ContourGraph) -> ContourGraph:
+    '''Assign thickness to each contour in the contour graph.
+
+    The thickness for each contour is set to twice the average absolute distance
+    between its slice_index and the slice_index of its neighboring nodes. If a
+    node does not have any neighbours, use the Contour.default_thickness value.
+
+    Args:
+        contour_graph (ContourGraph): The graph representation of the contours.
+
+    Returns:
+        ContourGraph: The updated contour graph with thickness set for each contour.
+    '''
+    for node, data in contour_graph.nodes(data=True):
+        contour = data['contour']
+        # get the slice index of the contour
+        this_slice = contour.slice_index
+        # Get the slice indexes of the neighbouring slices.
+        neighbour_slices = [contour_graph.nodes[n]['contour'].slice_index
+                            for n in contour_graph.adj[node]]
+        if neighbour_slices:
+            total_dist = sum(abs(this_slice - n_slice)
+                             for n_slice in neighbour_slices)
+            avg_dist = total_dist / len(neighbour_slices)
+            thickness = 2 * avg_dist
+        else:
+            thickness = getattr(Contour, 'default_thickness', 0)
+        contour.thickness = thickness
+    return contour_graph
+
+
 def build_contour_graph(contour_table: pd.DataFrame,
                         slice_sequence: SliceSequence,
                         roi: ROI_Type) -> Tuple[ContourGraph, SliceSequence]:
@@ -659,4 +690,7 @@ def build_contour_graph(contour_table: pd.DataFrame,
     contour_graph = set_enclosed_regions(contour_graph)
     # Set the hole type for the regions
     contour_graph = set_hole_type(contour_graph, slice_sequence)
+    # Set the thickness for the contours
+    contour_graph = set_thickness(contour_graph)
+    return contour_graph, slice_sequence
     return contour_graph, slice_sequence
