@@ -75,7 +75,7 @@ def calculate_node_volume(node: Contour, edges: List[Tuple],
         pseudo_volume = 0.0
         for edge in edges:
             contour_match = edge[2]['match']
-            thickness = edge[2]['match'].thickness
+            thickness = contour_match.gap / 2
             index1 = contour_match.contour1.index
             index2 = contour_match.contour2.index
             if index2 == node_index:
@@ -244,6 +244,7 @@ class StructureShape():
                     'Label_prv', 'Label_nxt']
         nbr_pairs = []
         for interpolated_slice in interpolated_slice_indexes:
+            # FIXME need to check for empty slice_sequence
             nbr = slice_sequence.get_neighbors(interpolated_slice)
 
             is_previous = self.contour_lookup.SliceIndex == nbr.previous_slice

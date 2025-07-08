@@ -371,6 +371,13 @@ class RegionSlice():
         '''
         return not self.is_empty
 
+# TODO Add method to calculate the area and volume of the slice.
+# 1. For each region in the slice, find the matching neighbouring regions in
+# each direction.
+# 2. Calculate the average area of the region and its neighbours.
+# 3. Calculate the volume of the region by multiplying the average area by the
+# height of the region.
+# 4. sum the volumes of all regions in the slice to get the total volume.
 
 # %% Slice related functions
 def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:

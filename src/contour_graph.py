@@ -43,6 +43,9 @@ def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
                 - RegionIndex, and
                 - Label.
     '''
+    if len(contour_graph) == 0:
+        # If the contour graph is empty, return an empty DataFrame
+        return pd.DataFrame()
     lookup_list = []
     for _, data in contour_graph.nodes(data=True):
         contour = data['contour']
