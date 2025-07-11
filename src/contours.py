@@ -702,15 +702,33 @@ class ContourMatch:
         contour1 (Contour): The first contour.
         contour2 (Contour): The second contour.
         gap (float): Half the difference between the two slice indices.
-        combined_area (float): The sum of the areas of the two contours.
-        direction (int): 1 if the difference between the slice_index of the
-            first and second contours is positive, -1 otherwise.
+
+    Methods:
+        volume: Calculate the approximate volume between the two contours.
+        direction: Get the direction of the contour match.
+
     '''
-    # TODO Add a method to calculate the volume between the two contours.
     def __init__(self, contour1: Contour, contour2: Contour) -> None:
         self.contour1 = contour1
         self.contour2 = contour2
         self.gap = abs(contour1.slice_index - contour2.slice_index)
+
+    def volume(self, use_hull=False) -> float:
+        '''Calculate the approximate volume between the two contours.
+
+        The volume is calculated as the average area of the two contours
+        multiplied by the gap between the two contours.
+
+        Returns:
+            float: The approximate volume between the two contours.
+        '''
+        if use_hull:
+            # Use the convex hull of the contours to calculate the volume.
+            avg_area = (self.contour1.hull.area + self.contour2.hull.area) / 2
+        else:
+            # Use the area of the contours to calculate the volume.
+            avg_area = (self.contour1.area + self.contour2.area) / 2
+        return avg_area * self.gap
 
     def direction(self, node: Contour) -> int:
         '''Get the direction of the contour match.
@@ -731,6 +749,7 @@ class ContourMatch:
             return direction
         else:
             raise ValueError('Node is not part of the match.')
+
 
 
 # %% Contour Table Construction

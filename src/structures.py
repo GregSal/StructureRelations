@@ -13,94 +13,6 @@ from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
 
 
-def get_directional_edges(contour_graph: ContourGraph,
-                          node: ContourIndex)->Dict[str, List[ContourLink]]:
-    '''Return edges separated into positive and negative direction with respect
-    to the node.
-
-    This function separates the edges of a contour node into positive and
-    negative direction based on the direction of the contour match. The
-    direction is determined by the ContourMatch.direction method, which returns
-    a positive value for edges in the positive direction and a negative value
-    for edges in the negative direction.  A dictionary is returned with two
-    keys: 'Positive' and 'Negative', each containing a list of edges in the
-    respective direction.
-
-    Args:
-        node (ContourIndex): The index of the contour node for which the
-            edges are separated.
-
-    Returns:
-        dict: A dictionary with two keys:
-            - 'Positive': A list of edges in the positive direction.
-    '''
-    edges = list(contour_graph.edges(node, data=True))
-    positive_edges = []
-    negative_edges = []
-    for edge in edges:
-        if edge[2]['match'].direction(node) > 0:
-            positive_edges.append(edge[0:1])
-        else:
-            negative_edges.append(edge[0:1])
-    directional_edges = {'Positive': positive_edges,
-                         'Negative': negative_edges}
-    return directional_edges
-
-
-def separate_edges_by_direction(
-        node: ContourIndex,
-        edges: List[ContourIndex]
-        ) -> Tuple[List[ContourIndex], List[ContourIndex]]:
-    '''Separate edges into positive and negative direction with respect to the node.
-
-    Args:
-        node (ContourIndex): The index of the contour node for which the
-            edges are separated.
-        edges (List[ContourIndex]): A list of edges connected to the node.
-
-    Returns:
-        Tuple[List[ContourIndex], List[ContourIndex]]: Two lists of edges,
-            positive and negative.
-    '''
-    positive_edges = []
-    negative_edges = []
-    for edge in edges:
-        if edge[2]['match'].direction(node) > 0:
-            positive_edges.append(edge)
-        else:
-            negative_edges.append(edge)
-    return positive_edges, negative_edges
-
-
-def calculate_node_volume(contour_graph: ContourGraph,
-                          node: ContourIndex,
-                          use_hull=False) -> float:
-    '''Calculate a volume for a node based on its edges.
-
-    Args:
-        node (Contour): The contour node for which the volume is calculated.
-        edges (List[Tuple]): A list of edges connected to the node. Each edge
-            contains the edge data with a 'match' attribute of type
-            ContourMatch.
-        use_hull (bool): If True, use the convex hull area for calculations.
-            If False, use the actual area of the contour.
-
-    Returns:
-        float: The calculated volume for the node.
-    '''
-    # FIXME volume is calculated by summing the ContourMatch volumes.
-
-
-    contour = contour_graph.nodes(data=True)[node]['contour']
-    positive_edges, negative_edges = get_directional_edges(contour_graph, node)
-
-    node_volume = (calculate_volume(contour, positive_edges, use_hull) +
-                   calculate_volume(contour, negative_edges, use_hull))
-    return node_volume
-
-
-
-
 class StructureShape():
     '''Class containing the data for the shape of a structure.
 
@@ -168,13 +80,16 @@ class StructureShape():
             float: The total physical volume of the ContourGraph.
         '''
         total_volume = 0.0
-        for node, data in self.contour_graph.nodes(data=True):
-            contour = data['contour']
-            edges = list(self.contour_graph.edges(node, data=True))
-            node_volume = calculate_node_volume(contour, edges)
-            if contour.is_hole:
-                node_volume = -node_volume
-            total_volume += node_volume
+        # Iterate over all edges in the contour graph
+        for _, _, data in self.contour_graph.edges(data=True):
+            match = data['match']
+            contour1 = match.contour1
+            volume = match.volume()
+            # If contour1 is a hole, subtract the volume; otherwise, add it
+            if contour1.is_hole:
+                total_volume -= volume
+            else:
+                total_volume += volume
         self.physical_volume = total_volume
 
     def calculate_exterior_volume(self):
@@ -187,16 +102,20 @@ class StructureShape():
             float: The total exterior volume of the ContourGraph.
         '''
         total_volume = 0.0
-        for node, data in self.contour_graph.nodes(data=True):
-            contour = data['contour']
-            edges = list(self.contour_graph.edges(node, data=True))
-            node_volume = calculate_node_volume(contour, edges)
-            if contour.is_hole:
-                if contour.hole_type == 'Open':
-                    node_volume = -node_volume
-                elif contour.hole_type == 'Closed':
-                    node_volume = 0.0
-            total_volume += node_volume
+        for _, _, data in self.contour_graph.edges(data=True):
+            match = data['match']
+            contour1 = match.contour1
+            volume = match.volume()
+            if contour1.is_hole:
+                if contour1.hole_type == 'Open':
+                    total_volume -= volume
+                elif contour1.hole_type == 'Closed':
+                    volume = 0.0
+                    # Do not add/subtract closed hole volume
+                else:
+                    total_volume -= volume
+            else:
+                total_volume += volume
         self.exterior_volume = total_volume
 
 
@@ -213,12 +132,13 @@ class StructureShape():
             float: The total hull volume of the EnclosedRegionTable.
         '''
         total_volume = 0.0
-        for node, data in self.contour_graph.nodes(data=True):
-            contour = data['contour']
-            if not contour.is_hole:
-                edges = list(self.contour_graph.edges(node, data=True))
-                node_volume = calculate_node_volume(contour, edges, use_hull=True)
-                total_volume += node_volume
+        for _, _, data in self.contour_graph.edges(data=True):
+            match = data['match']
+            contour1 = match.contour1
+            volume = match.volume(use_hull=True)
+            if contour1.is_hole:
+                volume = 0.0
+            total_volume += volume
         self.hull_volume = total_volume
 
     def get_contour(self, label: ContourIndex) -> Contour:
@@ -295,4 +215,9 @@ class StructureShape():
             contour_match = ContourMatch(contour_nxt, interpolated_contour)
             self.contour_graph.add_edge(contour_nxt.index, interpolated_label,
                                         match=contour_match)
+            self.contour_lookup = build_contour_lookup(self.contour_graph)
+            self.contour_lookup = build_contour_lookup(self.contour_graph)
+            self.contour_graph.add_edge(contour_nxt.index, interpolated_label,
+                                        match=contour_match)
+            self.contour_lookup = build_contour_lookup(self.contour_graph)
             self.contour_lookup = build_contour_lookup(self.contour_graph)
