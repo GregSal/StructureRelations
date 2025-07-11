@@ -24,10 +24,12 @@ class SliceNeighbours:
         this_slice (SliceIndexType): The current slice index.
         previous_slice (SliceIndexType): The previous slice index.
         next_slice (SliceIndexType): The next slice index.
+        number_of_neighbours (int): The number of neighbours.
+        neighbour_list (List[SliceIndexType]): A list of neighbouring slice indices.
 
         force_types: Method to ensure the slice indices are of the correct type.
         is_neighbour: Method to check if another slice index is a neighbour.
-        gaps: Method to calculate the gaps between slices.
+        nearest: Method to return the nearest neighbouring slice index to a given slice.
     '''
 
     this_slice: SliceIndexType
@@ -59,34 +61,7 @@ class SliceNeighbours:
         return sum(1 for slice_index in [self.previous_slice, self.next_slice]
                    if (slice_index is not None) & (slice_index == slice_index))
 
-    def gap(self, absolute=True) -> Union[int, float]:
-        '''Calculate the gaps between slices.
-
-        If one of the two neighbours is None, then calculate the gap based on
-        the distance between the current slice and the other slice. if absolute
-        is True, return the absolute value of the gap. If both neighbours are
-        None, return nan.
-
-        Returns:
-            Union[int, float]: The gap between slices.
-        '''
-        # If both neighbours are None, return nan
-        if pd.isna(self.previous_slice) and pd.isna(self.next_slice):
-            return np.nan
-        # If one of the neighbours is None, calculate the gap based on the
-        # distance between the current slice and the other slice.
-        if pd.isna(self.previous_slice):
-            gap = self.next_slice - self.this_slice
-        elif pd.isna(self.next_slice):
-            gap = self.previous_slice - self.this_slice
-        else:
-            # Calculate the gap between the previous and next slice
-            # and divide by 2 to get the average gap.
-            gap = (self.next_slice - self.previous_slice) / 2
-        if absolute:
-            return abs(gap)
-        return gap
-
+    @property
     def neighbour_list(self) -> List[SliceIndexType]:
         '''Return a list of neighbours, excluding the current slice and
         None values.'''
@@ -731,7 +706,7 @@ class ContourMatch:
         direction (int): 1 if the difference between the slice_index of the
             first and second contours is positive, -1 otherwise.
     '''
-
+    # TODO Add a method to calculate the volume between the two contours.
     def __init__(self, contour1: Contour, contour2: Contour) -> None:
         self.contour1 = contour1
         self.contour2 = contour2

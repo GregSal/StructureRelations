@@ -37,6 +37,10 @@ ContourPointsType = NewType('ContourPointsType', List[tuple[float]])
 #   - An indexer value to force unique nodes.
 ContourIndex = NewType('ContourIndex', Tuple[ROI_Type, SliceIndexType, int])
 
+# A link between two contours.
+# The link is a tuple of two ContourIndexes.
+ContourLink = NewType('ContourLink', Tuple[ContourIndex, ContourIndex])
+
 # The index of a a unique contiguous 3D region.
 RegionIndex = NewType('RegionIndex', str)
 
