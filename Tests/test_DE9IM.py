@@ -1,8 +1,6 @@
 import pytest
 import shapely
 
-from region_slice import RegionSlice
-
 from relations import DE9IM
 from debug_tools import box_points, circle_points
 
