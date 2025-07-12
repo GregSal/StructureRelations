@@ -793,26 +793,46 @@ class DE27IM():
                     f'Structure_b input was: {str(type(structure_b))}'
                     ]))
         else:
-            # If contour_a and contour_b are shapely Polygons or Contour
-            # objects, then get the 9 bit DE9IM relationship and pad the other
-            # 18 bits with 0s.
-            if isinstance(structure_a, (shapely.Polygon, shapely.MultiPolygon)):
+            # If contour_a and contour_b are Contour objects, shapely Polygons
+            # or MultiPolygons then get the 9 bit DE9IM relationships for the
+            # contour, external and hull.
+            # Note: If contour_a is a Contour object, the external will
+            # match the contour relation, because a Contour polygon does not
+            # contain holes.
+            if isinstance(structure_a, Contour):
+                poly_a = structure_a.polygon
+                outline = shapely.get_exterior_ring(poly_a)
+                external_polygon = shapely.Polygon(outline)
+                hull_polygon = structure_a.hull
+            elif isinstance(structure_a, (shapely.Polygon,
+                                          shapely.MultiPolygon)):
                 poly_a = structure_a
+                outline = shapely.get_exterior_ring(poly_a)
+                external_polygon = shapely.Polygon(outline)
+                hull_polygon = poly_a.convex_hull
             else:
-                poly_a = getattr(structure_a, 'polygon', None)
-            if isinstance(structure_b, (shapely.Polygon, shapely.MultiPolygon)):
+                raise ValueError(''.join([
+                    'Structure_a and structure_b must both be RegionSlice, ',
+                    'Contour, shapely Polygon, or shapely MultiPolygon objects. ',
+                    f'Structure_a input was: {str(type(structure_a))}\t',
+                    f'Structure_b input was: {str(type(structure_b))}'
+                    ]))
+            if isinstance(structure_b, Contour):
+                poly_b = structure_b.polygon
+            elif isinstance(structure_b, (shapely.Polygon,
+                                            shapely.MultiPolygon)):
                 poly_b = structure_b
             else:
-                poly_b = getattr(structure_b, 'polygon', None)
-            if (poly_a is None) or (poly_b is None):
                 raise ValueError(''.join([
-                    'Both structure_a and structure_b must both be RegionSlice, ',
+                    'Structure_a and structure_b must both be RegionSlice, ',
                     'Contour, shapely Polygon, or shapely MultiPolygon objects. ',
                     f'Structure_a input was: {str(type(structure_a))}\t',
                     f'Structure_b input was: {str(type(structure_b))}'
                     ]))
             contour = DE9IM(poly_a, poly_b)
-            relation_group = (contour, self.padding, self.padding)
+            external = DE9IM(external_polygon, poly_b)
+            convex_hull = DE9IM(hull_polygon, poly_b)
+            relation_group = (contour, external, convex_hull)
             # If adjustments are supplied, apply them to the relationship.
             relation_str = self.combine_groups(relation_group, adjustments)
             # Merge the relationship into the DE27IM object.
