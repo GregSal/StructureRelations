@@ -34,7 +34,7 @@ class TestContains:
         circle3 = shapely.Polygon(circle_points(1.5))
         circle2 = shapely.Polygon(circle_points(1))
         a = (circle6 - circle2)
-        b = (circle5, circle3)
+        b = (circle5 - circle3)
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.CONTAINS
 
@@ -101,9 +101,7 @@ class TestShelters:
         shell = shapely.difference(circle6, circle5)
         cove = shapely.difference(shell, circle4_offset)
         circle2 = shapely.Polygon(circle_points(1, offset_x=1))
-        a = RegionSlice([cove])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(cove, circle2).identify_relation()
         assert relation_type == RelationshipType.SHELTERS
 
     def test_shelters_circle(self):
@@ -111,36 +109,28 @@ class TestShelters:
         circle3 = shapely.Polygon(circle_points(1.5, offset_x=1.6))
         crescent = shapely.difference(circle6, circle3)
         circle2 = shapely.Polygon(circle_points(1, offset_x=1.5))
-        a = RegionSlice([crescent])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(crescent, circle2).identify_relation()
         assert relation_type == RelationshipType.SHELTERS
 
 class TestDisjoint:
     def test_disjoint(self):
         circle4_left = shapely.Polygon(circle_points(4, offset_x=-4.5))
         circle4_right = shapely.Polygon(circle_points(4, offset_x=4.5))
-        a = RegionSlice([circle4_left])
-        b = RegionSlice([circle4_right])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle4_left, circle4_right).identify_relation()
         assert relation_type == RelationshipType.DISJOINT
 
 class TestBorders:
     def test_borders_simple(self):
         box4_left = shapely.Polygon(box_points(4, offset_x=-2))
         box4_right = shapely.Polygon(box_points(4, offset_x=2))
-        a = RegionSlice([box4_left])
-        b = RegionSlice([box4_right])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box4_left, box4_right).identify_relation()
         assert relation_type == RelationshipType.BORDERS
 
     def test_borders_insert(self):
         box6 = shapely.Polygon(box_points(6))
         box5_up = shapely.Polygon(box_points(5, offset_y=3))
         box6_cropped = shapely.difference(box6, box5_up)
-        a = RegionSlice([box6_cropped])
-        b = RegionSlice([box5_up])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box6_cropped, box5_up).identify_relation()
         assert relation_type == RelationshipType.BORDERS
 
 class TestConfines:
@@ -148,64 +138,56 @@ class TestConfines:
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         box4_offset = shapely.Polygon(box_points(4, offset_x=2))
+        ring = shapely.difference(circle6, circle4)
         cropped_circle = shapely.difference(circle4, box4_offset)
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([cropped_circle])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(ring, cropped_circle).identify_relation()
         assert relation_type == RelationshipType.CONFINES
 
     def test_confines_ring(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle2 = shapely.Polygon(circle_points(1))
+        a = (circle6 - circle4).union(circle2)
+        b = circle4 - circle2
         # b has internal borders with the ring portion of a, but has an external
         # border with the island part of a. The internal borders relation wins.
-        a = RegionSlice([circle6, circle4, circle2])
-        b = RegionSlice([circle4, circle2])
         relation_type = DE27IM(a, b).identify_relation()
         assert relation_type == RelationshipType.CONFINES
 
     def test_confines_embedded_box(self):
         box6 = shapely.Polygon(box_points(6))
         box4 = shapely.Polygon(box_points(4))
-        a = RegionSlice([box6, box4])
-        b = RegionSlice([box4])
-        relation_type = DE27IM(a, b).identify_relation()
+        box_with_hole = box6.difference(box4)
+        relation_type = DE27IM(box_with_hole, box4).identify_relation()
         assert relation_type == RelationshipType.CONFINES
 
     def test_confines_corner_box(self):
         box6 = shapely.Polygon(box_points(6))
         box4 = shapely.Polygon(box_points(4))
         box2_offset = shapely.Polygon(box_points(2, offset_x=-1, offset_y=-1))
-        a = RegionSlice([box6, box4])
-        b = RegionSlice([box2_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        box_with_hole = box6.difference(box4)
+        relation_type = DE27IM(box_with_hole, box2_offset).identify_relation()
         assert relation_type == RelationshipType.CONFINES
 
 class TestPartition:
     def test_partition_simple(self):
         box4 = shapely.Polygon(box_points(4))
         box4_cropped = shapely.Polygon(box_points(2, 4, offset_x=-1))
-        a = RegionSlice([box4])
-        b = RegionSlice([box4_cropped])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box4, box4_cropped).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
     def test_partition_side_box(self):
         box6 = poly_round(shapely.Polygon(box_points(6)))
         box4_offset = shapely.Polygon(box_points(4, offset_x=-1))
-        a = RegionSlice([box6])
-        b = RegionSlice([box4_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box6, box4_offset).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
     def test_partition_island(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle4, circle2])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = (circle6 - circle4).union(circle2)
+        relation_type = DE27IM(a, circle2).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
     def test_partition_partial_ring(self):
@@ -215,9 +197,7 @@ class TestPartition:
         box6_offset = shapely.Polygon(box_points(6, offset_x=2))
         ring = shapely.difference(circle6, circle4)
         cropped_ring = poly_round(shapely.difference(ring, box6_offset))
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([cropped_ring])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(ring, cropped_ring).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
     @pytest.mark.xfail
@@ -228,113 +208,95 @@ class TestPartition:
         circle4_offset = shapely.Polygon(circle_points(2, offset_x=2))
         cropped_circle = poly_round(shapely.intersection(circle6,
                                                          circle4_offset))
-        a = RegionSlice([circle6])
-        b = RegionSlice([cropped_circle])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6, cropped_circle).identify_relation()
         assert relation_type == RelationshipType.PARTITION
 
 class TestOverlaps:
     def test_overlaps_box(self):
         box4 = shapely.Polygon(box_points(4))
         box4_offset = shapely.Polygon(box_points(4, offset_x=2))
-        a = RegionSlice([box4])
-        b = RegionSlice([box4_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box4, box4_offset).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_box_circle(self):
         circle6 = shapely.Polygon(circle_points(3))
         box6_offset = shapely.Polygon(box_points(6, offset_x=3))
-        a = RegionSlice([circle6])
-        b = RegionSlice([box6_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6, box6_offset).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_circles(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle6_offset = shapely.Polygon(circle_points(3, offset_x=2))
-        a = RegionSlice([circle6])
-        b = RegionSlice([circle6_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle6, circle6_offset).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_ring_box(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         box6_offset = shapely.Polygon(box_points(6, offset_x=3))
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([box6_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        ring = shapely.difference(circle6, circle4)
+        relation_type = DE27IM(ring, box6_offset).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_ring_circle(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle6_offset = shapely.Polygon(circle_points(3, offset_x=2.5))
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([circle6_offset])
-        relation_type = DE27IM(a, b).identify_relation()
+        ring = shapely.difference(circle6, circle4)
+        relation_type = DE27IM(ring, circle6_offset).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_surrounded(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle2 = shapely.Polygon(circle_points(1.5, offset_x=1))
-        a = RegionSlice([circle6, circle4])
-        b = RegionSlice([circle2])
-        relation_type = DE27IM(a, b).identify_relation()
+        ring = shapely.difference(circle6, circle4)
+        relation_type = DE27IM(ring, circle2).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_surrounded_box(self):
         box6 = shapely.Polygon(box_points(6))
         box4 = shapely.Polygon(box_points(4))
         box3 = shapely.Polygon(box_points(3, offset_x=1))
-        a = RegionSlice([box6, box4])
-        b = RegionSlice([box3])
-        relation_type = DE27IM(a, b).identify_relation()
+        box_with_hole = box6.difference(box4)
+        relation_type = DE27IM(box_with_hole, box3).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_ring_surrounded(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle3 = shapely.Polygon(circle_points(1.5))
         circle4 = shapely.Polygon(circle_points(2))
-        a = RegionSlice([circle6, circle3])
-        b = RegionSlice([circle4])
-        relation_type = DE27IM(a, b).identify_relation()
+        ring = shapely.difference(circle6, circle3)
+        relation_type = DE27IM(ring, circle4).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlaps_circle_island(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle4, circle2])
-        b = RegionSlice([circle4])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = (circle6 - circle4).union(circle2)
+        relation_type = DE27IM(a, circle4).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
 
-    def overlaps_concentric_rings(self):
+    def test_overlaps_concentric_rings(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle4 = shapely.Polygon(circle_points(2))
         circle3 = shapely.Polygon(circle_points(1.5))
         circle2 = shapely.Polygon(circle_points(1))
-        a = RegionSlice([circle6, circle3, circle2])
-        b = RegionSlice([circle4])
-        relation_type = DE27IM(a, b).identify_relation()
+        a = (circle6 - circle3).union(circle2)
+        relation_type = DE27IM(a, circle4).identify_relation()
         assert relation_type == RelationshipType.OVERLAPS
+
 
 class TestEquals:
     def test_equals_box(self):
         box6 = shapely.Polygon(box_points(6))
-        a = RegionSlice([box6])
-        b = RegionSlice([box6])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(box6, box6).identify_relation()
         assert relation_type == RelationshipType.EQUALS
 
     def test_equals_circle(self):
         circle6 = shapely.Polygon(circle_points(3))
         circle5 = shapely.Polygon(circle_points(2.5))
         cropped_circle = shapely.intersection(circle6, circle5)
-        a = RegionSlice([circle5])
-        b = RegionSlice([cropped_circle])
-        relation_type = DE27IM(a, b).identify_relation()
+        relation_type = DE27IM(circle5, cropped_circle).identify_relation()
         assert relation_type == RelationshipType.EQUALS

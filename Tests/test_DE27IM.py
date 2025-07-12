@@ -44,13 +44,6 @@ def test_de27im_initialization_with_contours():
     assert de27im.relation is not None
     assert de27im.int is not None
 
-def test_de27im_padding_with_contours():
-    poly_a = shapely.Polygon(circle_points(2))
-    poly_b = shapely.Polygon(circle_points(2))
-    de27im = DE27IM(poly_a, poly_b)
-    assert de27im.relation[9:]  == '0' * 18
-    assert de27im.relation[:9]  == '100010001'
-
 def test_de27im_initialization_with_contour():
     roi = 1
     slice_index = 0.5

@@ -19,6 +19,7 @@ from types_and_classes import ContourGraph, ContourIndex
 from contours import Contour, SliceNeighbours, calculate_new_slice_index
 from contours import interpolate_polygon
 from region_slice import RegionSlice, empty_structure
+from utilities import make_multi
 
 # An object that can be used for obtaining DE9IM relationships.
 # Either a polygon or and object that contains a polygon attribute.
@@ -800,15 +801,20 @@ class DE27IM():
             # match the contour relation, because a Contour polygon does not
             # contain holes.
             if isinstance(structure_a, Contour):
-                poly_a = structure_a.polygon
-                outline = shapely.get_exterior_ring(poly_a)
-                external_polygon = shapely.Polygon(outline)
+                poly_a = make_multi(structure_a.polygon)
+                # Create a solid Polygon from poly_a
+                solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                          for poly in poly_a.geoms]
+                external_polygon = shapely.unary_union(solids)
                 hull_polygon = structure_a.hull
             elif isinstance(structure_a, (shapely.Polygon,
                                           shapely.MultiPolygon)):
-                poly_a = structure_a
-                outline = shapely.get_exterior_ring(poly_a)
-                external_polygon = shapely.Polygon(outline)
+                poly_a = make_multi(structure_a)
+                # Create a solid Polygon from poly_a
+                # Create a solid Polygon from poly_a
+                solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                          for poly in poly_a.geoms]
+                external_polygon = shapely.unary_union(solids)
                 hull_polygon = poly_a.convex_hull
             else:
                 raise ValueError(''.join([
