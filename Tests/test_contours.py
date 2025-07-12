@@ -69,7 +69,28 @@ class TestSliceNeighbours():
         '''Test that the neighbour_list method returns the correct list of
         neighbours.'''
         sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
-        assert sn.neighbour_list() == [4.0, 6.0]
+        assert sn.neighbour_list == [4.0, 6.0]
+
+    def test_nearest(self):
+        '''Test that the nearest method returns the correct neighbour.'''
+        sn = SliceNeighbours(this_slice=5.0, previous_slice=4.0, next_slice=6.0)
+        # Nearest to 4.1 should be 4.0
+        assert sn.nearest(4.1) == 4.0
+        # Nearest to 5.9 should be 6.0
+        assert sn.nearest(5.9) == 6.0
+        # Nearest to 5.0 should be 4.0 (since neighbour_list does not include this_slice)
+        assert sn.nearest(5.0) == 4.0 or sn.nearest(5.0) == 6.0
+
+        # Test with only one neighbour
+        sn2 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=7.0)
+        assert sn2.nearest(6.0) == 7.0
+
+        sn3 = SliceNeighbours(this_slice=5.0, previous_slice=3.0, next_slice=None)
+        assert sn3.nearest(4.0) == 3.0
+
+        # Test with no neighbours
+        sn4 = SliceNeighbours(this_slice=5.0, previous_slice=None, next_slice=None)
+        assert sn4.nearest(5.0) is None
 
 
 class TestSliceSequence():

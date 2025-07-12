@@ -181,7 +181,7 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     # Determine the slice index that is not matched to the boundary contour.
     # (This is the slice index that will be used to set the interpolated
     # slice index.)
-    neighbour_slices = set(neighbors.neighbour_list())
+    neighbour_slices = set(neighbors.neighbour_list)
     non_neighbour_slices = neighbour_slices - matched_slices
     if non_neighbour_slices:
         non_neighbour_slice = non_neighbour_slices.pop()
@@ -553,7 +553,7 @@ def set_hole_type(contour_graph: ContourGraph,
         neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
         # 4.1.3. Use slice_sequence to get the neighbouring slice indexes and
         #        select the one that is not a neighbour of the boundary contour.
-        neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list()
+        neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list
         # The slice that is not a neighbour of the boundary contour is the
         # slice beyond the boundary contour.
         non_neighbour_slice = [nbr for nbr in neighbors
