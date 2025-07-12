@@ -28,8 +28,10 @@ class SliceNeighbours:
         neighbour_list (List[SliceIndexType]): A list of neighbouring slice indices.
 
         force_types: Method to ensure the slice indices are of the correct type.
+        gap: Method to calculate the gaps between slices.
         is_neighbour: Method to check if another slice index is a neighbour.
-        nearest: Method to return the nearest neighbouring slice index to a given slice.
+        nearest: Method to return the nearest neighbouring slice index to a
+        given slice.
     '''
 
     this_slice: SliceIndexType
@@ -70,10 +72,39 @@ class SliceNeighbours:
                            if (slice_index is not None) & (slice_index == slice_index)]
         return valid_neighbours
 
+
+    def gap(self, absolute=True) -> Union[int, float]:
+        '''Calculate the gaps between slices.
+
+        If one of the two neighbours is None, then calculate the gap based on
+        the distance between the current slice and the other slice. if absolute
+        is True, return the absolute value of the gap. If both neighbours are
+        None, return nan.
+
+        Returns:
+            Union[int, float]: The gap between slices.
+        '''
+        # If both neighbours are None, return nan
+        if pd.isna(self.previous_slice) and pd.isna(self.next_slice):
+            return np.nan
+        # If one of the neighbours is None, calculate the gap based on the
+        # distance between the current slice and the other slice.
+        if pd.isna(self.previous_slice):
+            gap = self.next_slice - self.this_slice
+        elif pd.isna(self.next_slice):
+            gap = self.previous_slice - self.this_slice
+        else:
+            # Calculate the gap between the previous and next slice
+            # and divide by 2 to get the average gap.
+            gap = (self.next_slice - self.previous_slice) / 2
+        if absolute:
+            return abs(gap)
+        return gap
+
     def is_neighbour(self, other_slice: SliceIndexType) -> bool:
         '''Check if another slice index is a neighbour.'''
         # Get valid neighbours and add the current slice to the list.
-        neighbourhood = self.neighbour_list()
+        neighbourhood = self.neighbour_list
         neighbourhood.append(self.this_slice)
         if neighbourhood:
             return (min(neighbourhood) <= other_slice <= max(neighbourhood))
@@ -82,11 +113,12 @@ class SliceNeighbours:
     def nearest(self, other_slice: SliceIndexType) -> SliceIndexType:
         '''Return the nearest neighbouring slice index to the given slice.'''
         # Get valid neighbours and add the current slice to the list.
-        neighbourhood = self.neighbour_list()
+        neighbourhood = self.neighbour_list
         if neighbourhood:
             distance = abs(np.array(neighbourhood) - other_slice)
             return neighbourhood[distance.argmin()]
         return None
+
 
 
 class SliceSequence:
@@ -557,8 +589,6 @@ class Contour:
             This is a read-only property.
       shape:
         polygon (shapely.Polygon): The polygon generated from the contour.
-        thickness (float): The thickness of the contour.  Defaults to
-            Contour.default_thickness (0.0).
 
       hole information:
         is_hole (bool): Whether the contour is a hole.
@@ -580,8 +610,6 @@ class Contour:
     # Class Variables
     # Incremented counter for contour index
     counter = 0
-    # Default thickness for contours
-    default_thickness = 0.0
 
     def __init__(self, roi: ROI_Type, slice_index: SliceIndexType,
                  polygon: shapely.Polygon,
@@ -595,10 +623,6 @@ class Contour:
         # Set the contour parameters
         self.contour_index = Contour.counter
         Contour.counter += 1
-        if 'thickness' in contour_parameters:
-            self.thickness = contour_parameters['thickness']
-        else:
-            self.thickness = Contour.default_thickness
         if 'is_boundary' in contour_parameters:
             self.is_boundary = contour_parameters['is_boundary']
         else:
