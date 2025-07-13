@@ -51,24 +51,29 @@ class StructureShape():
         self.exterior_volume = 0.0
         self.hull_volume = 0.0
 
-    def build_contour_graph(self, contour_table: pd.DataFrame,
-                            slice_sequence: SliceSequence) -> None:
+    def add_contour_graph(self, contour_table: pd.DataFrame,
+                          slice_sequence: SliceSequence) -> SliceSequence:
         '''Builds the contour graph and the contour lookup table.
 
         Args:
             contour_table (pd.DataFrame): The contour table.
             slice_sequence (SliceSequence): The slice sequence.
+
+        Returns:
+            SliceSequence: The updated slice sequence with the contour graph
         '''
         contour_graph, slice_sequence = build_contour_graph(contour_table,
                                                             slice_sequence,
                                                             self.roi)
         self.contour_graph = contour_graph
         self.contour_lookup = build_contour_lookup(contour_graph)
+        not_original = slice_sequence.sequence.Original == False
+        intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
+        self.generate_interpolated_contours(slice_sequence, intp_idx)
         self.calculate_physical_volume()
         self.calculate_exterior_volume()
         self.calculate_hull_volume()
         return slice_sequence
-
 
     def calculate_physical_volume(self):
         '''Calculate the physical volume of a ContourGraph.
@@ -118,7 +123,6 @@ class StructureShape():
                 total_volume += volume
         self.exterior_volume = total_volume
 
-
     def calculate_hull_volume(self):
         '''Calculate the hull volume of an EnclosedRegionTable.
 
@@ -166,8 +170,11 @@ class StructureShape():
         selected_columns = ['ThisSlice', 'SliceIndex_prv', 'SliceIndex_nxt',
                     'Label_prv', 'Label_nxt']
         nbr_pairs = []
+        # check for empty slice_sequence
+        if not slice_sequence:
+            return
         for interpolated_slice in interpolated_slice_indexes:
-            # FIXME need to check for empty slice_sequence
+
             nbr = slice_sequence.get_neighbors(interpolated_slice)
 
             is_previous = self.contour_lookup.SliceIndex == nbr.previous_slice
