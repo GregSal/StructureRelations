@@ -3,10 +3,11 @@ import pytest
 
 import shapely
 
-from structure_set import generate_region_graph, make_slice_table
+from contours import build_contour_table
 from relations import RelationshipType, find_relations
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
 from debug_tools import make_sphere, make_box, box_points
+from structures import StructureShape
 from utilities import poly_round
 
 
@@ -22,6 +23,14 @@ class TestContains:
         # combine the contours
         slice_data = sphere6 + sphere3 + body
         # convert contour slice data into a table of slices and structures
+        contour_table, slice_sequence = build_contour_table(slice_data)
+        outer_cylinder = StructureShape(roi=1, name='outer_cylinder')
+        inner_cylinder = StructureShape(roi=1, name='inner_cylinder')
+        slice_sequence = outer_cylinder.add_contour_graph(contour_table,
+                                                             slice_sequence)
+        slice_sequence = inner_cylinder.add_contour_graph(contour_table,
+                                                            slice_sequence)
+
         slice_table = make_slice_table(slice_data, ignore_errors=True)
         regions = generate_region_graph(slice_table)
         selected_roi = [1, 2]
