@@ -364,7 +364,7 @@ def add_graph_edges(contour_graph: ContourGraph,
         # match this contour to the contours on the next slice
         for neighbour in contour_lookup.loc[neighbour_idx, 'Label']:
             neighbour_contour = contour_graph.nodes(data=True)[neighbour]['contour']
-            if this_contour.polygon_with_holes.intersects(neighbour_contour.polygon_with_holes):
+            if this_contour.poly_h.intersects(neighbour_contour.poly_h):
                 contour_match = ContourMatch(this_contour, neighbour_contour)
                 contour_graph.add_edge(this_label, neighbour, match=contour_match)
     return contour_graph
