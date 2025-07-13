@@ -25,6 +25,8 @@ from contours import ContourPoints
 
 # %% Tuples to Strings
 def colour_text(roi_colour):
+    '''Format the ROI colour as a string.
+    '''
     colour_fmt = ''.join([
         f'({roi_colour[0]:0d}, ',
         f'{roi_colour[1]:0d}, ',
@@ -34,6 +36,8 @@ def colour_text(roi_colour):
 
 
 def com_text(com):
+    '''Format the centre of mass as a string.
+    '''
     com_fmt = ''.join([
         f'({com[0]:-5.2f}, ',
         f'{com[1]:-5.2f}, ',
@@ -43,6 +47,18 @@ def com_text(com):
 
 
 def to_str(relation_int: int, size=27)->str:
+    '''Convert an integer to a binary string of the specified size.
+    The integer must be less than 2**size. If the integer is larger than
+    2**size, a ValueError is raised.
+    Args:
+        relation_int (int): The integer to convert to a binary string.
+        size (int, optional): The number of bits in the binary string.
+            Defaults to 27.
+    Returns:
+        str: The binary string representation of the integer.
+    Raises:
+        ValueError: If the integer is larger than 2**size.
+    '''
     str_size = size + 2  # Accounts for '0b' prefix.
     bin_str = bin(relation_int)
     if len(bin_str) < str_size:
@@ -60,6 +76,16 @@ def to_str(relation_int: int, size=27)->str:
 
 # %% Debugging display functions
 def bin_format(bin_val: int, ignore_errors=False):
+    '''Format a binary value as a string with three 9-bit sections.
+
+    Args:
+        bin_val (int): The binary value to format.
+        ignore_errors (bool, optional): If True, ignore errors and return 'Error'
+            if the input is not an integer. Defaults to False.
+
+    Returns:
+        str: The formatted binary string.
+    '''
     if np.isnan(bin_val):
         return ''
     try:
@@ -81,6 +107,14 @@ def bin_format(bin_val: int, ignore_errors=False):
     return bin_fmt.format(**bin_dict)
 
 def bin2matrix(bin_val: int):
+    '''Convert a binary value to a 3x3 matrix string.
+
+    Args:
+        bin_val (int): The binary value to convert.
+
+    Returns:
+        str: A string representation of the binary value as a 3x3 matrix.
+    '''
     bin_str = to_str(bin_val)
     if len(bin_str) < 9:
         zero_pad = 9 - len(bin_str)
@@ -93,6 +127,8 @@ def bin2matrix(bin_val: int):
 
 
 def show_bounds(polygon):
+    '''Display the bounds of a polygon as a DataFrame.
+    '''
     a = polygon.bounds
     b = pd.DataFrame([[a[0], a[1]],[a[2], a[3]]],
              columns=['x', 'y'],
@@ -101,9 +137,29 @@ def show_bounds(polygon):
 
 
 def plot_ab(poly_a, poly_b):
+    '''Plot the difference between two polygons.
+
+    This function plots the difference between two polygons, showing the
+    parts that are only in poly_a, only in poly_b, and the intersection of
+    both.   The parts that are only in poly_a are plotted in blue, the parts
+    that are only in poly_b are plotted in green, and the intersection is
+    plotted in orange. The axes are set to equal aspect ratio and the
+    horizontal and vertical lines at 0 are shown as dashed gray lines.
+
+        If the polygons are MultiPolygons, they are plotted as a single polygon.
+    If the polygons are LineStrings, they are plotted as a single line.
+
+    Args:
+        poly_a (shapely.Polygon): The first polygon.
+        poly_b (shapely.Polygon): The second polygon.
+
+    Returns:
+        ax: The matplotlib axis with the plotted polygons.
+    '''
     def plot_geom(ax, geom, color='black'):
         if isinstance(geom, (shapely.Polygon, shapely.MultiPolygon)):
-            plot_polygon(geom, ax=ax, add_points=False, color=color, facecolor=color)
+            plot_polygon(geom, ax=ax, add_points=False, color=color,
+                         facecolor=color)
         elif isinstance(geom, (shapely.LineString, shapely.MultiLineString,
                                shapely.LinearRing, shapely.LinearRing)):
             plot_line(geom, ax=ax, add_points=False, color=color)
@@ -131,6 +187,15 @@ def plot_ab(poly_a, poly_b):
 
 
 def plot_roi(slice_table, roi_list: List[int]):
+    '''Plot the contours of the specified ROIs in 3D.
+
+    This function plots the contours of the specified ROIs in 3D. Each ROI is
+    plotted in a different color. The contours are plotted as points in 3D space.
+
+    Args:
+        slice_table (pd.DataFrame): The table of slices containing the contours.
+        roi_list (List[int]): A list of ROI numbers to plot.
+    '''
     def make_array(slice_table, roi_num: List[int]):
         all_points = []
         for slice_idx, structure_slice in slice_table[roi_num].dropna().items():
@@ -162,8 +227,7 @@ def make_slice_list(height: float = None, number_slices: int = None,
                     precision=PRECISION) -> List[SliceIndexType]:
     '''Generate a list of SliceIndexType with the desired range and increment.
 
-
-    height or number_slices must be provided.
+    Height or number_slices must be provided.
     If height is supplied then then calculate the spacing from
             height / number_slices
         or calculate the number of slices from
@@ -199,8 +263,33 @@ def make_slice_list(height: float = None, number_slices: int = None,
     return slices
 
 
-def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
-                  num_points: int = 16, precision=3, z:float=None)->list[tuple[float, float]]:
+def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
+                  precision=3, z: float = None)->list[tuple[float, float]]:
+    '''Generate points for a circle with the specified radius.
+
+    The circle is centered at (offset_x, offset_y) and the coordinates are
+    rounded to the specified precision. If z is not None, the points will be
+    3D points with the specified z coordinate. The points are at equal
+    intervals around the circle.
+
+    Args:
+        radius (float): The radius of the circle.
+        offset_x (float, optional): The x position of the center of the circle.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the circle.
+            Defaults to 0.
+        num_points (int, optional): The number of points to generate for the
+            circle. Defaults to 16.
+        precision (int, optional): The number of decimal points to use when
+            rounding the coordinates. Defaults to 3.
+        z (float, optional): The z coordinate of the points. If None, the points
+            will be 2D points. Defaults to None.
+
+    Returns:
+        list[tuple[float, float]]: A list of tuples containing the x and y
+            coordinates of the points on the circle. If z is not None, the
+            tuples will contain the z coordinate as well.
+    '''
     deg_step = radians(360/num_points)
     degree_points = np.arange(stop=radians(360), step=deg_step)
     if radius == 0:
@@ -217,9 +306,24 @@ def circle_points(radius: float, offset_x: float = 0, offset_y: float = 0,
     return coords
 
 
-def circle_x_points(radius: float, x_list: List[float],
-                    offset_x: float = 0, offset_y: float = 0,
+def circle_x_points(radius: float, x_list: List[float], offset_x=0, offset_y=0,
                     precision=3)->list[tuple[float, float]]:
+    '''Generate points for a circle with the specified radius and x coordinates.
+
+    Args:
+        radius (float): The radius of the circle.
+        x_list (List[float]): A list of x coordinates for the circle.
+        offset_x (float, optional): The x position of the center of the circle.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the circle.
+            Defaults to 0.
+        precision (int, optional): The number of decimal points to use when
+            rounding the coordinates. Defaults to 3.
+
+    Returns:
+        list[tuple[float, float]]: A list of tuples containing the x and y
+            coordinates of the points on the circle.
+    '''
     coords_pos = []
     coords_neg = []
     for x in x_list:
@@ -238,8 +342,30 @@ def circle_x_points(radius: float, x_list: List[float],
     return coords
 
 
-def box_points(width: float, height: float = None, offset_x: float = 0,
-               offset_y: float = 0, precision=3) -> list[tuple[float, float]]:
+def box_points(width: float, height: float = None, offset_x=0.0, offset_y=0.0,
+               precision=3) -> list[tuple[float, float]]:
+    '''Generate points for a rectangle with the specified width and height.
+
+    The rectangle is centered at (offset_x, offset_y) and the coordinates are
+    rounded to the specified precision. If height is not supplied, it is set to
+    the same value as width. The points are in the order: top left, bottom left,
+    bottom right, top right.
+
+    Args:
+        width (float): The width of the rectangle.
+        height (float, optional): The height of the rectangle. If None, height
+            is set to width. Defaults to None.
+        offset_x (float, optional): The x position of the center of the rectangle.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the rectangle.
+            Defaults to 0.
+        precision (int, optional): The number of decimal points to use when
+            rounding the coordinates. Defaults to 3.
+
+    Returns:
+        list[tuple[float, float]]: A list of tuples containing the x and y
+            coordinates of the points on the rectangle.
+    '''
     x1_unit = width / 2
     if x1_unit == 0:
         x1_unit = 10**(-precision)
@@ -262,6 +388,32 @@ def box_points(width: float, height: float = None, offset_x: float = 0,
 def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
                 precision=3)->Dict[SliceIndexType, tuple[float, float]]:
+    '''Generate points for a sphere with the specified radius.
+
+    The center of the sphere is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified. The sphere is sliced
+    into horizontal slices at the specified spacing. The points are at equal
+    intervals around the circle. The z coordinate of the points is the slice
+    index. The points are returned as a dictionary with the slice index as the
+    key and a tuple of (x, y) coordinates as the value.
+
+    Args:
+        radius (float): The radius of the sphere.
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        num_points (int, optional): The number of points to use for each contour
+            (polygon). Defaults to 16.
+        offset_x (float, optional): The x position of the center of the sphere.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the sphere.
+            Defaults to 0.
+        offset_z (float, optional): The z position of the center of the sphere.
+            Defaults to 0.
+        precision (int, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+    Returns:
+        Dict[SliceIndexType, tuple[float, float]]: A dictionary containing the
+            slice index as the key and a tuple of (x, y) coordinates as the value.
+    '''
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
@@ -279,6 +431,32 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
 def cylinder_points(radius: float, length: float, spacing: float = 0.1,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
                 precision=3)->Dict[SliceIndexType, tuple[float, float]]:
+    '''Generate points for a cylinder with the specified radius and length.
+
+    The center of the cylinder is at (offset_x, offset_y, offset_z). The
+    coordinates are rounded to the precision specified. The cylinder is sliced
+    into horizontal slices at the specified spacing. The points are at equal
+    intervals around the circle. The z coordinate of the points is the slice
+    index. The points are returned as a dictionary with the slice index as the
+    key and a tuple of (x, y) coordinates as the value.
+
+    Args:
+        radius (float): The radius of the cylinder.
+        length (float): The length of the cylinder in the z direction.
+        spacing (float, optional): The spacing of the slices. Defaults to 0.1.
+        offset_x (float, optional): The x position of the center of the cylinder.
+            Defaults to 0.
+        offset_y (float, optional): The y position of the center of the cylinder.
+            Defaults to 0.
+        offset_z (float, optional): The z position of the center of the cylinder.
+            Defaults to 0.
+        precision (int, optional): The number of decimal points to use when
+            rounding the polygon coordinates. Defaults to 3.
+
+    Returns:
+        Dict[SliceIndexType, tuple[float, float]]: A dictionary containing the
+            slice index as the key and a tuple of (x, y) coordinates as the value.
+    '''
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,

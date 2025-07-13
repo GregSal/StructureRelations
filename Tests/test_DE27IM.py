@@ -1,9 +1,8 @@
 '''Test the DE27IM class.'''
 import networkx as nx
 import shapely
-from matplotlib import contour
 
-from contours import Contour, ContourMatch, SliceNeighbours
+from contours import Contour, ContourMatch
 from debug_tools import circle_points
 from region_slice import RegionSlice
 from relations import DE9IM, DE27IM

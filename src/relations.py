@@ -325,16 +325,21 @@ class DE9IM():
         self.int = self.to_int()
 
     def to_bool(self):
+        '''Return the DE-9IM relationship as a boolean string.'''
         relation = self.relation_str.replace('F','0').replace('2','1')
         return relation
 
     def to_int(self, shift=0):
+        '''Convert the DE-9IM relationship to an integer.'''
         shift_factor = 2**shift
         binary_relation = int(self.to_bool(), base=2) * shift_factor
         return binary_relation
 
     def boundary_adjustment(self, boundary_type: str)->'DE9IM':
         '''Adjust the DE-9IM relationship matrix of a boundary slice.
+
+        The “*Interior*” bits of the DE-9IM relationship metric become the
+        “*Boundary*” bits of the new relationship metric.
         '''
         new_str_list = []
         if boundary_type == 'a':
@@ -428,6 +433,14 @@ class DE9IM():
         return False
 
     def merge(self, relations: List["DE9IM"]) -> "DE9IM":
+        '''Merge multiple DE-9IM relationships into a single DE-9IM relationship.
+
+        Merging is done by performing a bitwise OR operation on the integer
+        representations of the DE-9IM relationships.
+
+        Args:
+            relations (List[DE9IM]): A list of DE-9IM relationships to merge
+        '''
         def to_str(relation_int: int)->str:
             size=9
             str_size = size + 2  # Accounts for '0b' prefix.
@@ -437,8 +450,9 @@ class DE9IM():
                 bin_str = '0' * zero_pad + bin_str[2:]
             elif len(bin_str) > str_size:
                 raise ValueError(''.join([
-                    'The input integer must be {size} bits long. The input integer ',
-                    'was: ', f'{len(bin_str) - 2}'
+                    'The input integer must be {size} bits long. ',
+                    'The input integer was: ',
+                    f'{len(bin_str) - 2}'
                     ]))
             else:
                 bin_str = bin_str[2:]
@@ -607,7 +621,7 @@ class DE27IM():
                          0b100000100100000000100000000,
                          0b100000100100000000100000000)
             ]
-    # padding is a DE9IM object built from astring of 'FFFFFFFFF', which
+    # padding is a DE9IM object built from a string of 'FFFFFFFFF', which
     # becomes 9 zeros when converted to binary.  Padding is used in cases where
     # Exterior and Hull relationships are not relevant.
     padding = DE9IM(relation_str='FFFFFFFFF')  # 'F' * 9
@@ -670,6 +684,7 @@ class DE27IM():
 
     @staticmethod
     def to_str(relation_int: int)->str:
+        '''Convert the 27 bit binary integer into a formatted string.'''
         bin_str = bin(relation_int)
         if len(bin_str) < 29:
             zero_pad = 29 - len(bin_str)
@@ -685,6 +700,7 @@ class DE27IM():
 
     @staticmethod
     def to_int(relation_str: str)->int:
+        '''Convert the 27 bit binary string into an integer.'''
         try:
             relation_int = int(relation_str, base=2)
         except ValueError as err:
@@ -846,10 +862,29 @@ class DE27IM():
 
     def apply_adjustments(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
                           adjustments: List[str])-> tuple[DE9IM, DE9IM, DE9IM]:
-        # Apply adjustments to the relationship matrix.
-        # Note: The order of the adjustments is important.
-        # When hole adjustments are applied, only the "contour" bits are relevant,
-        # the external and hull bits are set to 'FFFFFFFFF'.
+        '''Apply adjustments to the DE-9IM relationship matrix.
+
+        Three types of adjustments can be applied to the DE-9IM relationship
+        matrix in the following order:
+            1. Boundary Adjustments: Adjust the relationship matrix when one of
+               the contours is a boundary. Because the contour is a boundary,
+               the “*Interior*” bits of the DE-9IM relationship metric become
+               the “*Boundary*” bits of the new relationship metric.
+
+        2. Hole Adjustments: Adjust the relationship matrix when one of
+               the contours is a hole.  Because the contour is a hole, the
+               “*Interior*” bits of the DE-9IM relationship metric become the
+               “*Exterior*” bits and the new “*Interior*” bits become 'F'.
+
+        3. Transpose Adjustment: Transpose the relationship matrix. This
+           converts a relationship between polygon A and polygon B into a
+           relationship between polygon B and polygon A. This is useful because
+           the order of the polygons is important.
+
+        Note: The order of the adjustments is important.
+        When hole adjustments are applied, only the "contour" bits are relevant,
+        the external and hull bits are set to 'FFFFFFFFF'.
+        '''
         # Apply Boundary Adjustments
         if 'boundary_a' in adjustments:
             relation_group = tuple(de9im.boundary_adjustment('a')
@@ -879,6 +914,28 @@ class DE27IM():
 
     def combine_groups(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
                        adjustments: List[str] = None)-> str:
+        '''Combine the DE-9IM relationships into a DE-27IM relationship string.
+
+        The three DE-9IM relationships (contour, external, and convex_hull) are
+        combined into a DE-27IM relationship string. If adjustments are
+        supplied, they are applied to the DE-9IM relationships before combining
+        them into a DE-27IM relationship string.
+
+        Args:
+            relation_group (Tuple[DE9IM, DE9IM, DE9IM]): A tuple of the three
+                DE-9IM relationships in the following order:
+                    (contour, external, convex hull).
+            adjustments (List[str]): A list of strings that define the
+                adjustments to be applied to the DE-9IM relationships before
+                combining them. Possible adjustments are:
+                - 'boundary_a': Apply boundary adjustments to the first DE-9IM.
+                - 'boundary_b': Apply boundary adjustments to the second DE-9IM.
+                - 'hole_a': Apply hole adjustments to the first DE-9IM.
+                - 'hole_b': Apply hole adjustments to the second DE-9IM.
+                - 'transpose': Apply transpose adjustments to both DE-9IMs.
+        Returns:
+            str: A DE-27IM relationship string.
+        '''
         if adjustments:
             relation_group = self.apply_adjustments(relation_group, adjustments)
         # Convert the DE-9IM relationships into a DE-27IM relationship string.
@@ -974,6 +1031,20 @@ def relate_structures(slice_structures: pd.DataFrame,
 def set_adjustments(region1: Contour,
                     region2: Union[Contour, None],
                     selected_roi: StructurePairType):
+    '''Set the adjustments for the DE-9IM relationship.
+
+    The adjustments are determined based on the properties of the regions and
+    the selected ROI. The adjustments are used to modify the DE-9IM relationship
+    matrix to account for boundaries, holes, and the order of the regions.
+
+    Args:
+        region1 (Contour): The first region.
+        region2 (Union[Contour, None]): The second region, which can be None.
+        selected_roi (StructurePairType): A tuple of ROI numbers that index the
+            regions in the ContourGraph.
+    Returns:
+        List[str]: A list of adjustments to be applied to the DE-9IM relationship.
+    '''
     # The first region is always a boundary.
     adjustments = ['boundary_a']
     # If either regions is a hole, then the interior and exterior parts of the
@@ -996,9 +1067,21 @@ def set_adjustments(region1: Contour,
 # %% Functions for boundary relations
 def node_selector(region_graph: ContourGraph, region: Contour,
                   selected_roi: StructurePairType) -> List[ContourIndex]:
-    # Select regions from the other ROI that are between region's
-    # prev_slice and next_slice.
+    '''Select neighbouring regions from the other ROI.
 
+      The selected regions are those that are between region's prev_slice and
+      next_slice.
+
+    Args:
+        region_graph (ContourGraph): The graph containing the regions.
+        region (Contour): The region for which to select neighbouring regions.
+        selected_roi (StructurePairType): A tuple of two ROI numbers which refer
+            to the structures to be compared.
+
+    Returns:
+        ContourGraph: A subgraph containing the selected regions from the other
+            ROI.
+    '''
     # get the other roi
     roi = region['roi']
     if roi == selected_roi[0]:
@@ -1026,7 +1109,18 @@ def node_selector(region_graph: ContourGraph, region: Contour,
 
 
 def get_boundaries(graph: ContourGraph,
-                    selected_roi: StructurePairType)->List[ContourIndex]:
+                   selected_roi: StructurePairType)->List[ContourIndex]:
+    '''Get the boundary nodes from the graph for the selected ROIs.
+
+    Args:
+        graph (ContourGraph): The graph containing the regions.
+        selected_roi (StructurePairType): A tuple of two ROI numbers which refer
+            to the structures to be compared.
+
+    Returns:
+        List[ContourIndex]: A list of node labels that are boundaries in the
+            selected ROI.
+    '''
     boundaries = []
     for node in graph.nodes:
         region = graph.nodes[node]
@@ -1036,7 +1130,15 @@ def get_boundaries(graph: ContourGraph,
 
 
 def drop_nodes(graph: nx.Graph, node):
-    # drop the node and its neighbours from the graph
+    '''Drop the node and its neighbours from the graph.
+
+    This function is used to remove a node and its neighbours from the graph.
+    The function modifies the graph in place.
+
+    Args:
+        graph (nx.Graph): The graph from which to remove the node.
+        node: The node to remove.
+    '''
     neighbours = [neighbour for neighbour in graph.neighbors(node)]
     if neighbours:
         graph.remove_node(neighbours[0])
@@ -1046,8 +1148,23 @@ def drop_nodes(graph: nx.Graph, node):
 
 
 def get_relation(region1: Contour,
-                  region2: Union[Contour, None],
-                  selected_roi: StructurePairType):
+                 region2: Union[Contour, None],
+                 selected_roi: StructurePairType):
+    '''Get the DE-27IM relationship between two regions.
+
+    This function calculates the DE-27IM relationship between two regions
+    based on their properties and the selected ROI. If region2 is None, then
+    the relationship is disjoint.
+
+    Args:
+        region1 (Contour): The first region.
+        region2 (Union[Contour, None]): The second region, which can be None.
+
+        selected_roi (StructurePairType): A tuple of two ROI numbers which refer
+            to the structures to be compared.
+    Returns:
+        DE27IM: The DE-27IM relationship between the two regions.
+    '''
     # Get the necessary adjustments for the relationship.
     adjustments = set_adjustments(region1, region2, selected_roi)
     relation = DE27IM(region1, region2, adjustments=adjustments)
@@ -1056,7 +1173,19 @@ def get_relation(region1: Contour,
 
 def get_matching_region(sub_graph: ContourGraph,
                         region1: Contour)->Union[Contour, None]:
-    # if a region has the same slice index as the boundary, then return it.
+    '''Return a region that has the same slice index as the supplied region.
+
+    This function checks if there is a region in the sub_graph that has the same
+    slice index as the supplied region. If such a region exists, it is returned
+    and removed from the sub_graph. If no such region exists, None is returned.
+
+    Args:
+        sub_graph (ContourGraph): The subgraph containing the regions.
+        region1 (Contour): The region for which to find a matching region.
+
+    Returns:
+        Union[Contour, None]: The matching region if it exists, otherwise None.
+    '''
     slice_index = region1['slice_index']
     sub_graph_slices = dict(sub_graph.nodes.data('slice_index'))
     other_indexes = {idx: node for node, idx in sub_graph_slices.items()}
@@ -1070,11 +1199,21 @@ def get_matching_region(sub_graph: ContourGraph,
 
 
 def get_interpolated_region(sub_graph):
-    # Select the first node in sub_graph.
-    # Select that node's neighbour.
-    # build an interpolated region from these two regions.
-    # Assumes that the sub-graph has at least two nodes.
-    #assert len(sub_graph) >= 2
+    '''Build an interpolated region from the first node in sub_graph and its
+    neighbour.
+
+    The function assumes that the sub-graph has at least two nodes.
+    It selects the first node in the sub-graph, finds its neighbour, and builds
+    an interpolated region from the two regions. The new region is created with
+    the slice index that is the average of the two nodes' slice indexes. The
+    new region is considered a boundary if the second node is a boundary.
+    The original nodes are removed from the sub-graph.
+
+    Args:
+        sub_graph (ContourGraph): The subgraph containing the regions.
+    Returns:
+        dict: A dictionary representation of the new interpolated region.
+    '''
     # Select the first node in the subgraph
     first_node_label = list(sub_graph.nodes)[0]
     first_node = sub_graph.nodes[first_node_label]
@@ -1086,7 +1225,6 @@ def get_interpolated_region(sub_graph):
     new_slice = calculate_new_slice_index(slices)
     new_neighbours = SliceNeighbours(new_slice, *slices)
     # Define a new node to store the interpolated region
-    ## FIXME Temporary fix for the Contour
     intp_node = Contour(**second_node)
     intp_node.is_interpolated = True
     intp_node.slice_index = new_slice
@@ -1138,18 +1276,30 @@ def get_boundary_relations(region_graph: ContourGraph,
             boundary_relations.append(relation)
 
         # Interpolate the remaining regions to match the boundary slice.
-        done = (len(sub_graph) == 0)
+        done = len(sub_graph) == 0
         while not done:
             # interpolate each relevant region to match the boundary slice.
             region2 = get_interpolated_region(sub_graph)
             relation = get_relation(region1, region2, selected_roi)
             boundary_relations.append(relation)
-            done = (len(sub_graph) == 0)
+            done = len(sub_graph) == 0
     return boundary_relations
 
 
 # %% Functions for finding relations
 def merged_relations(relations):
+    '''Merge a list of DE27IM relations into a single DE27IM object.
+
+    This function takes a list of DE27IM relations and merges them into a
+    single DE27IM object. The merging is done by performing a bitwise OR
+    operation on the integer representations of the relationships.
+
+    Args:
+        relations (List[DE27IM]): A list of DE27IM relations to be merged.
+
+    Returns:
+        DE27IM: A single DE27IM object that represents the merged relationships.
+    '''
     merged = DE27IM()
     for relation in list(relations):
         merged.merge(relation)
@@ -1157,6 +1307,25 @@ def merged_relations(relations):
 
 
 def find_relations(slice_table, regions, selected_roi):
+    '''Find relations between structures in the slice table.
+
+    This function finds relations between structures in the slice table based on
+    the selected ROI. It selects the slices that contain contours for both
+    Primary and Secondary structures, and then applies the relate_structures
+    function to get the relations. It also gets the boundary relations for the
+    selected ROI and merges them with the relations from the slice table.
+
+    Args:
+        slice_table (pd.DataFrame): A DataFrame containing the slices and their
+            contours.
+        regions (ContourGraph): The graph containing the regions.
+        selected_roi (StructurePairType): A tuple of two ROI numbers which refer
+            to the structures to be compared.
+
+    Returns:
+        DE27IM: A DE27IM object that contains the merged relations for the
+            selected ROI.
+    '''
     selected_slices = slice_table[selected_roi].dropna(how='all')
     # Send all slices with both Primary and Secondary contours for standard
     # relation testing

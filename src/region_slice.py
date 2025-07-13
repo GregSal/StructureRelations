@@ -15,9 +15,8 @@ import networkx as nx
 import shapely
 
 # Local packages
-from contours import Contour
 from contour_graph import build_contour_lookup, get_region_contours
-from types_and_classes import RegionIndex, SliceIndexType
+from types_and_classes import SliceIndexType
 from utilities import make_multi
 
 
@@ -157,7 +156,7 @@ class RegionSlice():
         # The RegionIndexes of the primary contours are used to
         # identify the regions on the slice and are the keys of the
         # RegionSlice dictionary attributes.
-        primary_contours = ((slice_contours['Interpolated'] == False) &
+        primary_contours = ((slice_contours['Interpolated'] is False) &
                             (slice_contours['HoleType'] == 'None'))
         reference_columns = ['Label', 'RegionIndex',
                              'HoleType', 'Interpolated', 'Boundary']
@@ -371,13 +370,6 @@ class RegionSlice():
         '''
         return not self.is_empty
 
-# TODO Add method to calculate the area and volume of the slice.
-# 1. For each region in the slice, find the matching neighbouring regions in
-# each direction.
-# 2. Calculate the average area of the region and its neighbours.
-# 3. Calculate the volume of the region by multiplying the average area by the
-# height of the region.
-# 4. sum the volumes of all regions in the slice to get the total volume.
 
 # %% Slice related functions
 def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:

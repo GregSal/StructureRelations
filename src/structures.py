@@ -1,13 +1,13 @@
 '''Contains the structure class.
 '''
 
-from typing import Dict, List, Tuple
+from typing import List
 
 import pandas as pd
 import networkx as nx
 
-from types_and_classes import ContourLink, ROI_Type, SliceIndexType
-from types_and_classes import ContourGraph, ContourIndex
+from types_and_classes import ROI_Type, SliceIndexType
+from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
@@ -52,7 +52,7 @@ class StructureShape():
         self.hull_volume = 0.0
 
     def build_contour_graph(self, contour_table: pd.DataFrame,
-                        slice_sequence: SliceSequence) -> None:
+                            slice_sequence: SliceSequence) -> None:
         '''Builds the contour graph and the contour lookup table.
 
         Args:

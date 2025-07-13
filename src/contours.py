@@ -618,7 +618,7 @@ class Contour:
         self.roi = roi
         self.slice_index = slice_index
         self.polygon = polygon
-        self.polygon_with_holes = polygon
+        self.poly_h = polygon   # polygon_with_holes
         self.validate_polygon()
         # Set the contour parameters
         self.contour_index = Contour.counter
@@ -687,17 +687,17 @@ class Contour:
             InvalidContour: Raised if the new contour overlaps an existing
                 contour in the list.
         '''
-        for existing_contour in contours:
+        for contour in contours:
             # starting from the largest contour and working down to the smallest.
             # If there is a sequence of concentric contours the result will be
             # alternating holes and islands.
-            if self.polygon.within(existing_contour.polygon):
+            if self.polygon.within(contour.polygon):
                 # New contour is completely within the existing contour
                 # Add the existing contour to the related contours of the new
                 # contour and vice versa.
-                self.related_contours.append(existing_contour.index)
-                existing_contour.related_contours.append(self.index)
-                if existing_contour.is_hole:
+                self.related_contours.append(contour.index)
+                contour.related_contours.append(self.index)
+                if contour.is_hole:
                     # If the existing contour is a hole, the new contour cannot
                     # be its hole, which means that it is an island.
                     self.is_hole = False
@@ -708,8 +708,8 @@ class Contour:
                     self.hole_type = 'Unknown'
                     # Subtract the existing contour polygon from the new
                     # contour polygon to get the polygon with holes.
-                    existing_contour.polygon_with_holes = existing_contour.polygon_with_holes - self.polygon
-            elif self.polygon.overlaps(existing_contour.polygon):
+                    contour.poly_h = contour.poly_h - self.polygon
+            elif self.polygon.overlaps(contour.polygon):
                 # New contour overlaps an existing contour, raise an error
                 raise InvalidContour('New contour overlaps an existing contour.')
 

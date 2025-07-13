@@ -3,7 +3,7 @@ The contour graph is a undirected graph where each node represents a contour
 and edges represent connect matched contours on the next and previous slice.
 '''
 # %% Setup
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 from collections import defaultdict
 
 import pandas as pd
@@ -12,7 +12,7 @@ import shapely
 
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
-from types_and_classes import SliceIndexType, ContourIndex, ContourLink
+from types_and_classes import SliceIndexType, ContourIndex
 from types_and_classes import ContourGraph, RegionIndex
 
 from types_and_classes import InvalidSlice, ROI_Type, InvalidContour
