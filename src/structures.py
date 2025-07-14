@@ -6,6 +6,7 @@ from typing import List
 import pandas as pd
 import networkx as nx
 
+from region_slice import build_region_table
 from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
@@ -73,6 +74,8 @@ class StructureShape():
         self.calculate_physical_volume()
         self.calculate_exterior_volume()
         self.calculate_hull_volume()
+        self.region_table = build_region_table(self.contour_graph,
+                                               slice_sequence)
         return slice_sequence
 
     def calculate_physical_volume(self):
