@@ -12,6 +12,7 @@ from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
 from region_slice import build_region_table
+from relations import DE27IM
 
 
 class StructureShape():
@@ -232,17 +233,47 @@ class StructureShape():
             self.contour_lookup = build_contour_lookup(self.contour_graph)
             self.contour_lookup = build_contour_lookup(self.contour_graph)
 
-    def relate(self, other: 'StructureShape') -> None:
+    def relate(self, other: 'StructureShape') -> 'DE27IM':
         '''Relate this structure to another structure.
+
+        This method identifies common slices between the two structures and
+        creates a DE27IM relationship for each common slice and merges the slice
+        relations to get the overall relationship between the two structures.
 
         Args:
             other (StructureShape): The other structure to relate to.
+
+        Returns:
+            DE27IM: A DE27IM relationship object containing the relationship
+            between the two structures.
         '''
-        # This method is a placeholder for future implementation
-        # It can be used to establish relationships between structures
-        #1. Create an initial blank DE27IM relationship object.
-        #1. Identify the slices where both structures have non-empty RegionSlice objects.
-        #2. For each of these slices
-        #    1. Get the DE27IM relationship for the two RegionSlice objects.
-        #    3. Merge the DE27IM relationship into the composite DE27IM relationship object.
-        pass
+        # 1. Create an initial blank DE27IM relationship object.
+        composite_relation = DE27IM()
+        # 2. Identify slices where both structures have non-empty RegionSlice objects.
+        slices_self = set(self.region_table['SliceIndex'])
+        slices_other = set(other.region_table['SliceIndex'])
+        common_slices = slices_self & slices_other
+        # 3. Find the common slices for the two structures.
+        this_slice_mask = self.region_table.SliceIndex.isin(common_slices)
+        # FIXME also need to check if individual polygons in the regions and boundaries are empty
+        this_empty_slice_mask = self.region_table.is_empty
+        this_mask = this_slice_mask & ~this_empty_slice_mask
+        regions_self = self.region_table.loc[this_mask,
+                                             ['SliceIndex', 'RegionSlice']]
+        regions_self.set_index('SliceIndex', inplace=True)
+
+        other_slice_mask = other.region_table.SliceIndex.isin(common_slices)
+        other_empty_slice_mask = other.region_table.is_empty
+        other_mask = other_slice_mask & ~other_empty_slice_mask
+        regions_other = other.region_table.loc[other_mask,
+                                             ['SliceIndex', 'RegionSlice']]
+        regions_other.set_index('SliceIndex', inplace=True)
+        regions = regions_self.join(regions_other, how='inner',
+                                    suffixes=('_self', '_other'))
+        # 4. For each common slice, get and merge the DE27IM relationship.
+        for _, row in regions.iterrows():
+            region_self = row['RegionSlice_self']
+            region_other = row['RegionSlice_other']
+            relation = DE27IM(region_self, region_other)
+            composite_relation.merge(relation)
+        return composite_relation

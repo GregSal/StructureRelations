@@ -370,6 +370,18 @@ class RegionSlice():
         '''
         return not self.is_empty
 
+    def is_empty(self) -> bool:
+        '''Check if the slice is empty.
+
+        Returns:
+            bool: True if the slice is empty, False otherwise.
+        '''
+        # FIXME also need to check if individual polygons in the regions and boundaries are empty
+        # Check if the regions and boundaries are empty
+        self.regions.is_empty and self.boundaries.is_empty
+
+        # FIXME add a boolean magic method to check if the slice is empty
+        # This is used to check if the slice is empty in a boolean context.
 
 # %% Slice related functions
 def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:
