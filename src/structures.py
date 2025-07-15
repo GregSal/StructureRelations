@@ -6,12 +6,12 @@ from typing import List
 import pandas as pd
 import networkx as nx
 
-from region_slice import build_region_table
 from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
+from region_slice import build_region_table
 
 
 class StructureShape():
@@ -68,7 +68,7 @@ class StructureShape():
                                                             self.roi)
         self.contour_graph = contour_graph
         self.contour_lookup = build_contour_lookup(contour_graph)
-        not_original = slice_sequence.sequence.Original == False
+        not_original = slice_sequence.sequence.Original is False
         intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
         self.generate_interpolated_contours(slice_sequence, intp_idx)
         self.calculate_physical_volume()
@@ -231,3 +231,18 @@ class StructureShape():
                                         match=contour_match)
             self.contour_lookup = build_contour_lookup(self.contour_graph)
             self.contour_lookup = build_contour_lookup(self.contour_graph)
+
+    def relate(self, other: 'StructureShape') -> None:
+        '''Relate this structure to another structure.
+
+        Args:
+            other (StructureShape): The other structure to relate to.
+        '''
+        # This method is a placeholder for future implementation
+        # It can be used to establish relationships between structures
+        #1. Create an initial blank DE27IM relationship object.
+        #1. Identify the slices where both structures have non-empty RegionSlice objects.
+        #2. For each of these slices
+        #    1. Get the DE27IM relationship for the two RegionSlice objects.
+        #    3. Merge the DE27IM relationship into the composite DE27IM relationship object.
+        pass
