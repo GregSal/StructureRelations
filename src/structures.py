@@ -48,7 +48,7 @@ class StructureShape():
         self.roi = roi
         self.contour_graph = nx.Graph()
         self.contour_lookup = pd.DataFrame()
-        self.region_table = []
+        self.region_table = pd.DataFrame()
         self.physical_volume = 0.0
         self.exterior_volume = 0.0
         self.hull_volume = 0.0
@@ -69,7 +69,11 @@ class StructureShape():
                                                             self.roi)
         self.contour_graph = contour_graph
         self.contour_lookup = build_contour_lookup(contour_graph)
-        not_original = slice_sequence.sequence.Original is False
+        # FIXME slice_sequence will not contain the interpolated slices for
+        # structures that have not been built yet.
+        # Will need to re-run this method after the structure is built.
+        # TODO Generate intp_idx in generate_interpolated_contours
+        not_original = slice_sequence.sequence.Original == False
         intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
         self.generate_interpolated_contours(slice_sequence, intp_idx)
         self.calculate_physical_volume()
@@ -249,29 +253,27 @@ class StructureShape():
         '''
         # 1. Create an initial blank DE27IM relationship object.
         composite_relation = DE27IM()
-        # 2. Identify slices where both structures have non-empty RegionSlice objects.
+        # 2. Identify slices where either structures have non-empty RegionSlice objects.
         slices_self = set(self.region_table['SliceIndex'])
         slices_other = set(other.region_table['SliceIndex'])
-        common_slices = slices_self & slices_other
+        used_slices = slices_self | slices_other
         # 3. Find the common slices for the two structures.
-        this_slice_mask = self.region_table.SliceIndex.isin(common_slices)
-        # FIXME also need to check if individual polygons in the regions and boundaries are empty
-        this_empty_slice_mask = self.region_table.is_empty
-        this_mask = this_slice_mask & ~this_empty_slice_mask
+        this_slice_mask = self.region_table.SliceIndex.isin(used_slices)
+        this_mask = this_slice_mask & ~self.region_table.Empty
         regions_self = self.region_table.loc[this_mask,
                                              ['SliceIndex', 'RegionSlice']]
         regions_self.set_index('SliceIndex', inplace=True)
 
-        other_slice_mask = other.region_table.SliceIndex.isin(common_slices)
-        other_empty_slice_mask = other.region_table.is_empty
-        other_mask = other_slice_mask & ~other_empty_slice_mask
+        other_slice_mask = other.region_table.SliceIndex.isin(used_slices)
+        other_mask = other_slice_mask & ~other.region_table.Empty
         regions_other = other.region_table.loc[other_mask,
                                              ['SliceIndex', 'RegionSlice']]
         regions_other.set_index('SliceIndex', inplace=True)
-        regions = regions_self.join(regions_other, how='inner',
-                                    suffixes=('_self', '_other'))
+        regions = regions_self.join(regions_other, how='outer',
+                                    lsuffix='_self', rsuffix='_other')
+
         # 4. For each common slice, get and merge the DE27IM relationship.
-        for _, row in regions.iterrows():
+        for sliceindex, row in regions.iterrows():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other)
