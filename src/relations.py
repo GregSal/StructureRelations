@@ -540,23 +540,23 @@ class DE27IM():
     using a logical OR to obtain the relationship between the 3D volumes.
 
     Args:
-        structure_a (AllPolygonType): The first polygon structure.
-        structure_b (AllPolygonType): The second polygon structure.
+        region_a (AllPolygonType): The first polygon structure.
+        region_b (AllPolygonType): The second polygon structure.
         relation_str (str): A DE-27IM relationship string.
         relation_int (int): An integer representation of the DE-27IM
             relationship.
         adjustments (List[str]): A list of strings that define the adjustments
-            to be applied when structure_a and structure_b are not RegionSlices.
+            to be applied when region_a and region_b are not RegionSlices.
             Possible adjustments are:
             - 'transpose': Transpose the relationship matrix.
             - 'boundary_a': Adjust the relationship matrix for the boundary
-                slice of structure_a.
+                slice of region_a.
             - 'boundary_b': Adjust the relationship matrix for the boundary
-                slice of structure_b.
+                slice of region_b.
             - 'hole_a': Adjust the relationship matrix for the hole (negative
-                space) of structure_a.
+                space) of region_a.
             - 'hole_b': Adjust the relationship matrix for the hole (negative
-                space) of structure_b.
+                space) of region_b.
     Raises:
         ValueError: If the relationship cannot be determined.
         ValueError: If neither contours nor a relationship string is supplied.
@@ -627,20 +627,20 @@ class DE27IM():
     # If only the B contour is supplied, then B is exterior to A
     exterior_b = DE9IM(relation_str='FFFFFF111')  # 'F'*3 + 'F'*3 + '1'*3
 
-    def __init__(self, structure_a: AllPolygonType = None,
-                 structure_b: AllPolygonType = None,
+    def __init__(self, region_a: AllPolygonType = None,
+                 region_b: AllPolygonType = None,
                  relation_str: str = None,
                  relation_int: int = None,
                  adjustments: List[str] = None):
-        if not empty_structure(structure_a):
-            if not empty_structure(structure_b):
+        if not empty_structure(region_a):
+            if not empty_structure(region_b):
                 # If both contours are supplied, the relationship is calculated.
                 # Initialize the relationship with all padding.
                 relation_group = tuple([self.padding] * 3)
                 self.relation = self.combine_groups(relation_group)
                 # calculate the 27 bit relationships and merge them with the
                 # initial relationship.
-                self.relate_contours(structure_a, structure_b, adjustments)
+                self.relate_contours(region_a, region_b, adjustments)
                 self.int = self.to_int(self.relation)
             else:
                 # If only the A contour is supplied, the relationship is
@@ -648,7 +648,7 @@ class DE27IM():
                 relation_group = tuple([self.exterior_a] * 3)
                 self.relation = self.combine_groups(relation_group, adjustments)
                 self.int = self.to_int(self.relation)
-        elif structure_b is not None:
+        elif region_b is not None:
             # If only the B contour is supplied, the relationship is
             #   B is exterior to A
             relation_group = tuple([self.exterior_b] * 3)
@@ -707,8 +707,8 @@ class DE27IM():
                 ])) from err
         return relation_int
 
-    def relate_contours(self, structure_a: AllPolygonType,
-                        structure_b: AllPolygonType,
+    def relate_contours(self, region_a: AllPolygonType,
+                        region_b: AllPolygonType,
                         adjustments: List[str] = None):
         '''Get the 27 bit relationship for two structures on a given slice.
         The supplied adjustments are only applied if the structures are not
@@ -727,46 +727,47 @@ class DE27IM():
         '''
         # If structure_a and structure_b are both RegionSlices, then get the
         # full 27 bit relationship.
-        if isinstance(structure_a, RegionSlice):
-            if isinstance(structure_b, RegionSlice):
-                # All regions in structure_a are compared with all regions and
-                # boundaries in structure_b.
-                # All boundaries in structure_a are compared with all regions
-                # and boundaries in structure_b.
+        if isinstance(region_a, RegionSlice):
+            if isinstance(region_b, RegionSlice):
+                # All regions in region_a are compared with all regions and
+                # boundaries in region_b.
+                # All boundaries in region_a are compared with all regions
+                # and boundaries in region_b.
                 # All of these comparisons are merged into a single DE27IM object.
                 #
-                # 1. for each MultiPolygon in RegionSlice.regions of structure_a:
+                # 1. for each MultiPolygon in RegionSlice.regions of region_a:
                 #    a. Get a 27 bit relation with all MultiPolygons in
-                #        RegionSlice.regions and in RegionSlice.boundaries of structure_b.
+                #        RegionSlice.regions and in RegionSlice.boundaries of region_b.
                 #          - MultiPolygon vs other MultiPolygon
                 #          - RegionSlice.exterior vs other MultiPolygon
                 #          - RegionSlice.hull vs other MultiPolygon
                 #          *Note: External and hull comparisons are not required for boundaries*
                 #    b. Apply appropriate corrections for holes and boundaries.
-                # 2. for each MultiPolygon in RegionSlice.boundaries of structure_a:
+                # 2. for each MultiPolygon in RegionSlice.boundaries of region_a:
                 #    a. Get a 27 bit relation with all MultiPolygons in
-                #       RegionSlice.regions and in RegionSlice.boundaries of structure_b
+                #       RegionSlice.regions and in RegionSlice.boundaries of region_b
                 #       that are on the same slice.
                 #           - Boundary MultiPolygon vs other MultiPolygon
                 #           *Note: External and hull comparisons are not required for boundaries*
                 #    b. Apply appropriate corrections for holes and boundaries.
                 # 3. Combine all relations with OR
-                exteriors = structure_a.exterior
-                hulls = structure_a.hull
-                for region_index, region_a in structure_a.regions.items():
-                    # Get the 27 bit relationship for each region in structure_a
-                    # with all regions and boundaries in structure_b.
-                    for region_b in structure_b.regions.values():
-                        contour = DE9IM(region_a, region_b)
-                        external = DE9IM(exteriors[region_index], region_b)
-                        convex_hull = DE9IM(hulls[region_index], region_b)
+                exteriors = region_a.exterior
+                hulls = region_a.hull
+                for region_index, poly_a in region_a.regions.items():
+                    # Get the 27 bit relationship for each region in region_a
+                    # with all regions and boundaries in region_b.
+                    for poly_b in region_b.regions.values():
+                        contour = DE9IM(poly_a, poly_b)
+                        external = DE9IM(exteriors[region_index], poly_b)
+                        convex_hull = DE9IM(hulls[region_index], poly_b)
                         relation_group = (contour, external, convex_hull)
                         # No adjustments required for regions.
                         relation_str = self.combine_groups(relation_group)
                         # Merge the relationship into the DE27IM object.
                         self.merge(self.to_int(relation_str))
-                    for boundary_b in structure_b.boundaries.values():
-                        contour = DE9IM(region_a, boundary_b)
+                        # FIXME Need to skip boundaries if empty
+                    for boundary_b in region_b.boundaries.values():
+                        contour = DE9IM(poly_a, boundary_b)
                         relation_group = (contour, self.padding, self.padding)
                         # Adjust for secondary boundaries.
                         adjustments = ['boundary_b']
@@ -774,13 +775,13 @@ class DE27IM():
                                                            adjustments)
                         # Merge the relationship into the DE27IM object.
                         self.merge(self.to_int(relation_str))
-                for boundary_a in structure_a.boundaries.values():
-                    # Get the 27 bit relationship for each boundary in structure_a
-                    # with all regions and boundaries in structure_b.
+                for boundary_a in region_a.boundaries.values():
+                    # Get the 27 bit relationship for each boundary in region_a
+                    # with all regions and boundaries in region_b.
                     adjustments = ['boundary_a']
-                    for region_b in structure_b.regions.values():
+                    for poly_b in region_b.regions.values():
                         relation_group = []
-                        contour = DE9IM(boundary_a, region_b)
+                        contour = DE9IM(boundary_a, poly_b)
                         # External and hull relationships are not relevant for
                         # boundaries.
                         relation_group = (contour, self.padding, self.padding)
@@ -791,7 +792,7 @@ class DE27IM():
                         self.merge(self.to_int(relation_str))
                     # Add the boundary_b adjustment to the existing 'boundary_a' adjustment.
                     adjustments.append('boundary_b')
-                    for boundary_b in structure_b.boundaries.values():
+                    for boundary_b in region_b.boundaries.values():
                         contour = DE9IM(boundary_a, boundary_b)
                         relation_group = (contour, self.padding, self.padding)
                         # Adjust for primary and secondary boundaries.
@@ -801,10 +802,10 @@ class DE27IM():
                         self.merge(self.to_int(relation_str))
             else:
                 raise ValueError(''.join([
-                    'Structure_a and structure_b must both be RegionSlice, ',
+                    'Region_a and region_b must both be RegionSlice, ',
                     'Contour, shapely Polygon, or shapely MultiPolygon objects. ',
-                    f'Structure_a input was: {str(type(structure_a))}\t',
-                    f'Structure_b input was: {str(type(structure_b))}'
+                    f'Region_a input was: {str(type(region_a))}\t',
+                    f'Region_b input was: {str(type(region_b))}'
                     ]))
         else:
             # If contour_a and contour_b are Contour objects, shapely Polygons
@@ -813,16 +814,16 @@ class DE27IM():
             # Note: If contour_a is a Contour object, the external will
             # match the contour relation, because a Contour polygon does not
             # contain holes.
-            if isinstance(structure_a, Contour):
-                poly_a = make_multi(structure_a.polygon)
+            if isinstance(region_a, Contour):
+                poly_a = make_multi(region_a.polygon)
                 # Create a solid Polygon from poly_a
                 solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
                           for poly in poly_a.geoms]
                 external_polygon = shapely.unary_union(solids)
-                hull_polygon = structure_a.hull
-            elif isinstance(structure_a, (shapely.Polygon,
+                hull_polygon = region_a.hull
+            elif isinstance(region_a, (shapely.Polygon,
                                           shapely.MultiPolygon)):
-                poly_a = make_multi(structure_a)
+                poly_a = make_multi(region_a)
                 # Create a solid Polygon from poly_a
                 # Create a solid Polygon from poly_a
                 solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
@@ -831,22 +832,22 @@ class DE27IM():
                 hull_polygon = poly_a.convex_hull
             else:
                 raise ValueError(''.join([
-                    'Structure_a and structure_b must both be RegionSlice, ',
+                    'Region_a and region_b must both be RegionSlice, ',
                     'Contour, shapely Polygon, or shapely MultiPolygon objects. ',
-                    f'Structure_a input was: {str(type(structure_a))}\t',
-                    f'Structure_b input was: {str(type(structure_b))}'
+                    f'Region_a input was: {str(type(region_a))}\t',
+                    f'Region_b input was: {str(type(region_b))}'
                     ]))
-            if isinstance(structure_b, Contour):
-                poly_b = structure_b.polygon
-            elif isinstance(structure_b, (shapely.Polygon,
-                                            shapely.MultiPolygon)):
-                poly_b = structure_b
+            if isinstance(region_b, Contour):
+                poly_b = region_b.polygon
+            elif isinstance(region_b, (shapely.Polygon,
+                                          shapely.MultiPolygon)):
+                poly_b = region_b
             else:
                 raise ValueError(''.join([
-                    'Structure_a and structure_b must both be RegionSlice, ',
+                    'Region_a and region_b must both be RegionSlice, ',
                     'Contour, shapely Polygon, or shapely MultiPolygon objects. ',
-                    f'Structure_a input was: {str(type(structure_a))}\t',
-                    f'Structure_b input was: {str(type(structure_b))}'
+                    f'Region_a input was: {str(type(region_a))}\t',
+                    f'Region_b input was: {str(type(region_b))}'
                     ]))
             contour = DE9IM(poly_a, poly_b)
             external = DE9IM(external_polygon, poly_b)

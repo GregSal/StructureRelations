@@ -72,10 +72,7 @@ class StructureShape():
         # FIXME slice_sequence will not contain the interpolated slices for
         # structures that have not been built yet.
         # Will need to re-run this method after the structure is built.
-        # TODO Generate intp_idx in generate_interpolated_contours
-        not_original = slice_sequence.sequence.Original == False
-        intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
-        self.generate_interpolated_contours(slice_sequence, intp_idx)
+        self.generate_interpolated_contours(slice_sequence)
         self.calculate_physical_volume()
         self.calculate_exterior_volume()
         self.calculate_hull_volume()
@@ -162,8 +159,7 @@ class StructureShape():
         contour = self.contour_graph.nodes(data=True)[label]['contour']
         return contour
 
-    def generate_interpolated_contours(self, slice_sequence: SliceSequence,
-                                       interpolated_slice_indexes: List[SliceIndexType]) -> None:
+    def generate_interpolated_contours(self, slice_sequence: SliceSequence) -> None:
         '''Generate interpolated contours for the structure.
 
         Args:
@@ -181,8 +177,9 @@ class StructureShape():
         # check for empty slice_sequence
         if not slice_sequence:
             return
-        for interpolated_slice in interpolated_slice_indexes:
-
+        not_original = slice_sequence.sequence.Original == False
+        intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
+        for interpolated_slice in intp_idx:
             nbr = slice_sequence.get_neighbors(interpolated_slice)
 
             is_previous = self.contour_lookup.SliceIndex == nbr.previous_slice
