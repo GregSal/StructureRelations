@@ -6,7 +6,7 @@ from typing import List, Union
 # Shared Packages
 import shapely
 
-from types_and_classes import PRECISION
+from types_and_classes import PRECISION, PolygonType
 
 
 # %% Rounding Functions
@@ -70,12 +70,12 @@ def poly_round(polygon: shapely.Polygon,
     return clean_poly
 
 # %% Polygon Functions
-def make_multi(poly: Union[shapely.Polygon, shapely.MultiPolygon]
-               ) -> shapely.MultiPolygon:
+def make_multi(poly: PolygonType) -> shapely.MultiPolygon:
     '''Convert a polygon to a multipolygon.
+
     Args:
-        poly (Union[shapely.Polygon, shapely.MultiPolygon]): The polygon to
-            convert.
+        poly (PolygonType): The polygon to convert.
+
     Returns:
         shapely.MultiPolygon: The converted multipolygon.
     '''
@@ -84,3 +84,30 @@ def make_multi(poly: Union[shapely.Polygon, shapely.MultiPolygon]
     else:
         multi_poly = shapely.MultiPolygon([poly])
     return multi_poly
+
+
+def make_solid(polygon: PolygonType, external_holes: PolygonType = None,
+               ) -> shapely.MultiPolygon:
+    '''Create a solid Polygon from polygon.
+
+    All holes in the supplied polygon are filled in to create a solid
+    polygon.  If an external_holes polygon is supplied, it is subtracted
+    from the final solid polygon.
+
+    Args:
+        polygon (PolygonType): The polygon to convert to a solid.
+        external_holes (PolygonType, optional): A polygon or multipolygon
+            representing external holes to be subtracted from the final solid.
+            Defaults to None.
+
+    Returns:
+        shapely.Polygon: The resulting solid polygon.
+    '''
+    polygon = make_multi(polygon)
+    solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
+                for poly in polygon.geoms]
+    external_polygon = shapely.unary_union(solids)
+    external_polygon = make_multi(external_polygon)
+    if external_holes is not None:
+        external_polygon = external_polygon.difference(external_holes)
+    return external_polygon
