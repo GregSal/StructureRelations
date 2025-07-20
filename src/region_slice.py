@@ -5,7 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import List, Union
+from typing import Dict, List, Union
 
 # Standard Libraries
 
@@ -16,8 +16,8 @@ import shapely
 
 # Local packages
 from contour_graph import build_contour_lookup, get_region_contours
-from types_and_classes import SliceIndexType
-from utilities import make_multi
+from types_and_classes import RegionIndex, SliceIndexType
+from utilities import make_multi, make_solid
 
 
 # %% StructureSlice Class
@@ -152,12 +152,11 @@ class RegionSlice():
             return
 
         # select the primary contours on the slice, which are those
-        # contours that are not interpolated, holes or boundaries.
+        # contours that are not holes or boundaries.
         # The RegionIndexes of the primary contours are used to
         # identify the regions on the slice and are the keys of the
         # RegionSlice dictionary attributes.
-        primary_contours = ((slice_contours['Interpolated'] is False) &
-                            (slice_contours['HoleType'] == 'None'))
+        primary_contours = slice_contours['HoleType'] == 'None'
         reference_columns = ['Label', 'RegionIndex',
                              'HoleType', 'Interpolated', 'Boundary']
         contour_reference = slice_contours.loc[primary_contours,
@@ -288,7 +287,7 @@ class RegionSlice():
         self.is_interpolated = all(interpolated_contours)
 
     @property
-    def exterior(self)-> List[shapely.MultiPolygon]:
+    def exterior(self)-> Dict[RegionIndex, shapely.MultiPolygon]:
         '''The solid exterior contour MultiPolygon.
 
         Boundaries are not included in the exterior contour MultiPolygon.
@@ -304,28 +303,22 @@ class RegionSlice():
             if region.is_empty:
                 exterior_regions[region_index] = region
                 continue
-            # Create a MultiPolygon from the region
-            solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                      for poly in region.geoms]
-            solid = shapely.unary_union(solids)
-            ext_poly = make_multi(solid)
-            # Subtract open holes
-            if not self.open_holes[region_index].is_empty:
-                ext_poly = ext_poly - self.open_holes[region_index]
+            ext_poly = make_solid(region, self.open_holes[region_index])
             exterior_regions[region_index] = ext_poly
         return exterior_regions
 
     @property
-    def hull(self)-> List[shapely.MultiPolygon]:
+    def hull(self)-> Dict[RegionIndex, shapely.MultiPolygon]:
         '''A list of bounding polygons generated from each region.
 
         A convex hull can be pictures as an elastic band stretched around the
         external contour.
 
         If a region contains more than one polygon the hull will contain the
-        area between the regions.  In other words, each convex hull
-        will consist of one elastic bands stretched around each external
-        polygon that is part of the region.
+        area between the regions.  In other words, each convex hull will consist
+        of one elastic band stretched around each external polygon that is part
+        of the region.
+
         Returns:
             Dict[RegionIndex, shapely.MultiPolygon]: The convex hulls for each
                 region.

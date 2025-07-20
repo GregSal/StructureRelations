@@ -11,6 +11,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import networkx as nx
+import shapely
 
 # %% Type definitions and Globals
 # Index to structures defined in Structure RT DICOM file
@@ -55,6 +56,9 @@ ContourGraph = NewType('ContourGraph', nx.Graph)
 
 # The reference numbers for two different structures to be compared.
 StructurePairType = NewType('StructurePairType', Tuple[ROI_Type, ROI_Type])
+
+# PolygonType is a type alias for shapely.Polygon or shapely.MultiPolygon.
+PolygonType = Union[shapely.Polygon, shapely.MultiPolygon]
 
 # Global Settings
 PRECISION = 3

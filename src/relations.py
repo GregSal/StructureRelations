@@ -16,7 +16,8 @@ import networkx as nx
 # Local packages
 from contours import Contour
 from region_slice import RegionSlice, empty_structure
-from utilities import make_multi
+from types_and_classes import PolygonType
+from utilities import make_multi, make_solid
 
 # An object that can be used for obtaining DE9IM relationships.
 # Either a polygon or and object that contains a polygon attribute.
@@ -753,53 +754,45 @@ class DE27IM():
                 # 3. Combine all relations with OR
                 exteriors = region_a.exterior
                 hulls = region_a.hull
-                for region_index, poly_a in region_a.regions.items():
-                    # Get the 27 bit relationship for each region in region_a
-                    # with all regions and boundaries in region_b.
-                    for poly_b in region_b.regions.values():
-                        contour = DE9IM(poly_a, poly_b)
-                        external = DE9IM(exteriors[region_index], poly_b)
-                        convex_hull = DE9IM(hulls[region_index], poly_b)
-                        relation_group = (contour, external, convex_hull)
-                        # No adjustments required for regions.
-                        relation_str = self.combine_groups(relation_group)
-                        # Merge the relationship into the DE27IM object.
-                        self.merge(self.to_int(relation_str))
-                        # FIXME Need to skip boundaries if empty
-                    for boundary_b in region_b.boundaries.values():
-                        contour = DE9IM(poly_a, boundary_b)
-                        relation_group = (contour, self.padding, self.padding)
-                        # Adjust for secondary boundaries.
-                        adjustments = ['boundary_b']
-                        relation_str = self.combine_groups(relation_group,
-                                                           adjustments)
-                        # Merge the relationship into the DE27IM object.
-                        self.merge(self.to_int(relation_str))
-                for boundary_a in region_a.boundaries.values():
+                adjustments = []
+                if region_a.regions:
+                    for region_index, poly_a in region_a.regions.items():
+                        # Get the 27 bit relationship for each region in region_a
+                        # with all regions and boundaries in region_b.
+                        if region_b.regions:
+                            for poly_b in region_b.regions.values():
+                                self.relate_poly(poly_a, poly_b,
+                                                exteriors[region_index],
+                                                hulls[region_index], adjustments)
+                        if region_b.regions:
+                            adjustments.append('boundary_b')
+                            for boundary_b in region_b.boundaries.values():
+                                self.relate_poly(poly_a, boundary_b,
+                                                 adjustments=adjustments)
+                adjustments = []
+                if region_a.boundaries:
                     # Get the 27 bit relationship for each boundary in region_a
                     # with all regions and boundaries in region_b.
-                    adjustments = ['boundary_a']
-                    for poly_b in region_b.regions.values():
-                        relation_group = []
-                        contour = DE9IM(boundary_a, poly_b)
-                        # External and hull relationships are not relevant for
-                        # boundaries.
-                        relation_group = (contour, self.padding, self.padding)
-                        # Adjust for primary boundaries.
-                        relation_str = self.combine_groups(relation_group,
-                                                           adjustments)
-                        # Merge the relationship into the DE27IM object.
-                        self.merge(self.to_int(relation_str))
-                    # Add the boundary_b adjustment to the existing 'boundary_a' adjustment.
-                    adjustments.append('boundary_b')
-                    for boundary_b in region_b.boundaries.values():
-                        contour = DE9IM(boundary_a, boundary_b)
-                        relation_group = (contour, self.padding, self.padding)
-                        # Adjust for primary and secondary boundaries.
-                        relation_str = self.combine_groups(relation_group,
-                                                           adjustments)
-                        # Merge the relationship into the DE27IM object.
-                        self.merge(self.to_int(relation_str))
+                    adjustments.append('boundary_a')
+                    for boundary_a in region_a.boundaries.values():
+                        # Get the 27 bit relationship for each boundary in region_a
+                        # with all regions and boundaries in region_b.
+                        if region_b.regions:
+                            for poly_b in region_b.regions.values():
+                                self.relate_poly(boundary_a, poly_b,
+                                                 adjustments=adjustments)
+                        if region_b.boundaries:
+                            # If region_b has boundaries, then get the 27 bit
+                            # relationship for each boundary in region_a with
+                            # all boundaries in region_b.
+                            # Add the boundary_b adjustment to the existing
+                            # 'boundary_a' adjustment.
+                            adjustments.append('boundary_b')
+                            for boundary_b in region_b.boundaries.values():
+                                # G``et the 27 bit relationship for each boundary
+                                # in region_a with all boundaries in region_b.
+                                self.relate_poly(boundary_a, boundary_b,
+                                                 adjustments=adjustments)
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
@@ -816,19 +809,12 @@ class DE27IM():
             # contain holes.
             if isinstance(region_a, Contour):
                 poly_a = make_multi(region_a.polygon)
-                # Create a solid Polygon from poly_a
-                solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                          for poly in poly_a.geoms]
-                external_polygon = shapely.unary_union(solids)
+                external_polygon = make_solid(poly_a.polygon)
                 hull_polygon = region_a.hull
             elif isinstance(region_a, (shapely.Polygon,
                                           shapely.MultiPolygon)):
                 poly_a = make_multi(region_a)
-                # Create a solid Polygon from poly_a
-                # Create a solid Polygon from poly_a
-                solids = [shapely.Polygon(shapely.get_exterior_ring(poly))
-                          for poly in poly_a.geoms]
-                external_polygon = shapely.unary_union(solids)
+                external_polygon = make_solid(poly_a)
                 hull_polygon = poly_a.convex_hull
             else:
                 raise ValueError(''.join([
@@ -849,14 +835,64 @@ class DE27IM():
                     f'Region_a input was: {str(type(region_a))}\t',
                     f'Region_b input was: {str(type(region_b))}'
                     ]))
-            contour = DE9IM(poly_a, poly_b)
+            self.relate_poly(poly_a, poly_b, external_polygon, hull_polygon,
+                             adjustments=adjustments)
+
+
+    def relate_poly(self, poly_a: PolygonType, poly_b: PolygonType,
+                    external_polygon: PolygonType = None,
+                    hull_polygon: PolygonType = None,
+                    adjustments: List[str] = None):
+        '''Calculate the DE-27IM relationship for two polygons.
+
+          The DE-27IM relationship is calculated by creating three DE-9IM
+          relationships:
+            1. The DE-9IM relationship between the two polygons (contour).
+            2. The DE-9IM relationship between the *exterior* of the first
+                polygon (external) and the second polygon.
+            3. The DE-9IM relationship between the *convex hull* of the first
+                polygon (convex_hull) and the second polygon.
+
+        Args:
+            poly_a (PolygonType): The first polygon.
+            poly_b (PolygonType): The second polygon.
+            external_polygon (PolygonType): The external polygon of the first
+                polygon. If not supplied, self.padding is used.
+            hull_polygon (PolygonType): The convex hull polygon of the first
+                polygon. If not supplied, self.padding is used.
+            adjustments (List[str]): A list of strings that define the
+                   adjustments to be applied to the DE-9IM relationships before
+                   combining them into a DE-27IM relationship string.
+                   Possible adjustments are:
+                    - 'boundary_a': Apply boundary adjustments to the first
+                       DE-9IM.
+                    - 'boundary_b': Apply boundary adjustments to the second
+                          DE-9IM.
+                    - 'hole_a': Apply hole adjustments to the first DE-9IM.
+                    - 'hole_b': Apply hole adjustments to the second DE-9IM.
+                    - 'transpose': Apply transpose adjustments to both DE-9IMs.
+        '''
+        contour = DE9IM(poly_a, poly_b)
+        # If an external polygon is supplied, create a DE9IM relationship for
+        # the external polygon.
+        if external_polygon is None:
+            external = self.padding
+        else:
             external = DE9IM(external_polygon, poly_b)
+        # If a hull polygon is supplied, create a DE9IM relationship for the
+        # hull polygon.
+        if hull_polygon is None:
+            convex_hull = self.padding
+        else:
             convex_hull = DE9IM(hull_polygon, poly_b)
-            relation_group = (contour, external, convex_hull)
-            # If adjustments are supplied, apply them to the relationship.
-            relation_str = self.combine_groups(relation_group, adjustments)
-            # Merge the relationship into the DE27IM object.
-            self.merge(self.to_int(relation_str))
+        # Create a tuple of the three DE-9IM relationships.
+        # The order is important: (contour, external, convex_hull).
+        relation_group = (contour, external, convex_hull)
+        # If adjustments are supplied, apply them to the relationship.
+        relation_str = self.combine_groups(relation_group, adjustments)
+        # Merge the relationship into the DE27IM object.
+        self.merge(self.to_int(relation_str))
+
 
     def apply_adjustments(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
                           adjustments: List[str])-> tuple[DE9IM, DE9IM, DE9IM]:
