@@ -177,6 +177,7 @@ class StructureShape():
         # check for empty slice_sequence
         if not slice_sequence:
             return
+        # FIXME need to include interpolated slices
         not_original = slice_sequence.sequence.Original == False
         intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
         for interpolated_slice in intp_idx:

@@ -755,33 +755,33 @@ class DE27IM():
                 exteriors = region_a.exterior
                 hulls = region_a.hull
                 adjustments = []
-                if region_a.regions:
+                if region_a.has_regions():
                     for region_index, poly_a in region_a.regions.items():
                         # Get the 27 bit relationship for each region in region_a
                         # with all regions and boundaries in region_b.
-                        if region_b.regions:
+                        if region_b.has_regions():
                             for poly_b in region_b.regions.values():
                                 self.relate_poly(poly_a, poly_b,
                                                 exteriors[region_index],
                                                 hulls[region_index], adjustments)
-                        if region_b.regions:
+                        if region_b.has_boundaries():
                             adjustments.append('boundary_b')
                             for boundary_b in region_b.boundaries.values():
                                 self.relate_poly(poly_a, boundary_b,
                                                  adjustments=adjustments)
                 adjustments = []
-                if region_a.boundaries:
+                if region_a.has_boundaries():
                     # Get the 27 bit relationship for each boundary in region_a
                     # with all regions and boundaries in region_b.
                     adjustments.append('boundary_a')
                     for boundary_a in region_a.boundaries.values():
                         # Get the 27 bit relationship for each boundary in region_a
                         # with all regions and boundaries in region_b.
-                        if region_b.regions:
+                        if region_b.has_regions():
                             for poly_b in region_b.regions.values():
                                 self.relate_poly(boundary_a, poly_b,
                                                  adjustments=adjustments)
-                        if region_b.boundaries:
+                        if region_b.has_boundaries():
                             # If region_b has boundaries, then get the 27 bit
                             # relationship for each boundary in region_a with
                             # all boundaries in region_b.

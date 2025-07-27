@@ -642,7 +642,7 @@ def build_contour_graph(contour_table: pd.DataFrame,
     # Get the relevant contours
     contour_by_slice = build_contours(contour_table, roi)
     if not contour_by_slice:
-        # If not contours are found for the given ROI, return an empty graph.
+        # If no contours are found for the given ROI, return an empty graph.
         return contour_graph, slice_sequence
     # Add nodes to the graph
     for contour_data in contour_by_slice.values():

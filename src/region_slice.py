@@ -5,6 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
+import re
 from typing import Dict, List, Union
 
 # Standard Libraries
@@ -333,6 +334,30 @@ class RegionSlice():
                 hull_regions[region_index] = hull_poly
         return hull_regions
 
+    def has_regions(self) -> bool:
+        '''Check if the slice has any regions.
+
+        Returns:
+            bool: True if the slice has regions, False otherwise.
+        '''
+        if self.regions:
+            no_regions = all(region.is_empty
+                             for region in self.regions.values())
+            return not no_regions
+        return False
+
+    def has_boundaries(self) -> bool:
+        '''Check if the slice has any boundaries.
+
+        Returns:
+            bool: True if the slice has boundaries, False otherwise.
+        '''
+        if self.boundaries:
+            no_boundaries = all(boundary.is_empty
+                                for boundary in self.boundaries.values())
+            return not no_boundaries
+        return False
+
     @property
     def is_empty(self)-> bool:
         '''Check if the entire slice is empty.
@@ -340,16 +365,8 @@ class RegionSlice():
         Returns:
             bool: True if the slice is empty, False otherwise.
         '''
-        if self.regions:
-            no_regions = all(region.is_empty
-                             for region in self.regions.values())
-        else:
-            no_regions = True
-        if self.boundaries:
-            no_boundaries = all(boundary.is_empty
-                                for boundary in self.boundaries.values())
-        else:
-            no_boundaries = True
+        no_regions = not self.has_regions()
+        no_boundaries = not self.has_boundaries()
         return no_regions & no_boundaries
 
     def __bool__(self) -> bool:
