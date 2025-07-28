@@ -1,12 +1,9 @@
 '''Contains the structure class.
 '''
-
-from typing import List
-
 import pandas as pd
 import networkx as nx
 
-from types_and_classes import ROI_Type, SliceIndexType
+from types_and_classes import ROI_Type
 from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
@@ -69,16 +66,101 @@ class StructureShape():
                                                             self.roi)
         self.contour_graph = contour_graph
         self.contour_lookup = build_contour_lookup(contour_graph)
-        # FIXME slice_sequence will not contain the interpolated slices for
-        # structures that have not been built yet.
-        # Will need to re-run this method after the structure is built.
-        self.generate_interpolated_contours(slice_sequence)
-        self.calculate_physical_volume()
-        self.calculate_exterior_volume()
-        self.calculate_hull_volume()
-        self.region_table = build_region_table(self.contour_graph,
-                                               slice_sequence)
         return slice_sequence
+
+    def add_interpolated_contours(self, slice_sequence: SliceSequence) -> None:
+        '''Generate interpolated contours for the structure.
+
+        Generates interpolated contours to match with boundary contours
+        generated for other structures.  It creates interpolated contours for
+        all slice indexes from the SliceSequence that fall between edges in the
+        contour graph, but do not have contours in the contour graph.
+
+        Args:
+            slice_sequence (SliceSequence): The table of all slices used in the
+                structure set.
+        '''
+        # Check for empty slice_sequence
+        if not slice_sequence:
+            return
+
+        # Get the min and max slice indexes in the contour graph
+        if len(self.contour_graph) == 0:
+            return
+
+        contour_slices = [
+            self.contour_graph.nodes[node]['contour'].slice_index
+            for node in self.contour_graph.nodes
+        ]
+        min_slice = min(contour_slices)
+        max_slice = max(contour_slices)
+
+        # For all slice indexes in the SliceSequence
+        for slice_index in slice_sequence.slices:
+            # If the slice index is not between the maximum and minimum slice
+            # indexes in the contour graph, continue
+            if slice_index < min_slice or slice_index > max_slice:
+                continue
+
+            # If the slice index is already in the contour graph, continue
+            slice_exists = any(
+                self.contour_graph.nodes[node]['contour'].slice_index == slice_index
+                for node in self.contour_graph.nodes
+            )
+            if slice_exists:
+                continue
+
+            # Find all edges where the slice index is between the node slices
+            edges_to_interpolate = []
+            for edge in self.contour_graph.edges():
+                node1, node2 = edge
+                slice1 = self.contour_graph.nodes[node1]['contour'].slice_index
+                slice2 = self.contour_graph.nodes[node2]['contour'].slice_index
+
+                # Check if slice_index is between slice1 and slice2
+                if min(slice1, slice2) < slice_index < max(slice1, slice2):
+                    edges_to_interpolate.append((node1, node2))
+
+            # For each edge that spans this slice index
+            for node1, node2 in edges_to_interpolate:
+                contour1 = self.contour_graph.nodes[node1]['contour']
+                contour2 = self.contour_graph.nodes[node2]['contour']
+
+                # Create interpolated polygon
+                slices = [contour1.slice_index, contour2.slice_index]
+                interpolated_polygon = interpolate_polygon(
+                    slices, contour1.polygon, contour2.polygon
+                )
+
+                # Create interpolated contour with parameters from first node
+                interpolated_contour = Contour(
+                    roi=contour1.roi,
+                    slice_index=slice_index,
+                    polygon=interpolated_polygon,
+                    existing_contours=[],
+                    is_interpolated=True,
+                    is_boundary=contour1.is_boundary,
+                    is_hole=contour1.is_hole,
+                    hole_type=contour1.hole_type,
+                    region_index=contour1.region_index
+                )
+
+                # Add the interpolated contour to the graph
+                interpolated_label = interpolated_contour.index
+                self.contour_graph.add_node(interpolated_label,
+                                          contour=interpolated_contour)
+
+                # Add edges from interpolated contour to both original nodes
+                contour_match1 = ContourMatch(contour1, interpolated_contour)
+                self.contour_graph.add_edge(node1, interpolated_label,
+                                          match=contour_match1)
+
+                contour_match2 = ContourMatch(contour2, interpolated_contour)
+                self.contour_graph.add_edge(node2, interpolated_label,
+                                          match=contour_match2)
+
+        # Update the contour lookup table
+        self.contour_lookup = build_contour_lookup(self.contour_graph)
 
     def calculate_physical_volume(self):
         '''Calculate the physical volume of a ContourGraph.
@@ -150,6 +232,24 @@ class StructureShape():
             total_volume += volume
         self.hull_volume = total_volume
 
+    def finalize(self, slice_sequence: SliceSequence):
+        '''Add interpolated contours, calculate volumes and build the region table.
+
+        This method adds interpolated contours, based on the input slice
+        sequence. It then calculates the physical, exterior, and hull volumes
+        of the structure and builds the region table.
+
+        Args:
+            slice_sequence (SliceSequence): The slice sequence to use for
+                interpolated contours.
+        '''
+        self.add_interpolated_contours(slice_sequence)
+        # Calculate volumes
+        self.calculate_physical_volume()
+        self.calculate_exterior_volume()
+        self.calculate_hull_volume()
+        self.region_table = build_region_table(self)
+
     def get_contour(self, label: ContourIndex) -> Contour:
         '''Retrieve the contour representation of the structure.
 
@@ -158,82 +258,6 @@ class StructureShape():
         '''
         contour = self.contour_graph.nodes(data=True)[label]['contour']
         return contour
-
-    def generate_interpolated_contours(self, slice_sequence: SliceSequence) -> None:
-        '''Generate interpolated contours for the structure.
-
-        Args:
-            slice_sequence (SliceSequence): The table of all slices used in the
-                structure set.
-            interpolated_slice_indexes (List[SliceIndexType]): A list of slice
-                indexes containing interpolated contours.
-        '''
-        nbr_pairs = []
-        match_index = ['ROI', 'HoleType', 'Interpolated', 'Boundary',
-               'RegionIndex', 'ThisSlice']
-        selected_columns = ['ThisSlice', 'SliceIndex_prv', 'SliceIndex_nxt',
-                    'Label_prv', 'Label_nxt']
-        nbr_pairs = []
-        # check for empty slice_sequence
-        if not slice_sequence:
-            return
-        # FIXME need to include interpolated slices
-        not_original = slice_sequence.sequence.Original == False
-        intp_idx = list(slice_sequence.sequence.loc[not_original, 'ThisSlice'])
-        for interpolated_slice in intp_idx:
-            nbr = slice_sequence.get_neighbors(interpolated_slice)
-
-            is_previous = self.contour_lookup.SliceIndex == nbr.previous_slice
-            prv_contours = self.contour_lookup.loc[is_previous, :].copy()
-            prv_contours['ThisSlice'] = interpolated_slice
-
-            is_next = self.contour_lookup.SliceIndex == nbr.next_slice
-            nxt_contours = self.contour_lookup.loc[is_next, :].copy()
-            nxt_contours['ThisSlice'] = interpolated_slice
-            prv_nxt = prv_contours.merge(nxt_contours, how='outer',
-                                         on=match_index,
-                                        suffixes=('_prv', '_nxt'))
-            prv_nxt = prv_nxt[selected_columns]
-            nbr_pairs.append(prv_nxt)
-        nbr_pairs = pd.concat(nbr_pairs, ignore_index=True).dropna(axis=0,
-                                                                   how='any')
-        nbr_pairs.reset_index(drop=True, inplace=True)
-        for intp_param in nbr_pairs.itertuples():
-            slices = [intp_param.SliceIndex_prv, intp_param.SliceIndex_nxt]
-            contour_prv = self.get_contour(intp_param.Label_prv)
-            contour_nxt = self.get_contour(intp_param.Label_nxt)
-            interpolated_polygon = interpolate_polygon(slices,
-                                                       contour_prv.polygon,
-                                                       contour_nxt.polygon)
-            interpolated_contour = Contour(
-                roi=self.roi,
-                slice_index=intp_param.ThisSlice,
-                polygon=interpolated_polygon,
-                existing_contours=[]
-                )
-            interpolated_contour.is_interpolated = True
-            interpolated_contour.is_boundary = False
-            interpolated_contour.is_hole = contour_prv.is_hole
-            interpolated_contour.hole_type = contour_prv.hole_type
-            interpolated_contour.region_index = contour_prv.region_index
-            # Add the interpolated contour to the graph
-            interpolated_label = interpolated_contour.index
-            self.contour_graph.add_node(interpolated_label,
-                                            contour=interpolated_contour)
-            # Add ContourMatch edges between the original contours and the
-            # interpolated contour.
-            contour_match = ContourMatch(contour_prv, interpolated_contour)
-            self.contour_graph.add_edge(contour_prv.index, interpolated_label,
-                                        match=contour_match)
-            contour_match = ContourMatch(contour_nxt, interpolated_contour)
-            self.contour_graph.add_edge(contour_nxt.index, interpolated_label,
-                                        match=contour_match)
-            self.contour_lookup = build_contour_lookup(self.contour_graph)
-            self.contour_lookup = build_contour_lookup(self.contour_graph)
-            self.contour_graph.add_edge(contour_nxt.index, interpolated_label,
-                                        match=contour_match)
-            self.contour_lookup = build_contour_lookup(self.contour_graph)
-            self.contour_lookup = build_contour_lookup(self.contour_graph)
 
     def relate(self, other: 'StructureShape') -> 'DE27IM':
         '''Relate this structure to another structure.

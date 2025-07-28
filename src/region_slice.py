@@ -434,29 +434,31 @@ def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:
 
 
 
-def build_region_table(contour_graph: nx.Graph,
-                       slice_sequence: pd.DataFrame) -> pd.DataFrame:
+def build_region_table(structure: 'StructureShape') -> pd.DataFrame:
     '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
 
-    ***This Text needs Correcting***
     Args:
-        contour_graph (nx.Graph): The graph representation of the contours.
-        contour_lookup (pd.DataFrame): A DataFrame serving as a lookup table
-            for contours.
+        structure (StructureShape): The structure containing the contour graph
+            and slice sequence.
 
     Returns:
         pd.DataFrame: A DataFrame containing RegionSlices with the following
         columns:
-            - RegionIndex
             - SliceIndex
             - RegionSlice
+            - Empty
+            - Interpolated
     '''
     enclosed_region_data = []
 
-    # Iterate through each unique combination of RegionIndex and SliceIndex
-    for slice_index in slice_sequence.slices:
+    # Get slice indexes from contour_lookup instead of slice_sequence
+    contour_lookup = build_contour_lookup(structure.contour_graph)
+    slice_indexes = contour_lookup['SliceIndex'].unique()
+
+    # Iterate through each unique SliceIndex
+    for slice_index in slice_indexes:
         # Create a RegionSlice for the given SliceIndex
-        region_slice = RegionSlice(contour_graph, slice_index)
+        region_slice = RegionSlice(structure.contour_graph, slice_index)
         # Add the RegionSlice to the DataFrame
         enclosed_region_data.append({
             'SliceIndex': slice_index,
@@ -466,5 +468,7 @@ def build_region_table(contour_graph: nx.Graph,
         })
 
     # Create the enclosed_region DataFrame
+    enclosed_region_table = pd.DataFrame(enclosed_region_data)
+    return enclosed_region_table
     enclosed_region_table = pd.DataFrame(enclosed_region_data)
     return enclosed_region_table
