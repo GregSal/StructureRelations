@@ -806,14 +806,14 @@ class DE27IM():
             # match the contour relation, because a Contour polygon does not
             # contain holes.
             if isinstance(region_a, Contour):
-                poly_a = make_multi(region_a.polygon)
-                external_polygon = make_solid(poly_a.polygon)
+                poly_a = region_a.polygon
+                external_polygon = make_solid(region_a.polygon)
                 hull_polygon = region_a.hull
             elif isinstance(region_a, (shapely.Polygon,
-                                          shapely.MultiPolygon)):
-                poly_a = make_multi(region_a)
-                external_polygon = make_solid(poly_a)
-                hull_polygon = poly_a.convex_hull
+                                       shapely.MultiPolygon)):
+                poly_a = region_a
+                external_polygon = make_solid(region_a)
+                hull_polygon = region_a.convex_hull
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
