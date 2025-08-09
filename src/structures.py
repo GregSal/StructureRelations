@@ -8,7 +8,7 @@ from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
-from region_slice import RegionSlice, build_region_table
+from region_slice import RegionSlice
 from relations import DE27IM
 
 

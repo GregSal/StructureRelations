@@ -1,16 +1,26 @@
+#%%
 import pandas as pd
 import pytest
 
 import shapely
 
-from contours import build_contour_table
-from relations import RelationshipType, find_relations
+from structure_set import StructureSet
+from relations import DE27IM, RelationshipType
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
 from debug_tools import make_sphere, make_box, box_points
-from structures import StructureShape
 from utilities import poly_round
 
+# %% Utility functions
+def get_relation_type(slice_data, roi1=1, roi2=2)->DE27IM:
+    # build the structure set
+    structures = StructureSet(slice_data)
+    structure_a = structures.structures[roi1]
+    structure_b = structures.structures[roi2]
+    relation = structure_a.relate(structure_b)
+    relation_type = relation.identify_relation()
+    return relation_type
 
+# %% Tests
 class TestContains:
     def test_contains_embedded_spheres(self):
         slice_spacing = 0.5
@@ -22,20 +32,7 @@ class TestContains:
         sphere3 = make_sphere(roi_num=2, radius=1.5, spacing=slice_spacing)
         # combine the contours
         slice_data = sphere6 + sphere3 + body
-        # convert contour slice data into a table of slices and structures
-        contour_table, slice_sequence = build_contour_table(slice_data)
-        outer_cylinder = StructureShape(roi=1, name='outer_cylinder')
-        inner_cylinder = StructureShape(roi=1, name='inner_cylinder')
-        slice_sequence = outer_cylinder.add_contour_graph(contour_table,
-                                                             slice_sequence)
-        slice_sequence = inner_cylinder.add_contour_graph(contour_table,
-                                                            slice_sequence)
-
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONTAINS
 
     def test_contains_simple_cylinders(self):
@@ -53,13 +50,8 @@ class TestContains:
                                                     offset_x=0, offset_z=0,
                                                     spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, contained_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + contained_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONTAINS
 
     def test_embedded_boxes(self):
@@ -71,13 +63,8 @@ class TestContains:
         cube6 = make_box(roi_num=1, width=6, spacing=slice_spacing)
         cube3 = make_box(roi_num=2, width=3, offset_z=0, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([cube6, cube3, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = cube6 + cube3 + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONTAINS
 
     def test_parallel_cylinders_example(self):
@@ -99,14 +86,8 @@ class TestContains:
                                                        offset_x=2.5, offset_z=0,
                                                        spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, left_cylinder, right_cylinder,
-                                right_middle_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + left_cylinder + right_cylinder + right_middle_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONTAINS
 
     def test_nested_spheres(self):
@@ -120,13 +101,8 @@ class TestContains:
         sphere6 = make_sphere(roi_num=2, radius=3, spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, sphere12, hole10, sphere8, sphere6])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + sphere12 + hole10 + sphere8 + sphere6
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONTAINS
 
 class TestSurrounds:
@@ -143,14 +119,8 @@ class TestSurrounds:
                                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                surrounded_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SURROUNDS
 
     def test_surrounded_horizontal_cylinder(self):
@@ -166,14 +136,8 @@ class TestSurrounds:
                                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                surrounded_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SURROUNDS
 
     def test_sphere_in_shell(self):
@@ -186,13 +150,8 @@ class TestSurrounds:
         sphere6 = make_sphere(roi_num=2, radius=3, spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, sphere12, hole10, sphere6])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + sphere12 + hole10 + sphere6
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SURROUNDS
 
     def test_sphere_in_cylinders_in_box(self):
@@ -212,14 +171,8 @@ class TestSurrounds:
                                 offset_x=2.5, offset_z=0,
                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cube6, left_cylinder, right_cylinder,
-                                right_sphere])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SURROUNDS
 
 class TestShelters:
@@ -238,17 +191,11 @@ class TestShelters:
                                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([outer_cylinder, cylinder_hole,
-                                surrounded_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    @pytest.mark.xfail
+    #@pytest.mark.xfail
     def test_shelters_horizontal_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -266,17 +213,11 @@ class TestShelters:
                                 offset_x=2.5, offset_z=0,
                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cube6, left_cylinder, right_cylinder,
-                                right_sphere])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    @pytest.mark.xfail
+    #@pytest.mark.xfail
     def test_shelters_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -290,17 +231,11 @@ class TestShelters:
                                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                surrounded_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    @pytest.mark.xfail
+    #@pytest.mark.xfail
     def test_sphere_in_cylinders_in_box(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -318,14 +253,8 @@ class TestShelters:
                                 offset_x=2.5, offset_z=0,
                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cube6, left_cylinder, right_cylinder,
-                                right_sphere])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
 class TestDisjoint:
@@ -340,13 +269,8 @@ class TestDisjoint:
         right_cube = make_box(roi_num=2, width=2, offset_x=3,
                             spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([left_cube, right_cube, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = left_cube + right_cube + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
     def test_extended_inner_cylinder(self):
@@ -361,14 +285,8 @@ class TestDisjoint:
         inner_cylinder = make_vertical_cylinder(roi_num=2, radius=3, length=12,
                                                     spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                inner_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
     def test_disjoint_horizontal_cylinder(self):
@@ -384,14 +302,8 @@ class TestDisjoint:
                                                     length=12,
                                                     spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([outer_cylinder, cylinder_hole,
-                                surrounded_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = outer_cylinder + cylinder_hole + surrounded_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
     def test_parallel_disjoint_cylinder(self):
@@ -409,14 +321,8 @@ class TestDisjoint:
                                                    length=6, offset_x=10,
                                                    spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                inner_cylinder, disjoint_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder + disjoint_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
     def test_axial_disjoint_cylinder(self):
@@ -434,14 +340,8 @@ class TestDisjoint:
                                                    length=6, offset_z=12,
                                                    spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, outer_cylinder, cylinder_hole,
-                                inner_cylinder, disjoint_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder + disjoint_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
     def test_disjoint_concentric_cylinders(self):
@@ -462,14 +362,8 @@ class TestDisjoint:
                                                 offset_z=-7,
                                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, upper_cylinder1,
-                                lower_cylinder2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + upper_cylinder1 + lower_cylinder2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.DISJOINT
 
 class TestBorders:
@@ -491,14 +385,8 @@ class TestBorders:
                                                 offset_z=-6,
                                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, bordering_cylinder1,
-                                bordering_cylinder2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + bordering_cylinder1 + bordering_cylinder2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
     def test_lateral_borders_boxes(self):
@@ -512,13 +400,8 @@ class TestBorders:
         right_cube = make_box(roi_num=2, width=2, offset_x=1,
                             spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([left_cube, right_cube, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = left_cube + right_cube + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
     def test_concentric_cylinders_sup_offset(self):
@@ -533,13 +416,8 @@ class TestBorders:
         sup_cylinder = make_vertical_cylinder(roi_num=2, radius=0.2, length=0.4,
                                               offset_z=0, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, sup_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + sup_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
     def test_lateral_borders_two_boxes(self):
@@ -555,13 +433,8 @@ class TestBorders:
         disjoint_cube = make_box(roi_num=2, width=2, offset_x=-2,
                             spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([left_cube, right_cube, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = left_cube + right_cube + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
 class TestConfines:
@@ -576,13 +449,8 @@ class TestConfines:
         Box4 = make_box(roi_num=2, width=4,  spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, box6, hole4, Box4])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + box6 + hole4 + Box4
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
     def test_confines_cylinder(self):
@@ -603,14 +471,8 @@ class TestConfines:
                                                    length=0.5, offset_x=2.5,
                                                    spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, left_hole, right_hole,
-                                confines_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + left_hole + right_hole + confines_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
     def test_embedded_cylinder(self):
@@ -628,13 +490,8 @@ class TestConfines:
                                                 offset_z=-0.2,
                                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, center_hole, middle_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + center_hole + middle_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
     def test_embedded_spheres(self):
@@ -651,13 +508,8 @@ class TestConfines:
         hole8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, sphere12, hole10, sphere8, sphere10, hole8])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + sphere12 + hole10 + sphere8 + sphere10 + hole8
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
     def test_confined_box_z_border(self):
@@ -671,13 +523,8 @@ class TestConfines:
         Box2 = make_box(roi_num=2, width=2, offset_z=1,  spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, box6, hole4, Box2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + box6 + hole4 + Box2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
     def test_confined_box_y_border(self):
@@ -691,13 +538,8 @@ class TestConfines:
         Box2 = make_box(roi_num=2, width=2, offset_y=1,  spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, box6, hole4, Box2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + box6 + hole4 + Box2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
 
@@ -711,13 +553,8 @@ class TestPartition:
         box6_3 = make_box(roi_num=2, width=6, length=3, height=6, offset_y=1.5,
                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([box6, box6_3, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = box6 + box6_3 + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_partition_embedded_box_on_z_surface(self):
@@ -730,13 +567,8 @@ class TestPartition:
         box6_3 = make_box(roi_num=2, width=6, length=6, height=3, offset_z=1.5,
                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([box6, box6_3, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = box6 + box6_3 + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
 
@@ -750,13 +582,8 @@ class TestPartition:
         cylinder1h = make_horizontal_cylinder(radius=1, length=5, roi_num=2,
                                             spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cylinder1h, cylinder2h])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cylinder1h + cylinder2h
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_vertical_concentric_cylinders(self):
@@ -769,13 +596,8 @@ class TestPartition:
         cylinder4 = make_vertical_cylinder(roi_num=2, radius=4, length=10,
                                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cylinder6, cylinder4])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cylinder6 + cylinder4
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_concentric_cylinders_same_start(self):
@@ -791,13 +613,8 @@ class TestPartition:
                                             offset_z=-1.5,
                                             spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, sup_partition])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + sup_partition
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_concentric_cylinders_same_end(self):
@@ -812,13 +629,8 @@ class TestPartition:
         inf_partition = make_vertical_cylinder(roi_num=2, radius=1, length=4,
                                             offset_z=2, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, inf_partition])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + inf_partition
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_concentric_cylinders_same_start_end(self):
@@ -833,13 +645,8 @@ class TestPartition:
         mid_partition = make_vertical_cylinder(roi_num=2, radius=1, length=0.7,
                                             offset_z=-0.0, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, mid_partition])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + mid_partition
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
     def test_partition_sphere_island(self):
@@ -855,13 +662,8 @@ class TestPartition:
         sphere4_2 = make_sphere(roi_num=2, radius=2, spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, sphere12, hole8, sphere4, sphere4_2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + sphere12 + hole8 + sphere4 + sphere4_2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
 
@@ -878,13 +680,8 @@ class TestOverlaps:
                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, right_sphere6, left_sphere6])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + right_sphere6 + left_sphere6
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlapping_boxes_y(self):
@@ -897,13 +694,8 @@ class TestOverlaps:
         box6_y = make_box(roi_num=2, width=0.6, offset_y=0.2,
                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([box6, box6_y, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = box6 + box6_y + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlapping_boxes_z(self):
@@ -916,13 +708,8 @@ class TestOverlaps:
         box6_y = make_box(roi_num=2, width=0.6, offset_z=0.3,
                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([box6, box6_y, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = box6 + box6_y + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_stacked_boxes(self):
@@ -935,13 +722,8 @@ class TestOverlaps:
         box6_y = make_box(roi_num=2, width=0.6, offset_z=0.6,
                         spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([box6, box6_y, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = box6 + box6_y + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlapping_concentric_cylinders_example(self):
@@ -962,14 +744,8 @@ class TestOverlaps:
                                                 offset_z=-5,
                                                 spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, overlapping_cylinder1,
-                                overlapping_cylinder2])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + overlapping_cylinder1 + overlapping_cylinder2
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlapping_cubes_inf_rt(self):
@@ -982,13 +758,8 @@ class TestOverlaps:
         cube6_inf_rt = make_box(roi_num=2, width=6, offset_z=3, offset_x=3,
                                 offset_y=3, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([body, cube6, cube6_inf_rt])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + cube6 + cube6_inf_rt
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
     def test_overlapping_extended_cylinder(self):
@@ -1006,13 +777,8 @@ class TestOverlaps:
                                                       spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, primary_cylinder, overlapping_cylinder])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + primary_cylinder + overlapping_cylinder
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.OVERLAPS
 
 
@@ -1029,15 +795,8 @@ class TestEquals:
                                     spacing=slice_spacing)
 
         # combine the contours
-        slice_data = pd.concat([body, a_sphere6, b_sphere6])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = body + a_sphere6 + b_sphere6
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.EQUALS
 
     def test_equal_boxes(self):
@@ -1049,16 +808,13 @@ class TestEquals:
         a_box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
         b_box6 = make_box(roi_num=2, width=0.6, spacing=slice_spacing)
         # combine the contours
-        slice_data = pd.concat([a_box6, b_box6, body])
-        # convert contour slice data into a table of slices and structures
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = a_box6 + b_box6 + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.EQUALS
 
+    @pytest.mark.xfail
     def test_equal_boxes_by_crop(self):
+    # FIXME this function assumes that make_box returns a dataframe rather than a list of points
         def apply_crop(p):
             # polygon made from offset boxed resulting in a 4x4 square hole in the
             # middle.
@@ -1083,10 +839,6 @@ class TestEquals:
 
         poly_a = box8.loc[(slice(None), slice(-0.2, 0.2)), :].copy()
         poly_a.Contour = poly_a.Contour.apply(apply_crop)
-        slice_data = pd.concat([poly_a, box4, body])
-        slice_table = make_slice_table(slice_data, ignore_errors=True)
-        regions = generate_region_graph(slice_table)
-        selected_roi = [1, 2]
-        relation = find_relations(slice_table, regions, selected_roi)
-        relation_type = relation.identify_relation()
+        slice_data = poly_a + box4 + body
+        relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.EQUALS
