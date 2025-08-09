@@ -5,8 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-import re
-from typing import Dict, List, Union
+from typing import Dict, Union
 
 # Standard Libraries
 
@@ -431,44 +430,3 @@ def empty_structure(structure: Union[RegionSlice, float], invert=False) -> bool:
     if invert:
         return not is_empty
     return is_empty
-
-
-
-def build_region_table(structure: 'StructureShape') -> pd.DataFrame:
-    '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
-
-    Args:
-        structure (StructureShape): The structure containing the contour graph
-            and slice sequence.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing RegionSlices with the following
-        columns:
-            - SliceIndex
-            - RegionSlice
-            - Empty
-            - Interpolated
-    '''
-    enclosed_region_data = []
-
-    # Get slice indexes from contour_lookup instead of slice_sequence
-    contour_lookup = build_contour_lookup(structure.contour_graph)
-    slice_indexes = contour_lookup['SliceIndex'].unique()
-
-    # Iterate through each unique SliceIndex
-    for slice_index in slice_indexes:
-        # Create a RegionSlice for the given SliceIndex
-        region_slice = RegionSlice(structure.contour_graph, slice_index)
-        # Add the RegionSlice to the DataFrame
-        enclosed_region_data.append({
-            'SliceIndex': slice_index,
-            'RegionSlice': region_slice,
-            'Empty': region_slice.is_empty,
-            'Interpolated': region_slice.is_interpolated
-        })
-
-    # Create the enclosed_region DataFrame
-    enclosed_region_table = pd.DataFrame(enclosed_region_data)
-    return enclosed_region_table
-    enclosed_region_table = pd.DataFrame(enclosed_region_data)
-    return enclosed_region_table

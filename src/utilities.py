@@ -1,7 +1,7 @@
 '''Utility Functions'''
 # %% Imports
 # Type imports
-from typing import List, Union
+from typing import List
 
 # Shared Packages
 import shapely

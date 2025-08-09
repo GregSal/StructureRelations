@@ -8,7 +8,7 @@ from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
-from region_slice import build_region_table
+from region_slice import RegionSlice, build_region_table
 from relations import DE27IM
 
 
@@ -232,6 +232,41 @@ class StructureShape():
             total_volume += volume
         self.hull_volume = total_volume
 
+    def build_region_table(self):
+        '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
+
+        The region table is a DataFrame containing RegionSlices with the
+        following columns:
+            - SliceIndex
+            - RegionSlice
+            - Empty
+            - Interpolated
+        Args:
+            structure (StructureShape): The structure containing the contour graph
+                and slice sequence.
+        '''
+        enclosed_region_data = []
+
+        # Get slice indexes from contour_lookup instead of slice_sequence
+        contour_lookup = build_contour_lookup(self.contour_graph)
+        slice_indexes = contour_lookup['SliceIndex'].unique()
+
+        # Iterate through each unique SliceIndex
+        for slice_index in slice_indexes:
+            # Create a RegionSlice for the given SliceIndex
+            region_slice = RegionSlice(self.contour_graph, slice_index)
+            # Add the RegionSlice to the DataFrame
+            enclosed_region_data.append({
+                'SliceIndex': slice_index,
+                'RegionSlice': region_slice,
+                'Empty': region_slice.is_empty,
+                'Interpolated': region_slice.is_interpolated
+            })
+
+        # Create the enclosed_region DataFrame
+        enclosed_region_table = pd.DataFrame(enclosed_region_data)
+        self.region_table = enclosed_region_table
+
     def finalize(self, slice_sequence: SliceSequence):
         '''Add interpolated contours, calculate volumes and build the region table.
 
@@ -248,7 +283,7 @@ class StructureShape():
         self.calculate_physical_volume()
         self.calculate_exterior_volume()
         self.calculate_hull_volume()
-        self.region_table = build_region_table(self)
+        self.build_region_table()
 
     def get_contour(self, label: ContourIndex) -> Contour:
         '''Retrieve the contour representation of the structure.
@@ -295,7 +330,7 @@ class StructureShape():
                                     lsuffix='_self', rsuffix='_other')
 
         # 4. For each common slice, get and merge the DE27IM relationship.
-        for sliceindex, row in regions.iterrows():
+        for _, row in regions.iterrows():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other)

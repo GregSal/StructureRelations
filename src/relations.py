@@ -10,8 +10,6 @@ from dataclasses import dataclass
 
 # Shared Packages
 import shapely
-import pandas as pd
-import networkx as nx
 
 # Local packages
 from contours import Contour

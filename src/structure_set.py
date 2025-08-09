@@ -1,12 +1,12 @@
 '''StructureSet class for managing multiple structures and their relationships.
 '''
 # %% Imports
-from typing import Dict, List
+from typing import List
 import pandas as pd
 import networkx as nx
 
 from types_and_classes import ROI_Type
-from contours import SliceSequence, build_contour_table
+from contours import build_contour_table
 from structures import StructureShape
 from relations import DE27IM
 
