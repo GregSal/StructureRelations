@@ -5,7 +5,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,
-    "pythonTestExplorer.testFramework": "pytest"
+    "pythonTestExplorer.testFramework": "pytest",
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src"
     ],
@@ -21,11 +21,11 @@
     "python.analysis.supportDocstringTemplate": true,
     "python.analysis.reportExtraTelemetry": false,
     "python.analysis.ignore": [
-        "**/FreeCAD Scripts"
+        "**/FreeCAD Scripts/*"
     ],
     "python.analysis.exclude": [
         "**/debug_tools.py",
-        "**/FreeCAD_Scripts"
+        "**/FreeCAD_Scripts/*"
     ],
     "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python",
     "python.terminal.activateEnvInCurrentTerminal": true,

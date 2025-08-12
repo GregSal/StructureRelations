@@ -4,7 +4,7 @@
     "context": "..",
     "dockerfile": "Dockerfile"
   },
-  "postCreateCommand": "conda config --set solver classic && conda env create --name StructureRelations -f StructureRelations_FULL.yml && conda activate StructureRelations",
+  "postCreateCommand": "conda config --set solver classic && conda init && conda env create --name StructureRelations -f StructureRelations_FULL.yml && conda activate StructureRelations",
   "customizations": {
     "vscode": {
       "extensions": [
