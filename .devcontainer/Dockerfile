@@ -1,5 +1,5 @@
 # Use the official devcontainers Conda image
-FROM mcr.microsoft.com/devcontainers/python:3.10-conda
+FROM mcr.microsoft.com/devcontainers/miniconda:0-3
 
 # Install additional packages (optional)
 RUN conda install -n base -c conda-forge \
