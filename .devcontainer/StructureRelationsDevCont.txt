@@ -1,0 +1,18 @@
+conda config --append channels conda-forge
+conda create -y --name StructureRelations
+conda init
+conda activate StructureRelations
+conda install -y python=3.11 networkx shapely pygraphviz pandas matplotlib numpy pyodbc pydicom pysimplegui scipy jupyterlab ipympl pylint pytest
+conda env export > StructureRelations_FULL.yml
+conda env export --from-history > environment.yml
+
+
+
+########## Install command ############
+conda create --name StructureRelations --file "C:\TEMP\StructureRelations_specfile.txt"
+
+conda env create --name StructureRelations --file="StructureRelations.yml"
+
+{
+  "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python"
+}

@@ -1,0 +1,33 @@
+{
+  "name": "Structure Relations Dev Environment",
+  "build": { 
+    "context": "..",
+    "dockerfile": "Dockerfile"
+  },
+  "postCreateCommand": "conda env update -f StructureRelations_FULL.yml && conda activate StructureRelations",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-python.vscode-pylance",
+        "hbenl.vscode-test-explorer",
+        "LittleFoxTeam.vscode-python-test-adapter",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-python.isort",
+        "VisualStudioExptTeam.vscodeintellicode"
+      ],
+      "settings": {
+        "python.testing.nosetestsEnabled": false
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/conda:1": {
+      "addCondaForge": true,
+      "installMiniconda": true,
+      "condaVersion": "latest"
+    }
+  }
+}
