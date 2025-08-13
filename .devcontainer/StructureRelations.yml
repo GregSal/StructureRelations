@@ -1,8 +1,5 @@
 name: StructureRelations
 channels:
-  - defaults
-  - https://repo.anaconda.com/pkgs/main
-  - https://repo.anaconda.com/pkgs/r
   - conda-forge
 dependencies:
   - ipympl=0.8.7

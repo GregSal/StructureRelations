@@ -1,4 +1,5 @@
 {
+    "python.envFile": "${workspaceFolder}/.env",
     "python.testing.pytestArgs": [
         "Tests"
     ],
@@ -9,7 +10,6 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src"
     ],
-    "python.envFile": "${workspaceFolder}/.env",
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": false,
     "python.analysis.autoImportCompletions": true,
