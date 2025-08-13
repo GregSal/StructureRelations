@@ -251,5 +251,5 @@ dependencies:
   - zlib=1.2.13=h5eee18b_1
   - zstd=1.5.6=hc292b87_0
 variables:
-  PYTHONPATH: /workspaces/StructureRelations /workspaces/StructureRelations/src /workspaces/StructureRelations/Tests /workspaces/StructureRelations/examples $PYTHONPATH
+  PYTHONPATH: /workspaces/StructureRelations:/workspaces/StructureRelations/src:/workspaces/StructureRelations/Tests:/workspaces/StructureRelations/examples:$PYTHONPATH
 prefix: /opt/conda/envs/StructureRelations
