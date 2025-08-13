@@ -734,8 +734,8 @@ class DE27IM():
                 # and boundaries in region_b.
                 # All of these comparisons are merged into a single DE27IM object.
                 #
-                # 1. for each MultiPolygon in RegionSlice.regions of region_a:
-                #    a. Get a 27 bit relation with all MultiPolygons in
+                # 1. Merge the MultiPolygon in RegionSlice.regions of region_a:
+                #    a. Get a 27 bit relation with the combined MultiPolygons in
                 #        RegionSlice.regions and in RegionSlice.boundaries of region_b.
                 #          - MultiPolygon vs other MultiPolygon
                 #          - RegionSlice.exterior vs other MultiPolygon
@@ -749,51 +749,40 @@ class DE27IM():
                 #           - Boundary MultiPolygon vs other MultiPolygon
                 #           *Note: External and hull comparisons are not required for boundaries*
                 #    b. Apply appropriate corrections for holes and boundaries.
-                # 3. Combine all relations with OR
-                # FIXME region_a.regions must be combined into a MultiPolygon
-                # exteriors must be combined into a MultiPolygon
-                # hulls must be combined into a MultiPolygon
-                exteriors = region_a.exterior
-                hulls = region_a.hull
+                # 3. Combine all relations with OR.
                 adjustments = []
                 if region_a.has_regions():
-                    for region_index, poly_a in region_a.regions.items():
-                        # Get the 27 bit relationship for each region in region_a
-                        # with all regions and boundaries in region_b.
-                        if region_b.has_regions():
-                            for poly_b in region_b.regions.values():
-                                self.relate_poly(poly_a, poly_b,
-                                                exteriors[region_index],
-                                                hulls[region_index], adjustments)
-                        if region_b.has_boundaries():
-                            adjustments.append('boundary_b')
-                            for boundary_b in region_b.boundaries.values():
-                                self.relate_poly(poly_a, boundary_b,
-                                                 adjustments=adjustments)
+                    # Get the 27 bit relationship for the combined regions in
+                    # region_a with all regions and boundaries in region_b.
+                    poly_a = shapely.union_all(list(region_a.regions.values()))
+                    exterior = shapely.union_all(list(region_a.exterior.values()))
+                    hull = shapely.union_all(list(region_a.hull.values()))
+                    if region_b.has_regions():
+                        poly_b = shapely.union_all(list(region_b.regions.values()))
+                        self.relate_poly(poly_a, poly_b, exterior, hull,
+                                         adjustments=adjustments)
+                    if region_b.has_boundaries():
+                        adjustments.append('boundary_b')
+                        boundary_b = shapely.union_all(list(region_b.boundaries.values()))
+                        self.relate_poly(poly_a, boundary_b,
+                                         adjustments=adjustments)
                 adjustments = []
                 if region_a.has_boundaries():
-                    # Get the 27 bit relationship for each boundary in region_a
-                    # with all regions and boundaries in region_b.
+                    # Get the 27 bit relationship for the combined boundaries in
+                    # region_a with all regions and boundaries in region_b.
                     adjustments.append('boundary_a')
-                    for boundary_a in region_a.boundaries.values():
-                        # Get the 27 bit relationship for each boundary in region_a
-                        # with all regions and boundaries in region_b.
-                        if region_b.has_regions():
-                            for poly_b in region_b.regions.values():
-                                self.relate_poly(boundary_a, poly_b,
-                                                 adjustments=adjustments)
-                        if region_b.has_boundaries():
-                            # If region_b has boundaries, then get the 27 bit
-                            # relationship for each boundary in region_a with
-                            # all boundaries in region_b.
-                            # Add the boundary_b adjustment to the existing
-                            # 'boundary_a' adjustment.
-                            adjustments.append('boundary_b')
-                            for boundary_b in region_b.boundaries.values():
-                                # G``et the 27 bit relationship for each boundary
-                                # in region_a with all boundaries in region_b.
-                                self.relate_poly(boundary_a, boundary_b,
-                                                 adjustments=adjustments)
+                    boundary_a = shapely.union_all(list(region_a.boundaries.values()))
+                    if region_b.has_regions():
+                        poly_b = shapely.union_all(list(region_b.regions.values()))
+                        self.relate_poly(boundary_a, poly_b,
+                                         adjustments=adjustments)
+                    if region_b.has_boundaries():
+                        # Add the boundary_b adjustment to the existing
+                        # 'boundary_a' adjustment.
+                        adjustments.append('boundary_b')
+                        boundary_b = shapely.union_all(list(region_b.boundaries.values()))
+                        self.relate_poly(boundary_a, boundary_b,
+                                         adjustments=adjustments)
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
