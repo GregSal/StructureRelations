@@ -1,7 +1,7 @@
 {
   "name": "Structure Relations Dev Environment",
   "image": "mcr.microsoft.com/vscode/devcontainers/anaconda:3",
-  "postCreateCommand": "mkdir -p .vscode && cp -n .devcontainer/settings.json .vscode/settings.json && cp -n .devcontainer/DevCont.env .env && cp -n .devcontainer/StructureRelations_FULL.yml environment.yml && conda init && conda env create --name StructureRelations -f StructureRelations_FULL.yml",
+  "postCreateCommand": "mkdir -p .vscode && cp -n .devcontainer/settings.json .vscode/settings.json && cp -n .devcontainer/DevCont.env .env && cp -n .devcontainer/StructureRelations_FULL.yml environment.yml && conda init && conda env create --name StructureRelations -f .devcontainer/StructureRelations_FULL.yml",
   "customizations": {
     "vscode": {
       "extensions": [
