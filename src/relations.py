@@ -750,6 +750,9 @@ class DE27IM():
                 #           *Note: External and hull comparisons are not required for boundaries*
                 #    b. Apply appropriate corrections for holes and boundaries.
                 # 3. Combine all relations with OR
+                # FIXME region_a.regions must be combined into a MultiPolygon
+                # exteriors must be combined into a MultiPolygon
+                # hulls must be combined into a MultiPolygon
                 exteriors = region_a.exterior
                 hulls = region_a.hull
                 adjustments = []
