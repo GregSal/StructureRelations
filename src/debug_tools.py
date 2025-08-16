@@ -137,7 +137,7 @@ def show_bounds(polygon):
     return b
 
 
-def plot_ab(poly_a, poly_b):
+def plot_ab(poly_a, poly_b, add_axis=True):
     '''Plot the difference between two polygons.
 
     This function plots the difference between two polygons, showing the
@@ -186,8 +186,9 @@ def plot_ab(poly_a, poly_b):
     both_ab = shapely.intersection(poly_a, poly_b)
     plot_geom(ax, both_ab, color='orange')
 
-    ax.axhline(0, color='gray', linestyle='--')
-    ax.axvline(0, color='gray', linestyle='--')
+    if add_axis:
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.axvline(0, color='gray', linestyle='--')
     plt.show()
     return ax
 
