@@ -368,6 +368,20 @@ class RegionSlice():
         no_boundaries = not self.has_boundaries()
         return no_regions & no_boundaries
 
+    def merge_regions(self, include='all') -> shapely.MultiPolygon:
+        '''Merge adjacent regions in the slice.
+        '''
+        if self.has_regions() & (include in ['all', 'regions']):
+           poly_r = shapely.union_all(list(self.regions.values()))
+        else:
+            poly_r = shapely.MultiPolygon()
+        if self.has_boundaries() & (include in ['all', 'boundaries']):
+            poly_b = shapely.union_all(list(self.boundaries.values()))
+        else:
+            poly_b = shapely.MultiPolygon()
+        merged = poly_r.union(poly_b)
+        return merged
+
     def __bool__(self) -> bool:
         '''Check if the slice is empty.
 

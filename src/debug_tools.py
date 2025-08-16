@@ -19,6 +19,7 @@ from shapely.plotting import plot_polygon, plot_line
 
 from types_and_classes import PRECISION, SliceIndexType
 from contours import ContourPoints
+from region_slice import RegionSlice
 
 
 
@@ -150,8 +151,8 @@ def plot_ab(poly_a, poly_b):
     If the polygons are LineStrings, they are plotted as a single line.
 
     Args:
-        poly_a (shapely.Polygon): The first polygon.
-        poly_b (shapely.Polygon): The second polygon.
+        poly_a (shapely.Polygon | RegionSlice): The first polygon.
+        poly_b (shapely.Polygon | RegionSlice): The second polygon.
 
     Returns:
         ax: The matplotlib axis with the plotted polygons.
@@ -167,6 +168,11 @@ def plot_ab(poly_a, poly_b):
             # plot each of the geometry objects in the collection
             for g in geom.geoms:
                 plot_geom(ax, g, color)
+
+    if isinstance(poly_a, (RegionSlice)):
+        poly_a = poly_a.merge_regions()
+    if isinstance(poly_b, (RegionSlice)):
+        poly_b = poly_b.merge_regions()
 
     fig = plt.figure(1, figsize=(4,2))
     ax = fig.add_subplot(121)

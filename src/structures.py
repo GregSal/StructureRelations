@@ -1,9 +1,10 @@
 '''Contains the structure class.
 '''
+import re
 import pandas as pd
 import networkx as nx
 
-from types_and_classes import ROI_Type
+from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
@@ -294,6 +295,21 @@ class StructureShape():
         contour = self.contour_graph.nodes(data=True)[label]['contour']
         return contour
 
+    def get_slice(self, slice_index: SliceIndexType)->RegionSlice:
+        '''Get the RegionSlice for a given slice index.
+
+        Args:
+            slice_index (SliceIndexType): The slice index of the desired
+                RegionSlice.
+
+        Returns:
+            RegionSlice: The RegionSlice object for the given slice index.
+        '''
+        idx = self.region_table['SliceIndex'] == slice_index
+        if not any(idx):
+            return None
+        return self.region_table.loc[idx, 'RegionSlice'].values[0]
+
     def relate(self, other: 'StructureShape') -> 'DE27IM':
         '''Relate this structure to another structure.
 
@@ -330,7 +346,7 @@ class StructureShape():
                                     lsuffix='_self', rsuffix='_other')
 
         # 4. For each common slice, get and merge the DE27IM relationship.
-        for _, row in regions.iterrows():
+        for slice_index, row in regions.iterrows():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other)
