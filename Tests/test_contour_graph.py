@@ -394,9 +394,9 @@ class TestBoundaryContourGeneration():
         # verify that region_index matches original
         assert intp_contour1.region_index == orig_contour_1.region_index
         assert intp_contour2.region_index == orig_contour_2.region_index
-        # Area is less than original
-        assert intp_contour1.area < orig_contour_1.area
-        assert intp_contour2.area < orig_contour_2.area
+        # Area is less than or equal to the original
+        assert intp_contour1.area <= orig_contour_1.area
+        assert intp_contour2.area <= orig_contour_2.area
 
     def test_edge_between_original_and_interpolated(self):
         '''Test the edge between the original and interpolated contours.

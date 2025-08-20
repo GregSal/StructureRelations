@@ -413,7 +413,9 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
 
     # If only one polygon is given, scale the polygon to half its size.
     if p2 is None:
-        itp_poly = shapely.affinity.scale(p1, xfact=0.5, yfact=0.5)
+        # For boundary polygons do not interpolate.
+        # itp_poly = shapely.affinity.scale(p1, xfact=0.5, yfact=0.5)
+        itp_poly = p1
         itp_poly = Polygon(shapely.get_coordinates(itp_poly))
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly

@@ -443,10 +443,10 @@ class TestRegionSlice:
         for embedded in region_slice.embedded_regions.values():
             assert len(embedded) == 1
             assert isinstance(embedded[0], Contour)
-        # Region holes should should contain an interpolated (smaller) Hole Contour
+        # Region holes should should contain an interpolated Hole Contour
         for holes in region_slice.region_holes.values():
             assert len(holes) == 1
-            assert holes[0].area < shapely.Polygon(hole).area
+            assert holes[0].area <= shapely.Polygon(hole).area
         # Contour indexes should contain one item with two ContourIndexes
         assert len(region_slice.contour_indexes) == 1
         for indexes in region_slice.contour_indexes.values():

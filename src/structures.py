@@ -3,6 +3,11 @@
 import re
 import pandas as pd
 import networkx as nx
+import logging
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
@@ -350,5 +355,9 @@ class StructureShape():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other)
+            
+            # Log slice_index and relation at debug level using lazy formatting
+            logger.debug("SliceIndex: %s, \nRelation:\n %s\n", slice_index, relation)
+
             composite_relation.merge(relation)
         return composite_relation
