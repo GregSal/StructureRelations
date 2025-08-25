@@ -16,6 +16,7 @@ from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
 from region_slice import RegionSlice
 from relations import DE27IM
+from itertools import combinations
 
 
 class StructureShape():
@@ -101,6 +102,9 @@ class StructureShape():
         min_slice = min(contour_slices)
         max_slice = max(contour_slices)
 
+        related_contour_ref = {}
+        daughter_contour_ref = {}
+
         # For all slice indexes in the SliceSequence
         for slice_index in slice_sequence.slices:
             # If the slice index is not between the maximum and minimum slice
@@ -164,7 +168,30 @@ class StructureShape():
                 contour_match2 = ContourMatch(contour2, interpolated_contour)
                 self.contour_graph.add_edge(node2, interpolated_label,
                                           match=contour_match2)
+                
+                # Combine unique related_contours from contour1 and contour2
+                related_contours = set(contour1.related_contours) | set(contour2.related_contours)
+                related_contour_ref[interpolated_label] = list(related_contours)
 
+                # Add daughter contour references for node1 and node2
+                if node1 not in daughter_contour_ref:
+                    daughter_contour_ref[node1] = []
+                daughter_contour_ref[node1].append(interpolated_label)
+                if node2 not in daughter_contour_ref:
+                    daughter_contour_ref[node2] = []
+                daughter_contour_ref[node2].append(interpolated_label)
+
+        for key, related_list in related_contour_ref.items():
+            # Find all keys in daughter_contour_ref that match items in related_list
+            matching_keys = [k for k in daughter_contour_ref if k in related_list]
+            # Iterate over all unique pairs of matching_keys
+            for k1, k2 in combinations(matching_keys, 2):
+                daughters1 = set(daughter_contour_ref[k1])
+                daughters2 = set(daughter_contour_ref[k2])
+                common_daughters = daughters1 & daughters2
+                if common_daughters:
+                    contour = self.contour_graph.nodes[key]['contour']                    
+                    contour.related_contours.extend(list(common_daughters))
         # Update the contour lookup table
         self.contour_lookup = build_contour_lookup(self.contour_graph)
 

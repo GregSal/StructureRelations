@@ -24,7 +24,7 @@ from utilities import make_multi, make_solid
 class RegionSlice():
     '''Class representing all regions of a structure on a specific slice.
 
-    The class contains multiple dictionaries of Shapley MultiPolygons. The
+    The class contains multiple dictionaries of Shapely MultiPolygons. The
     keys of each dictionary are RegionIndexes. The number of items in each of
     the dictionaries is the same, representing all regions on that slice. The
     values of the dictionaries are MultiPolygons that represent the
