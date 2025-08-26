@@ -196,13 +196,13 @@ class TestShelters:
         assert relation_type == RelationshipType.SHELTERS
 
     #@pytest.mark.xfail
-    def test_shelters_horizontal_cylinder(self):
-        slice_spacing = 1
+    def test_shelters_sphere_in_cylinders_in_box(self):
+        slice_spacing = 0.5
         # Body structure defines slices in use
-        body = make_box(roi_num=0, width=20, offset_z=0,
+        body = make_box(roi_num=0, width=12, offset_z=0,
                                     spacing=slice_spacing)
         # embedded boxes
-        cube6 = make_box(roi_num=1, width=10, length=10, height=10, spacing=slice_spacing)
+        cube6 = make_box(roi_num=1, width=10, length=10, height=8, spacing=slice_spacing)
         left_cylinder = make_vertical_cylinder(roi_num=1, radius=2, length=8,
                                             offset_x=-2.5, offset_z=0,
                                             spacing=slice_spacing)
