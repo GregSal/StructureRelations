@@ -812,9 +812,7 @@ class TestEquals:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.EQUALS
 
-    @pytest.mark.xfail
     def test_equal_boxes_by_crop(self):
-    # FIXME this function assumes that make_box returns a dataframe rather than a list of points
         def apply_crop(p):
             # polygon made from offset boxed resulting in a 4x4 square hole in the
             # middle.
@@ -830,15 +828,28 @@ class TestEquals:
                                         up_crop, down_crop])
             cropped = p - crop_poly
             return poly_round(cropped)
-
+        
+        def get_cropped_box(box8):# -> List[Dict[str, Any]]:  
+            cropped_box = []
+            for contour_slice in box8:
+                contour = contour_slice['Points']
+                poly = shapely.Polygon(contour)
+                cropped_poly = apply_crop(poly)
+                cropped_coords = list(cropped_poly.boundary.coords)
+                cropped_contour = {
+                    'ROI': contour_slice['ROI'],
+                    'Slice': contour_slice['Slice'],
+                    'Points': cropped_coords,
+                }
+                cropped_box.append(cropped_contour)
+            return cropped_box
         slice_spacing = 0.1
         body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
                                     spacing=slice_spacing)
         box8 = make_box(roi_num=1, width=0.8, spacing=slice_spacing)
         box4 = make_box(roi_num=2, width=0.4, spacing=slice_spacing)
-
-        poly_a = box8.loc[(slice(None), slice(-0.2, 0.2)), :].copy()
-        poly_a.Contour = poly_a.Contour.apply(apply_crop)
-        slice_data = poly_a + box4 + body
+        # apply the crop to box8 to create a copy of box4
+        cropped_box = get_cropped_box(box8)
+        slice_data = body + box4 + cropped_box
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.EQUALS

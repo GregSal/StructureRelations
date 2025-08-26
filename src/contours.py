@@ -14,6 +14,8 @@ from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
 from types_and_classes import PRECISION, SliceIndexSequenceType
 
+from utilities import points_to_polygon
+
 
 # %% Classes for Slice Indexing and Neighbours
 @dataclass
@@ -247,25 +249,6 @@ class SliceSequence:
 
 
 # %% Polygon Functions
-def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
-    '''Convert a list of points to a Shapely polygon and validate it.
-
-    Args:
-        points (List[Tuple[float, float]]): A list of tuples containing 2D or
-            3D points.
-
-    Raises:
-        InvalidContour: If the points cannot form a valid polygon.
-
-    Returns:
-        Polygon: A valid Shapely polygon.
-    '''
-    if not points:
-        return shapely.Polygon()
-    polygon = Polygon(points)
-    if not polygon.is_valid:
-        raise InvalidContour("Invalid polygon created from points.")
-    return polygon
 
 
 #%% Interpolation Functions

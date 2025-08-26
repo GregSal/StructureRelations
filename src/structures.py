@@ -384,7 +384,8 @@ class StructureShape():
             relation = DE27IM(region_self, region_other)
             
             # Log slice_index and relation at debug level using lazy formatting
-            logger.debug("SliceIndex: %s, \nRelation:\n %s\n", slice_index, relation)
+            logger.debug('SliceIndex: %s,\nRelationType: %s\nRelation:\n%s\n',
+                         slice_index, relation.identify_relation(), relation)
 
             composite_relation.merge(relation)
         return composite_relation

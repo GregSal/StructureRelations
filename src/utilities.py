@@ -1,17 +1,19 @@
 '''Utility Functions'''
 # %% Imports
 # Type imports
-from typing import List
+from typing import List, Tuple
 
 # Shared Packages
 import shapely
+from shapely.geometry import Polygon
 
 from types_and_classes import PRECISION, PolygonType
+from types_and_classes import InvalidContour
 
 
 # %% Rounding Functions
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
-    '''Round the coordinates of a shapley point to the specified precision.
+    '''Round the coordinates of a shapely point to the specified precision.
 
     Args:
         point (shapely.Point): A shapely point.
@@ -111,3 +113,24 @@ def make_solid(polygon: PolygonType, external_holes: PolygonType = None,
     if external_holes is not None:
         external_polygon = external_polygon.difference(external_holes)
     return external_polygon
+
+
+def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
+    '''Convert a list of points to a Shapely polygon and validate it.
+
+    Args:
+        points (List[Tuple[float, float]]): A list of tuples containing 2D or
+            3D points.
+
+    Raises:
+        InvalidContour: If the points cannot form a valid polygon.
+
+    Returns:
+        Polygon: A valid Shapely polygon.
+    '''
+    if not points:
+        return shapely.Polygon()
+    polygon = Polygon(points)
+    if not polygon.is_valid:
+        raise InvalidContour("Invalid polygon created from points.")
+    return polygon
