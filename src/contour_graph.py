@@ -5,6 +5,11 @@ and edges represent connect matched contours on the next and previous slice.
 # %% Setup
 from typing import List, Tuple
 from collections import defaultdict
+import logging
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 import networkx as nx
@@ -131,6 +136,9 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     contour = contour_graph.nodes[starting_contour]['contour']
     # Get the slice index of the contour
     this_slice = contour.slice_index
+
+    logger.debug(f'Generating interpolated contour for ROI: {contour.roi} from slice: {this_slice}')
+
     # Get the neighboring slices of the contour.
     matched_slices = set()
     for nbr in contour_graph.adj[starting_contour]:
@@ -185,10 +193,12 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     non_neighbour_slices = neighbour_slices - matched_slices
     if non_neighbour_slices:
         non_neighbour_slice = non_neighbour_slices.pop()
+        logger.debug(f'Using slice: {non_neighbour_slice:5.2f} for interpolation.')
     else:
         # Use gap to create an estimated slice index
         gap = neighbors.gap(absolute=False)
         non_neighbour_slice = this_slice - gap
+        logger.debug(f'Using gap: {gap:3.2f} to create interpolated slice: {non_neighbour_slice:5.2f}')
     interpolation_slices = [this_slice, non_neighbour_slice]
     # Calculate the interpolated contour using only the boundary contour.
     interpolated_polygon = interpolate_polygon(interpolation_slices,
@@ -398,6 +408,9 @@ def add_boundary_contours(contour_graph: ContourGraph,
                               'slice_sequence': slice_sequence,
                               'starting_contour': original_boundary,
                               'is_interpolated': True, 'is_boundary': True}
+        
+        logger.debug(f"Generating interpolated contour for boundary: {original_boundary}")
+
         # Generate the interpolated contour
         interpolation = generate_interpolated_contours(**contour_parameters)
         # Unpack the interpolation result
