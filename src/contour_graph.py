@@ -410,7 +410,7 @@ def add_boundary_contours(contour_graph: ContourGraph,
                               'starting_contour': original_boundary,
                               'is_interpolated': True, 'is_boundary': True}
 
-        logger.debug(f"Generating interpolated contour for boundary: {original_boundary}")
+        #logger.debug(f"Generating interpolated contour for boundary: {original_boundary}")
 
         # Generate the interpolated contour
         interpolation = generate_interpolated_contours(**contour_parameters)
