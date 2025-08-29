@@ -400,6 +400,7 @@ def add_boundary_contours(contour_graph: ContourGraph,
     # Select all nodes with only one edge (degree=1)
     boundary_nodes = {node for node, degree in contour_graph.degree()
                       if degree == 1}
+    logger.debug(f'Found {len(boundary_nodes)} boundary contours to interpolate.')
 
     while boundary_nodes:
         all_related_contours = set()
@@ -408,7 +409,7 @@ def add_boundary_contours(contour_graph: ContourGraph,
                               'slice_sequence': slice_sequence,
                               'starting_contour': original_boundary,
                               'is_interpolated': True, 'is_boundary': True}
-        
+
         logger.debug(f"Generating interpolated contour for boundary: {original_boundary}")
 
         # Generate the interpolated contour
@@ -653,6 +654,7 @@ def build_contour_graph(contour_table: pd.DataFrame,
     # Create an empty graph
     contour_graph = nx.Graph()
     # Get the relevant contours
+    logger.debug('Building contour graph for ROI: %s', roi)
     contour_by_slice = build_contours(contour_table, roi)
     if not contour_by_slice:
         # If no contours are found for the given ROI, return an empty graph.

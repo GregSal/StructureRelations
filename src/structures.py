@@ -168,7 +168,7 @@ class StructureShape():
                 contour_match2 = ContourMatch(contour2, interpolated_contour)
                 self.contour_graph.add_edge(node2, interpolated_label,
                                           match=contour_match2)
-                
+
                 # Combine unique related_contours from contour1 and contour2
                 related_contours = set(contour1.related_contours) | set(contour2.related_contours)
                 related_contour_ref[interpolated_label] = list(related_contours)
@@ -190,7 +190,7 @@ class StructureShape():
                 daughters2 = set(daughter_contour_ref[k2])
                 common_daughters = daughters1 & daughters2
                 if common_daughters:
-                    contour = self.contour_graph.nodes[key]['contour']                    
+                    contour = self.contour_graph.nodes[key]['contour']
                     contour.related_contours.extend(list(common_daughters))
         # Update the contour lookup table
         self.contour_lookup = build_contour_lookup(self.contour_graph)
@@ -382,7 +382,7 @@ class StructureShape():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other)
-            
+
             # Log slice_index and relation at debug level using lazy formatting
             logger.debug('SliceIndex: %s,\nRelationType: %s\nRelation:\n%s\n',
                          slice_index, relation.identify_relation(), relation)

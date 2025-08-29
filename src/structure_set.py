@@ -2,6 +2,12 @@
 '''
 # %% Imports
 from typing import List
+import logging
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 import pandas as pd
 import networkx as nx
 
@@ -49,8 +55,14 @@ class StructureSet:
         # 2. For each ROI in the contour_table:
         for roi in unique_rois:
             # 2.1. Create a StructureShape object from the contour table
+            logger.debug('Building structure for ROI: %s', roi)
             structure = StructureShape(roi=roi, name=f'Structure_{roi}')
-            self.slice_sequence = structure.add_contour_graph(contour_table, self.slice_sequence)
+            self.slice_sequence = structure.add_contour_graph(
+                contour_table,
+                self.slice_sequence
+                )
+            logger.debug('Slice sequence after ROI %s:\n%s', roi,
+                         self.slice_sequence.sequence)
 
             # 2.2. Add the StructureShape object to dictionary with the ROI as the key
             self.structures[roi] = structure
