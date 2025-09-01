@@ -602,6 +602,34 @@ Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
 
 
+# %% Make Borders Inserted Cylinder
+file_name = 'Borders Inserted Cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outside_cylinder = make_vertical_cylinder(radius=4, length=8)
+center_hole = make_vertical_cylinder(radius=2, length=4,offset_z=2)
+primary_structure = merge_parts([outside_cylinder, center_hole])
+
+middle_cylinder = make_vertical_cylinder(radius=1, length=4,offset_z=2)
+
+a, b, both = display_interactions(primary_structure, middle_cylinder)
+
+doc.recompute()
+cropped_list, crop_box = crop_quarter([a], quarter = (1,-1,1))
+b.ViewObject.Transparency = 0
+cropped_list[0].ViewObject.Transparency = 25
+doc.recompute()
+
+Gui.activeDocument().activeView().viewDimetric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
 # %% Make Overlapping Concentric Cylinders
 file_name = 'Overlapping Concentric Cylinders'
 image_file_path = IMAGE_PATH + "//" + file_name + ".png"

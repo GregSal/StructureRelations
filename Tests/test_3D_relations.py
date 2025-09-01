@@ -437,6 +437,26 @@ class TestBorders:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
+    def test_inserted_cylinder(self):
+        '''Test cylinder inserted in open hole of first cylinder.'''
+        slice_spacing = 0.1
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=1, offset_z=-0.6,
+                                    spacing=slice_spacing)
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=4, length=0.8,
+                                                offset_z=-0.3,
+                                                spacing=slice_spacing)
+        center_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.6,
+                                            offset_z=-0.2, spacing=slice_spacing)
+        # Two concentric cylinders different z offsets
+        middle_cylinder = make_vertical_cylinder(roi_num=2, radius=1, length=0.6,
+                                                offset_z=-0.2,
+                                                spacing=slice_spacing)
+        # combine the contours
+        slice_data = body + primary_cylinder + center_hole + middle_cylinder
+        relation_type = get_relation_type(slice_data)
+        assert relation_type == RelationshipType.BORDERS
+
 class TestConfines:
     def test_confined_bordering_boxes(self):
         slice_spacing = 0.1
@@ -453,12 +473,12 @@ class TestConfines:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
-    def test_confines_cylinder(self):
+    def test_confines_dual_cylinders(self):
         slice_spacing = 0.1
         # Body structure defines slices in use
         body = make_vertical_cylinder(roi_num=0, radius=12, length=1.2,
                                       spacing=slice_spacing)
-        # Centred cylinder with two embedded cylinders
+        # Centred cylinder with two cylindrical holes
         primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5,
                                                   length=0.8,
                                                   spacing=slice_spacing)
