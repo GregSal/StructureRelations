@@ -456,19 +456,19 @@ class TestConfines:
     def test_confines_cylinder(self):
         slice_spacing = 0.1
         # Body structure defines slices in use
-        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.1,
+        body = make_vertical_cylinder(roi_num=0, radius=12, length=1.2,
                                       spacing=slice_spacing)
         # Centred cylinder with two embedded cylinders
         primary_cylinder = make_vertical_cylinder(roi_num=1, radius=5,
-                                                  length=0.7,
+                                                  length=0.8,
                                                   spacing=slice_spacing)
-        left_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.5,
+        left_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.6,
                                            offset_x=-2.5, spacing=slice_spacing)
-        right_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.5,
+        right_hole = make_vertical_cylinder(roi_num=1, radius=2, length=0.6,
                                             offset_x=2.5, spacing=slice_spacing)
         # cylinder with interior borders
         confines_cylinder = make_vertical_cylinder(roi_num=2, radius=1,
-                                                   length=0.5, offset_x=2.5,
+                                                   length=0.6, offset_x=2.5,
                                                    spacing=slice_spacing)
         # combine the contours
         slice_data = body + primary_cylinder + left_hole + right_hole + confines_cylinder
@@ -828,8 +828,8 @@ class TestEquals:
                                         up_crop, down_crop])
             cropped = p - crop_poly
             return poly_round(cropped)
-        
-        def get_cropped_box(box8):# -> List[Dict[str, Any]]:  
+
+        def get_cropped_box(box8):# -> List[Dict[str, Any]]:
             cropped_box = []
             for contour_slice in box8:
                 contour = contour_slice['Points']

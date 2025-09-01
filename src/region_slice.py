@@ -254,13 +254,9 @@ class RegionSlice():
                     region = region - contour.polygon
                     # Check whether the contour is a boundary
                     if contour.is_boundary:
-                        if boundary.is_empty:
-                            # If the boundary is empty, add the hole to the
-                            # boundary.
-                            boundary = boundary.union(contour.polygon)
-                        else:
-                            # Subtract the hole from the boundary
-                            boundary = boundary - contour.polygon
+                        # Add the hole to the boundary.
+                        # (At the boundary holes and solids are treated the same.)
+                        boundary = boundary.union(contour.polygon)
                 else:
                     # Check whether the contour is a boundary
                     if contour.is_boundary:
