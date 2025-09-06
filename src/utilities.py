@@ -134,3 +134,102 @@ def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
     if not polygon.is_valid:
         raise InvalidContour("Invalid polygon created from points.")
     return polygon
+
+
+# %% Relationship display functions
+def int2str(relation_int: int, length=27)->str:
+    '''Convert a 9 or 27 bit binary integer into a formatted string.
+
+    Converts a 9 or 27 bit binary integer into a formatted string. The string
+    is formatted as a binary number with leading zeros to make the string the
+    specified length.
+
+    Args:
+        relation_int (int): The integer representation of the 9 or 27 bit
+            relationship.
+        length (int, optional): The expected length of the string.
+            (Generally should be 9 or 27.) Defaults to 27.
+
+    Raises:
+        ValueError: If the input integer is longer than the specified length.
+    Returns:
+        str: The integer converted into a zero-padded binary integer.
+    '''
+    str_len = length + 2  # Accounts for '0b' prefix.
+    bin_str = bin(relation_int)
+    if len(bin_str) < str_len:
+        zero_pad = str_len - len(bin_str)
+        bin_str = '0' * zero_pad + bin_str[2:]
+    elif len(bin_str) > str_len:
+        raise ValueError(''.join([
+            f'The input integer must be {length} bits long. The input integer ',
+            'was: ', str(relation_int)
+            ]))
+    else:
+        bin_str = bin_str[2:]
+    return bin_str
+
+
+def int2matrix(relation_int: int, indent: str = '') -> str:
+    '''Convert a 27 bit binary integer into a formatted matrix.
+
+    The display matrix is formatted as follows:
+        |001|	|111|	|111|
+        |001|	|001|	|001|
+        |111|	|001|	|001|
+
+    Args:
+        relation_int (int): The integer representation of the 27 bit
+            relationship.
+        indent (str, optional): The string to prefix each row of the 3-line
+            matrix display. Usually this will be a sequence of spaces to indent
+            the display text.  Defaults to ''.
+
+    Returns:
+        str: A multi-line string displaying the 27 formatted bit relationship
+            matrix.
+    '''
+    bin_str = int2str(relation_int, length=27)
+    # This is the template for one row of the matrix.
+    # *bin#* is replaced with the binary string for the row.
+    # *#* is replaced with the row and matrix index.
+    bin_fmt = '|{bin#}|_'
+    bin_list = []
+    # Generate the 3-line matrix template.
+    for row_num in range(3):
+        # The template for the 3-line matrix
+        for matrix_num in range(3):
+            # index represents where the 3-bit sequence should be placed in the
+            # formatted string.  The first row of the string is the first row of
+            # each matrix. The second row is the second row of each matrix.
+            index = row_num * 3 + matrix_num
+            bin_text = bin_fmt.replace('#', str(index))
+            if matrix_num == 0:
+                # The first matrix has an indent before the binary string and a
+                # tab after the binary string.
+                bin_text = indent + bin_text.replace('_', '\t')
+            elif matrix_num == 1:
+                # The second matrix has a tab after the binary string.
+                bin_text = bin_text.replace('_', '\t')
+            elif matrix_num == 2:
+                # The third matrix has a newline after the binary string.
+                bin_text = bin_text.replace('_', '\n')
+            bin_list.append(bin_text)
+    bin_template = ''.join(bin_list)
+    # Split the 27 bit binary string into 9 3-bit sections; rows in the 3
+    # matrices.
+    bin_dict = {}
+    for idx in range(9):
+        # Calculate the row and column (matrix) number for the current 3-bit
+        # sequence
+        row_num = idx % 3  # The row number in the 3-line matrix
+        matrix_num = idx // 3  # The matrix number
+        # index represents where the 3-bit sequence should be placed in the
+        # formatted string.  The first row of the string is the first row of
+        # each matrix (every third sequence in the binary string). The second
+        # row is the second row of each matrix (every third sequence plus 1).
+        index = row_num * 3 + matrix_num
+        # Add the 3-bit sequence to the dictionary so that it van be inserted
+        # into the template at the appropriate spot.
+        bin_dict[f'bin{index}'] = bin_str[idx*3:(idx+1)*3]
+    return bin_template.format(**bin_dict)
