@@ -866,7 +866,8 @@ class TestEquals:
         slice_spacing = 0.1
         body = make_vertical_cylinder(roi_num=0, radius=10, length=1,
                                     spacing=slice_spacing)
-        box8 = make_box(roi_num=1, width=0.8, spacing=slice_spacing)
+        box8 = make_box(roi_num=1, width=0.8, height=0.4,
+                        spacing=slice_spacing)
         box4 = make_box(roi_num=2, width=0.4, spacing=slice_spacing)
         # apply the crop to box8 to create a copy of box4
         cropped_box = get_cropped_box(box8)
