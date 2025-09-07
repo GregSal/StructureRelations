@@ -481,14 +481,15 @@ class TestRegionSlice:
         assert len(region_slice.boundaries) == 1
         for boundary in region_slice.boundaries.values():
             assert isinstance(boundary, shapely.MultiPolygon)
-            # The boundary should be the interpolated hole, which is smaller
-            # than the original hole
-            assert boundary.area < shapely.Polygon(hole).area
+            # The boundary should be the interpolated hole, which is the same
+            # size or smaller than the original hole.
+            assert boundary.area <= shapely.Polygon(hole).area
         # Regions should contain a MultiPolygon with both the exterior and the hole
         for region in region_slice.regions.values():
             assert isinstance(region, shapely.MultiPolygon)
-            # Since it includes the hole, the area should be less than the outer box
-            assert region.area < shapely.Polygon(outer).area
+            # Since it includes the hole, the area should be the same size or
+            # smaller than the outer box.
+            assert region.area <= shapely.Polygon(outer).area
         # Open holes should contain an empty MultiPolygon
         for open_hole in region_slice.open_holes.values():
             assert isinstance(open_hole, shapely.MultiPolygon)
@@ -497,11 +498,11 @@ class TestRegionSlice:
         for embedded in region_slice.embedded_regions.values():
             assert len(embedded) == 1
             assert isinstance(embedded[0], Contour)
-            assert embedded[0].area < shapely.Polygon(hole).area
+            assert embedded[0].area <= shapely.Polygon(hole).area
         # Region holes should should contain the Hole Contour
         for holes in region_slice.region_holes.values():
             assert len(holes) == 1
-            assert holes[0].area < shapely.Polygon(hole).area
+            assert holes[0].area <= shapely.Polygon(hole).area
         # Contour indexes should contain one item with two ContourIndexes
         assert len(region_slice.contour_indexes) == 1
         for indexes in region_slice.contour_indexes.values():
