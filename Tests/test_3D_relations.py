@@ -217,7 +217,6 @@ class TestShelters:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    #@pytest.mark.xfail
     def test_shelters_cylinder(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -235,7 +234,6 @@ class TestShelters:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    #@pytest.mark.xfail
     def test_sphere_in_cylinders_in_box(self):
         slice_spacing = 1
         # Body structure defines slices in use
@@ -437,8 +435,13 @@ class TestBorders:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
+    @pytest.mark.xfail
     def test_inserted_cylinder(self):
-        '''Test cylinder inserted in open hole of first cylinder.'''
+        '''This test illustrates the issue that an open hole that is open only
+        on one end will be treated as open on both ends for the sake of boundary
+        testing. As a result, a structure that borders another structure at the
+        end of a hole within the first structure will not be correctly
+        recognized as a *Borders* relationship.'''
         slice_spacing = 0.1
         # Body structure defines slices in use
         body = make_vertical_cylinder(roi_num=0, radius=10, length=1, offset_z=-0.6,
