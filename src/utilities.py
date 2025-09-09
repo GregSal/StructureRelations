@@ -206,11 +206,11 @@ def int2matrix(relation_int: int, indent: str = '') -> str:
             bin_text = bin_fmt.replace('#', str(index))
             if matrix_num == 0:
                 # The first matrix has an indent before the binary string and a
-                # tab after the binary string.
-                bin_text = indent + bin_text.replace('_', '\t')
+                # space after the binary string.
+                bin_text = indent + bin_text.replace('_', ' ')
             elif matrix_num == 1:
-                # The second matrix has a tab after the binary string.
-                bin_text = bin_text.replace('_', '\t')
+                # The second matrix has a space after the binary string.
+                bin_text = bin_text.replace('_', ' ')
             elif matrix_num == 2:
                 # The third matrix has a newline after the binary string.
                 bin_text = bin_text.replace('_', '\n')
@@ -232,4 +232,5 @@ def int2matrix(relation_int: int, indent: str = '') -> str:
         # Add the 3-bit sequence to the dictionary so that it van be inserted
         # into the template at the appropriate spot.
         bin_dict[f'bin{index}'] = bin_str[idx*3:(idx+1)*3]
-    return bin_template.format(**bin_dict)
+    final_string = bin_template.format(**bin_dict)
+    return final_string
