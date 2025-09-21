@@ -1,0 +1,9 @@
+# Method 1: Using DicomStructureFile (recommended)
+dicom_file = DicomStructureFile(top_dir=Path("Tests"), file_name="test.dcm")
+structure_set = StructureSet(dicom_structure_file=dicom_file)
+
+# Method 2: Traditional slice_data (still supported)
+structure_set = StructureSet(slice_data=contour_points_list)
+
+# Apply exclusions to filter unwanted structures
+structure_set.apply_exclusions(exclusion_patterns=['x', 'z'])

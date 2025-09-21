@@ -1,7 +1,7 @@
 '''StructureSet class for managing multiple structures and their relationships.
 '''
 # %% Imports
-from typing import List
+from typing import List, Optional
 import logging
 
 # Configure logging if not already configured
@@ -15,6 +15,7 @@ from types_and_classes import ROI_Type
 from contours import build_contour_table
 from structures import StructureShape
 from relations import DE27IM
+from dicom import DicomStructureFile
 
 
 class StructureSet:
@@ -26,19 +27,40 @@ class StructureSet:
         relationship_graph (nx.Graph): Graph where nodes are structures and edges are relationships.
     '''
 
-    def __init__(self, slice_data: List = None):
+    def __init__(self, 
+                 slice_data: Optional[List] = None,
+                 dicom_structure_file: Optional[DicomStructureFile] = None):
         '''Initialize the StructureSet.
 
         Args:
             slice_data (List, optional): List of ContourPoints for building structures.
-                If None, creates an empty StructureSet.
+                If None, creates an empty StructureSet. Deprecated - use dicom_structure_file instead.
+            dicom_structure_file (DicomStructureFile, optional): DICOM structure file object
+                containing contour points. Takes precedence over slice_data if both are provided.
         '''
         self.structures = {}
         self.slice_sequence = None
         self.relationship_graph = nx.Graph()
+        self.dicom_structure_file = dicom_structure_file
 
-        if slice_data:
+        # Prioritize dicom_structure_file over slice_data
+        if dicom_structure_file is not None:
+            self.build_from_dicom_file(dicom_structure_file)
+        elif slice_data is not None:
             self.build_from_slice_data(slice_data)
+
+    def build_from_dicom_file(self, dicom_file: DicomStructureFile) -> None:
+        '''Build structures from DicomStructureFile following the StructureSet process.
+
+        Args:
+            dicom_file (DicomStructureFile): DICOM structure file object containing contour points.
+        '''
+        if not dicom_file.contour_points:
+            logger.warning("No contour points found in DicomStructureFile")
+            return
+            
+        logger.info("Building StructureSet from %d contour points", len(dicom_file.contour_points))
+        self.build_from_slice_data(dicom_file.contour_points)
 
     def build_from_slice_data(self, slice_data: List) -> None:
         '''Build structures from slice data following the StructureSet process.
@@ -73,6 +95,34 @@ class StructureSet:
         # 2.3 & 2.4. Use the SliceSequence to add interpolated contours and generate RegionSlices
         for structure in self.structures.values():
             structure.finalize(self.slice_sequence)
+
+    def apply_exclusions(self, exclusion_patterns: Optional[List[str]] = None, 
+                        exclude_default: bool = True) -> None:
+        '''Apply exclusions to filter out unwanted structures and rebuild.
+        
+        Args:
+            exclusion_patterns (List[str], optional): List of patterns to exclude.
+                If None, uses default patterns ['x', 'z'] if exclude_default is True.
+            exclude_default (bool): Whether to apply default exclusion patterns.
+        '''
+        if self.dicom_structure_file is None:
+            logger.warning("No DicomStructureFile available for applying exclusions")
+            return
+            
+        # Apply exclusions to the dicom structure file
+        excluded_contours = self.dicom_structure_file.apply_exclusions(
+            exclusion_patterns=exclusion_patterns,
+            exclude_default=exclude_default
+        )
+        
+        if excluded_contours:
+            logger.info("Applied exclusions, removed %d contour sets", len(excluded_contours))
+            # Rebuild structures with filtered contour points
+            self.structures.clear()
+            self.relationship_graph.clear()
+            self.build_from_slice_data(self.dicom_structure_file.contour_points)
+        else:
+            logger.info("No structures excluded")
 
     def finalize(self) -> None:
         '''Complete the StructureSet process by calculating relationships.

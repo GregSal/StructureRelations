@@ -290,3 +290,181 @@ class DicomStructureFile:
         roi_df = df[df['roi'] == roi_number].copy()
         logger.debug(f"Retrieved {len(roi_df)} points for ROI {roi_number}")
         return roi_df
+    
+    def get_structure_names(self) -> pd.DataFrame:
+        '''Get ROI names and numbers from the structure set.
+        
+        Returns:
+            pd.DataFrame: DataFrame with columns 'ROINumber' and 'StructureID' 
+                containing the mapping of ROI numbers to structure names.
+        '''
+        if not self.is_structure_file():
+            logger.warning(f"File {self.file_name} is not a RT Structure file")
+            return pd.DataFrame()
+        
+        if not hasattr(self.dataset, 'StructureSetROISequence'):
+            logger.warning("Dataset does not contain StructureSetROISequence")
+            return pd.DataFrame()
+        
+        structure_data = []
+        for roi in self.dataset.StructureSetROISequence:
+            structure_data.append({
+                'ROINumber': int(roi.ROINumber),
+                'StructureID': str(roi.ROIName)
+            })
+        
+        return pd.DataFrame(structure_data)
+    
+    def filter_exclusions(self, 
+                         exclude_prefixes: List[str] = None,
+                         case_sensitive: bool = False,
+                         exclude_empty: bool = True) -> List[ContourPoints]:
+        '''Filter out unwanted structures from the contour points list.
+        
+        This method is similar to drop_exclusions in RS_DICOM_Utilities.py.
+        It removes structures based on naming patterns and optionally excludes 
+        structures without contour data.
+        
+        Args:
+            exclude_prefixes (List[str], optional): List of prefixes to exclude.
+                Defaults to ['x', 'z'] which are commonly used for temporary
+                or excluded structures.
+            case_sensitive (bool, optional): Whether prefix matching should be 
+                case sensitive. Defaults to False.
+            exclude_empty (bool, optional): Whether to exclude ROIs that have
+                no contour points. Defaults to True.
+                
+        Returns:
+            List[ContourPoints]: Filtered list of contour points with excluded
+                structures removed.
+        '''
+        if exclude_prefixes is None:
+            exclude_prefixes = ['x', 'z']
+        
+        # Get structure names
+        structure_names = self.get_structure_names()
+        if structure_names.empty:
+            logger.warning("No structure names found, cannot filter exclusions")
+            return self.contour_points or []
+        
+        # Get contour points if not already loaded
+        if self.contour_points is None:
+            self.get_contour_points()
+        
+        if not self.contour_points:
+            logger.info("No contour points to filter")
+            return []
+        
+        # Create lookup for ROI numbers to structure names
+        roi_name_lookup = dict(zip(structure_names['ROINumber'], 
+                                  structure_names['StructureID']))
+        
+        # Identify ROIs to exclude based on naming patterns
+        excluded_rois = set()
+        
+        for roi_num, struct_name in roi_name_lookup.items():
+            struct_name_check = struct_name if case_sensitive else struct_name.lower()
+            
+            for prefix in exclude_prefixes:
+                prefix_check = prefix if case_sensitive else prefix.lower()
+                
+                if struct_name_check.startswith(prefix_check):
+                    excluded_rois.add(roi_num)
+                    logger.debug(f"Excluding ROI {roi_num} ('{struct_name}') - matches prefix '{prefix}'")
+                    break
+        
+        # If excluding empty structures, identify ROIs with no contour data
+        if exclude_empty:
+            # Get ROIs that have contour points
+            rois_with_contours = set(cp.roi for cp in self.contour_points)
+            
+            # Find ROIs in structure set but not in contour points
+            all_rois = set(structure_names['ROINumber'])
+            empty_rois = all_rois - rois_with_contours
+            
+            for roi_num in empty_rois:
+                excluded_rois.add(roi_num)
+                struct_name = roi_name_lookup.get(roi_num, 'Unknown')
+                logger.debug(f"Excluding ROI {roi_num} ('{struct_name}') - no contour data")
+        
+        # Filter contour points
+        filtered_contour_points = [
+            cp for cp in self.contour_points 
+            if cp.roi not in excluded_rois
+        ]
+        
+        # Update stored contour points and DataFrame
+        original_count = len(self.contour_points)
+        filtered_count = len(filtered_contour_points)
+        excluded_count = original_count - filtered_count
+        
+        logger.info(f"Filtered {excluded_count} contours from {len(excluded_rois)} excluded ROIs. "
+                   f"Remaining: {filtered_count} contours from {len(set(cp.roi for cp in filtered_contour_points))} ROIs")
+        
+        # Optionally update the stored data
+        self.contour_points = filtered_contour_points
+        self.contour_dataframe = self._create_contour_dataframe(filtered_contour_points)
+        
+        return filtered_contour_points
+    
+    def get_excluded_structures(self, 
+                               exclude_prefixes: List[str] = None,
+                               case_sensitive: bool = False) -> pd.DataFrame:
+        '''Get information about structures that would be excluded by filtering.
+        
+        This method returns information about structures that would be excluded
+        without actually filtering them, useful for inspection and validation.
+        
+        Args:
+            exclude_prefixes (List[str], optional): List of prefixes to check for exclusion.
+                Defaults to ['x', 'z'].
+            case_sensitive (bool, optional): Whether prefix matching should be 
+                case sensitive. Defaults to False.
+                
+        Returns:
+            pd.DataFrame: DataFrame with information about excluded structures
+                including ROINumber, StructureID, and exclusion reason.
+        '''
+        if exclude_prefixes is None:
+            exclude_prefixes = ['x', 'z']
+        
+        structure_names = self.get_structure_names()
+        if structure_names.empty:
+            return pd.DataFrame()
+        
+        # Get contour points to check for empty structures
+        if self.contour_points is None:
+            self.get_contour_points()
+        
+        rois_with_contours = set(cp.roi for cp in self.contour_points) if self.contour_points else set()
+        
+        excluded_info = []
+        
+        for _, row in structure_names.iterrows():
+            roi_num = row['ROINumber']
+            struct_name = row['StructureID']
+            exclusion_reasons = []
+            
+            # Check naming patterns
+            struct_name_check = struct_name if case_sensitive else struct_name.lower()
+            
+            for prefix in exclude_prefixes:
+                prefix_check = prefix if case_sensitive else prefix.lower()
+                
+                if struct_name_check.startswith(prefix_check):
+                    exclusion_reasons.append(f"Name starts with '{prefix}'")
+                    break
+            
+            # Check for empty contours
+            if roi_num not in rois_with_contours:
+                exclusion_reasons.append("No contour data")
+            
+            # Only include structures that would be excluded
+            if exclusion_reasons:
+                excluded_info.append({
+                    'ROINumber': roi_num,
+                    'StructureID': struct_name,
+                    'ExclusionReason': '; '.join(exclusion_reasons)
+                })
+        
+        return pd.DataFrame(excluded_info)
