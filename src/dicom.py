@@ -29,7 +29,7 @@ class DicomStructureFile:
         file_name (str): The name of the DICOM file.
         dataset (pydicom.Dataset): The loaded DICOM dataset.
         contour_points (List[ContourPoints]): List of extracted contour points.
-        contour_dataframe (pd.DataFrame): DataFrame containing all contour point data.
+        structure_names (pd.DataFrame): Table containing all roi number and structure names.
     '''
     
     def __init__(self, top_dir: Path, 
@@ -77,9 +77,10 @@ class DicomStructureFile:
             self._load_dataset()
         
         # Initialize contour attributes
-        self.contour_points: Optional[List[ContourPoints]] = None
-        self.contour_dataframe: Optional[pd.DataFrame] = None
-    
+        self.structure_set_info = self.get_structure_set_info()
+        self.contour_points = self.get_contour_points()
+        self.structure_names = self.get_structure_names()
+
     def _load_dataset(self) -> None:
         '''Load the DICOM dataset from file.
         
@@ -103,7 +104,7 @@ class DicomStructureFile:
             return False
         return 'RTSTRUCT' in str(self.dataset.Modality)
     
-    def get_structure_info(self) -> dict:
+    def get_structure_set_info(self) -> dict:
         '''Get basic structure file information.
         
         Returns:
@@ -133,6 +134,7 @@ class DicomStructureFile:
         }
         
         logger.debug(f"Retrieved structure info for {structure_info['StructureSet']}")
+        self.structure_set_info = structure_info
         return structure_info
     
     def __repr__(self) -> str:
@@ -141,7 +143,7 @@ class DicomStructureFile:
     
     def __str__(self) -> str:
         '''Human-readable string representation.'''
-        info = self.get_structure_info()
+        info = self.get_structure_set_info()
         if info:
             return f"DICOM RT Structure: {info.get('StructureSet', 'Unknown')} for patient {info.get('PatientID', 'Unknown')}"
         return f"DICOM file: {self.file_name}"
@@ -170,7 +172,7 @@ class DicomStructureFile:
         contour_points_list = []
         
         for roi in self.dataset.ROIContourSequence:
-            roi_number = int(roi.ReferencedROINumber)
+            roi_number = ROI_Type(roi.ReferencedROINumber)
             
             # Check if this ROI has contour data
             if not hasattr(roi, 'ContourSequence'):
@@ -183,6 +185,10 @@ class DicomStructureFile:
                 
                 if geom_type not in ['CLOSED_PLANAR', 'POINT', 'OPEN_PLANAR']:
                     logger.warning(f"Unsupported geometric type {geom_type} in ROI {roi_number}")
+                    continue
+                if geom_type not in ['CLOSED_PLANAR']:
+                    logger.warning(f"Skipping non-closed planar contour in ROI {roi_number}")
+                    continue
                 
                 # Extract contour data - it's a flat array of x,y,z coordinates
                 if hasattr(contour, 'ContourData') and len(contour.ContourData) >= 9:
@@ -193,17 +199,17 @@ class DicomStructureFile:
                     points_array = points_array / 10.0
                     
                     # Convert to list of tuples for ContourPoints constructor
-                    points_tuples = [tuple(point) for point in points_array]
+                    #points_tuples = [tuple(point) for point in points_array]
                     
                     # Extract slice index from the z-coordinate of the first point
-                    slice_index = SliceIndexType(points_tuples[0][2])
+                    slice_index = SliceIndexType(points_array[0][2])
                     
                     # Create ContourPoints object with additional metadata
                     contour_points = ContourPoints(
-                        points=points_tuples,
+                        points=points_array,
                         roi=ROI_Type(roi_number),
                         slice_index=slice_index,
-                        ContourGeometricType=geom_type
+                        #ContourGeometricType=geom_type
                     )
                     
                     contour_points_list.append(contour_points)
@@ -214,82 +220,7 @@ class DicomStructureFile:
         logger.info(f"Extracted {len(contour_points_list)} contours from {len(self.dataset.ROIContourSequence)} ROIs")
         
         # Store contour points and convert to DataFrame
-        self.contour_points = contour_points_list
-        self.contour_dataframe = self._create_contour_dataframe(contour_points_list)
-        
         return contour_points_list
-    
-    def _create_contour_dataframe(self, contour_points_list: List[ContourPoints]) -> pd.DataFrame:
-        '''Convert list of ContourPoints to a pandas DataFrame.
-        
-        Args:
-            contour_points_list (List[ContourPoints]): List of contour points to convert.
-            
-        Returns:
-            pd.DataFrame: DataFrame with columns for ROI, slice_index, point_index, x, y, z, and geometry_type.
-        '''
-        if not contour_points_list:
-            logger.warning("No contour points to convert to DataFrame")
-            return pd.DataFrame()
-        
-        rows = []
-        
-        for contour in contour_points_list:
-            roi = contour.roi
-            slice_index = contour.slice_index
-            geom_type = getattr(contour, 'ContourGeometricType', 'CLOSED_PLANAR')
-            
-            for point_idx, point in enumerate(contour.points):
-                x, y, z = point[:3]  # Handle both 2D and 3D points
-                if len(point) == 2:
-                    # 2D point, use slice_index for z
-                    z = float(slice_index)
-                
-                row = {
-                    'roi': int(roi) if roi is not None else 0,
-                    'slice_index': float(slice_index) if slice_index is not None else 0.0,
-                    'point_index': point_idx,
-                    'x': float(x),
-                    'y': float(y),
-                    'z': float(z),
-                    'geometry_type': geom_type
-                }
-                rows.append(row)
-        
-        df = pd.DataFrame(rows)
-        logger.info(f"Created DataFrame with {len(df)} points from {len(contour_points_list)} contours")
-        return df
-    
-    def get_contour_dataframe(self) -> pd.DataFrame:
-        '''Get the contour points as a pandas DataFrame.
-        
-        If contours haven't been loaded yet, this method will load them first.
-        
-        Returns:
-            pd.DataFrame: DataFrame containing all contour points.
-        '''
-        if self.contour_dataframe is None:
-            logger.info("Contour DataFrame not yet created, loading contours...")
-            self.get_contour_points()
-        
-        return self.contour_dataframe if self.contour_dataframe is not None else pd.DataFrame()
-    
-    def get_roi_dataframe(self, roi_number: int) -> pd.DataFrame:
-        '''Get contour points for a specific ROI as a DataFrame.
-        
-        Args:
-            roi_number (int): The ROI number to filter by.
-            
-        Returns:
-            pd.DataFrame: DataFrame containing points only for the specified ROI.
-        '''
-        df = self.get_contour_dataframe()
-        if df.empty:
-            return df
-        
-        roi_df = df[df['roi'] == roi_number].copy()
-        logger.debug(f"Retrieved {len(roi_df)} points for ROI {roi_number}")
-        return roi_df
     
     def get_structure_names(self) -> pd.DataFrame:
         '''Get ROI names and numbers from the structure set.
@@ -309,11 +240,11 @@ class DicomStructureFile:
         structure_data = []
         for roi in self.dataset.StructureSetROISequence:
             structure_data.append({
-                'ROINumber': int(roi.ROINumber),
+                'ROI': int(roi.ROINumber),
                 'StructureID': str(roi.ROIName)
             })
         
-        return pd.DataFrame(structure_data)
+        return structure_data
     
     def filter_exclusions(self, 
                          exclude_prefixes: List[str] = None,
@@ -342,8 +273,8 @@ class DicomStructureFile:
             exclude_prefixes = ['x', 'z']
         
         # Get structure names
-        structure_names = self.get_structure_names()
-        if structure_names.empty:
+        roi_name_lookup = self.structure_names
+        if roi_name_lookup.empty:
             logger.warning("No structure names found, cannot filter exclusions")
             return self.contour_points or []
         
@@ -354,11 +285,7 @@ class DicomStructureFile:
         if not self.contour_points:
             logger.info("No contour points to filter")
             return []
-        
-        # Create lookup for ROI numbers to structure names
-        roi_name_lookup = dict(zip(structure_names['ROINumber'], 
-                                  structure_names['StructureID']))
-        
+                
         # Identify ROIs to exclude based on naming patterns
         excluded_rois = set()
         
@@ -379,7 +306,7 @@ class DicomStructureFile:
             rois_with_contours = set(cp.roi for cp in self.contour_points)
             
             # Find ROIs in structure set but not in contour points
-            all_rois = set(structure_names['ROINumber'])
+            all_rois = set(self.structure_names['ROINumber'])
             empty_rois = all_rois - rois_with_contours
             
             for roi_num in empty_rois:

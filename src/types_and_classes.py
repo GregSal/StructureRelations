@@ -25,6 +25,7 @@ SliceIndexSequenceType = Union[List[SliceIndexType],
                                SliceIndexType]
 
 # A list of contour points.
+# TODO update ContourPointsType to include nx2, or nx3 numpy arrays and specify nx2 or nx3 tuples
 ContourPointsType = NewType('ContourPointsType', List[tuple[float]])
 
 # The index for an individual contour.
