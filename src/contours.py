@@ -539,11 +539,11 @@ class ContourPoints(dict):
         point_dim = None
         for point in points:
             # Verify that each point is a tuple of float.
-            if not isinstance(point, tuple):
-                raise InvalidContour("Points must be tuples of floats.")
+            #if not isinstance(point, tuple):
+                # raise InvalidContour("Points must be tuples of floats.")
             if not all(isinstance(coord, (float, int)) for coord in point):
                 raise InvalidContour("Points must be tuples of floats.")
-            # Verify that each point is a tuple of length 2 or 3.
+            # Verify that each point is as tuple of length 2 or 3.
             this_point_dim = len(point)
             if this_point_dim not in (2, 3):
                 raise InvalidContour("Points must be tuples of length 2 or 3.")
