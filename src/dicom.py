@@ -237,13 +237,9 @@ class DicomStructureFile:
             logger.warning("Dataset does not contain StructureSetROISequence")
             return pd.DataFrame()
         
-        structure_data = []
+        structure_data = {}
         for roi in self.dataset.StructureSetROISequence:
-            structure_data.append({
-                'ROI': int(roi.ROINumber),
-                'StructureID': str(roi.ROIName)
-            })
-        
+            structure_data[ROI_Type(roi.ROINumber)] = str(roi.ROIName)        
         return structure_data
     
     def filter_exclusions(self, 
@@ -274,7 +270,7 @@ class DicomStructureFile:
         
         # Get structure names
         roi_name_lookup = self.structure_names
-        if roi_name_lookup.empty:
+        if not roi_name_lookup:
             logger.warning("No structure names found, cannot filter exclusions")
             return self.contour_points or []
         
@@ -303,10 +299,10 @@ class DicomStructureFile:
         # If excluding empty structures, identify ROIs with no contour data
         if exclude_empty:
             # Get ROIs that have contour points
-            rois_with_contours = set(cp.roi for cp in self.contour_points)
+            rois_with_contours = set(cp['ROI'] for cp in self.contour_points)
             
             # Find ROIs in structure set but not in contour points
-            all_rois = set(self.structure_names['ROINumber'])
+            all_rois = set(self.structure_names.keys())
             empty_rois = all_rois - rois_with_contours
             
             for roi_num in empty_rois:
@@ -317,7 +313,7 @@ class DicomStructureFile:
         # Filter contour points
         filtered_contour_points = [
             cp for cp in self.contour_points 
-            if cp.roi not in excluded_rois
+            if cp['ROI'] not in excluded_rois
         ]
         
         # Update stored contour points and DataFrame
@@ -326,12 +322,10 @@ class DicomStructureFile:
         excluded_count = original_count - filtered_count
         
         logger.info(f"Filtered {excluded_count} contours from {len(excluded_rois)} excluded ROIs. "
-                   f"Remaining: {filtered_count} contours from {len(set(cp.roi for cp in filtered_contour_points))} ROIs")
+                   f"Remaining: {filtered_count} contours from {len(set(cp['ROI'] for cp in filtered_contour_points))} ROIs")
         
         # Optionally update the stored data
-        self.contour_points = filtered_contour_points
-        self.contour_dataframe = self._create_contour_dataframe(filtered_contour_points)
-        
+        self.contour_points = filtered_contour_points        
         return filtered_contour_points
     
     def get_excluded_structures(self, 
