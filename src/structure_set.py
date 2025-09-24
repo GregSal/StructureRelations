@@ -25,6 +25,7 @@ class StructureSet:
         structures (Dict[ROI_Type, StructureShape]): Dictionary of structures keyed by ROI.
         slice_sequence (SliceSequence): The slice sequence used across all structures.
         relationship_graph (nx.Graph): Graph where nodes are structures and edges are relationships.
+        dicom_structure_file (DicomStructureFile): Optional reference to the source DICOM file.
     '''
 
     def __init__(self, 
@@ -74,11 +75,26 @@ class StructureSet:
         # Get unique ROIs
         unique_rois = contour_table['ROI'].unique()
 
+        # Get structure names from DicomStructureFile if available
+        structure_names_dict = {}
+        if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'structure_names'):
+            structure_names_dict = self.dicom_structure_file.structure_names
+            logger.debug("Using structure names from DicomStructureFile: %s", structure_names_dict)
+
         # 2. For each ROI in the contour_table:
         for roi in unique_rois:
             # 2.1. Create a StructureShape object from the contour table
             logger.debug('Building structure for ROI: %s', roi)
-            structure = StructureShape(roi=roi, name=f'Structure_{roi}')
+            
+            # Use meaningful name from DICOM file if available, otherwise use generic name
+            if roi in structure_names_dict:
+                structure_name = structure_names_dict[roi]
+                logger.debug('Using DICOM structure name for ROI %s: %s', roi, structure_name)
+            else:
+                structure_name = f'Structure_{roi}'
+                logger.debug('Using generic name for ROI %s: %s', roi, structure_name)
+                
+            structure = StructureShape(roi=roi, name=structure_name)
             self.slice_sequence = structure.add_contour_graph(
                 contour_table,
                 self.slice_sequence
@@ -110,9 +126,9 @@ class StructureSet:
             return
             
         # Apply exclusions to the dicom structure file
-        excluded_contours = self.dicom_structure_file.apply_exclusions(
-            exclusion_patterns=exclusion_patterns,
-            exclude_default=exclude_default
+        excluded_contours = self.dicom_structure_file.filter_exclusions(
+            exclude_prefixes=exclusion_patterns,
+            exclude_empty=True
         )
         
         if excluded_contours:
@@ -146,24 +162,31 @@ class StructureSet:
         self.relationship_graph.add_node(structure.roi, structure=structure)
 
     def calculate_relationships(self) -> None:
-        '''Calculate relationships between all structures in the set.'''
-        roi_list = list(self.structures.keys())
+        '''Calculate relationships between all structure pairs.
 
-        # Calculate relationships between all pairs of structures
-        for i, roi_a in enumerate(roi_list):
-            for roi_b in roi_list[i+1:]:
+        This method calculates the DE27IM spatial relationship between every
+        pair of structures and stores the results in the relationship_graph
+        as edge attributes.
+        '''
+        structure_rois = list(self.structures.keys())
+        
+        # Calculate relationships for all pairs
+        for i, roi_a in enumerate(structure_rois):
+            for roi_b in structure_rois[i+1:]:
                 structure_a = self.structures[roi_a]
                 structure_b = self.structures[roi_b]
-
-                # Calculate relationship
+                
+                # Calculate the relationship
                 relationship = structure_a.relate(structure_b)
-
-                # Add edge to relationship graph
+                
+                # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
-                    roi_a, roi_b,
+                    roi_a, roi_b, 
                     relationship=relationship,
-                    relation_type=relationship.identify_relation()
+                    relationship_type=str(relationship)
                 )
+                
+                logger.debug(f"Calculated relationship between ROI {roi_a} and ROI {roi_b}: {relationship}")
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> DE27IM:
         '''Get the relationship between two structures.
@@ -173,14 +196,12 @@ class StructureSet:
             roi_b (ROI_Type): Second structure ROI.
 
         Returns:
-            DE27IM: The relationship between the structures.
+            DE27IM: The spatial relationship between the structures.
         '''
         if self.relationship_graph.has_edge(roi_a, roi_b):
             return self.relationship_graph[roi_a][roi_b]['relationship']
         elif self.relationship_graph.has_edge(roi_b, roi_a):
-            # Return transposed relationship
-            relationship = self.relationship_graph[roi_b][roi_a]['relationship']
-            return relationship.transpose()
+            return self.relationship_graph[roi_b][roi_a]['relationship']
         else:
             return None
 
@@ -191,11 +212,16 @@ class StructureSet:
             volume_type (str): Type of volume to sort by ('physical', 'exterior', 'hull').
 
         Returns:
-            List[StructureShape]: Structures sorted by volume (ascending).
+            List[StructureShape]: Structures sorted by volume (descending).
         '''
-        volume_attr = f'{volume_type}_volume'
-        return sorted(self.structures.values(),
-                     key=lambda s: getattr(s, volume_attr))
+        if volume_type == 'physical':
+            return sorted(self.structures.values(), key=lambda s: s.physical_volume, reverse=True)
+        elif volume_type == 'exterior':
+            return sorted(self.structures.values(), key=lambda s: s.exterior_volume, reverse=True)
+        elif volume_type == 'hull':
+            return sorted(self.structures.values(), key=lambda s: s.hull_volume, reverse=True)
+        else:
+            raise ValueError(f"Unknown volume type: {volume_type}")
 
     def summary(self) -> pd.DataFrame:
         '''Get a summary of all structures in the set.
@@ -218,18 +244,55 @@ class StructureSet:
         return pd.DataFrame(summary_data)
 
     def relationship_summary(self) -> pd.DataFrame:
-        '''Get a summary of all relationships in the set.
+        '''Get a summary of all relationships between structures as a matrix.
 
         Returns:
-            pd.DataFrame: Summary table with relationship information.
+            pd.DataFrame: Matrix with Structure_A as index, Structure_B as columns,
+                and Relationship_Type as values. The matrix is symmetric for 
+                symmetric relationships.
         '''
-        relationship_data = []
-        for roi_a, roi_b, data in self.relationship_graph.edges(data=True):
-            relationship_data.append({
-                'Structure_A': roi_a,
-                'Structure_B': roi_b,
-                'Relationship_Type': data['relation_type'],
-                'DE27IM': str(data['relationship'])
-            })
+        if not self.relationship_graph.edges():
+            return pd.DataFrame()
 
-        return pd.DataFrame(relationship_data)
+        # Get all unique ROIs and their corresponding names for matrix dimensions
+        all_rois = sorted(list(self.structures.keys()))
+        all_names = [self.structures[roi].name for roi in all_rois]
+        
+        # Create empty matrix filled with None using structure names
+        relationship_matrix = pd.DataFrame(
+            index=all_names, 
+            columns=all_names, 
+            dtype='object'
+        )
+        # Fill with None values explicitly
+        relationship_matrix[:] = None
+        
+        # Create ROI to name mapping for lookups
+        roi_to_name = {roi: self.structures[roi].name for roi in all_rois}
+        
+        # Fill diagonal with self-relationships (typically "Equals")
+        for name in all_names:
+            relationship_matrix.loc[name, name] = "Equals"
+        
+        # Fill matrix with calculated relationships
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(data=True):
+            #relationship_type = edge_data['relationship_type']
+            relationship_obj = edge_data['relationship']
+            relationship_type = relationship_obj.identify_relation()
+
+            # Get structure names for the ROIs
+            name_a = roi_to_name[roi_a]
+            name_b = roi_to_name[roi_b]
+            
+            # Set the relationship in the matrix using names
+            relationship_matrix.loc[name_a, name_b] = relationship_type
+            
+            # For symmetric relationships, also set the transpose
+            if relationship_type.is_symmetric:
+                relationship_matrix.loc[name_b, name_a] = relationship_type
+        
+        # Set index and columns names for clarity
+        relationship_matrix.index.name = 'Structure_A'
+        relationship_matrix.columns.name = 'Structure_B'
+        
+        return relationship_matrix
