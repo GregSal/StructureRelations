@@ -14,7 +14,7 @@ import networkx as nx
 from types_and_classes import ROI_Type
 from contours import build_contour_table
 from structures import StructureShape
-from relations import DE27IM
+from relations import DE27IM, RelationshipType
 from dicom import DicomStructureFile
 
 
@@ -243,7 +243,8 @@ class StructureSet:
 
         return pd.DataFrame(summary_data)
 
-    def relationship_summary(self) -> pd.DataFrame:
+    @property
+    def relationship_matrix(self) -> pd.DataFrame:
         '''Get a summary of all relationships between structures as a matrix.
 
         Returns:
@@ -265,14 +266,14 @@ class StructureSet:
             dtype='object'
         )
         # Fill with None values explicitly
-        relationship_matrix[:] = None
+        relationship_matrix[:] = RelationshipType.UNKNOWN
         
         # Create ROI to name mapping for lookups
         roi_to_name = {roi: self.structures[roi].name for roi in all_rois}
         
         # Fill diagonal with self-relationships (typically "Equals")
         for name in all_names:
-            relationship_matrix.loc[name, name] = "Equals"
+            relationship_matrix.loc[name, name] = RelationshipType.EQUALS
         
         # Fill matrix with calculated relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(data=True):
@@ -296,3 +297,30 @@ class StructureSet:
         relationship_matrix.columns.name = 'Structure_B'
         
         return relationship_matrix
+    def relationship_summary(self, symbol_map=None) -> pd.DataFrame:
+        def to_symbol(relationship_type: RelationshipType) -> str:
+            if relationship_type:
+                return default_symbol_map[relationship_type]
+            return default_symbol_map[RelationshipType.UNKNOWN]
+        
+        default_symbol_map = {
+            RelationshipType.UNKNOWN: RelationshipType.UNKNOWN.label,
+            RelationshipType.DISJOINT: RelationshipType.DISJOINT.label,
+            RelationshipType.EQUALS: RelationshipType.EQUALS.label,
+            RelationshipType.OVERLAPS: RelationshipType.OVERLAPS.label,
+            RelationshipType.CONTAINS: RelationshipType.CONTAINS.label,
+            RelationshipType.SURROUNDS: RelationshipType.SURROUNDS.label,
+            RelationshipType.SHELTERS: RelationshipType.SHELTERS.label,
+            RelationshipType.BORDERS: RelationshipType.BORDERS.label,
+            RelationshipType.CONFINES: RelationshipType.CONFINES.label,
+            RelationshipType.PARTITION: RelationshipType.PARTITION.label
+        }
+        if symbol_map:
+            default_symbol_map.update(symbol_map)
+
+        relationship_matrix = self.relationship_matrix
+        if relationship_matrix.empty:
+            return pd.DataFrame()
+        # Convert matrix to labels for better readability
+        labeled_matrix = relationship_matrix.map(to_symbol)
+        return labeled_matrix
