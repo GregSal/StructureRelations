@@ -477,12 +477,14 @@ def set_enclosed_regions(contour_graph: ContourGraph) -> List[ContourGraph]:
         roi = enclosed_region.nodes[list(region_nodes)[0]]['contour'].roi
         # Check if the region_counter exceeds the length of region_labels
         # If so, add a suffix to the label.
-        if region_counter > len(region_labels):
+        if region_counter >= len(region_labels):
             suffix = str(region_counter // len(region_labels) - 1)
+            region_label_idx = region_counter % len(region_labels)
         else:
             suffix = ''
+            region_label_idx = region_counter
         # Create a label for the enclosed region.
-        region_label = f'{roi}{region_labels[region_counter]}{suffix}'
+        region_label = f'{roi}{region_labels[region_label_idx]}{suffix}'
         # Assign the label to each contour in the SubGraph.
         for node in enclosed_region.nodes:
             contour = enclosed_region.nodes[node]['contour']
