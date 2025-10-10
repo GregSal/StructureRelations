@@ -678,7 +678,12 @@ class DicomStructureFile:
         
         if body_roi is None:
             logger.warning(f"No BODY/EXTERNAL structure found among: {list(structure_names.values())}")
-            return None
+            # Fall back to using the largest structure
+            body_roi, body_name = self._find_largest_structure()
+            if body_roi is None:
+                logger.error("No suitable structure found for resolution calculation")
+                return None
+            logger.info(f"Using largest structure for resolution calculation: ROI {body_roi} - '{body_name}'")
         
         # Get contour points for the body structure
         if self.contour_points is None:
@@ -768,3 +773,64 @@ class DicomStructureFile:
         
         logger.info(f"Rounded {rounded_count} contours to resolution of {self.resolution:.1f} cm/pixel")
         logger.debug(f"Total contour points processed: {len(self.contour_points)}")
+    
+    def _find_largest_structure(self) -> tuple[Optional[int], Optional[str]]:
+        '''Find the largest structure by calculating bounding box area.
+        
+        Returns:
+            tuple: (roi_number, structure_name) of the largest structure,
+                or (None, None) if no suitable structure is found.
+        '''
+        if not self.contour_points:
+            logger.warning("No contour points available to find largest structure")
+            return None, None
+        
+        structure_names = self.get_structure_names()
+        if not structure_names:
+            logger.warning("No structure names available")
+            return None, None
+        
+        # Calculate bounding box area for each structure
+        structure_areas = {}
+        
+        # Group contours by ROI
+        roi_contours = {}
+        for contour in self.contour_points:
+            roi = contour.roi
+            if roi not in roi_contours:
+                roi_contours[roi] = []
+            roi_contours[roi].append(contour)
+        
+        # Calculate bounding box area for each ROI
+        for roi, contours in roi_contours.items():
+            all_x_coords = []
+            all_y_coords = []
+            
+            for contour in contours:
+                x_coords = contour.points[:, 0]  # x coordinates
+                y_coords = contour.points[:, 1]  # y coordinates
+                all_x_coords.extend(x_coords)
+                all_y_coords.extend(y_coords)
+            
+            if all_x_coords and all_y_coords:
+                x_extent = max(all_x_coords) - min(all_x_coords)
+                y_extent = max(all_y_coords) - min(all_y_coords)
+                area = x_extent * y_extent  # Bounding box area in cm²
+                structure_areas[roi] = area
+                
+                struct_name = structure_names.get(roi, f"ROI_{roi}")
+                logger.debug(f"Structure {struct_name} (ROI {roi}): "
+                           f"extent {x_extent:.2f}×{y_extent:.2f} cm, area {area:.2f} cm²")
+        
+        if not structure_areas:
+            logger.warning("No structures with valid coordinates found")
+            return None, None
+        
+        # Find the ROI with the largest bounding box area
+        largest_roi = max(structure_areas, key=structure_areas.get)
+        largest_area = structure_areas[largest_roi]
+        largest_name = structure_names.get(largest_roi, f"ROI_{largest_roi}")
+        
+        logger.debug(f"Largest structure: {largest_name} (ROI {largest_roi}) with area {largest_area:.2f} cm²")
+        
+        return largest_roi, largest_name
