@@ -366,7 +366,7 @@ class DicomStructureFile:
         if self.contour_points is None:
             self.get_contour_points()
         
-        rois_with_contours = set(cp.roi for cp in self.contour_points) if self.contour_points else set()
+        rois_with_contours = set(cp['ROI'] for cp in self.contour_points) if self.contour_points else set()
         
         excluded_info = []
         
@@ -655,7 +655,7 @@ class DicomStructureFile:
                 suitable structure is found.
         '''
         # Look for BODY or EXTERNAL structures in the structure names
-        structure_names = self.get_structure_names()
+        structure_names = self.structure_names
         if not structure_names:
             logger.warning("No structure names available for resolution calculation")
             return None
@@ -679,11 +679,11 @@ class DicomStructureFile:
         if body_roi is None:
             logger.warning(f"No BODY/EXTERNAL structure found among: {list(structure_names.values())}")
             # Fall back to using the largest structure
-            body_roi, body_name = self._find_largest_structure()
+            body_roi = self._find_largest_structure()
             if body_roi is None:
                 logger.error("No suitable structure found for resolution calculation")
                 return None
-            logger.info(f"Using largest structure for resolution calculation: ROI {body_roi} - '{body_name}'")
+            logger.info(f"Using largest structure for resolution calculation: ROI {body_roi}")
         
         # Get contour points for the body structure
         if self.contour_points is None:
@@ -694,9 +694,10 @@ class DicomStructureFile:
             return None
         
         # Find contour points for the body ROI
-        body_contours = [cp for cp in self.contour_points if cp.roi == body_roi]
+        body_contours = [cp for cp in self.contour_points if cp['ROI'] == body_roi]
         
         if not body_contours:
+            body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
             logger.warning(f"No contour points found for structure ROI {body_roi} ('{body_name}')")
             return None
         
@@ -705,14 +706,16 @@ class DicomStructureFile:
         all_y_coords = []
         
         for contour in body_contours:
-            # contour.points is a numpy array of shape (n, 3) with x, y, z coordinates
-            x_coords = contour.points[:, 0]  # x coordinates
-            y_coords = contour.points[:, 1]  # y coordinates
+            # contour['Points'] contains the coordinate points
+            points = np.array(contour['Points'])
+            x_coords = points[:, 0]  # x coordinates
+            y_coords = points[:, 1]  # y coordinates
             
             all_x_coords.extend(x_coords)
             all_y_coords.extend(y_coords)
         
         if not all_x_coords or not all_y_coords:
+            body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
             logger.warning(f"No valid coordinates found for structure '{body_name}'")
             return None
         
@@ -732,6 +735,7 @@ class DicomStructureFile:
         # Round up to single decimal place
         resolution = math.ceil(resolution * 10) / 10
         
+        body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
         logger.info(f"Calculated resolution from structure '{body_name}': {resolution:.1f} cm/pixel")
         logger.debug(f"Structure extents: x={x_extent:.2f} cm, y={y_extent:.2f} cm, "
                     f"diameter={diameter_cm:.2f} cm, pixels={default_pixels}")
@@ -760,77 +764,68 @@ class DicomStructureFile:
         for contour in self.contour_points:
             # Round x and y coordinates to nearest resolution increment
             # Z coordinates (slice positions) are left unchanged
-            original_points = contour.points.copy()
+            points = np.array(contour['Points'])
+            original_points = points.copy()
             
             # Round x and y coordinates
-            contour.points[:, 0] = np.round(contour.points[:, 0] / self.resolution) * self.resolution
-            contour.points[:, 1] = np.round(contour.points[:, 1] / self.resolution) * self.resolution
+            points[:, 0] = np.round(points[:, 0] / self.resolution) * self.resolution
+            points[:, 1] = np.round(points[:, 1] / self.resolution) * self.resolution
             # Z coordinates ([:, 2]) are left unchanged
             
+            # Update the contour with rounded points
+            contour['Points'] = points.tolist()
+            
             # Count how many points were actually changed
-            if not np.array_equal(original_points, contour.points):
+            if not np.array_equal(original_points, points):
                 rounded_count += 1
         
         logger.info(f"Rounded {rounded_count} contours to resolution of {self.resolution:.1f} cm/pixel")
         logger.debug(f"Total contour points processed: {len(self.contour_points)}")
     
-    def _find_largest_structure(self) -> tuple[Optional[int], Optional[str]]:
-        '''Find the largest structure by calculating bounding box area.
-        
+    def _find_largest_structure(self) -> Optional[int]:
+        '''Find the ROI of the largest structure by bounding box area.
         Returns:
-            tuple: (roi_number, structure_name) of the largest structure,
-                or (None, None) if no suitable structure is found.
+            roi_number of the largest structure, or None if not found.
         '''
         if not self.contour_points:
             logger.warning("No contour points available to find largest structure")
-            return None, None
-        
-        structure_names = self.get_structure_names()
+            return None
+        structure_names = self.structure_names
         if not structure_names:
             logger.warning("No structure names available")
-            return None, None
-        
+            return None
         # Calculate bounding box area for each structure
         structure_areas = {}
-        
         # Group contours by ROI
         roi_contours = {}
         for contour in self.contour_points:
-            roi = contour.roi
+            roi = contour['ROI']
             if roi not in roi_contours:
                 roi_contours[roi] = []
             roi_contours[roi].append(contour)
-        
         # Calculate bounding box area for each ROI
         for roi, contours in roi_contours.items():
             all_x_coords = []
             all_y_coords = []
-            
             for contour in contours:
-                x_coords = contour.points[:, 0]  # x coordinates
-                y_coords = contour.points[:, 1]  # y coordinates
+                points = np.array(contour['Points'])
+                x_coords = points[:, 0]
+                y_coords = points[:, 1]
                 all_x_coords.extend(x_coords)
                 all_y_coords.extend(y_coords)
-            
             if all_x_coords and all_y_coords:
                 x_extent = max(all_x_coords) - min(all_x_coords)
                 y_extent = max(all_y_coords) - min(all_y_coords)
-                area = x_extent * y_extent  # Bounding box area in cm²
+                area = x_extent * y_extent
                 structure_areas[roi] = area
-                
                 struct_name = structure_names.get(roi, f"ROI_{roi}")
                 logger.debug(f"Structure {struct_name} (ROI {roi}): "
                            f"extent {x_extent:.2f}×{y_extent:.2f} cm, area {area:.2f} cm²")
-        
         if not structure_areas:
             logger.warning("No structures with valid coordinates found")
-            return None, None
-        
-        # Find the ROI with the largest bounding box area
+            return None
         largest_roi = max(structure_areas, key=structure_areas.get)
         largest_area = structure_areas[largest_roi]
         largest_name = structure_names.get(largest_roi, f"ROI_{largest_roi}")
-        
         logger.debug(f"Largest structure: {largest_name} (ROI {largest_roi}) with area {largest_area:.2f} cm²")
-        
-        return largest_roi, largest_name
+        return largest_roi
