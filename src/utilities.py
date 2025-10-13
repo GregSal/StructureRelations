@@ -132,7 +132,11 @@ def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
         return shapely.Polygon()
     polygon = Polygon(points)
     if not polygon.is_valid:
-        raise InvalidContour("Invalid polygon created from points.")
+        try:
+             polygon = shapely.make_valid(polygon, method="structure",
+                                          keep_collapsed=False)
+        except Exception as e:
+            raise InvalidContour("Invalid polygon created from points.") from e
     return polygon
 
 
