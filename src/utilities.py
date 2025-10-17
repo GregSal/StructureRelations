@@ -3,15 +3,64 @@
 # Type imports
 from typing import List, Tuple
 
+import logging
+
+
 # Shared Packages
 import shapely
 from shapely.geometry import Polygon
+import numpy as np
 
-from types_and_classes import PRECISION, PolygonType
+# Local Packages
+from types_and_classes import PRECISION, TRANSVERSE_PRECISION
+from types_and_classes import ContourPointsType, PolygonType
 from types_and_classes import InvalidContour
 
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # %% Rounding Functions
+def round_contour_points(contour_points: ContourPointsType,
+                         resolution=TRANSVERSE_PRECISION) -> None:
+    '''Round contour points to the specified resolution.
+
+    Rounds the x and y coordinates of all contour points to the nearest
+    resolution increment. Z coordinates are left unchanged as they typically
+    represent slice positions that should remain precise.
+
+    Args:
+        contour_points (ContourPointsType): A list of length 2 or three tuples
+            of float containing the (x, y) or (x, y, z) coordinates that define
+            a contour.
+        resolution (float, optional): The resolution increment to round to in
+            cm. Defaults to TRANSVERSE_PRECISION.
+
+
+    '''
+    if not contour_points:
+        logger.debug("No contour points to round")
+        return
+
+
+    # convert contour_points to numpy array for easier manipulation
+    points = np.array(contour_points)
+    original_points = points.copy()
+
+    # Round x and y coordinates
+    points[:, 0] = np.round(points[:, 0] / resolution) * resolution
+    points[:, 1] = np.round(points[:, 1] / resolution) * resolution
+    # Z coordinates ([:, 2]) are left unchanged
+
+    # convert back to list of tuples
+    rounded_points = points.tolist()
+
+    # Difference between the original and rounded points
+    differences = np.abs(np.array(rounded_points) - original_points)
+    logger.debug(f"Max difference (x, y): {np.max(differences[:, :2], axis=0)}")
+    logger.debug(f"Average difference (x, y): {np.mean(differences[:, :2], axis=0)}")
+
+
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
     '''Round the coordinates of a shapely point to the specified precision.
 
