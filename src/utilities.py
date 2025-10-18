@@ -21,8 +21,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # %% Rounding Functions
+def round_value(number: float, resolution: float) -> float:
+    '''Round a single value to the specified resolution.
+
+    Rounds the value to the nearest resolution increment.
+    Args:
+        number (float): The value to round.
+        resolution (float): The resolution increment to round to.
+    Returns:
+        float: The rounded value.
+
+    '''
+    if resolution <= 0:
+        raise ValueError("Resolution must be a positive number")
+
+    # Determine the number of decimal places for rounding based on resolution
+    decimal_places = -int(np.log10(resolution)) + 1
+
+    # Round the value to the specified resolution
+    rounded_value = round((number // resolution * resolution), decimal_places)
+
+    return rounded_value
+
+
 def round_contour_points(contour_points: ContourPointsType,
-                         resolution=TRANSVERSE_PRECISION) -> None:
+                         resolution=TRANSVERSE_PRECISION) -> ContourPointsType:
     '''Round contour points to the specified resolution.
 
     Rounds the x and y coordinates of all contour points to the nearest
@@ -36,20 +59,32 @@ def round_contour_points(contour_points: ContourPointsType,
         resolution (float, optional): The resolution increment to round to in
             cm. Defaults to TRANSVERSE_PRECISION.
 
+    Returns:
+        ContourPointsType: A new list of contour points with x and y
+            coordinates rounded to the specified resolution.
 
     '''
     if not contour_points:
         logger.debug("No contour points to round")
-        return
+        return []
 
+    if resolution <= 0:
+        raise ValueError("Resolution must be a positive number")
+    # Determine the number of decimal places for rounding based on resolution
+    decimal_places = -int(np.log10(resolution)) + 1
+    logger.debug(f"Rounding to resolution: {resolution} cm, decimal places: {decimal_places}")
 
     # convert contour_points to numpy array for easier manipulation
     points = np.array(contour_points)
     original_points = points.copy()
 
-    # Round x and y coordinates
-    points[:, 0] = np.round(points[:, 0] / resolution) * resolution
-    points[:, 1] = np.round(points[:, 1] / resolution) * resolution
+    # convert x and y coordinates to multiple of resolution
+    points[:, 0] = (points[:, 0] // resolution) * resolution
+    points[:, 1] = (points[:, 1] // resolution) * resolution
+    # Round x and y coordinates to avoid floating point precision issues
+    points[:, 0] = np.round(points[:, 0], decimals=decimal_places)
+    points[:, 1] = np.round(points[:, 1], decimals=decimal_places)
+
     # Z coordinates ([:, 2]) are left unchanged
 
     # convert back to list of tuples
@@ -60,6 +95,7 @@ def round_contour_points(contour_points: ContourPointsType,
     logger.debug(f"Max difference (x, y): {np.max(differences[:, :2], axis=0)}")
     logger.debug(f"Average difference (x, y): {np.mean(differences[:, :2], axis=0)}")
 
+    return rounded_points
 
 def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
     '''Round the coordinates of a shapely point to the specified precision.

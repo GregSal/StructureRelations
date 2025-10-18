@@ -7,6 +7,7 @@ from typing import List, Dict
 
 # Standard Libraries
 from math import ceil, sin, cos, radians, sqrt
+from unittest.mock import DEFAULT
 
 
 # Shared Packages
@@ -17,11 +18,15 @@ import matplotlib.pyplot as plt
 import shapely
 from shapely.plotting import plot_polygon, plot_line
 
-from types_and_classes import PRECISION, SliceIndexType
+from types_and_classes import SliceIndexType
+from types_and_classes import TRANSVERSE_PRECISION, SLICE_INDEX_PRECISION
+from utilities import round_value
 from contours import ContourPoints
 from region_slice import RegionSlice
 
-
+# %% Global Settings
+# Use the minimum precision for general use.  Most functions will use this
+DEFAULT_PRECISION = min(TRANSVERSE_PRECISION, SLICE_INDEX_PRECISION)
 
 
 # %% Tuples to Strings
@@ -230,8 +235,9 @@ def plot_roi(slice_table, roi_list: List[int]):
 
 # %% Contour Creation Functions
 def make_slice_list(height: float = None, number_slices: int = None,
-                    start: float = 0.0, spacing: float = 0.1,
-                    precision=PRECISION) -> List[SliceIndexType]:
+                    start: float = 0.0,
+                    spacing: float = SLICE_INDEX_PRECISION * 10,
+                    precision=SLICE_INDEX_PRECISION) -> List[SliceIndexType]:
     '''Generate a list of SliceIndexType with the desired range and increment.
 
     Height or number_slices must be provided.
@@ -244,11 +250,13 @@ def make_slice_list(height: float = None, number_slices: int = None,
             If None, number_slices is required. Defaults to None.
         number_slices (int, optional): The number of slices to include in the
             list. If None, height is required. Defaults to None.
-        start (float, optional): The lowest SliceIndexType value. Defaults to 0.0.
+        start (float, optional): The lowest SliceIndexType value.
+            Defaults to 0.0.
         spacing (float, optional): The gap between slices. Not used if both
-            height and number_slices are provided. Defaults to 0.1.
-        precision (int, optional): SliceIndexType values are rounded to this number
-            of decimal places.precision. Defaults to PRECISION (3).
+            height and number_slices are provided. Defaults to
+            SLICE_INDEX_PRECISION * 10 (= 0.1).
+        precision (float, optional): SliceIndexType values are rounded to a
+            multiple of this number. Defaults to SLICE_INDEX_PRECISION = 0.01.
 
     Raises:
         ValueError: if neither height nor number_slices is provided.
@@ -265,13 +273,15 @@ def make_slice_list(height: float = None, number_slices: int = None,
     elif not number_slices:
         msg = 'At least one of height or number_slices must be specified.'
         raise ValueError(msg)
-    slices = [round(SliceIndexType(num*spacing + start), precision)
-              for num in range(number_slices)]
+
+    slices = [round_value(SliceIndexType(slice_idx), precision)
+              for slice_idx in range(number_slices)]
     return slices
 
 
 def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
-                  precision=3, z: float = None)->list[tuple[float, float]]:
+                  precision=DEFAULT_PRECISION,
+                  z: float = None)->list[tuple[float, float]]:
     '''Generate points for a circle with the specified radius.
 
     The circle is centered at (offset_x, offset_y) and the coordinates are
@@ -287,8 +297,8 @@ def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
             Defaults to 0.
         num_points (int, optional): The number of points to generate for the
             circle. Defaults to 16.
-        precision (int, optional): The number of decimal points to use when
-            rounding the coordinates. Defaults to 3.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
         z (float, optional): The z coordinate of the points. If None, the points
             will be 2D points. Defaults to None.
 
@@ -300,9 +310,11 @@ def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
     deg_step = radians(360/num_points)
     degree_points = np.arange(stop=radians(360), step=deg_step)
     if radius == 0:
-        radius = 10**(-precision)
-    x_coord = np.array([round(radius*sin(d), precision) for d in degree_points])
-    y_coord = np.array([round(radius*cos(d), precision) for d in degree_points])
+        radius = precision
+    x_coord = np.array([round_value(radius*sin(d), precision)
+                        for d in degree_points])
+    y_coord = np.array([round_value(radius*cos(d), precision)
+                        for d in degree_points])
     x_coord = x_coord + offset_x
     y_coord = y_coord + offset_y
     if z is not None:
@@ -314,7 +326,7 @@ def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
 
 
 def circle_x_points(radius: float, x_list: List[float], offset_x=0, offset_y=0,
-                    precision=3)->list[tuple[float, float]]:
+                    precision=DEFAULT_PRECISION)->list[tuple[float, float]]:
     '''Generate points for a circle with the specified radius and x coordinates.
 
     Args:
@@ -324,8 +336,8 @@ def circle_x_points(radius: float, x_list: List[float], offset_x=0, offset_y=0,
             Defaults to 0.
         offset_y (float, optional): The y position of the center of the circle.
             Defaults to 0.
-        precision (int, optional): The number of decimal points to use when
-            rounding the coordinates. Defaults to 3.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
 
     Returns:
         list[tuple[float, float]]: A list of tuples containing the x and y
@@ -338,10 +350,10 @@ def circle_x_points(radius: float, x_list: List[float], offset_x=0, offset_y=0,
         try:
             y = sqrt(radius**2 - x0**2)
         except ValueError:
-            y = 10**(-precision)
+            y = precision
         else:
-            y_pos = round(offset_y + y, precision)
-            y_neg = round(offset_y - y, precision)
+            y_pos = round_value(offset_y + y, precision)
+            y_neg = round_value(offset_y - y, precision)
         coords_pos.append((x, y_pos))
         coords_neg.append((x, y_neg))
     coords_neg.reverse()
@@ -350,7 +362,7 @@ def circle_x_points(radius: float, x_list: List[float], offset_x=0, offset_y=0,
 
 
 def box_points(width: float, height: float = None, offset_x=0.0, offset_y=0.0,
-               precision=3) -> list[tuple[float, float]]:
+               precision=DEFAULT_PRECISION) -> list[tuple[float, float]]:
     '''Generate points for a rectangle with the specified width and height.
 
     The rectangle is centered at (offset_x, offset_y) and the coordinates are
@@ -366,8 +378,8 @@ def box_points(width: float, height: float = None, offset_x=0.0, offset_y=0.0,
             Defaults to 0.
         offset_y (float, optional): The y position of the center of the rectangle.
             Defaults to 0.
-        precision (int, optional): The number of decimal points to use when
-            rounding the coordinates. Defaults to 3.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
 
     Returns:
         list[tuple[float, float]]: A list of tuples containing the x and y
@@ -375,12 +387,12 @@ def box_points(width: float, height: float = None, offset_x=0.0, offset_y=0.0,
     '''
     x1_unit = width / 2
     if x1_unit == 0:
-        x1_unit = 10**(-precision)
+        x1_unit = precision
     if height is None:
         y1_unit = x1_unit
     else:
         if height == 0:
-            y1_unit = 10**(-precision)
+            y1_unit = precision
         else:
             y1_unit = height / 2
     coords = [
@@ -394,7 +406,7 @@ def box_points(width: float, height: float = None, offset_x=0.0, offset_y=0.0,
 
 def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3)->Dict[SliceIndexType, tuple[float, float]]:
+                precision=DEFAULT_PRECISION)->Dict[SliceIndexType, tuple[float, float]]:
     '''Generate points for a sphere with the specified radius.
 
     The center of the sphere is at (offset_x, offset_y, offset_z). The
@@ -415,8 +427,9 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
             Defaults to 0.
         offset_z (float, optional): The z position of the center of the sphere.
             Defaults to 0.
-        precision (int, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
+
     Returns:
         Dict[SliceIndexType, tuple[float, float]]: A dictionary containing the
             slice index as the key and a tuple of (x, y) coordinates as the value.
@@ -425,7 +438,7 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
                               start=start_slice, precision=precision)
-    r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision+1)
+    r_coord = circle_x_points(radius, z_coord, offset_z, precision=precision/10)
     # Generate circle for each slices
     slice_data = {}
     for slice_idx, radius in r_coord:
@@ -437,7 +450,7 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
 
 def cylinder_points(radius: float, length: float, spacing: float = 0.1,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3)->Dict[SliceIndexType, tuple[float, float]]:
+                precision=DEFAULT_PRECISION)->Dict[SliceIndexType, tuple[float, float]]:
     '''Generate points for a cylinder with the specified radius and length.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -457,8 +470,8 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
             Defaults to 0.
         offset_z (float, optional): The z position of the center of the cylinder.
             Defaults to 0.
-        precision (int, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
 
     Returns:
         Dict[SliceIndexType, tuple[float, float]]: A dictionary containing the
@@ -479,7 +492,7 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
 
 def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                precision=3, roi_num=0)->List[ContourPoints]:
+                precision=DEFAULT_PRECISION, roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a sphere.
 
     The center of the sphere is at (offset_x, offset_y, offset_z). The
@@ -496,9 +509,9 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
             Defaults to 0.
         offset_z (float, optional): The y position of the center of the sphere.
             Defaults to 0.
-        precision (int, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
-        roi_num (int, optional): Thr structure index number. Defaults to 0.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
+        roi_num (int, optional): The structure index number. Defaults to 0.
 
     Returns:
         List[ContourPoints]: A list of dictionaries containing the roi,
@@ -516,7 +529,7 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
 def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
                            num_points: int = 16, offset_x: float = 0,
                            offset_y: float = 0, offset_z: float = 0,
-                           precision=PRECISION, roi_num=0)->List[ContourPoints]:
+                           precision=DEFAULT_PRECISION, roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a vertical cylinder.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -534,9 +547,9 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
             cylinder. Defaults to 0.
         offset_z (float, optional): The z position of the center of the
             cylinder. Defaults to 0.
-        precision (_type_, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
-        roi_num (int, optional): Thr structure index number. Defaults to 0.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
+        roi_num (int, optional): The structure index number. Defaults to 0.
 
     Returns:
         List[ContourPoints]: A list of dictionaries containing the roi,
@@ -555,7 +568,7 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
 
 def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
                              offset_x: float = 0, offset_y: float = 0,
-                             offset_z: float = 0, precision=PRECISION,
+                             offset_z: float = 0, precision=DEFAULT_PRECISION,
                              roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a horizontal cylinder.
 
@@ -574,9 +587,9 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
             cylinder. Defaults to 0.
         offset_z (float, optional): The z position of the center of the
             cylinder. Defaults to 0.
-        precision (_type_, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
-        roi_num (int, optional): Thr structure index number. Defaults to 0.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
+        roi_num (int, optional): The structure index number. Defaults to 0.
 
     Returns:
         List[ContourPoints]: A list of dictionaries containing the roi,
@@ -593,7 +606,7 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
 
 def make_box(width: float, length: float = None, height: float = None,
              offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-             spacing: float = 0.1, precision=PRECISION,
+             spacing: float = 0.1, precision=DEFAULT_PRECISION,
              roi_num=0)->List[ContourPoints]:
     '''Generate contour slices for a rectangular prism cylinder.
 
@@ -615,9 +628,9 @@ def make_box(width: float, length: float = None, height: float = None,
             box. Defaults to 0.
         offset_z (float, optional): The z position of the center of the
             box. Defaults to 0.
-        precision (_type_, optional): The number of decimal points to use when
-            rounding the polygon coordinates. Defaults to 3.
-        roi_num (int, optional): Thr structure index number. Defaults to 0.
+        precision (float, optional): The resolution increment to round to.
+            Defaults to DEFAULT_PRECISION (0.01).
+        roi_num (int, optional): The structure index number. Defaults to 0.
 
     Returns:
         List[ContourPoints]: A list of dictionaries containing the roi,
@@ -625,7 +638,7 @@ def make_box(width: float, length: float = None, height: float = None,
     '''
     if not height:
         if height == 0:
-            height = 10**(-precision)
+            height = precision
         else:
             height = width
     starting_z = offset_z - height / 2
