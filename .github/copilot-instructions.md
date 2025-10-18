@@ -3,6 +3,13 @@
 ## Project Overview
 This project analyzes spatial relationships between DICOM RT (Radiotherapy) structures using computational geometry. The core algorithm builds 3D structure representations from 2D contour slices and classifies relationships using DE-9IM (Dimensionally Extended 9-Intersection Model) extended to 27 dimensions for 3D structures.
 
+## Formatting conventions
+- Use 4 spaces for indentation
+- Prefer limiting lines to 80 characters, accept lines up to 100 characters
+- use single quotes for strings unless double quotes are needed for interpolation or nested quotes
+- use google style docstring for functions and classes
+- use type hints for function arguments and return values
+
 ## Architecture
 
 ### Core Data Flow
@@ -25,7 +32,7 @@ This project analyzes spatial relationships between DICOM RT (Radiotherapy) stru
 - `SliceIndexType`: Z-axis position in cm (float)
 - `ContourIndex`: Unique contour identifier `(ROI, SliceIndex, uniqueness_int)`
 - `PolygonType`: `shapely.Polygon | shapely.MultiPolygon`
-- Global precision constants: `TRANSVERSE_PRECISION = 0.01`, `SLICE_INDEX_PRECISION = 0.01`, `PRECISION = 3`
+- Global precision constants: `TRANSVERSE_PRECISION = 0.01`, `SLICE_INDEX_PRECISION = 0.01`
 
 ## Critical Conventions
 
