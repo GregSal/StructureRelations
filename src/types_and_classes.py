@@ -25,7 +25,7 @@ SliceIndexSequenceType = Union[List[SliceIndexType],
                                SliceIndexType]
 
 # A list of contour points.
-Coordinate = Union[Tuple(float, float), Tuple(float, float, float)]
+Coordinate = Union[Tuple[float, float], Tuple[float, float, float]]
 ContourPointsType = NewType('ContourPointsType', List[Coordinate])
 
 # The index for an individual contour.
