@@ -319,9 +319,9 @@ def circle_points(radius: float, offset_x=0.0, offset_y=0.0, num_points=16,
     y_coord = y_coord + offset_y
     if z is not None:
         z = float(z)
-        coords = [(x,y,z) for x,y in zip(x_coord,y_coord)]
+        coords = [(float(x), float(y), z) for x,y in zip(x_coord,y_coord)]
     else:
-        coords = list(zip(x_coord,y_coord))
+        coords = [(float(x), float(y)) for x,y in zip(x_coord,y_coord)]
     return coords
 
 
