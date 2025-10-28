@@ -28,12 +28,15 @@ def round_value(number: float, resolution: float) -> float:
     Args:
         number (float): The value to round.
         resolution (float): The resolution increment to round to.
+            If resolution is 0.0 no rounding will be performed.
     Returns:
         float: The rounded value.
 
     '''
-    if resolution <= 0:
+    if resolution < 0:
         raise ValueError("Resolution must be a positive number")
+    if resolution == 0:
+        return number
 
     # Determine the number of decimal places for rounding based on resolution
     decimal_places = -int(np.log10(resolution)) + 1
