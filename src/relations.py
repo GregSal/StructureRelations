@@ -386,7 +386,8 @@ class DE9IM():
                     'bin3': bin_str[6:9]}
         return bin_fmt.format(**bin_dict)
 
-
+# TODO The combine_groups and apply_adjustments methods should be moved to a utility class 
+# or module, because they are not specific to the DE27IM class.
 class DE27IM():
     '''Three DE-9IM relationship strings concatenated.
 
