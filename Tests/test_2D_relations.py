@@ -242,9 +242,9 @@ class TestPartition:
         Note: Rounding required here because of floating point inaccuracies.
         '''
         # Rounding required because of floating point inaccuracies.
-        circle6 = shapely.Polygon(circle_points(3))
-        circle4 = shapely.Polygon(circle_points(2))
-        box6_offset = shapely.Polygon(box_points(6, offset_x=2))
+        circle6 = shapely.Polygon(circle_points(3, tolerance=0.01))
+        circle4 = shapely.Polygon(circle_points(2, tolerance=0.01))
+        box6_offset = shapely.Polygon(box_points(6, offset_x=2, tolerance=0.01))
         ring = shapely.difference(circle6, circle4)
         cropped_ring = poly_round(shapely.difference(ring, box6_offset))
         relation_type = DE27IM(ring, cropped_ring).identify_relation()

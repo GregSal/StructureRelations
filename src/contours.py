@@ -21,7 +21,7 @@ from types_and_classes import SliceIndexSequenceType
 from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
 from types_and_classes import SLICE_INDEX_PRECISION
 
-from utilities import points_to_polygon
+from utilities import points_to_polygon, round_value
 
 
 # %% Classes for Slice Indexing and Neighbours
@@ -271,7 +271,7 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
         float: The calculated new z value.
     '''
     if isinstance(slices, (list, tuple)):
-        new_slice = round(np.mean(slices), precision)
+        new_slice = round_value(np.mean(slices), precision)
         min_slice = min(slices)
         max_slice = max(slices)
         if not min_slice <= new_slice <= max_slice:
