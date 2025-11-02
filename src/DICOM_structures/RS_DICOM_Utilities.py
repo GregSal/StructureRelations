@@ -18,9 +18,10 @@ import PySimpleGUI as sg
 import pydicom
 from shapely.geometry import Polygon
 
-
-# Global Settings
-PRECISION = 3
+# Local Packages
+from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
+from types_and_classes import SLICE_INDEX_PRECISION
+from utilities import round_value
 
 #%% Tuples to Strings
 def colour_text(roi_colour):
@@ -187,7 +188,7 @@ class ContourSlice():
     default_thickness = 0.2  # Default slice thickness in cm
     # This is assigned to ContourSlice rather than to ContourSet because the
     # slice thickness may vary between slices.
-    precision = PRECISION  # The number of digits to use for measurement values.
+    tolerance = DEFAULT_TRANSVERSE_TOLERANCE  # factor to round measurements.
 
     def __init__(self, contour_points: np.array):
         '''Create a new contour slice.
@@ -212,7 +213,7 @@ class ContourSlice():
         # Normalize orders the polygon coordinates in a standard way to simplify
         # comparisons.
         self.contour = shp.normalize()
-        self.axial_position = round(contour_points[0,2], self.precision)
+        self.axial_position = round(contour_points[0,2], self.tolerance)
         self.thickness = self.default_thickness
         self.region_count = 1
         self.is_solid = True
@@ -225,7 +226,7 @@ class ContourSlice():
         Returns:
             float: The area of the composite polygon(s)
         '''
-        return round(self.contour.area, self.precision)
+        return round(self.contour.area, self.tolerance)
 
     @property
     def areas(self) -> list:
@@ -236,11 +237,11 @@ class ContourSlice():
         '''
         area_list = []
         if self.contour.geometryType() == 'Polygon':
-            area = round(self.contour.area, self.precision)
+            area = round(self.contour.area, self.tolerance)
             area_list.append(area)
         else:
             for contour in self.contour.geoms:
-                area = round(contour.area, self.precision)
+                area = round(contour.area, self.tolerance)
                 area_list.append(area)
         return area_list
 
@@ -258,7 +259,7 @@ class ContourSlice():
                 returns None.
         '''
         if self.contour.geometryType() == 'Polygon':
-            return round(sqrt(self.contour.area / pi), self.precision)
+            return round(sqrt(self.contour.area / pi), self.tolerance)
         return None
 
     @property
@@ -271,11 +272,11 @@ class ContourSlice():
         '''
         radius_list = []
         if self.contour.geometryType() == 'Polygon':
-            radius = round(sqrt(self.contour.area / pi), self.precision)
+            radius = round(sqrt(self.contour.area / pi), self.tolerance)
             radius_list.append(radius)
         else:
             for contour in self.contour.geoms:
-                radius = round(sqrt(contour.area / pi), self.precision)
+                radius = round(sqrt(contour.area / pi), self.tolerance)
                 radius_list.append(radius)
         return radius_list
 
@@ -286,7 +287,7 @@ class ContourSlice():
         Returns:
             Tuple[float]: The area of the composite polygon(s)
         '''
-        com =  [round(num, self.precision)
+        com =  [round(num, self.tolerance)
                 for num in list(self.contour.centroid.coords[0])]
         com.append(self.axial_position)
         return tuple(com)
@@ -302,12 +303,12 @@ class ContourSlice():
         if self.contour.geometryType() == 'Polygon':
             coord = list(self.contour.centroid.coords[0])
             coord.append(self.axial_position)
-            centre_list.append(tuple(round(c, self.precision) for c in coord))
+            centre_list.append(tuple(round(c, self.tolerance) for c in coord))
         else:
             for contour in self.contour.geoms:
                 coord = list(contour.centroid.coords[0])
                 coord.append(self.axial_position)
-                centre_list.append(tuple(round(c, self.precision) for c in coord))
+                centre_list.append(tuple(round(c, self.tolerance) for c in coord))
         return centre_list
 
     @property
@@ -317,7 +318,7 @@ class ContourSlice():
         Returns:
             float: The combined perimeters of the polygon(s) in the ContourSlice.
         '''
-        return round(self.contour.length, self.precision)
+        return round(self.contour.length, self.tolerance)
 
     @property
     def perimeters(self) -> list:
@@ -328,11 +329,11 @@ class ContourSlice():
         '''
         perimeter_list = []
         if self.contour.geometryType() == 'Polygon':
-            perimeter = round(self.contour.length, self.precision)
+            perimeter = round(self.contour.length, self.tolerance)
             perimeter_list.append(perimeter)
         else:
             for contour in self.contour.geoms:
-                perimeter = round(contour.length, self.precision)
+                perimeter = round(contour.length, self.tolerance)
                 perimeter_list.append(perimeter)
         return perimeter_list
 
@@ -362,7 +363,7 @@ class ContourSlice():
                 res = num_points / length
                 res_list.append(res)
         mean_res = mean(res_list)
-        return round(mean_res, self.precision)
+        return round(mean_res, self.tolerance)
 
     def combine(self, other: "ContourSlice"):
         '''Add an additional contour for the same structure on the same slice.
@@ -447,7 +448,8 @@ class ContourSet():
             'Sup Slice': self.sup_slice,
             'Inf Slice': self.inf_slice,
             'Length': self.length,
-            'Thickness': round(self.length / len(self.contours), PRECISION),
+            'Thickness': round_value(self.length / len(self.contours),
+                                     SLICE_INDEX_PRECISION),
             'Volume': self.volume,
             'Eq Sp Diam': self.spherical_radius * 2,
             'Center of Mass': self.center_of_mass,
@@ -476,7 +478,7 @@ class ContourSet():
                 new_dict = {}
                 for gap, slc in zip(gaps, slices):
                     contour = self.contours[slc]
-                    contour.thickness = round(gap, PRECISION)
+                    contour.thickness = round_value(gap, SLICE_INDEX_PRECISION)
                     new_dict[slc] = contour
                 self.contours = new_dict
             else:
@@ -525,19 +527,20 @@ class ContourSet():
                 # Volume starts at first slice
                 slice_volume = 0
             volume += slice_volume
-            self.volume = round(volume, PRECISION)
+            self.volume = round_value(volume, DEFAULT_TRANSVERSE_TOLERANCE)
             s_radius = (3 * self.volume / (4 * pi)) ** (1 / 3)
-            self.spherical_radius = round(s_radius, PRECISION)
+            self.spherical_radius = round_value(s_radius,
+                                                DEFAULT_TRANSVERSE_TOLERANCE)
             com_vector = np.array([0.0, 0.0, 0.0])
             for com in com_list:
                 com_vector += com
             total_com = com_vector / area_sum
-            self.center_of_mass = tuple(round(num, PRECISION)
+            self.center_of_mass = tuple(round_value(num, DEFAULT_TRANSVERSE_TOLERANCE)
                                         for num in list(total_com))
 
         def calculate_resolution():
             res_list = [slice.resolution for slice in self.contours.values()]
-            self.resolution = round(mean(res_list), PRECISION)
+            self.resolution = round_value(mean(res_list), DEFAULT_TRANSVERSE_TOLERANCE)
             if self.resolution > 15:
                 self.resolution_type = 'High'
             else:

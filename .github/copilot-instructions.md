@@ -32,14 +32,14 @@ This project analyzes spatial relationships between DICOM RT (Radiotherapy) stru
 - `SliceIndexType`: Z-axis position in cm (float)
 - `ContourIndex`: Unique contour identifier `(ROI, SliceIndex, uniqueness_int)`
 - `PolygonType`: `shapely.Polygon | shapely.MultiPolygon`
-- Global precision constants: `TRANSVERSE_PRECISION = 0.01`, `SLICE_INDEX_PRECISION = 0.01`
+- Global precision constants: `DEFAULT_TRANSVERSE_TOLERANCE = 0.01`, `SLICE_INDEX_PRECISION = 0.01`
 
 ## Critical Conventions
 
 ### Coordinate Systems & Precision
 - **DICOM coordinates**: Right-handed 3D system, Z-axis perpendicular to slices
-- **Floating-point handling**: Coordinates rounded to `TRANSVERSE_PRECISION` (0.01 cm) to avoid geometry errors
-- **Resolution issues**: Shapely relationship computations are sensitive to rounding; see `src/notebooks/relations/ResolutionAnalysis.ipynb` for ongoing work on `simplify()`, `snap()`, and `make_valid()` approaches
+- **Floating-point handling**: Coordinates rounded to `DEFAULT_TRANSVERSE_TOLERANCE` (0.01 cm) to avoid geometry errors
+
 
 ### Relationship Classification
 Relationships are identified by pattern-matching against DE-27IM bit patterns (see `RelationshipTest` dataclass):
@@ -110,7 +110,7 @@ structure_set.calculate_relationships()
 
 ### Shapely Geometry Utilities
 - `utilities.make_solid()`: Fills holes in polygons (creates exterior-only version)
-- `utilities.poly_round()`: Rounds polygon coordinates to precision
+- `utilities.poly_round()`: Rounds polygon coordinates to specified tolerance.
 - `utilities.points_to_polygon()`: Converts point list to shapely.Polygon with validation
 
 ## Files to Reference

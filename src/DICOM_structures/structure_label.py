@@ -26,8 +26,6 @@ from types_and_classes import InvalidContour
 
 from types_and_classes import StructureSlice
 
-# Global Default Settings
-PRECISION = 3
 
 #%% Structure Class
 class StructureCategory(Enum):

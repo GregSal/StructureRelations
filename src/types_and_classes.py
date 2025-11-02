@@ -58,7 +58,7 @@ StructurePairType = NewType('StructurePairType', Tuple[ROI_Type, ROI_Type])
 PolygonType = Union[shapely.Polygon, shapely.MultiPolygon]
 
 # Global Settings
-TRANSVERSE_PRECISION = 0.01  # The default resolution in the transverse plane in cm
+DEFAULT_TRANSVERSE_TOLERANCE = 0.01  # The default resolution in the transverse plane in cm
 SLICE_INDEX_PRECISION = 0.01  # The default precision for slice indexes in cm
 PRECISION = 3
 

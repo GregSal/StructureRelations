@@ -17,7 +17,9 @@ from shapely.geometry import Polygon
 from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
 from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
-from types_and_classes import PRECISION, SliceIndexSequenceType
+from types_and_classes import SliceIndexSequenceType
+from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
+from types_and_classes import SLICE_INDEX_PRECISION
 
 from utilities import points_to_polygon
 
@@ -258,7 +260,7 @@ class SliceSequence:
 
 #%% Interpolation Functions
 def calculate_new_slice_index(slices: SliceIndexSequenceType,
-                              precision=PRECISION) -> float:
+                              precision=SLICE_INDEX_PRECISION) -> float:
     '''Calculate the new z value based on the given slices.
 
     Args:

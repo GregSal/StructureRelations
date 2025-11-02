@@ -12,7 +12,7 @@ from shapely.geometry import Polygon
 import numpy as np
 
 # Local Packages
-from types_and_classes import PRECISION, TRANSVERSE_PRECISION
+from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
 from types_and_classes import ContourPointsType, PolygonType
 from types_and_classes import InvalidContour
 
@@ -21,70 +21,71 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # %% Rounding Functions
-def round_value(number: float, resolution: float) -> float:
-    '''Round a single value to the specified resolution.
+def round_value(number: float, tolerance: float) -> float:
+    '''Round a single value to the specified tolerance.
 
-    Rounds the value to the nearest resolution increment.
+    Rounds the value to the nearest tolerance increment.
     Args:
         number (float): The value to round.
-        resolution (float): The resolution increment to round to.
-            If resolution is 0.0 no rounding will be performed.
+        tolerance (float): The tolerance increment to round to.
+            If tolerance is 0.0 no rounding will be performed.
     Returns:
         float: The rounded value.
 
     '''
-    if resolution < 0:
+    if tolerance < 0:
         raise ValueError("Resolution must be a positive number")
-    if resolution == 0:
+    if tolerance == 0:
         return number
 
     # Determine the number of decimal places for rounding based on resolution
-    decimal_places = -int(np.log10(resolution)) + 1
+    decimal_places = -int(np.log10(tolerance)) + 1
 
     # Round the value to the specified resolution
-    rounded_value = round((number // resolution * resolution), decimal_places)
+    rounded_value = round((number // tolerance * tolerance), decimal_places)
 
     return rounded_value
 
 
 def round_contour_points(contour_points: ContourPointsType,
-                         resolution=TRANSVERSE_PRECISION) -> ContourPointsType:
-    '''Round contour points to the specified resolution.
+                         tolerance=DEFAULT_TRANSVERSE_TOLERANCE) -> ContourPointsType:
+    '''Round contour points to the specified tolerance.
 
     Rounds the x and y coordinates of all contour points to the nearest
-    resolution increment. Z coordinates are left unchanged as they typically
+    tolerance increment. Z coordinates are left unchanged as they typically
     represent slice positions that should remain precise.
 
     Args:
         contour_points (ContourPointsType): A list of length 2 or three tuples
             of float containing the (x, y) or (x, y, z) coordinates that define
             a contour.
-        resolution (float, optional): The resolution increment to round to in
-            cm. Defaults to TRANSVERSE_PRECISION.
+        tolerance (float, optional): The tolerance increment to round to in
+            cm. Defaults to DEFAULT_TRANSVERSE_TOLERANCE.
 
     Returns:
         ContourPointsType: A new list of contour points with x and y
-            coordinates rounded to the specified resolution.
+            coordinates rounded to the specified tolerance.
 
     '''
     if not contour_points:
         logger.debug("No contour points to round")
         return []
 
-    if resolution <= 0:
-        raise ValueError("Resolution must be a positive number")
-    # Determine the number of decimal places for rounding based on resolution
-    decimal_places = -int(np.log10(resolution)) + 1
-    logger.debug(f"Rounding to resolution: {resolution} cm, decimal places: {decimal_places}")
+    if tolerance <= 0:
+        raise ValueError("Tolerance must be a positive number")
+    # Determine the number of decimal places for rounding based on tolerance
+    decimal_places = -int(np.log10(tolerance)) + 1
+    logger.debug('Rounding to tolerance: %s cm, decimal places: %d',
+                 tolerance, decimal_places)
 
     # convert contour_points to numpy array for easier manipulation
     points = np.array(contour_points)
     original_points = points.copy()
 
     # convert x and y coordinates to multiple of resolution
-    points[:, 0] = (points[:, 0] // resolution) * resolution
-    points[:, 1] = (points[:, 1] // resolution) * resolution
-    # Round x and y coordinates to avoid floating point precision issues
+    points[:, 0] = (points[:, 0] // tolerance) * tolerance
+    points[:, 1] = (points[:, 1] // tolerance) * tolerance
+    # Round x and y coordinates to avoid floating point issues
     points[:, 0] = np.round(points[:, 0], decimals=decimal_places)
     points[:, 1] = np.round(points[:, 1], decimals=decimal_places)
 
@@ -95,63 +96,65 @@ def round_contour_points(contour_points: ContourPointsType,
 
     # Difference between the original and rounded points
     differences = np.abs(np.array(rounded_points) - original_points)
-    logger.debug(f"Max difference (x, y): {np.max(differences[:, :2], axis=0)}")
-    logger.debug(f"Average difference (x, y): {np.mean(differences[:, :2], axis=0)}")
+    logger.debug('Max difference (x, y): %s',
+                 np.max(differences[:, :2], axis=0))
+    logger.debug('Average difference (x, y): %s',
+                 np.mean(differences[:, :2], axis=0))
 
     return rounded_points
 
-def point_round(point: shapely.Point, precision: int = PRECISION)->List[float]:
-    '''Round the coordinates of a shapely point to the specified precision.
+def point_round(point: shapely.Point,
+                tolerance: float = DEFAULT_TRANSVERSE_TOLERANCE)->List[float]:
+    '''Round the coordinates of a shapely point to the specified tolerance.
 
     Args:
         point (shapely.Point): A shapely point.
 
-        precision (int, optional): The number of decimal points to round to.
-            Defaults to global PRECISION value.
+        tolerance (float, optional): The tolerance to round to.
+            Defaults to global DEFAULT_TRANSVERSE_TOLERANCE value.
 
     Returns:
         shapely.Point: A shapely point with coordinates rounded to the
-            specified precision.
+            specified tolerance.
     '''
     dim = shapely.get_coordinate_dimension(point)
     if dim == 2:
         x, y = shapely.get_coordinates(point)[0]
-        clean_coords = [round(x,precision), round(y,precision)]
+        clean_coords = [round_value(x,tolerance), round_value(y,tolerance)]
     elif dim == 3:
         x, y, z = shapely.get_coordinates(point, include_z=True)[0]
-        clean_coords = [round(x,precision), round(y,precision),
-                        round(z,precision)]
+        clean_coords = [round_value(x,tolerance), round_value(y,tolerance),
+                        round_value(z,tolerance)]
     else:
         raise ValueError(f"Invalid coordinate dimension: {dim}")
-    clean_coords = (round(x,precision), round(y,precision))
     return shapely.Point(clean_coords)
 
 
 def poly_round(polygon: shapely.Polygon,
-               precision: int = PRECISION)->shapely.Polygon:
-    '''Round the coordinates of a polygon to the specified precision.
+               tolerance: float = DEFAULT_TRANSVERSE_TOLERANCE)->shapely.Polygon:
+    '''Round the coordinates of a polygon to the specified tolerance.
 
     Note: this function does not work for polygons with holes.
 
     Args:
         polygon (shapely.Polygon): The polygon to clean.
 
-        precision (int, optional): The number of decimal points sto round to.
-            Defaults to global PRECISION constant.
+        tolerance (float, optional): The tolerance to round to.
+            Defaults to global DEFAULT_TRANSVERSE_TOLERANCE value.
 
     Returns:
         shapely.Polygon: The supplied polygon with all coordinate points
-            rounded to the supplied precision.
+            rounded to the supplied tolerance.
     '''
     if len(polygon.interiors) > 0:
         raise ValueError("Cannot round polygons with holes using this function.")
     dim = shapely.get_coordinate_dimension(polygon)
     if dim == 2:
-        polygon_points = [(round(x,precision), round(y,precision))
+        polygon_points = [(round_value(x,tolerance), round_value(y,tolerance))
                           for x,y in shapely.get_coordinates(polygon)]
     elif dim == 3:
-        polygon_points = [(round(x,precision), round(y,precision),
-                           round(z,precision))
+        polygon_points = [(round_value(x,tolerance), round_value(y,tolerance),
+                           round_value(z,tolerance))
                           for x,y,z in shapely.get_coordinates(polygon,
                                                                include_z=True)]
     else:

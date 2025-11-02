@@ -30,10 +30,6 @@ from relations import Relationship
 from structure import Structure
 
 
-# Global Default Settings
-PRECISION = 3
-
-
 # %% StructureDiagram class
 class StructureDiagram:
     graph_defaults = {
