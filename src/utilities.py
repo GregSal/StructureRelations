@@ -42,7 +42,7 @@ def round_value(number: float, tolerance: float) -> float:
     decimal_places = -int(np.log10(tolerance)) + 1
 
     # Round the value to the specified resolution
-    rounded_value = round((number // tolerance * tolerance), decimal_places)
+    rounded_value = round(round(number / tolerance, decimal_places) * tolerance, decimal_places)
 
     return rounded_value
 
