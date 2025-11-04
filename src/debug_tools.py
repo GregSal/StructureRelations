@@ -272,9 +272,8 @@ def make_slice_list(height: float = None, number_slices: int = None,
     elif not number_slices:
         msg = 'At least one of height or number_slices must be specified.'
         raise ValueError(msg)
-
-    slices = [round_value(SliceIndexType(slice_idx), precision)
-              for slice_idx in range(number_slices)]
+    slices = [SliceIndexType(round_value(num * spacing + start, precision))
+              for num in range(number_slices)]
     return slices
 
 
@@ -449,7 +448,8 @@ def sphere_points(radius: float, spacing: float = 0.1, num_points: int = 16,
 
 def cylinder_points(radius: float, length: float, spacing: float = 0.1,
                 offset_x: float = 0, offset_y: float = 0, offset_z: float = 0,
-                tolerance=DEFAULT_TOLERANCE)->Dict[SliceIndexType, tuple[float, float]]:
+                contour_tolerance=DEFAULT_TOLERANCE,
+                slice_tolerance=DEFAULT_TOLERANCE)->Dict[SliceIndexType, List[tuple[float, float]]]:
     '''Generate points for a cylinder with the specified radius and length.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -479,12 +479,14 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
     number_slices = ceil(radius * 2 / spacing) + 1
     start_slice = offset_z - radius
     z_coord = make_slice_list(number_slices=number_slices, spacing=spacing,
-                              start=start_slice, precision=tolerance)
-    r_coord = circle_x_points(radius, z_coord, offset_z, tolerance=tolerance)
+                              start=start_slice, precision=slice_tolerance)
+    r_coord = circle_x_points(radius, z_coord, offset_z,
+                              tolerance=contour_tolerance)
     # Generate circle for each slices
     slice_data = {}
     for slice_idx, r in r_coord:
-        slice_points = box_points(length, r, offset_x, offset_y, tolerance)
+        slice_points = box_points(length, r, offset_x, offset_y,
+                                  tolerance=slice_tolerance)
         slice_data[SliceIndexType(slice_idx)] = slice_points
     return slice_data
 
@@ -527,8 +529,9 @@ def make_sphere(radius: float, spacing: float = 0.1, num_points: int = 16,
 
 def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
                            num_points: int = 16, offset_x: float = 0,
-                           offset_y: float = 0, offset_z: float = 0,
-                           tolerance=DEFAULT_TOLERANCE, roi_num=0)->List[ContourPoints]:
+                           offset_y: float = 0, offset_z: float = 0, roi_num=0,
+                           contour_tolerance=DEFAULT_TOLERANCE,
+                           slice_tolerance=DEFAULT_TOLERANCE)->List[ContourPoints]:
     '''Generate contour slices for a vertical cylinder.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -556,8 +559,9 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
     '''
     starting_z = offset_z - length / 2
     z_coord = make_slice_list(height=length, spacing=spacing, start=starting_z,
-                              precision=tolerance)
-    xy_points = circle_points(radius, offset_x, offset_y, num_points, tolerance)
+                              precision=slice_tolerance)
+    xy_points = circle_points(radius, offset_x, offset_y, num_points,
+                              tolerance=contour_tolerance)
     slice_list = []
     for slice_idx in z_coord:
         roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
@@ -567,8 +571,9 @@ def make_vertical_cylinder(radius: float, length: float, spacing: float = 0.1,
 
 def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
                              offset_x: float = 0, offset_y: float = 0,
-                             offset_z: float = 0, tolerance=DEFAULT_TOLERANCE,
-                             roi_num=0)->List[ContourPoints]:
+                             offset_z: float = 0, roi_num=0,
+                             contour_tolerance=DEFAULT_TOLERANCE,
+                             slice_tolerance=DEFAULT_TOLERANCE)->List[ContourPoints]:
     '''Generate contour slices for a horizontal cylinder.
 
     The center of the cylinder is at (offset_x, offset_y, offset_z). The
@@ -596,7 +601,8 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
     '''
     slice_list = []
     points_dict = cylinder_points(radius, length, spacing,
-                                   offset_x, offset_y, offset_z, tolerance)
+                                   offset_x, offset_y, offset_z,
+                                   contour_tolerance, slice_tolerance)
     for slice_idx, xy_points in points_dict.items():
         roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
