@@ -15,13 +15,15 @@
         "ms-python.isort",
         "VisualStudioExptTeam.vscodeintellicode",
         "streetsidesoftware.code-spell-checker",
-        "ms-python.pylint"
+        "ms-python.pylint",
+        "ms-toolsai.datawrangler"
       ],
       "settings": {
         "python.envFile": "${workspaceFolder}/.env",
         "python.testing.pytestEnabled": true,
         "python.testing.nosetestsEnabled": false,
-        "pythonTestExplorer.testFramework": "pytest"
+        "pythonTestExplorer.testFramework": "pytest",
+        "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python"
       }
     }
   },

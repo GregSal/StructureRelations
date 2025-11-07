@@ -3,8 +3,8 @@ conda create -y --name StructureRelations
 conda init
 conda activate StructureRelations
 conda install -y python=3.11 networkx shapely pygraphviz pandas matplotlib numpy pyodbc pydicom pysimplegui scipy jupyterlab ipympl pylint pytest
-conda env export > StructureRelations_FULL.yml
-conda env export --from-history > environment.yml
+conda env export > /workspaces/StructureRelations/.devcontainer/StructureRelations_FULL.yml
+conda env export --from-history > /workspaces/StructureRelations/.devcontainer/StructureRelations.yml
 
 
 
