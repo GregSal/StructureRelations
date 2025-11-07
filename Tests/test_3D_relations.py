@@ -68,8 +68,6 @@ class TestContains:
         assert relation_type == RelationshipType.CONTAINS
 
     def test_parallel_cylinders_example(self):
-        slice_spacing = 0.1
-        # Body structure defines slices in use
         slice_spacing = 1
         # Body structure defines slices in use
         body = make_vertical_cylinder(roi_num=0, radius=12, length=10,
