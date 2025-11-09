@@ -141,7 +141,7 @@ def show_bounds(polygon):
     return b
 
 
-def plot_ab(poly_a, poly_b, add_axis=True):
+def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
     '''Plot the difference between two polygons.
 
     This function plots the difference between two polygons, showing the
@@ -177,9 +177,11 @@ def plot_ab(poly_a, poly_b, add_axis=True):
         poly_a = poly_a.merge_regions()
     if isinstance(poly_b, (RegionSlice)):
         poly_b = poly_b.merge_regions()
-
-    fig = plt.figure(1, figsize=(4,2))
-    ax = fig.add_subplot(121)
+    if axes:
+        ax = axes
+    else:
+        fig = plt.figure(1, figsize=(4,2))
+        ax = fig.add_subplot(121)
     ax.set_axis_off()
     ax.axis('equal')
 
@@ -193,7 +195,8 @@ def plot_ab(poly_a, poly_b, add_axis=True):
     if add_axis:
         ax.axhline(0, color='gray', linestyle='--')
         ax.axvline(0, color='gray', linestyle='--')
-    plt.show()
+    if not axes:
+        plt.show()
     return ax
 
 
