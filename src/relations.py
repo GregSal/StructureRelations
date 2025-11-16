@@ -597,8 +597,9 @@ class DE27IM():
     @staticmethod
     def to_int(relation_str: str)->int:
         '''Convert the 27 bit binary string into an integer.'''
+        value_str = relation_str.replace('F','0').replace('2','1')
         try:
-            relation_int = int(relation_str, base=2)
+            relation_int = int(value_str, base=2)
         except ValueError as err:
             raise ValueError(''.join([
                 'The input string must be a 27 bit binary string. The input ',
