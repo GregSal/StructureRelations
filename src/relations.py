@@ -414,7 +414,7 @@ class DE27IM():
         Surrounds     FF*FF****    T***F****      *********   The Exterior of ***A*** contains ***B***.
         Borders       F***T****    F***T****      *********   Part of the *exterior* boundary of ***A***
                                                               touches the exterior boundary of ***B***.
-        Confines      F***T****    T***T****      *********   Part of the *interior* boundary of ***A***
+        Confines      F***T****    T*T***F**      *********   Part of the *interior* boundary of ***A***
                                                               touches the exterior boundary of ***B***.
         Partitions    T*T*T*F**    T*T*T*F**      T*T***F**   ***A*** contains ***B*** and
                                                               part of the *boundary* of ***B*** touches
