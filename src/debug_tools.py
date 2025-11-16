@@ -177,7 +177,7 @@ def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
         poly_a = poly_a.merge_regions()
     if isinstance(poly_b, (RegionSlice)):
         poly_b = poly_b.merge_regions()
-    if axes:
+    if axes is not None:
         ax = axes
     else:
         fig = plt.figure(1, figsize=(4,2))
