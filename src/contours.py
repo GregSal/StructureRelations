@@ -767,6 +767,82 @@ class ContourMatch:
             raise ValueError('Node is not part of the match.')
 
 
+class ContourMargin:
+    '''Class representing a contour margin.
+    Attributes:
+        original (shapely.Polygon | shapely.MultiPolygon): The original polygon.
+        margin (float): The margin distance.
+        boundary (shapely.Polygon | shapely.MultiPolygon): The boundary polygon
+            created by buffering the exterior of the original polygon.
+        true_interior (shapely.Polygon | shapely.MultiPolygon): The true interior
+            polygon, calculated as original - boundary.
+        full_interior (shapely.Polygon | shapely.MultiPolygon): The full interior
+            polygon, calculated as original + boundary.
+    Methods:
+        create_boundary: Static method to create a boundary polygon by
+            buffering the exterior of the input polygon.
+    '''
+    @staticmethod
+    def create_boundary(polygon, margin):
+        '''Create a boundary polygon by buffering the exterior of the input polygon.
+
+        Args:
+            polygon (shapely.Polygon | shapely.MultiPolygon): The input polygon(s).
+            margin (float): The buffer distance to create the boundary.
+
+        Returns:
+            shapely.Polygon | shapely.MultiPolygon: The boundary polygon.
+        '''
+        # Handle MultiPolygon by processing each polygon separately
+        if isinstance(polygon, shapely.MultiPolygon):
+            all_margins = []
+            for poly in polygon.geoms:
+                exterior_margin = poly.exterior.buffer(margin)
+                all_margins.append(exterior_margin)
+                for interior in poly.interiors:
+                    interior_margin = shapely.LineString(interior).buffer(margin)
+                    all_margins.append(interior_margin)
+            boundary = shapely.union_all(all_margins)
+            return boundary
+
+        # Handle single Polygon
+        exterior_margin = polygon.exterior.buffer(margin)
+        all_margins = [exterior_margin]
+        for interior in polygon.interiors:
+            interior_margin = shapely.LineString(interior).buffer(margin)
+            all_margins.append(interior_margin)
+        boundary = shapely.union_all(all_margins)
+        return boundary
+
+    def __init__(self, contour: Union[shapely.Polygon, shapely.MultiPolygon,
+                                      Contour, List[Contour]],
+                 margin: float) -> None:
+        '''Initialize ContourMargin with polygon(s) or Contour object(s).
+
+        Args:
+            contour: Can be:
+                - shapely.Polygon
+                - shapely.MultiPolygon
+                - Contour object
+                - List of Contour objects
+            margin (float): The buffer distance to create the boundary.
+        '''
+        # Extract polygon from Contour object(s)
+        if isinstance(contour, list):
+            polygons = [c.polygon if isinstance(c, Contour) else c
+                       for c in contour]
+            polygon = shapely.union_all(polygons)
+        elif isinstance(contour, Contour):
+            polygon = contour.polygon
+        else:
+            polygon = contour
+
+        self.original = polygon
+        self.margin = margin
+        self.boundary = self.create_boundary(polygon, margin)
+        self.true_interior = polygon - self.boundary
+        self.full_interior = shapely.union_all([polygon, self.boundary])
+
 
 # %% Contour Table Construction
 def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
