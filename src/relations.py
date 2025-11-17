@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import shapely
 
 # Local packages
-from contours import Contour
+from contours import Contour, ContourMargin
 from region_slice import RegionSlice, empty_structure
 from types_and_classes import PolygonType
 from utilities import make_solid, int2matrix
@@ -303,6 +303,62 @@ class DE9IM():
         new_str_list = interiors + boundaries + exteriors
         new_str = ''.join(new_str_list)
         return self.__class__(relation_str=new_str)
+
+    @staticmethod
+    def transpose_a(relation_str)->str:
+        '''Transpose the DE-9IM relationship matrix along the horizontal axis.
+        '''
+        # Select every third character from the string.
+        exteriors = relation_str[0:3]
+        boundaries = relation_str[3:6]
+        interiors = relation_str[6:9]
+        new_str_list = interiors + boundaries + exteriors
+        new_str = ''.join(new_str_list)
+        return new_str
+
+    @staticmethod
+    def transpose_b(relation_str)->str:
+        '''Transpose the DE-9IM relationship matrix along the vertical axis.
+        '''
+        # Select every third character from the string.
+        interiors = relation_str[2::-1]
+        boundaries = relation_str[5:2:-1]
+        exteriors = relation_str[8:5:-1]
+        new_str_list = interiors + boundaries + exteriors
+        new_str = ''.join(new_str_list)
+        return new_str
+
+    def relate_with_margins(self, poly_a, poly_b, margin: float)->'DE9IM':
+        '''Get the DE-9IM relationship with margins applied to the polygons.
+
+        Args:
+            margin (float): The margin to apply to the polygons.
+        Returns:
+            DE9IM: The DE-9IM relationship with margins applied.
+        '''
+        buffered_polygon_a = ContourMargin(poly_a, margin)
+        buffered_polygon_b = ContourMargin(poly_b, margin)
+        r_matrix = [
+            shapely.relate(buffered_polygon_a.true_interior,
+                           buffered_polygon_b.true_interior)[0],
+            shapely.relate(buffered_polygon_a.true_interior,
+                           buffered_polygon_b.boundary)[0],
+            self.transpose_b(shapely.relate(buffered_polygon_a.true_interior,
+                                            buffered_polygon_b.full_interior))[0],
+            shapely.relate(buffered_polygon_a.boundary,
+                           buffered_polygon_b.true_interior)[0],
+            shapely.relate(buffered_polygon_a.boundary,
+                           buffered_polygon_b.boundary)[0],
+            self.transpose_b(shapely.relate(buffered_polygon_a.boundary,
+                                            buffered_polygon_b.full_interior))[0],
+            self.transpose_b(shapely.relate(buffered_polygon_a.full_interior,
+                                            buffered_polygon_b.true_interior))[0],
+            self.transpose_b(shapely.relate(buffered_polygon_a.full_interior,
+                                            buffered_polygon_b.boundary))[0],
+            '2'  # Exteriors always intersect
+            ]
+        relation_str = ''.join(r_matrix)
+        return self.__class__(relation_str=relation_str)
 
     def test_relation(self, mask: int, value: int)->RelationshipType:
         '''Apply the defined test to the supplied relation binary.
