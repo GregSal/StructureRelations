@@ -190,7 +190,8 @@ class DE9IM():
     def __init__(self,
                  poly_a: SinglePolygonType = None,
                  poly_b: SinglePolygonType = None,
-                 relation_str: str = None):
+                 relation_str: str = None,
+                 tolerance=0.0):
         if (poly_a is not None) & (poly_a is not None):
             if not isinstance(poly_a, (shapely.Polygon, shapely.MultiPolygon)):
                 poly_a = getattr(poly_a, 'polygon', None)
@@ -206,7 +207,10 @@ class DE9IM():
                         'poly_b must be a shapely Polygon, MultiPolygon, or ',
                         'Contour object.'
                         ]))
-            self.relation_str = shapely.relate(poly_a, poly_b)
+            if tolerance > 0.0:
+                self.relation_str = self.relate_with_margins(poly_a, poly_b, tolerance)
+            else:
+                self.relation_str = shapely.relate(poly_a, poly_b)
         elif relation_str is not None:
             self.relation_str = relation_str
         else:
@@ -328,7 +332,7 @@ class DE9IM():
         new_str = ''.join(new_str_list)
         return new_str
 
-    def relate_with_margins(self, poly_a, poly_b, margin: float)->'DE9IM':
+    def relate_with_margins(self, poly_a, poly_b, margin: float)->str:
         '''Get the DE-9IM relationship with margins applied to the polygons.
 
         Args:
@@ -351,14 +355,14 @@ class DE9IM():
                            buffered_polygon_b.boundary)[0],
             self.transpose_b(shapely.relate(buffered_polygon_a.boundary,
                                             buffered_polygon_b.full_interior))[0],
-            self.transpose_b(shapely.relate(buffered_polygon_a.full_interior,
+            self.transpose_a(shapely.relate(buffered_polygon_a.full_interior,
                                             buffered_polygon_b.true_interior))[0],
-            self.transpose_b(shapely.relate(buffered_polygon_a.full_interior,
+            self.transpose_a(shapely.relate(buffered_polygon_a.full_interior,
                                             buffered_polygon_b.boundary))[0],
             '2'  # Exteriors always intersect
             ]
         relation_str = ''.join(r_matrix)
-        return self.__class__(relation_str=relation_str)
+        return relation_str
 
     def test_relation(self, mask: int, value: int)->RelationshipType:
         '''Apply the defined test to the supplied relation binary.
