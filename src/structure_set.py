@@ -28,7 +28,7 @@ class StructureSet:
         dicom_structure_file (DicomStructureFile): Optional reference to the source DICOM file.
     '''
 
-    def __init__(self, 
+    def __init__(self,
                  slice_data: Optional[List] = None,
                  dicom_structure_file: Optional[DicomStructureFile] = None):
         '''Initialize the StructureSet.
@@ -59,7 +59,7 @@ class StructureSet:
         if not dicom_file.contour_points:
             logger.warning("No contour points found in DicomStructureFile")
             return
-            
+
         logger.info("Building StructureSet from %d contour points", len(dicom_file.contour_points))
         self.build_from_slice_data(dicom_file.contour_points)
 
@@ -85,7 +85,7 @@ class StructureSet:
         for roi in unique_rois:
             # 2.1. Create a StructureShape object from the contour table
             logger.debug('Building structure for ROI: %s', roi)
-            
+
             # Use meaningful name from DICOM file if available, otherwise use generic name
             if roi in structure_names_dict:
                 structure_name = structure_names_dict[roi]
@@ -93,7 +93,7 @@ class StructureSet:
             else:
                 structure_name = f'Structure_{roi}'
                 logger.debug('Using generic name for ROI %s: %s', roi, structure_name)
-                
+
             structure = StructureShape(roi=roi, name=structure_name)
             self.slice_sequence = structure.add_contour_graph(
                 contour_table,
@@ -112,10 +112,10 @@ class StructureSet:
         for structure in self.structures.values():
             structure.finalize(self.slice_sequence)
 
-    def apply_exclusions(self, exclusion_patterns: Optional[List[str]] = None, 
+    def apply_exclusions(self, exclusion_patterns: Optional[List[str]] = None,
                         exclude_default: bool = True) -> None:
         '''Apply exclusions to filter out unwanted structures and rebuild.
-        
+
         Args:
             exclusion_patterns (List[str], optional): List of patterns to exclude.
                 If None, uses default patterns ['x', 'z'] if exclude_default is True.
@@ -124,13 +124,13 @@ class StructureSet:
         if self.dicom_structure_file is None:
             logger.warning("No DicomStructureFile available for applying exclusions")
             return
-            
+
         # Apply exclusions to the dicom structure file
         excluded_contours = self.dicom_structure_file.filter_exclusions(
             exclude_prefixes=exclusion_patterns,
             exclude_empty=True
         )
-        
+
         if excluded_contours:
             logger.info("Applied exclusions, removed %d contour sets", len(excluded_contours))
             # Rebuild structures with filtered contour points
@@ -169,24 +169,25 @@ class StructureSet:
         as edge attributes.
         '''
         structure_rois = list(self.structures.keys())
-        
+
         # Calculate relationships for all pairs
         for i, roi_a in enumerate(structure_rois):
             for roi_b in structure_rois[i+1:]:
                 structure_a = self.structures[roi_a]
                 structure_b = self.structures[roi_b]
-                
+
                 # Calculate the relationship
                 relationship = structure_a.relate(structure_b)
-                
+
                 # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
-                    roi_a, roi_b, 
+                    roi_a, roi_b,
                     relationship=relationship,
                     relationship_type=str(relationship)
                 )
-                
-                logger.debug(f"Calculated relationship between ROI {roi_a} and ROI {roi_b}: {relationship}")
+
+                logger.debug('Calculated relationship between ROI %s and ROI %s: %s',
+                             roi_a, roi_b, relationship)
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> DE27IM:
         '''Get the relationship between two structures.
@@ -249,7 +250,7 @@ class StructureSet:
 
         Returns:
             pd.DataFrame: Matrix with Structure_A as index, Structure_B as columns,
-                and Relationship_Type as values. The matrix is symmetric for 
+                and Relationship_Type as values. The matrix is symmetric for
                 symmetric relationships.
         '''
         if not self.relationship_graph.edges():
@@ -258,23 +259,23 @@ class StructureSet:
         # Get all unique ROIs and their corresponding names for matrix dimensions
         all_rois = sorted(list(self.structures.keys()))
         all_names = [self.structures[roi].name for roi in all_rois]
-        
+
         # Create empty matrix filled with None using structure names
         relationship_matrix = pd.DataFrame(
-            index=all_names, 
-            columns=all_names, 
+            index=all_names,
+            columns=all_names,
             dtype='object'
         )
         # Fill with None values explicitly
         relationship_matrix[:] = RelationshipType.UNKNOWN
-        
+
         # Create ROI to name mapping for lookups
         roi_to_name = {roi: self.structures[roi].name for roi in all_rois}
-        
+
         # Fill diagonal with self-relationships (typically "Equals")
         for name in all_names:
             relationship_matrix.loc[name, name] = RelationshipType.EQUALS
-        
+
         # Fill matrix with calculated relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(data=True):
             #relationship_type = edge_data['relationship_type']
@@ -284,25 +285,26 @@ class StructureSet:
             # Get structure names for the ROIs
             name_a = roi_to_name[roi_a]
             name_b = roi_to_name[roi_b]
-            
+
             # Set the relationship in the matrix using names
             relationship_matrix.loc[name_a, name_b] = relationship_type
-            
+
             # For symmetric relationships, also set the transpose
             if relationship_type.is_symmetric:
                 relationship_matrix.loc[name_b, name_a] = relationship_type
-        
+
         # Set index and columns names for clarity
         relationship_matrix.index.name = 'Structure_A'
         relationship_matrix.columns.name = 'Structure_B'
-        
+
         return relationship_matrix
+
     def relationship_summary(self, symbol_map=None) -> pd.DataFrame:
         def to_symbol(relationship_type: RelationshipType) -> str:
             if relationship_type:
                 return default_symbol_map[relationship_type]
             return default_symbol_map[RelationshipType.UNKNOWN]
-        
+
         default_symbol_map = {
             RelationshipType.UNKNOWN: RelationshipType.UNKNOWN.label,
             RelationshipType.DISJOINT: RelationshipType.DISJOINT.label,

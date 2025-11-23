@@ -590,7 +590,8 @@ class DE27IM():
                  region_b: AllPolygonType = None,
                  relation_str: str = None,
                  relation_int: int = None,
-                 adjustments: List[str] = None):
+                 adjustments: List[str] = None,
+                 tolerance=0.0):
         if not empty_structure(region_a):
             if not empty_structure(region_b):
                 # If both contours are supplied, the relationship is calculated.
@@ -599,7 +600,7 @@ class DE27IM():
                 self.relation = self.combine_groups(relation_group)
                 # calculate the 27 bit relationships and merge them with the
                 # initial relationship.
-                self.relate_contours(region_a, region_b, adjustments)
+                self.relate_contours(region_a, region_b, adjustments, tolerance)
                 self.int = self.to_int(self.relation)
             else:
                 # If only the A contour is supplied, the relationship is
@@ -669,7 +670,8 @@ class DE27IM():
 
     def relate_contours(self, region_a: AllPolygonType,
                         region_b: AllPolygonType,
-                        adjustments: List[str] = None):
+                        adjustments: List[str] = None,
+                        tolerance=0.0):
         '''Get the 27 bit relationship for two structures on a given slice.
         The supplied adjustments are only applied if the structures are not
         RegionSlices.  If the structures are RegionSlices, then the adjustments
@@ -719,31 +721,40 @@ class DE27IM():
                     exterior = shapely.union_all(list(region_a.exterior.values()))
                     hull = shapely.union_all(list(region_a.hull.values()))
                     if region_b.has_regions():
-                        poly_b = shapely.union_all(list(region_b.regions.values()))
+                        poly_b = shapely.union_all(list(
+                            region_b.regions.values()))
                         self.relate_poly(poly_a, poly_b, exterior, hull,
-                                         adjustments=adjustments)
+                                         adjustments=adjustments,
+                                         tolerance=tolerance)
                     if region_b.has_boundaries():
                         adjustments.append('boundary_b')
-                        boundary_b = shapely.union_all(list(region_b.boundaries.values()))
+                        boundary_b = shapely.union_all(list(
+                            region_b.boundaries.values()))
                         self.relate_poly(poly_a, boundary_b,
-                                         adjustments=adjustments)
+                                         adjustments=adjustments,
+                                         tolerance=tolerance)
                 adjustments = []
                 if region_a.has_boundaries():
                     # Get the 27 bit relationship for the combined boundaries in
                     # region_a with all regions and boundaries in region_b.
                     adjustments.append('boundary_a')
-                    boundary_a = shapely.union_all(list(region_a.boundaries.values()))
+                    boundary_a = shapely.union_all(list(
+                        region_a.boundaries.values()))
                     if region_b.has_regions():
-                        poly_b = shapely.union_all(list(region_b.regions.values()))
+                        poly_b = shapely.union_all(list(
+                            region_b.regions.values()))
                         self.relate_poly(boundary_a, poly_b,
-                                         adjustments=adjustments)
+                                         adjustments=adjustments,
+                                         tolerance=tolerance)
                     if region_b.has_boundaries():
                         # Add the boundary_b adjustment to the existing
                         # 'boundary_a' adjustment.
                         adjustments.append('boundary_b')
-                        boundary_b = shapely.union_all(list(region_b.boundaries.values()))
+                        boundary_b = shapely.union_all(list(
+                            region_b.boundaries.values()))
                         self.relate_poly(boundary_a, boundary_b,
-                                         adjustments=adjustments)
+                                         adjustments=adjustments,
+                                         tolerance=tolerance)
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
@@ -787,13 +798,13 @@ class DE27IM():
                     f'Region_b input was: {str(type(region_b))}'
                     ]))
             self.relate_poly(poly_a, poly_b, external_polygon, hull_polygon,
-                             adjustments=adjustments)
-
+                             adjustments=adjustments, tolerance=tolerance)
 
     def relate_poly(self, poly_a: PolygonType, poly_b: PolygonType,
                     external_polygon: PolygonType = None,
                     hull_polygon: PolygonType = None,
-                    adjustments: List[str] = None):
+                    adjustments: List[str] = None,
+                    tolerance=0.0):
         '''Calculate the DE-27IM relationship for two polygons.
 
           The DE-27IM relationship is calculated by creating three DE-9IM
@@ -823,19 +834,19 @@ class DE27IM():
                     - 'hole_b': Apply hole adjustments to the second DE-9IM.
                     - 'transpose': Apply transpose adjustments to both DE-9IMs.
         '''
-        contour = DE9IM(poly_a, poly_b)
+        contour = DE9IM(poly_a, poly_b, tolerance=tolerance)
         # If an external polygon is supplied, create a DE9IM relationship for
         # the external polygon.
         if external_polygon is None:
             external = self.padding
         else:
-            external = DE9IM(external_polygon, poly_b)
+            external = DE9IM(external_polygon, poly_b, tolerance=tolerance)
         # If a hull polygon is supplied, create a DE9IM relationship for the
         # hull polygon.
         if hull_polygon is None:
             convex_hull = self.padding
         else:
-            convex_hull = DE9IM(hull_polygon, poly_b)
+            convex_hull = DE9IM(hull_polygon, poly_b, tolerance=tolerance)
         # Create a tuple of the three DE-9IM relationships.
         # The order is important: (contour, external, convex_hull).
         relation_group = (contour, external, convex_hull)
@@ -843,7 +854,6 @@ class DE27IM():
         relation_str = self.combine_groups(relation_group, adjustments)
         # Merge the relationship into the DE27IM object.
         self.merge(self.to_int(relation_str))
-
 
     def apply_adjustments(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
                           adjustments: List[str])-> tuple[DE9IM, DE9IM, DE9IM]:

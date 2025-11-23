@@ -697,7 +697,6 @@ class DicomStructureFile:
 
         return resolution
 
-
     def _calculate_resolution_from_structures(self, default_pixels: int = 512
                                               ) -> Optional[float]:
         '''Calculate resolution using BODY or EXTERNAL structure dimensions.
