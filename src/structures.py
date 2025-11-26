@@ -342,7 +342,7 @@ class StructureShape():
             return None
         return self.region_table.loc[idx, 'RegionSlice'].values[0]
 
-    def relate(self, other: 'StructureShape') -> 'DE27IM':
+    def relate(self, other: 'StructureShape', tolerance=0.0) -> 'DE27IM':
         '''Relate this structure to another structure.
 
         This method identifies common slices between the two structures and
@@ -351,6 +351,8 @@ class StructureShape():
 
         Args:
             other (StructureShape): The other structure to relate to.
+            tolerance (float): The tolerance value to use for the boundaries of
+                the relation.
 
         Returns:
             DE27IM: A DE27IM relationship object containing the relationship
@@ -381,7 +383,7 @@ class StructureShape():
         for slice_index, row in regions.iterrows():
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
-            relation = DE27IM(region_self, region_other)
+            relation = DE27IM(region_self, region_other, tolerance=tolerance)
 
             # Log slice_index and relation at debug level using lazy formatting
             logger.debug('SliceIndex: %s,\nRelationType: %s\nRelation:\n%s\n',
