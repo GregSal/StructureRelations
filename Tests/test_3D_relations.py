@@ -193,7 +193,6 @@ class TestShelters:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.SHELTERS
 
-    #@pytest.mark.xfail
     def test_shelters_sphere_in_cylinders_in_box(self):
         slice_spacing = 0.5
         # Body structure defines slices in use
