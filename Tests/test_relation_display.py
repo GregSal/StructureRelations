@@ -1,5 +1,6 @@
+from ctypes import util
 import pytest
-from relations import int2str, int2matrix
+from utilities import int2str, int2matrix
 
 def test_int2str_9bit():
     assert int2str(0b101010101, length=9) == '101010101'

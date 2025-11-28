@@ -223,11 +223,7 @@ def points_to_polygon(points: List[Tuple[float, float]]) -> Polygon:
         return shapely.Polygon()
     polygon = Polygon(points)
     if not polygon.is_valid:
-#        try:
-#             polygon = shapely.make_valid(polygon, method="structure",
-#                                          keep_collapsed=False)
-#        except Exception as e:
-            raise InvalidContour("Invalid polygon created from points.") #from e
+        raise InvalidContour("Invalid polygon created from points.") #from e
     return polygon
 
 
@@ -302,10 +298,10 @@ def int2matrix(relation_int: int, indent: str = '') -> str:
             if matrix_num == 0:
                 # The first matrix has an indent before the binary string and a
                 # space after the binary string.
-                bin_text = indent + bin_text.replace('_', ' ')
+                bin_text = indent + bin_text.replace('_', '\t')
             elif matrix_num == 1:
                 # The second matrix has a space after the binary string.
-                bin_text = bin_text.replace('_', ' ')
+                bin_text = bin_text.replace('_', '\t')
             elif matrix_num == 2:
                 # The third matrix has a newline after the binary string.
                 bin_text = bin_text.replace('_', '\n')

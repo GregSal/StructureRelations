@@ -1,22 +1,22 @@
 #%%
-import pandas as pd
 import pytest
-
 import shapely
 
 from structure_set import StructureSet
+from contours import ContourPoints
 from relations import DE27IM, RelationshipType
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
-from debug_tools import make_sphere, make_box, box_points
+from debug_tools import make_sphere, make_box, box_points, circle_points
+from debug_tools import make_slice_list
 from utilities import poly_round
 
 # %% Utility functions
-def get_relation_type(slice_data, roi1=1, roi2=2)->DE27IM:
+def get_relation_type(slice_data, roi1=1, roi2=2, tolerance=0.0)->DE27IM:
     # build the structure set
     structures = StructureSet(slice_data)
     structure_a = structures.structures[roi1]
     structure_b = structures.structures[roi2]
-    relation = structure_a.relate(structure_b)
+    relation = structure_a.relate(structure_b, tolerance=tolerance)
     relation_type = relation.identify_relation()
     return relation_type
 
@@ -562,6 +562,36 @@ class TestConfines:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
+    def confines_partial_cylinder(self):
+        slice_spacing = 0.1
+        resolution=0.01
+        num_points = 16
+
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=2,
+                                    spacing=slice_spacing)
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=6, length=1,
+                                                spacing=slice_spacing)
+        hole_cylinder = make_vertical_cylinder(roi_num=1, radius=3, length=0.8,
+                                                spacing=slice_spacing)
+        # Define Partial Cylinder Slice
+        full_circle = shapely.Polygon(circle_points(3,tolerance=resolution,
+                                                    num_points=num_points))
+        circle4_offset = shapely.Polygon(circle_points(2, offset_x=2,
+                                                    tolerance=resolution,
+                                                    num_points=num_points))
+        cropped_circle = shapely.intersection(full_circle, circle4_offset)
+        b_coords = list(cropped_circle.boundary.coords)
+        z_coord = make_slice_list(height=0.8, spacing=slice_spacing, start=-0.4,
+                                    precision=slice_spacing)
+        slice_list_b = [ContourPoints(b_coords, roi=2, slice_index=slice_idx)
+                        for slice_idx in z_coord]
+
+        # combine the contours
+        slice_data = body + primary_cylinder + hole_cylinder + slice_list_b
+        relation_type = get_relation_type(slice_data, tolerance=resolution)
+        assert relation_type == RelationshipType.CONFINES
+
 
 class TestPartition:
     def test_partition_embedded_box_on_y_surface(self):
@@ -686,6 +716,34 @@ class TestPartition:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
+    def partitions_partial_cylinder(self):
+        '''Tests the use of boundary margins for relationships.'''
+        slice_spacing = 0.1
+        resolution=0.01
+        num_points = 16
+
+        # Body structure defines slices in use
+        body = make_vertical_cylinder(roi_num=0, radius=10, length=2,
+                                    spacing=slice_spacing)
+        primary_cylinder = make_vertical_cylinder(roi_num=1, radius=3, length=1,
+                                                spacing=slice_spacing)
+        # Define Partial Cylinder Slice
+        full_circle = shapely.Polygon(circle_points(3,tolerance=resolution,
+                                                    num_points=num_points))
+        circle4_offset = shapely.Polygon(circle_points(2, offset_x=2,
+                                                    tolerance=resolution,
+                                                    num_points=num_points))
+        cropped_circle = shapely.intersection(full_circle, circle4_offset)
+        b_coords = list(cropped_circle.boundary.coords)
+        z_coord = make_slice_list(height=0.8, spacing=slice_spacing, start=-0.4,
+                                    precision=slice_spacing)
+        slice_list_b = [ContourPoints(b_coords, roi=2, slice_index=slice_idx)
+                        for slice_idx in z_coord]
+
+        # combine the contours
+        slice_data = body + primary_cylinder + slice_list_b
+        relation_type = get_relation_type(slice_data, tolerance=resolution)
+        assert relation_type == RelationshipType.PARTITION
 
 class TestOverlaps:
     def test_overlapping_spheres_example(self):
