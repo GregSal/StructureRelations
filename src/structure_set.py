@@ -22,46 +22,56 @@ class StructureSet:
     '''Class for managing multiple StructureShape objects and their relationships.
 
     Attributes:
-        structures (Dict[ROI_Type, StructureShape]): Dictionary of structures keyed by ROI.
-        slice_sequence (SliceSequence): The slice sequence used across all structures.
-        relationship_graph (nx.Graph): Graph where nodes are structures and edges are relationships.
-        dicom_structure_file (DicomStructureFile): Optional reference to the source DICOM file.
+        structures (Dict[ROI_Type, StructureShape]): Dictionary of structures
+            keyed by ROI.
+        slice_sequence (SliceSequence): The slice sequence used across all
+            structures.
+        relationship_graph (nx.Graph): Graph where nodes are structures and
+            edges are relationships.
+        dicom_structure_file (DicomStructureFile): Optional reference to the
+            source DICOM file.
+        tolerance (float): Tolerance value for structure relationships.
     '''
 
     def __init__(self,
                  slice_data: Optional[List] = None,
-                 dicom_structure_file: Optional[DicomStructureFile] = None):
+                 dicom_structure_file: Optional[DicomStructureFile] = None,
+                 tolerance=0.0):
         '''Initialize the StructureSet.
 
         Args:
             slice_data (List, optional): List of ContourPoints for building structures.
-                If None, creates an empty StructureSet. Deprecated - use dicom_structure_file instead.
-            dicom_structure_file (DicomStructureFile, optional): DICOM structure file object
-                containing contour points. Takes precedence over slice_data if both are provided.
+                If None, creates an empty StructureSet.
+                Deprecated - use dicom_structure_file instead.
+            dicom_structure_file (DicomStructureFile, optional): DICOM structure
+                file object containing contour points. Takes precedence over
+                slice_data if both are provided.
+            tolerance (float, optional): Tolerance value for structure
+                relationships. Defaults to 0.0.
         '''
         self.structures = {}
         self.slice_sequence = None
         self.relationship_graph = nx.Graph()
         self.dicom_structure_file = dicom_structure_file
+        self.tolerance = tolerance
 
         # Prioritize dicom_structure_file over slice_data
         if dicom_structure_file is not None:
-            self.build_from_dicom_file(dicom_structure_file)
+            self.build_from_dicom_file()
         elif slice_data is not None:
             self.build_from_slice_data(slice_data)
 
-    def build_from_dicom_file(self, dicom_file: DicomStructureFile) -> None:
-        '''Build structures from DicomStructureFile following the StructureSet process.
-
-        Args:
-            dicom_file (DicomStructureFile): DICOM structure file object containing contour points.
+    def build_from_dicom_file(self) -> None:
+        '''Build structures from DicomStructureFile following the StructureSet
+        process.
         '''
-        if not dicom_file.contour_points:
+        if not self.dicom_structure_file.contour_points:
             logger.warning("No contour points found in DicomStructureFile")
             return
-
-        logger.info("Building StructureSet from %d contour points", len(dicom_file.contour_points))
-        self.build_from_slice_data(dicom_file.contour_points)
+        self.tolerance = self.dicom_structure_file.resolution
+        logger.info("Building StructureSet from %d contour points",
+                    len(self.dicom_structure_file.contour_points))
+        self.build_from_slice_data(self.dicom_structure_file.contour_points)
 
     def build_from_slice_data(self, slice_data: List) -> None:
         '''Build structures from slice data following the StructureSet process.
@@ -177,7 +187,8 @@ class StructureSet:
                 structure_b = self.structures[roi_b]
 
                 # Calculate the relationship
-                relationship = structure_a.relate(structure_b)
+                relationship = structure_a.relate(structure_b,
+                                                  tolerance=self.tolerance)
 
                 # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
