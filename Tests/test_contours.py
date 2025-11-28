@@ -170,7 +170,7 @@ class TestPointsToPolygon():
         polygon = points_to_polygon(points)
         assert polygon.is_valid
 
-    @pytest.mark.xfail  # points_to_polygon now runs make_valid,
+    #@pytest.mark.xfail  # points_to_polygon now runs make_valid,
     # Bad contours are not caught.  Consider dropping make_valid because
     # rounding will be replaced with boundary testing using rinds.
     def test_invalid_polygon(self):
