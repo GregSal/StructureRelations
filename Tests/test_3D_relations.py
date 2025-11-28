@@ -562,7 +562,7 @@ class TestConfines:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.CONFINES
 
-    def confines_partial_cylinder(self):
+    def test_confines_partial_cylinder(self):
         slice_spacing = 0.1
         resolution=0.01
         num_points = 16
@@ -620,7 +620,6 @@ class TestPartition:
         slice_data = box6 + box6_3 + body
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
-
 
     def test_horizontal_cylinders(self):
         slice_spacing = 0.1
@@ -716,7 +715,7 @@ class TestPartition:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.PARTITION
 
-    def partitions_partial_cylinder(self):
+    def test_partitions_partial_cylinder(self):
         '''Tests the use of boundary margins for relationships.'''
         slice_spacing = 0.1
         resolution=0.01
