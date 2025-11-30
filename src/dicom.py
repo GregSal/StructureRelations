@@ -289,7 +289,7 @@ class DicomStructureFile:
                 structures removed.
         '''
         if exclude_prefixes is None:
-            exclude_prefixes = ['x', 'z']
+            exclude_prefixes = ['x', 'z', 'DPV']
 
         # Get structure names
         roi_name_lookup = self.structure_names
@@ -344,6 +344,12 @@ class DicomStructureFile:
             if cp['ROI'] not in excluded_rois
         ]
 
+        # Update structure_names to remove excluded ROIs
+        self.structure_names = {
+            roi: name for roi, name in self.structure_names.items()
+            if roi not in excluded_rois
+        }
+
         # Update stored contour points and DataFrame
         original_count = len(self.contour_points)
         filtered_count = len(filtered_contour_points)
@@ -368,7 +374,7 @@ class DicomStructureFile:
 
         Args:
             exclude_prefixes (List[str], optional): List of prefixes to check
-                for exclusion. Defaults to ['x', 'z'].
+                for exclusion. Defaults to ['x', 'z', 'DPV'].
             case_sensitive (bool, optional): Whether prefix matching should be
                 case sensitive. Defaults to False.
 
@@ -377,7 +383,7 @@ class DicomStructureFile:
                 including ROINumber, StructureID, and exclusion reason.
         '''
         if exclude_prefixes is None:
-            exclude_prefixes = ['x', 'z']
+            exclude_prefixes = ['x', 'z', 'DPV']
 
         structure_names = self.get_structure_names()
         if structure_names.empty:
