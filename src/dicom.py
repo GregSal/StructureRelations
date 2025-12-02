@@ -90,8 +90,8 @@ class DicomStructureFile:
         self.resolution = self.calculate_structure_resolution()
 
         # Round contour points based on calculated resolution
-        if self.resolution is not None:
-            self.round_contour_points()
+        #if self.resolution is not None:
+        #    self.round_contour_points()
 
     def _load_dataset(self) -> None:
         '''Load the DICOM dataset from file.
