@@ -148,9 +148,9 @@ class RelationshipTest:
     def __repr__(self) -> str:
         rep_str = ''.join([
             f'RelationshipTest({self.relation_type}\n',
-            ' ' * 4,
+            '\t',
             f'mask =  0b{self.mask:0>27b}\n',
-            ' ' * 4,
+            '\t',
             f'value = 0b{self.value:0>27b}'
             ])
         return rep_str
@@ -175,9 +175,9 @@ class RelationshipTest:
         test_str = ''.join([
             f'RelationshipTest({self.relation_type}\n',
             '  Mask:\n',
-            int2matrix(self.mask, indent=' ' * 4),
+            int2matrix(self.mask, indent='\t'),
             '  Value\n',
-            int2matrix(self.value, indent=' ' * 4),
+            int2matrix(self.value, indent='\t'),
             '\n'
             ])
         return test_str
