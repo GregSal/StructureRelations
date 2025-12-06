@@ -109,8 +109,8 @@ class StructureSet:
                 contour_table,
                 self.slice_sequence
                 )
-            logger.debug('Slice sequence after ROI %s:\n%s', roi,
-                         self.slice_sequence.sequence)
+            #logger.debug('Slice sequence after ROI %s:\n%s', roi,
+            #             self.slice_sequence.sequence)
 
             # 2.2. Add the StructureShape object to dictionary with the ROI as the key
             self.structures[roi] = structure
@@ -120,6 +120,7 @@ class StructureSet:
 
         # 2.3 & 2.4. Use the SliceSequence to add interpolated contours and generate RegionSlices
         for structure in self.structures.values():
+            logger.debug('Finalizing structure for ROI %s', structure.name)
             structure.finalize(self.slice_sequence)
 
     def apply_exclusions(self, exclusion_patterns: Optional[List[str]] = None,
@@ -197,7 +198,7 @@ class StructureSet:
                     relationship_type=str(relationship)
                 )
 
-                logger.debug('Calculated relationship between ROI %s and ROI %s: %s',
+                logger.debug('Calculated relationship between ROI %s and ROI %s:\n%s',
                              roi_a, roi_b, relationship)
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> DE27IM:
