@@ -1,0 +1,462 @@
+'''FastAPI web application for StructureRelations DICOM analysis.
+
+This application provides a web interface for uploading DICOM RT files,
+selecting structures, and analyzing spatial relationships with customizable
+matrix visualization.
+'''
+import sys
+import logging
+import uuid
+import asyncio
+import tempfile
+from pathlib import Path
+from typing import List, Optional
+from datetime import datetime
+
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from pydantic import BaseModel
+import pandas as pd
+import io
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from dicom import DicomStructureFile
+from structure_set import StructureSet
+from webapp.session_manager import SessionManager, SessionData
+from webapp.websocket_manager import ConnectionManager
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app
+app = FastAPI(title='StructureRelations', version='1.0.0')
+
+# Initialize managers
+session_manager = SessionManager()
+connection_manager = ConnectionManager()
+
+# Mount static files
+static_dir = Path(__file__).parent / 'static'
+static_dir.mkdir(exist_ok=True)
+app.mount('/static', StaticFiles(directory=str(static_dir)), name='static')
+
+
+# Pydantic models for request/response validation
+class UploadResponse(BaseModel):
+    session_id: str
+    disk_usage_mb: float
+    disk_warning: bool
+
+
+class PreviewResponse(BaseModel):
+    session_id: str
+    structures: List[dict]
+    patient_info: dict
+    disk_usage_mb: float
+
+
+class MatrixRequest(BaseModel):
+    session_id: str
+    row_rois: Optional[List[int]] = None
+    col_rois: Optional[List[int]] = None
+    use_symbols: bool = True
+
+
+class MatrixResponse(BaseModel):
+    rows: List[int]
+    columns: List[int]
+    data: List[List[str]]
+    row_names: List[str]
+    col_names: List[str]
+    colors: dict
+
+
+class ProcessRequest(BaseModel):
+    session_id: str
+    selected_rois: Optional[List[int]] = None
+
+
+# Startup event
+@app.on_event('startup')
+async def startup_event():
+    '''Initialize the application and start cleanup task.'''
+    logger.info('Starting StructureRelations web application')
+
+    # Start background cleanup task
+    asyncio.create_task(periodic_cleanup())
+
+
+async def periodic_cleanup():
+    '''Periodically clean up expired sessions every 30 minutes.'''
+    while True:
+        await asyncio.sleep(1800)  # 30 minutes
+        logger.info('Running periodic session cleanup')
+        session_manager.enforce_disk_limit()
+
+
+@app.get('/', response_class=HTMLResponse)
+async def root():
+    '''Serve the main application page.'''
+    html_file = Path(__file__).parent / 'static' / 'index.html'
+    if html_file.exists():
+        return HTMLResponse(content=html_file.read_text(), status_code=200)
+    return HTMLResponse(content='<h1>StructureRelations</h1><p>Static files not found</p>', status_code=200)
+
+
+@app.post('/api/upload', response_model=UploadResponse)
+async def upload_dicom(file: UploadFile = File(...)):
+    '''Upload a DICOM RT Structure Set file and create a new session.
+
+    Args:
+        file (UploadFile): The DICOM file to upload.
+
+    Returns:
+        UploadResponse: Session ID and disk usage information.
+    '''
+    # Validate file extension
+    if not file.filename.lower().endswith('.dcm'):
+        raise HTTPException(status_code=400, detail='Only .dcm files are allowed')
+
+    # Generate unique session ID
+    session_id = str(uuid.uuid4())
+
+    # Save uploaded file to temporary location
+    temp_dir = Path(tempfile.gettempdir()) / 'structurerelations_uploads'
+    temp_dir.mkdir(exist_ok=True)
+
+    file_path = temp_dir / f'{session_id}_{file.filename}'
+
+    try:
+        with open(file_path, 'wb') as f:
+            content = await file.read()
+            f.write(content)
+
+        logger.info(f'Uploaded DICOM file {file.filename} for session {session_id}')
+
+        # Create session data
+        session_data = SessionData(
+            dicom_file_path=str(file_path),
+            structure_set=None,
+            created_at=datetime.now(),
+            last_accessed=datetime.now()
+        )
+
+        # Save session
+        session_manager.save_session(session_id, session_data)
+
+        # Get disk usage info
+        disk_info = session_manager.get_disk_usage_info()
+
+        return UploadResponse(
+            session_id=session_id,
+            disk_usage_mb=disk_info['usage_mb'],
+            disk_warning=disk_info['is_warning']
+        )
+
+    except Exception as e:
+        logger.error(f'Error uploading file: {e}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/api/preview', response_model=PreviewResponse)
+async def preview_structures(session_id: str):
+    '''Get DICOM structure metadata without full processing.
+
+    Args:
+        session_id (str): The session ID.
+
+    Returns:
+        PreviewResponse: Structure metadata and patient information.
+    '''
+    # Load session
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    try:
+        # Load DICOM file
+        dicom_file = DicomStructureFile(Path(session_data.dicom_file_path))
+
+        # Extract structure metadata
+        structures = []
+        structure_names = dicom_file.get_structure_names()
+
+        # Get colors from DICOM
+        colors = {}
+        try:
+            for roi_contour in dicom_file.dataset.ROIContourSequence:
+                roi_num = roi_contour.ReferencedROINumber
+                if hasattr(roi_contour, 'ROIDisplayColor'):
+                    colors[roi_num] = list(roi_contour.ROIDisplayColor)
+        except AttributeError:
+            pass
+
+        # Build structure list
+        for roi, name in structure_names.items():
+            structure_info = {
+                'roi': roi,
+                'name': name,
+                'color': colors.get(roi, [128, 128, 128]),  # Default gray
+                'num_contours': sum(1 for cp in dicom_file.contour_points if cp.roi == roi)
+            }
+            structures.append(structure_info)
+
+        # Sort by ROI number
+        structures.sort(key=lambda s: s['roi'])
+
+        # Get patient info
+        patient_info = dicom_file.get_patient_info()
+
+        # Get disk usage
+        disk_info = session_manager.get_disk_usage_info()
+
+        return PreviewResponse(
+            session_id=session_id,
+            structures=structures,
+            patient_info=patient_info,
+            disk_usage_mb=disk_info['usage_mb']
+        )
+
+    except Exception as e:
+        logger.error(f'Error previewing structures for session {session_id}: {e}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/api/process')
+async def process_structures(request: ProcessRequest, background_tasks: BackgroundTasks):
+    '''Process selected structures and calculate relationships.
+
+    This endpoint starts background processing and sends progress updates via WebSocket.
+
+    Args:
+        request (ProcessRequest): Processing request with session ID and selected ROIs.
+        background_tasks (BackgroundTasks): FastAPI background tasks.
+
+    Returns:
+        dict: Confirmation message.
+    '''
+    session_data = session_manager.load_session(request.session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    # Add processing task to background
+    background_tasks.add_task(
+        process_structure_set,
+        request.session_id,
+        session_data.dicom_file_path,
+        request.selected_rois
+    )
+
+    return {'message': 'Processing started', 'session_id': request.session_id}
+
+
+async def process_structure_set(session_id: str, dicom_file_path: str, selected_rois: Optional[List[int]]):
+    '''Background task to process DICOM file and calculate relationships.
+
+    Args:
+        session_id (str): The session ID.
+        dicom_file_path (str): Path to the DICOM file.
+        selected_rois (List[int], optional): List of ROI numbers to process.
+    '''
+    try:
+        # Send initial progress
+        disk_info = session_manager.get_disk_usage_info()
+        await connection_manager.send_progress(
+            session_id, 'parsing_dicom', 0, '', 'Loading DICOM file...', disk_info['usage_mb']
+        )
+
+        # Load DICOM file
+        dicom_file = DicomStructureFile(Path(dicom_file_path))
+
+        await connection_manager.send_progress(
+            session_id, 'parsing_dicom', 20, '', 'Parsing structures...', disk_info['usage_mb']
+        )
+
+        # Create structure set
+        structure_set = StructureSet(dicom_structure_file=dicom_file)
+
+        await connection_manager.send_progress(
+            session_id, 'building_graphs', 40, '', 'Building contour graphs...', disk_info['usage_mb']
+        )
+
+        # Process each structure
+        total_structures = len(structure_set.structures)
+        for idx, (roi, structure) in enumerate(structure_set.structures.items()):
+            if selected_rois and roi not in selected_rois:
+                continue
+
+            progress = 40 + int((idx / total_structures) * 30)
+            await connection_manager.send_progress(
+                session_id, 'building_graphs', progress,
+                structure.name, f'Processing {structure.name}...', disk_info['usage_mb']
+            )
+
+        await connection_manager.send_progress(
+            session_id, 'calculating_relationships', 70, '', 'Calculating relationships...', disk_info['usage_mb']
+        )
+
+        # Calculate relationships
+        structure_set.finalize()
+
+        await connection_manager.send_progress(
+            session_id, 'calculating_relationships', 100, '', 'Complete!', disk_info['usage_mb']
+        )
+
+        # Save completed session
+        session_data = session_manager.load_session(session_id)
+        if session_data:
+            session_data.structure_set = structure_set
+            session_manager.save_session(session_id, session_data)
+
+        # Send completion message
+        await connection_manager.send_complete(session_id, 'Processing complete')
+
+        logger.info(f'Completed processing for session {session_id}')
+
+    except Exception as e:
+        logger.error(f'Error processing session {session_id}: {e}')
+        await connection_manager.send_error(session_id, f'Processing error: {str(e)}')
+
+
+@app.post('/api/matrix', response_model=MatrixResponse)
+async def get_relationship_matrix(request: MatrixRequest):
+    '''Get a filtered relationship matrix.
+
+    Args:
+        request (MatrixRequest): Matrix request with session ID and filter parameters.
+
+    Returns:
+        MatrixResponse: The filtered relationship matrix.
+    '''
+    session_data = session_manager.load_session(request.session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    if session_data.structure_set is None:
+        raise HTTPException(status_code=400, detail='Structures not yet processed')
+
+    try:
+        # Get matrix as dictionary
+        matrix_dict = session_data.structure_set.to_dict(
+            row_rois=request.row_rois,
+            col_rois=request.col_rois,
+            use_symbols=request.use_symbols
+        )
+
+        return MatrixResponse(**matrix_dict)
+
+    except Exception as e:
+        logger.error(f'Error generating matrix for session {request.session_id}: {e}')
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/api/export/{format}/{session_id}')
+async def export_matrix(format: str, session_id: str, row_rois: Optional[str] = None,
+                       col_rois: Optional[str] = None, use_symbols: bool = True):
+    '''Export relationship matrix in various formats.
+
+    Args:
+        format (str): Export format ('csv', 'excel', 'json').
+        session_id (str): The session ID.
+        row_rois (str, optional): Comma-separated list of row ROI numbers.
+        col_rois (str, optional): Comma-separated list of column ROI numbers.
+        use_symbols (bool, optional): Use symbols instead of labels.
+
+    Returns:
+        FileResponse or StreamingResponse: The exported file.
+    '''
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    if session_data.structure_set is None:
+        raise HTTPException(status_code=400, detail='Structures not yet processed')
+
+    # Parse ROI lists
+    row_rois_list = [int(r) for r in row_rois.split(',')] if row_rois else None
+    col_rois_list = [int(c) for c in col_rois.split(',')] if col_rois else None
+
+    # Get matrix
+    matrix_df = session_data.structure_set.get_relationship_matrix(
+        row_rois=row_rois_list,
+        col_rois=col_rois_list,
+        use_symbols=use_symbols
+    )
+
+    if format == 'csv':
+        output = io.StringIO()
+        matrix_df.to_csv(output)
+        output.seek(0)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode()),
+            media_type='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=relationships.csv'}
+        )
+
+    elif format == 'excel':
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            matrix_df.to_excel(writer, sheet_name='Relationships')
+        output.seek(0)
+        return StreamingResponse(
+            output,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename=relationships.xlsx'}
+        )
+
+    elif format == 'json':
+        matrix_dict = session_data.structure_set.to_dict(
+            row_rois=row_rois_list,
+            col_rois=col_rois_list,
+            use_symbols=use_symbols
+        )
+        return matrix_dict
+
+    else:
+        raise HTTPException(status_code=400, detail='Invalid format. Use csv, excel, or json')
+
+
+@app.websocket('/ws/{session_id}')
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    '''WebSocket endpoint for real-time progress updates.
+
+    Args:
+        websocket (WebSocket): The WebSocket connection.
+        session_id (str): The session ID.
+    '''
+    # Verify session exists
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        await websocket.accept()
+        await connection_manager.send_error(session_id, 'Session expired, please re-upload')
+        await websocket.close()
+        return
+
+    await connection_manager.connect(session_id, websocket)
+
+    try:
+        # Keep connection alive and listen for client messages
+        while True:
+            data = await websocket.receive_text()
+            # Client can send ping messages to keep connection alive
+            if data == 'ping':
+                await websocket.send_text('pong')
+
+    except WebSocketDisconnect:
+        connection_manager.disconnect(session_id)
+        logger.info(f'Client disconnected from session {session_id}')
+    except Exception as e:
+        logger.error(f'WebSocket error for session {session_id}: {e}')
+        connection_manager.disconnect(session_id)
+
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8000)

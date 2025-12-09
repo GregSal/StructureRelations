@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StructureRelations - DICOM RT Analysis</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>StructureRelations</h1>
+            <p class="subtitle">3D Spatial Relationship Analysis for DICOM RT Structures</p>
+            <div class="status-bar">
+                <div class="connection-status">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="disk-usage" id="diskUsage"></div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Stage 1: Upload -->
+            <section class="stage" id="stage-upload">
+                <div class="card">
+                    <h2>Upload DICOM RT Structure Set</h2>
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept=".dcm" style="display: none;">
+                        <div class="upload-prompt">
+                            <svg class="upload-icon" viewBox="0 0 24 24" width="48" height="48">
+                                <path fill="currentColor" d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
+                            </svg>
+                            <p>Click to upload or drag and drop</p>
+                            <p class="file-info">DICOM RT Structure Set (.dcm)</p>
+                        </div>
+                    </div>
+                    <div class="disk-warning" id="diskWarning" style="display: none;">
+                        <p>⚠️ Session storage usage is high. Older sessions may be automatically deleted.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stage 2: Structure Selection -->
+            <section class="stage" id="stage-selection" style="display: none;">
+                <div class="card">
+                    <h2>Select Structures</h2>
+                    <div class="patient-info" id="patientInfo"></div>
+                    <div class="structure-controls">
+                        <button class="btn btn-secondary" id="selectAllBtn">Select All</button>
+                        <button class="btn btn-secondary" id="selectNoneBtn">Select None</button>
+                    </div>
+                    <div class="structures-list" id="structuresList"></div>
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" id="backToUploadBtn">Back</button>
+                        <button class="btn btn-primary" id="processBtn">Process Structures</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stage 3: Processing -->
+            <section class="stage" id="stage-processing" style="display: none;">
+                <div class="card">
+                    <h2>Processing Structures</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">Initializing...</p>
+                        <p class="progress-detail" id="progressDetail"></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stage 4: Results -->
+            <section class="stage" id="stage-results" style="display: none;">
+                <div class="card">
+                    <h2>Structure Summary</h2>
+                    <div class="table-container">
+                        <table id="structuresSummaryTable">
+                            <thead>
+                                <tr>
+                                    <th>ROI</th>
+                                    <th>Name</th>
+                                    <th>Volume (cm³)</th>
+                                    <th>Contours</th>
+                                </tr>
+                            </thead>
+                            <tbody id="structuresSummaryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Relationship Matrix Configuration</h2>
+                    <div class="matrix-config">
+                        <div class="axis-selector">
+                            <h3>Matrix Rows</h3>
+                            <div class="structure-lists">
+                                <div class="list-container">
+                                    <p class="list-label">Available</p>
+                                    <div class="sortable-list" id="availableRowsList"></div>
+                                </div>
+                                <div class="list-container">
+                                    <p class="list-label">Selected</p>
+                                    <div class="sortable-list" id="selectedRowsList"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="axis-selector">
+                            <h3>Matrix Columns</h3>
+                            <div class="structure-lists">
+                                <div class="list-container">
+                                    <p class="list-label">Available</p>
+                                    <div class="sortable-list" id="availableColsList"></div>
+                                </div>
+                                <div class="list-container">
+                                    <p class="list-label">Selected</p>
+                                    <div class="sortable-list" id="selectedColsList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="matrix-controls">
+                        <button class="btn btn-secondary" id="copyToColumnsBtn">Copy Rows to Columns</button>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="useSymbolsToggle" checked>
+                            <span>Use Symbols</span>
+                        </label>
+                        <button class="btn btn-primary" id="updateMatrixBtn">Update Matrix</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Relationship Matrix</h2>
+                    <div class="matrix-info" id="matrixInfo"></div>
+                    <div class="table-container matrix-table-container">
+                        <table id="relationshipMatrix" class="matrix-table">
+                            <thead id="matrixHead"></thead>
+                            <tbody id="matrixBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="export-controls">
+                        <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
+                        <button class="btn btn-secondary" id="exportExcelBtn">Export Excel</button>
+                        <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" id="newAnalysisBtn">New Analysis</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Powered by DE-27IM (Dimensionally Extended 9-Intersection Model)</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

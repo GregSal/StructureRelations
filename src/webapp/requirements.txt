@@ -1,0 +1,23 @@
+# FastAPI Web Application Requirements
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+websockets==12.0
+
+# Data Processing
+pandas==2.1.4
+openpyxl==3.1.2
+
+# DICOM Processing (from existing environment)
+pydicom>=2.4.4
+
+# Geometry (from existing environment)
+shapely>=2.0.2
+
+# Testing
+selenium==4.17.0
+pytest==7.4.4
+pytest-asyncio==0.23.3
+
+# Standard Library Dependencies
+pydantic==2.5.3

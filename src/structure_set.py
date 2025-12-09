@@ -338,3 +338,124 @@ class StructureSet:
         # Convert matrix to labels for better readability
         labeled_matrix = relationship_matrix.map(to_symbol)
         return labeled_matrix
+
+    def get_relationship_matrix(self, row_rois=None, col_rois=None, use_symbols=True) -> pd.DataFrame:
+        '''Get a filtered relationship matrix with optional symbol notation.
+
+        Args:
+            row_rois (List[ROI_Type], optional): List of ROI numbers for matrix rows.
+                If None, uses all structures.
+            col_rois (List[ROI_Type], optional): List of ROI numbers for matrix columns.
+                If None, uses all structures.
+            use_symbols (bool, optional): If True, use symbolic notation instead of labels.
+                Defaults to True.
+
+        Returns:
+            pd.DataFrame: Filtered relationship matrix with structure names as index/columns.
+        '''
+        # Get the base relationship matrix
+        relationship_matrix = self.relationship_matrix
+        if relationship_matrix.empty:
+            return pd.DataFrame()
+
+        # Filter by row ROIs if specified
+        if row_rois is not None:
+            # Convert ROI numbers to structure names
+            row_names = [self.structures[roi].name for roi in row_rois if roi in self.structures]
+            # Filter to only requested rows that exist in the matrix
+            row_names = [name for name in row_names if name in relationship_matrix.index]
+            relationship_matrix = relationship_matrix.loc[row_names, :]
+
+        # Filter by column ROIs if specified
+        if col_rois is not None:
+            # Convert ROI numbers to structure names
+            col_names = [self.structures[roi].name for roi in col_rois if roi in self.structures]
+            # Filter to only requested columns that exist in the matrix
+            col_names = [name for name in col_names if name in relationship_matrix.columns]
+            relationship_matrix = relationship_matrix.loc[:, col_names]
+
+        # Apply symbol mapping if requested
+        if use_symbols:
+            symbol_map = self._get_default_symbol_map()
+            relationship_matrix = relationship_matrix.map(lambda rt: symbol_map.get(rt, '?'))
+        else:
+            # Use labels
+            relationship_matrix = relationship_matrix.map(lambda rt: rt.label if rt else 'Unknown')
+
+        return relationship_matrix
+
+    def _get_default_symbol_map(self) -> dict:
+        '''Get the default symbol map for relationship types.
+
+        Returns:
+            dict: Mapping from RelationshipType to unicode symbols.
+        '''
+        return {
+            RelationshipType.UNKNOWN: '?',
+            RelationshipType.EQUALS: '=',
+            RelationshipType.CONTAINS: '⊂',
+            RelationshipType.OVERLAPS: '∩',
+            RelationshipType.PARTITION: '⊕',
+            RelationshipType.BORDERS: '|',
+            RelationshipType.SURROUNDS: '○',
+            RelationshipType.SHELTERS: '△',
+            RelationshipType.DISJOINT: '∅',
+            RelationshipType.CONFINES: '⊏'
+        }
+
+    def to_dict(self, row_rois=None, col_rois=None, use_symbols=True) -> dict:
+        '''Convert relationship matrix to dictionary for JSON serialization.
+
+        Args:
+            row_rois (List[ROI_Type], optional): List of ROI numbers for matrix rows.
+            col_rois (List[ROI_Type], optional): List of ROI numbers for matrix columns.
+            use_symbols (bool, optional): If True, use symbolic notation.
+
+        Returns:
+            dict: Dictionary with structure:
+                {
+                    'rows': [roi_numbers],
+                    'columns': [roi_numbers],
+                    'data': [[relationship_values]],
+                    'row_names': [structure_names],
+                    'col_names': [structure_names],
+                    'colors': {roi: [r, g, b]}
+                }
+        '''
+        # Get filtered matrix
+        matrix = self.get_relationship_matrix(row_rois, col_rois, use_symbols)
+
+        if matrix.empty:
+            return {
+                'rows': [],
+                'columns': [],
+                'data': [],
+                'row_names': [],
+                'col_names': [],
+                'colors': {}
+            }
+
+        # Extract ROI numbers from structure names
+        name_to_roi = {struct.name: roi for roi, struct in self.structures.items()}
+        row_rois_list = [name_to_roi[name] for name in matrix.index if name in name_to_roi]
+        col_rois_list = [name_to_roi[name] for name in matrix.columns if name in name_to_roi]
+
+        # Extract colors from DICOM file if available
+        colors = {}
+        if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'dataset'):
+            try:
+                for roi_contour in self.dicom_structure_file.dataset.ROIContourSequence:
+                    roi_num = roi_contour.ReferencedROINumber
+                    if hasattr(roi_contour, 'ROIDisplayColor'):
+                        colors[roi_num] = list(roi_contour.ROIDisplayColor)
+            except AttributeError:
+                pass
+
+        return {
+            'rows': row_rois_list,
+            'columns': col_rois_list,
+            'data': matrix.values.tolist(),
+            'row_names': matrix.index.tolist(),
+            'col_names': matrix.columns.tolist(),
+            'colors': colors
+        }
