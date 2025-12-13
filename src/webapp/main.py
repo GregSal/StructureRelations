@@ -62,6 +62,10 @@ class PreviewResponse(BaseModel):
     disk_usage_mb: float
 
 
+class SessionRequest(BaseModel):
+    session_id: str
+
+
 class MatrixRequest(BaseModel):
     session_id: str
     row_rois: Optional[List[int]] = None
@@ -106,8 +110,14 @@ async def root():
     '''Serve the main application page.'''
     html_file = Path(__file__).parent / 'static' / 'index.html'
     if html_file.exists():
-        return HTMLResponse(content=html_file.read_text(), status_code=200)
-    return HTMLResponse(content='<h1>StructureRelations</h1><p>Static files not found</p>', status_code=200)
+        return HTMLResponse(
+            content=html_file.read_text(encoding='utf-8'),
+            status_code=200
+        )
+    return HTMLResponse(
+        content='<h1>StructureRelations</h1><p>Static files not found</p>',
+        status_code=200
+    )
 
 
 @app.post('/api/upload', response_model=UploadResponse)
@@ -166,23 +176,27 @@ async def upload_dicom(file: UploadFile = File(...)):
 
 
 @app.post('/api/preview', response_model=PreviewResponse)
-async def preview_structures(session_id: str):
+async def preview_structures(request: SessionRequest):
     '''Get DICOM structure metadata without full processing.
 
     Args:
-        session_id (str): The session ID.
+        request (SessionRequest): Request containing session_id.
 
     Returns:
         PreviewResponse: Structure metadata and patient information.
     '''
     # Load session
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(request.session_id)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
     try:
         # Load DICOM file
-        dicom_file = DicomStructureFile(Path(session_data.dicom_file_path))
+        file_path = Path(session_data.dicom_file_path)
+        dicom_file = DicomStructureFile(
+            top_dir=file_path.parent,
+            file_path=file_path
+        )
 
         # Extract structure metadata
         structures = []
@@ -204,40 +218,47 @@ async def preview_structures(session_id: str):
                 'roi': roi,
                 'name': name,
                 'color': colors.get(roi, [128, 128, 128]),  # Default gray
-                'num_contours': sum(1 for cp in dicom_file.contour_points if cp.roi == roi)
+                'num_contours': sum(
+                    1 for cp in dicom_file.contour_points if cp['ROI'] == roi
+                )
             }
             structures.append(structure_info)
 
         # Sort by ROI number
         structures.sort(key=lambda s: s['roi'])
 
-        # Get patient info
-        patient_info = dicom_file.get_patient_info()
+        # Get patient info from structure set info
+        structure_set_info = dicom_file.get_structure_set_info()
+        patient_info = {
+            'patient_id': structure_set_info.get('PatientID', ''),
+            'patient_name': structure_set_info.get('PatientName', ''),
+            'structure_set': structure_set_info.get('StructureSet', ''),
+            'study_id': structure_set_info.get('StudyID', '')
+        }
 
         # Get disk usage
         disk_info = session_manager.get_disk_usage_info()
 
         return PreviewResponse(
-            session_id=session_id,
+            session_id=request.session_id,
             structures=structures,
             patient_info=patient_info,
             disk_usage_mb=disk_info['usage_mb']
         )
 
     except Exception as e:
-        logger.error(f'Error previewing structures for session {session_id}: {e}')
+        logger.error(f'Error previewing structures for session {request.session_id}: {e}')
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post('/api/process')
-async def process_structures(request: ProcessRequest, background_tasks: BackgroundTasks):
+async def process_structures(request: ProcessRequest):
     '''Process selected structures and calculate relationships.
 
     This endpoint starts background processing and sends progress updates via WebSocket.
 
     Args:
         request (ProcessRequest): Processing request with session ID and selected ROIs.
-        background_tasks (BackgroundTasks): FastAPI background tasks.
 
     Returns:
         dict: Confirmation message.
@@ -246,12 +267,13 @@ async def process_structures(request: ProcessRequest, background_tasks: Backgrou
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
-    # Add processing task to background
-    background_tasks.add_task(
-        process_structure_set,
-        request.session_id,
-        session_data.dicom_file_path,
-        request.selected_rois
+    # Start processing task asynchronously
+    asyncio.create_task(
+        process_structure_set(
+            request.session_id,
+            session_data.dicom_file_path,
+            request.selected_rois
+        )
     )
 
     return {'message': 'Processing started', 'session_id': request.session_id}
@@ -273,13 +295,26 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         )
 
         # Load DICOM file
-        dicom_file = DicomStructureFile(Path(dicom_file_path))
+        file_path = Path(dicom_file_path)
+        dicom_file = DicomStructureFile(
+            top_dir=file_path.parent,
+            file_path=file_path
+        )
 
         await connection_manager.send_progress(
             session_id, 'parsing_dicom', 20, '', 'Parsing structures...', disk_info['usage_mb']
         )
 
-        # Create structure set
+        # Filter contour points to only include selected ROIs
+        if selected_rois:
+            original_count = len(dicom_file.contour_points)
+            dicom_file.contour_points = [
+                cp for cp in dicom_file.contour_points
+                if cp['ROI'] in selected_rois
+            ]
+            logger.info(f'Filtered contours from {original_count} to {len(dicom_file.contour_points)} for selected ROIs: {selected_rois}')
+
+        # Create structure set with filtered contours
         structure_set = StructureSet(dicom_structure_file=dicom_file)
 
         await connection_manager.send_progress(

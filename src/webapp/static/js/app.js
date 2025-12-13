@@ -9,6 +9,16 @@ class WebAppClient {
         this.initializeEventListeners();
     }
 
+    // Helper to convert RGB array to CSS color string
+    rgbToColor(colorValue) {
+        if (!colorValue) return '#cccccc';
+        if (typeof colorValue === 'string') return colorValue;
+        if (Array.isArray(colorValue) && colorValue.length >= 3) {
+            return `rgb(${colorValue[0]}, ${colorValue[1]}, ${colorValue[2]})`;
+        }
+        return '#cccccc';
+    }
+
     initializeEventListeners() {
         // Upload area
         const uploadArea = document.getElementById('uploadArea');
@@ -36,33 +46,33 @@ class WebAppClient {
             }
         });
 
-        // Structure selection
-        document.getElementById('selectAll').addEventListener('click', () => {
+        // Structure selection - use correct IDs from HTML
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
             this.selectAllStructures(true);
         });
-        document.getElementById('selectNone').addEventListener('click', () => {
+        document.getElementById('selectNoneBtn').addEventListener('click', () => {
             this.selectAllStructures(false);
         });
         document.getElementById('processBtn').addEventListener('click', () => {
             this.startProcessing();
         });
 
-        // Matrix controls
-        document.getElementById('symbolToggle').addEventListener('change', () => {
+        // Matrix controls - use correct IDs from HTML
+        document.getElementById('useSymbolsToggle').addEventListener('change', () => {
             this.updateMatrix();
         });
         document.getElementById('updateMatrixBtn').addEventListener('click', () => {
             this.updateMatrix();
         });
 
-        // Export
-        document.getElementById('exportCsv').addEventListener('click', () => {
+        // Export - use correct IDs from HTML
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
             this.exportMatrix('csv');
         });
-        document.getElementById('exportExcel').addEventListener('click', () => {
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
             this.exportMatrix('excel');
         });
-        document.getElementById('exportJson').addEventListener('click', () => {
+        document.getElementById('exportJsonBtn').addEventListener('click', () => {
             this.exportMatrix('json');
         });
     }
@@ -139,8 +149,8 @@ class WebAppClient {
     }
 
     updateConnectionStatus(connected) {
-        const statusDot = document.querySelector('.status-dot');
-        const statusText = document.getElementById('connectionStatus');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
 
         if (connected) {
             statusDot.classList.add('connected');
@@ -186,10 +196,11 @@ class WebAppClient {
 
             // Update patient info
             const patientInfo = document.getElementById('patientInfo');
+            const pInfo = data.patient_info || {};
             patientInfo.innerHTML = `
-                <div><strong>Patient ID:</strong> ${data.patient_id}</div>
-                <div><strong>Patient Name:</strong> ${data.patient_name}</div>
-                <div><strong>Study Date:</strong> ${data.study_date}</div>
+                <div><strong>Patient ID:</strong> ${pInfo.patient_id || 'N/A'}</div>
+                <div><strong>Patient Name:</strong> ${pInfo.patient_name || 'N/A'}</div>
+                <div><strong>Structure Set:</strong> ${pInfo.structure_set || 'N/A'}</div>
             `;
 
             // Populate structures list
@@ -197,21 +208,25 @@ class WebAppClient {
             structuresList.innerHTML = '';
 
             data.structures.forEach(struct => {
+                // Convert RGB array to CSS color string
+                const colorArr = struct.color || [128, 128, 128];
+                const colorStr = `rgb(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]})`;
+
                 const item = document.createElement('div');
                 item.className = 'structure-item';
                 item.innerHTML = `
                     <input type="checkbox"
-                           data-roi="${struct.roi_number}"
+                           data-roi="${struct.roi}"
                            checked>
                     <div class="structure-color"
-                         style="background-color: ${struct.color}"></div>
+                         style="background-color: ${colorStr}"></div>
                     <div class="structure-info">
                         <div class="structure-name">${struct.name}</div>
-                        <div class="structure-details">ROI ${struct.roi_number}</div>
+                        <div class="structure-details">ROI ${struct.roi} (${struct.num_contours} contours)</div>
                     </div>
                 `;
                 structuresList.appendChild(item);
-                this.selectedStructures.add(struct.roi_number);
+                this.selectedStructures.add(struct.roi);
             });
 
             // Add checkbox event listeners
@@ -315,7 +330,7 @@ class WebAppClient {
             const data = await response.json();
 
             // Populate structure summary
-            const summaryBody = document.getElementById('structureSummaryBody');
+            const summaryBody = document.getElementById('structuresSummaryBody');
             summaryBody.innerHTML = '';
 
             const allStructures = [...new Set([...data.rows, ...data.columns])];
@@ -325,7 +340,8 @@ class WebAppClient {
                 const idx = data.rows.indexOf(roi);
                 const name = idx >= 0 ? data.row_names[idx] :
                              data.col_names[data.columns.indexOf(roi)];
-                const color = data.colors[roi] || '#cccccc';
+                // Colors object has string keys in JSON
+                const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -357,22 +373,29 @@ class WebAppClient {
     }
 
     initializeSortableLists(data) {
-        // Populate available lists
+        // Populate selected lists (start with all structures selected)
+        const selectedRowsList = document.getElementById('selectedRowsList');
+        const selectedColsList = document.getElementById('selectedColsList');
         const availableRowsList = document.getElementById('availableRowsList');
         const availableColsList = document.getElementById('availableColsList');
 
+        // Clear all lists
+        selectedRowsList.innerHTML = '';
+        selectedColsList.innerHTML = '';
         availableRowsList.innerHTML = '';
         availableColsList.innerHTML = '';
 
         data.rows.forEach((roi, idx) => {
-            const color = data.colors[roi] || '#cccccc';
+            // Colors object has string keys in JSON
+            const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
             const name = data.row_names[idx];
 
             const rowItem = this.createSortableItem(roi, name, color);
             const colItem = this.createSortableItem(roi, name, color);
 
-            availableRowsList.appendChild(rowItem);
-            availableColsList.appendChild(colItem);
+            // Add to selected lists by default
+            selectedRowsList.appendChild(rowItem);
+            selectedColsList.appendChild(colItem);
         });
 
         // Initialize SortableJS
@@ -382,7 +405,7 @@ class WebAppClient {
                 animation: 150,
                 ghostClass: 'dragging'
             }),
-            selected: new Sortable(document.getElementById('selectedRowsList'), {
+            selected: new Sortable(selectedRowsList, {
                 group: 'rows',
                 animation: 150,
                 ghostClass: 'dragging'
@@ -395,7 +418,7 @@ class WebAppClient {
                 animation: 150,
                 ghostClass: 'dragging'
             }),
-            selected: new Sortable(document.getElementById('selectedColsList'), {
+            selected: new Sortable(selectedColsList, {
                 group: 'columns',
                 animation: 150,
                 ghostClass: 'dragging'
@@ -415,6 +438,8 @@ class WebAppClient {
     }
 
     async updateMatrix() {
+        console.log('updateMatrix called');
+
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
 
@@ -428,7 +453,7 @@ class WebAppClient {
             return;
         }
 
-        const useSymbols = document.getElementById('symbolToggle').checked;
+        const useSymbols = document.getElementById('useSymbolsToggle').checked;
 
         try {
             const response = await fetch('/api/matrix', {
@@ -526,12 +551,12 @@ class WebAppClient {
 
     showStage(stageName) {
         // Hide all stages
-        document.querySelectorAll('.card').forEach(card => {
-            card.style.display = 'none';
+        document.querySelectorAll('.stage').forEach(stage => {
+            stage.style.display = 'none';
         });
 
         // Show selected stage
-        document.getElementById(`${stageName}Stage`).style.display = 'block';
+        document.getElementById(`stage-${stageName}`).style.display = 'block';
     }
 }
 

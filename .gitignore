@@ -181,3 +181,6 @@ Test Data/
 src/UnUsedFunctions.py
 src/Reference_Code/
 *.FCBak
+
+# Web Application Sessions
+webapp_sessions/
