@@ -22,6 +22,8 @@ from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE, SLICE_INDEX_PRECISIO
 from utilities import round_value
 from contours import ContourPoints
 from region_slice import RegionSlice
+from relations import DE27IM, RelationshipType
+
 
 # %% Global Settings
 # Use the maximum tolerance for general use.  Most functions will use this
@@ -232,6 +234,84 @@ def plot_roi(slice_table, roi_list: List[int]):
         ax.plot(data[:,0], data[:,1], data[:,2], linestyle='none', marker='.',
                 color=color_list[i])
     plt.show()
+
+
+def plot_slice_relationship(structure_set, roi_a, roi_b, slice_index,
+                           tolerance=0.0, axes=None):
+    '''Plot and analyze the relationship between two structures on a slice.
+
+    This function retrieves the contours for two structures on a specified
+    slice, plots them using plot_ab to visualize their spatial relationship,
+    and calculates the DE-27IM relationship between the region slices on that
+    slice.
+
+    Args:
+        structure_set: StructureSet object containing the structures.
+        roi_a: ROI identifier for the first structure.
+        roi_b: ROI identifier for the second structure.
+        slice_index (SliceIndexType): The slice index to analyze.
+        tolerance (float, optional): Tolerance for relationship calculation.
+            Defaults to 0.0.
+        axes (matplotlib.axes, optional): Existing axes to plot on. If None,
+            creates a new figure. Defaults to None.
+
+    Returns:
+        tuple: (ax, de27im) where ax is the matplotlib axes and de27im is the
+            DE27IM relationship object.
+
+    Raises:
+        ValueError: If either structure doesn't exist or has no contours on
+            the specified slice.
+    '''
+    # Verify structures exist
+    if roi_a not in structure_set.structures:
+        raise ValueError(f'ROI {roi_a} not found in structure set')
+    if roi_b not in structure_set.structures:
+        raise ValueError(f'ROI {roi_b} not found in structure set')
+
+    struct_a = structure_set.structures[roi_a]
+    struct_b = structure_set.structures[roi_b]
+
+    # Get the region slices for the specified slice index
+    region_a = struct_a.region_table.get(slice_index)
+    region_b = struct_b.region_table.get(slice_index)
+
+    # Check if both structures have contours on this slice
+    if region_a is None:
+        raise ValueError(
+            f'Structure {struct_a.name} (ROI {roi_a}) has no contours on '
+            f'slice {slice_index}'
+        )
+    if region_b is None:
+        raise ValueError(
+            f'Structure {struct_b.name} (ROI {roi_b}) has no contours on '
+            f'slice {slice_index}'
+        )
+
+    # Plot the contours
+    ax = plot_ab(region_a, region_b, add_axis=True, axes=axes)
+
+    # Calculate the DE-27IM relationship
+    de27im = DE27IM(region_a, region_b, tolerance=tolerance)
+
+    # Print the relationship information
+    print(f'\n{"="*60}')
+    print('Slice Relationship Analysis')
+    print(f'{"="*60}')
+    print(f'Slice Index: {slice_index} cm')
+    print(f'Structure A: {struct_a.name} (ROI {roi_a})')
+    print(f'Structure B: {struct_b.name} (ROI {roi_b})')
+    print(f'\nDE-27IM Binary String: {de27im.relation}')
+    print(f'DE-27IM Integer: {de27im.int}')
+    print('\nDE-27IM Matrix (27-bit):')
+    print(str(de27im))
+
+    # Classify the relationship
+    relationship_type = de27im.identify_relation()
+    print(f'\nClassified Relationship: {relationship_type.label}')
+    print(f'{"="*60}\n')
+
+    return ax, de27im
 
 
 
