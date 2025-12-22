@@ -4,10 +4,6 @@
 from typing import List, Optional
 import logging
 
-# Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import pandas as pd
 import networkx as nx
 
@@ -18,6 +14,12 @@ from relations import DE27IM, RelationshipType
 from dicom import DicomStructureFile
 
 
+# %% Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# %% Class Definition
 class StructureSet:
     '''Class for managing multiple StructureShape objects and their relationships.
 
@@ -122,34 +124,6 @@ class StructureSet:
         for structure in self.structures.values():
             logger.debug('Finalizing structure for ROI %s', structure.name)
             structure.finalize(self.slice_sequence)
-
-    def apply_exclusions(self, exclusion_patterns: Optional[List[str]] = None,
-                        exclude_default: bool = True) -> None:
-        '''Apply exclusions to filter out unwanted structures and rebuild.
-
-        Args:
-            exclusion_patterns (List[str], optional): List of patterns to exclude.
-                If None, uses default patterns ['x', 'z'] if exclude_default is True.
-            exclude_default (bool): Whether to apply default exclusion patterns.
-        '''
-        if self.dicom_structure_file is None:
-            logger.warning("No DicomStructureFile available for applying exclusions")
-            return
-
-        # Apply exclusions to the dicom structure file
-        excluded_contours = self.dicom_structure_file.filter_exclusions(
-            exclude_prefixes=exclusion_patterns,
-            exclude_empty=True
-        )
-
-        if excluded_contours:
-            logger.info("Applied exclusions, removed %d contour sets", len(excluded_contours))
-            # Rebuild structures with filtered contour points
-            self.structures.clear()
-            self.relationship_graph.clear()
-            self.build_from_slice_data(self.dicom_structure_file.contour_points)
-        else:
-            logger.info("No structures excluded")
 
     def finalize(self) -> None:
         '''Complete the StructureSet process by calculating relationships.
@@ -312,6 +286,18 @@ class StructureSet:
         return relationship_matrix
 
     def relationship_summary(self, symbol_map=None) -> pd.DataFrame:
+        '''Get a summary of all relationships between structures with optional
+        symbolic notation.
+
+        Args:
+            symbol_map (dict, optional): Custom mapping from RelationshipType to
+            symbols.
+        Returns:
+            pd.DataFrame: Adjacency matrix of a graph where nodes are structures
+                and edges represent relationships. The values of teh matrix are either
+                labels or symbols representing the relationship types. The index and columns
+                are structure names.
+        '''
         def to_symbol(relationship_type: RelationshipType) -> str:
             if relationship_type:
                 return default_symbol_map[relationship_type]
@@ -339,7 +325,8 @@ class StructureSet:
         labeled_matrix = relationship_matrix.map(to_symbol)
         return labeled_matrix
 
-    def get_relationship_matrix(self, row_rois=None, col_rois=None, use_symbols=True) -> pd.DataFrame:
+    def get_relationship_matrix(self, row_rois=None, col_rois=None,
+                                use_symbols=True) -> pd.DataFrame:
         '''Get a filtered relationship matrix with optional symbol notation.
 
         Args:

@@ -103,6 +103,7 @@ def round_contour_points(contour_points: ContourPointsType,
 
     return rounded_points
 
+
 def point_round(point: shapely.Point,
                 tolerance: float = DEFAULT_TRANSVERSE_TOLERANCE)->List[float]:
     '''Round the coordinates of a shapely point to the specified tolerance.
@@ -161,6 +162,7 @@ def poly_round(polygon: shapely.Polygon,
         raise ValueError(f"Invalid coordinate dimension: {dim}")
     clean_poly = shapely.Polygon(polygon_points)
     return clean_poly
+
 
 # %% Polygon Functions
 def make_multi(poly: PolygonType) -> shapely.MultiPolygon:

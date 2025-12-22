@@ -7,10 +7,6 @@ from typing import List, Tuple
 from collections import defaultdict
 import logging
 
-# Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import pandas as pd
 import networkx as nx
 import shapely
@@ -21,6 +17,10 @@ from types_and_classes import SliceIndexType, ContourIndex
 from types_and_classes import ContourGraph, RegionIndex
 
 from types_and_classes import InvalidSlice, ROI_Type, InvalidContour
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # %% Contour Lookup Table Functions
 def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
@@ -137,7 +137,8 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     # Get the slice index of the contour
     this_slice = contour.slice_index
 
-    logger.debug(f'Generating interpolated contour for ROI: {contour.roi} from slice: {this_slice}')
+    logger.debug('Generating interpolated contour for ROI: %s from slice: %s',
+                 contour.roi, this_slice)
 
     # Get the neighboring slices of the contour.
     matched_slices = set()
@@ -193,12 +194,13 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     non_neighbour_slices = neighbour_slices - matched_slices
     if non_neighbour_slices:
         non_neighbour_slice = non_neighbour_slices.pop()
-        logger.debug(f'Using slice: {non_neighbour_slice:5.2f} for interpolation.')
+        logger.debug('Using slice: %5.2f for interpolation.', non_neighbour_slice)
     else:
         # Use gap to create an estimated slice index
         gap = neighbors.gap(absolute=False)
         non_neighbour_slice = this_slice - gap
-        logger.debug(f'Using gap: {gap:3.2f} to create interpolated slice: {non_neighbour_slice:5.2f}')
+        logger.debug('Using gap: %3.2f to create interpolated slice: %5.2f',
+                     gap, non_neighbour_slice)
     interpolation_slices = [this_slice, non_neighbour_slice]
     # Calculate the interpolated contour using only the boundary contour.
     interpolated_polygon = interpolate_polygon(interpolation_slices,
@@ -400,7 +402,8 @@ def add_boundary_contours(contour_graph: ContourGraph,
     # Select all nodes with only one edge (degree=1)
     boundary_nodes = {node for node, degree in contour_graph.degree()
                       if degree == 1}
-    logger.debug(f'Found {len(boundary_nodes)} boundary contours to interpolate.')
+    logger.debug('Found %d boundary contours to interpolate.',
+                 len(boundary_nodes))
 
     while boundary_nodes:
         all_related_contours = set()

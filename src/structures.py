@@ -1,13 +1,10 @@
 '''Contains the structure class.
 '''
-import re
-import pandas as pd
-import networkx as nx
+from itertools import combinations
 import logging
 
-# Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import pandas as pd
+import networkx as nx
 
 from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
@@ -16,9 +13,13 @@ from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
 from region_slice import RegionSlice
 from relations import DE27IM
-from itertools import combinations
 
 
+# %% Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# %% StructureShape class
 class StructureShape():
     '''Class containing the data for the shape of a structure.
 

@@ -63,6 +63,7 @@ Contours on adjacent slices are connected if:
 - **Python interpreter**: `D:\.conda\envs\StructureRelations\python.exe`
 - **PYTHONPATH**: Auto-configured to include `src/`, `tests/`, `examples/`
 - **Activate**: Use VS Code's Python extension (already configured in workspace settings)
+- Code and documents in the reference and the FreeCAD_Scripts folders are not part of the main project and should not be referenced or modified.
 
 ### Running Tests
 - **Framework**: pytest (configured in workspace settings: `"python.testing.pytestEnabled": true`)
@@ -76,7 +77,8 @@ Contours on adjacent slices are connected if:
 
 ### Debugging & Visualization
 - **Notebooks**: Jupyter notebooks in `src/notebooks/` for exploratory analysis
-- **Visualization**: `debug_tools.plot_ab()` shows polygon differences (blue=only A, green=only B, orange=intersection)
+- **Visualization**: `contour_plotting.plot_ab()` shows polygon differences (blue=only A, green=only B, orange=intersection)
+- `contour_plotting.plot_roi_slice()` calls plot_ab to visualize all contours on a slice. Takes a StructureSet, slice index and one or two ROI numbers or names.
 - **Logging**: Configure via `logging.basicConfig(level=logging.DEBUG)` for detailed contour/relationship tracing
 
 ### Common Tasks
@@ -115,8 +117,14 @@ structure_set.calculate_relationships()
 
 ## Files to Reference
 - **`types_and_classes.py`**: Type definitions, global constants, custom exceptions
-- **`relations.py`**: DE-27IM implementation, relationship classification logic
+- **`utilities.py`**: Shared geometry utilities and helpers
+- **`contours.py`**: 2D contour creation and validation
+- **`dicom.py`**: DICOM RT Structure Set parsing- **`contour_graph.py`**: Contour graph construction and linking logic
+- **`region_slice.py`**: 2D slice of contours for one structure, multi-region handling
+- **`contour_plotting.py`**: Visualization functions for contours and relationships
+- **`structures.py`**: 3D structure representation and region slicing
 - **`structure_set.py`**: Entry point for processing multiple structures
+- **`relations.py`**: DE-27IM implementation, relationship classification logic
 - **`debug_tools.py`**: Test geometry generators and visualization
 - **`docs/Shelters Issues.md`**: Known geometric challenges with SHELTERS relationship
 - **`StructureRelations.code-workspace`**: VS Code configuration (Python paths, test settings)

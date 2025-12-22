@@ -374,7 +374,7 @@ class RegionSlice():
         '''Merge adjacent regions in the slice.
         '''
         if self.has_regions() & (include in ['all', 'regions']):
-           poly_r = shapely.union_all(list(self.regions.values()))
+            poly_r = shapely.union_all(list(self.regions.values()))
         else:
             poly_r = shapely.MultiPolygon()
         if self.has_boundaries() & (include in ['all', 'boundaries']):

@@ -5,10 +5,6 @@ from dataclasses import dataclass
 import warnings
 import logging
 
-# Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import numpy as np
 import pandas as pd
 import shapely
@@ -18,10 +14,13 @@ from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
 from types_and_classes import ContourIndex
 from types_and_classes import InvalidContour
 from types_and_classes import SliceIndexSequenceType
-from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
 from types_and_classes import SLICE_INDEX_PRECISION
 
 from utilities import points_to_polygon, round_value
+
+# Configure logging if not already configured
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 # %% Classes for Slice Indexing and Neighbours

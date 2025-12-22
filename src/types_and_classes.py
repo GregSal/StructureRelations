@@ -14,7 +14,7 @@ import shapely
 ROI_Type = NewType('ROI_Type', int)  # pylint: disable=invalid-name
 
 # The offset in cm between a given image slice and the DICOm origin in the
-# `Z` direction.        intp_node_label = (node_data['roi'], new_slice, intp_poly.wkt)
+# `Z` direction.
 SliceIndexType = NewType('SliceIndexType', float)
 
 # A sequence or individual slice index.
