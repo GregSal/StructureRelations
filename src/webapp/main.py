@@ -202,6 +202,9 @@ async def preview_structures(request: SessionRequest):
         structures = []
         structure_names = dicom_file.get_structure_names()
 
+        # Get ROI labels (DICOM Type and Code Meaning)
+        roi_labels = dicom_file.get_roi_labels()
+
         # Get colors from DICOM
         colors = {}
         try:
@@ -214,15 +217,26 @@ async def preview_structures(request: SessionRequest):
 
         # Build structure list
         for roi, name in structure_names.items():
+            # Get DICOM Type and Code Meaning from roi_labels
+            dicom_type = ''
+            code_meaning = ''
+            if not roi_labels.empty and roi in roi_labels.index:
+                dicom_type = roi_labels.loc[roi].get('DICOM_Type', '')
+                code_meaning = roi_labels.loc[roi].get('CodeMeaning', '')
+
             structure_info = {
                 'roi': roi,
                 'name': name,
+                'dicom_type': dicom_type,
+                'code_meaning': code_meaning,
                 'color': colors.get(roi, [128, 128, 128]),  # Default gray
                 'num_contours': sum(
                     1 for cp in dicom_file.contour_points if cp['ROI'] == roi
                 )
             }
-            structures.append(structure_info)
+            # Only include structures with contours
+            if structure_info['num_contours'] > 0:
+                structures.append(structure_info)
 
         # Sort by ROI number
         structures.sort(key=lambda s: s['roi'])

@@ -201,7 +201,7 @@ header h1 {
 .structure-item {
     display: flex;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s;
@@ -216,31 +216,48 @@ header h1 {
 }
 
 .structure-item input[type="checkbox"] {
-    margin-right: 1rem;
-    width: 18px;
-    height: 18px;
+    margin-right: 0.75rem;
+    width: 16px;
+    height: 16px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .structure-color {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    margin-right: 1rem;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    margin-right: 0.75rem;
     border: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .structure-info {
     flex: 1;
-}
-
-.structure-name {
-    font-weight: 500;
-}
-
-.structure-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     font-size: 0.875rem;
+}
+
+.structure-id {
+    font-weight: 600;
+    color: var(--primary-color);
+    min-width: 2rem;
+    flex-shrink: 0;
+}
+
+.structure-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.structure-contours {
+    font-size: 0.8rem;
     color: var(--text-secondary);
+    flex-shrink: 0;
 }
 
 /* Matrix Configuration */
@@ -284,13 +301,14 @@ header h1 {
 .sortable-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem;
-    margin-bottom: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.2rem;
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: move;
     transition: all 0.2s;
+    gap: 0.5rem;
 }
 
 .sortable-item:hover {
@@ -303,16 +321,27 @@ header h1 {
 }
 
 .item-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    margin-right: 0.5rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
     border: 1px solid var(--border-color);
+}
+
+.item-id {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    min-width: 2rem;
+    flex-shrink: 0;
 }
 
 .item-name {
     flex: 1;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .matrix-controls {
@@ -343,6 +372,33 @@ header h1 {
     color: var(--text-secondary);
 }
 
+/* Collapsible Card */
+.collapsible-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.collapsible-card .card-header h2 {
+    margin: 0;
+}
+
+.collapse-toggle {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-color);
+    padding: 0.25rem 0.5rem;
+    transition: transform 0.2s;
+}
+
+.collapse-toggle:hover {
+    background-color: var(--bg-color);
+    border-radius: 4px;
+}
+
 /* Tables */
 .table-container {
     overflow-x: auto;
@@ -351,6 +407,7 @@ header h1 {
 table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 0.875rem;
 }
 
 thead {
@@ -359,22 +416,89 @@ thead {
 
 th {
     text-align: left;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 1.5rem;
+}
+
+th.sortable:hover {
+    background-color: var(--border-color);
+}
+
+th.sortable::after {
+    content: '⇅';
+    position: absolute;
+    right: 0.5rem;
+    opacity: 0.3;
+}
+
+th.sorted-asc::after {
+    content: '↑';
+    opacity: 1;
+}
+
+th.sorted-desc::after {
+    content: '↓';
+    opacity: 1;
 }
 
 td {
-    padding: 0.75rem 1rem;
+    padding: 0.4rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
 }
 
 tbody tr:hover {
     background-color: var(--bg-color);
+}
+
+.checkbox-cell {
+    width: 40px;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+}
+
+.checkbox-cell input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.roi-cell {
+    font-weight: 600;
+    color: var(--primary-color);
+    width: 50px;
+}
+
+.type-cell {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.label-cell {
+    min-width: 200px;
+}
+
+.number-cell {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.slice-cell {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 /* Matrix Table */

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="/static/css/styles.css?v=2">
+    <link rel="stylesheet" href="/static/css/styles.css?v=6">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
@@ -75,20 +75,29 @@
 
             <!-- Stage 4: Results -->
             <section class="stage" id="stage-results" style="display: none;">
-                <div class="card">
-                    <h2>Structure Summary</h2>
-                    <div class="table-container">
-                        <table id="structuresSummaryTable">
-                            <thead>
-                                <tr>
-                                    <th>ROI</th>
-                                    <th>Name</th>
-                                    <th>Volume (cm³)</th>
-                                    <th>Contours</th>
-                                </tr>
-                            </thead>
-                            <tbody id="structuresSummaryBody"></tbody>
-                        </table>
+                <div class="card collapsible-card">
+                    <div class="card-header" id="summaryHeader">
+                        <h2>Structure Summary</h2>
+                        <button class="collapse-toggle" id="summaryToggle">▼</button>
+                    </div>
+                    <div class="card-content" id="summaryContent">
+                        <div class="table-container">
+                            <table id="structuresSummaryTable" class="sortable-table">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" data-column="row">Row</th>
+                                        <th class="sortable" data-column="col">Col</th>
+                                        <th class="sortable" data-column="roi">ROI</th>
+                                        <th class="sortable" data-column="type">Type</th>
+                                        <th class="sortable" data-column="label">Label</th>
+                                        <th class="sortable" data-column="regions">Regions</th>
+                                        <th class="sortable" data-column="volume">Volume (cm³)</th>
+                                        <th class="sortable" data-column="slices">Slice Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="structuresSummaryBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -159,6 +168,6 @@
         </footer>
     </div>
 
-    <script src="/static/js/app.js?v=3"></script>
+    <script src="/static/js/app.js?v=8"></script>
 </body>
 </html>

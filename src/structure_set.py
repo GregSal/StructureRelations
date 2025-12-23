@@ -430,8 +430,14 @@ class StructureSet:
         row_rois_list = [name_to_roi[name] for name in matrix.index if name in name_to_roi]
         col_rois_list = [name_to_roi[name] for name in matrix.columns if name in name_to_roi]
 
+        # Get all unique ROIs (both rows and columns)
+        all_rois = list(set(row_rois_list + col_rois_list))
+        all_rois.sort()
+
         # Extract colors from DICOM file if available
         colors = {}
+        roi_labels = None
+
         if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'dataset'):
             try:
                 for roi_contour in self.dicom_structure_file.dataset.ROIContourSequence:
@@ -441,11 +447,56 @@ class StructureSet:
             except AttributeError:
                 pass
 
+            # Get ROI labels for DICOM Type and Code Meaning
+            roi_labels = self.dicom_structure_file.get_roi_labels()
+
+        # Build comprehensive data dictionaries for ALL structures
+        dicom_types_dict = {}
+        code_meanings_dict = {}
+        volumes_dict = {}
+        num_regions_dict = {}
+        slice_ranges_dict = {}
+
+        for roi in all_rois:
+            # Get DICOM Type and Code Meaning
+            dicom_type = ''
+            code_meaning = ''
+            if roi_labels is not None and not roi_labels.empty and roi in roi_labels.index:
+                dicom_type = roi_labels.loc[roi].get('DICOM_Type', '')
+                code_meaning = roi_labels.loc[roi].get('CodeMeaning', '')
+            dicom_types_dict[roi] = dicom_type
+            code_meanings_dict[roi] = code_meaning
+
+            # Get structure data
+            if roi in self.structures:
+                struct = self.structures[roi]
+                volumes_dict[roi] = round(struct.physical_volume, 2)
+
+                # Number of regions: count unique RegionSlice objects
+                num_regions_dict[roi] = len(struct.region_table)
+
+                # Slice range
+                if not struct.region_table.empty:
+                    min_slice = struct.region_table['SliceIndex'].min()
+                    max_slice = struct.region_table['SliceIndex'].max()
+                    slice_ranges_dict[roi] = f'{min_slice:.2f} to {max_slice:.2f}'
+                else:
+                    slice_ranges_dict[roi] = ''
+            else:
+                volumes_dict[roi] = 0.0
+                num_regions_dict[roi] = 0
+                slice_ranges_dict[roi] = ''
+
         return {
             'rows': row_rois_list,
             'columns': col_rois_list,
             'data': matrix.values.tolist(),
             'row_names': matrix.index.tolist(),
             'col_names': matrix.columns.tolist(),
-            'colors': colors
+            'colors': colors,
+            'dicom_types': dicom_types_dict,
+            'code_meanings': code_meanings_dict,
+            'volumes': volumes_dict,
+            'num_regions': num_regions_dict,
+            'slice_ranges': slice_ranges_dict
         }

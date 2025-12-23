@@ -75,6 +75,11 @@ class WebAppClient {
         document.getElementById('exportJsonBtn').addEventListener('click', () => {
             this.exportMatrix('json');
         });
+
+        // Collapsible summary
+        document.getElementById('summaryToggle').addEventListener('click', () => {
+            this.toggleSummary();
+        });
     }
 
     async handleFileSelect(file) {
@@ -212,6 +217,12 @@ class WebAppClient {
                 const colorArr = struct.color || [128, 128, 128];
                 const colorStr = `rgb(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]})`;
 
+                // Build label: prefer Code Meaning, fallback to name
+                let label = struct.code_meaning || struct.name;
+                if (struct.dicom_type) {
+                    label = `${label} <span style="color: #666;">(${struct.dicom_type})</span>`;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'structure-item';
                 item.innerHTML = `
@@ -221,8 +232,9 @@ class WebAppClient {
                     <div class="structure-color"
                          style="background-color: ${colorStr}"></div>
                     <div class="structure-info">
-                        <div class="structure-name">${struct.name}</div>
-                        <div class="structure-details">ROI ${struct.roi} (${struct.num_contours} contours)</div>
+                        <span class="structure-id">${struct.roi}</span>
+                        <span class="structure-label">${label}</span>
+                        <span class="structure-contours">${struct.num_contours} contour${struct.num_contours !== 1 ? 's' : ''}</span>
                     </div>
                 `;
                 structuresList.appendChild(item);
@@ -329,33 +341,11 @@ class WebAppClient {
 
             const data = await response.json();
 
+            // Store data for sorting and checkbox management
+            this.summaryData = data;
+
             // Populate structure summary
-            const summaryBody = document.getElementById('structuresSummaryBody');
-            summaryBody.innerHTML = '';
-
-            const allStructures = [...new Set([...data.rows, ...data.columns])];
-            allStructures.sort((a, b) => a - b);
-
-            allStructures.forEach(roi => {
-                const idx = data.rows.indexOf(roi);
-                const name = idx >= 0 ? data.row_names[idx] :
-                             data.col_names[data.columns.indexOf(roi)];
-                // Colors object has string keys in JSON
-                const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${roi}</td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div class="structure-color"
-                                 style="background-color: ${color}"></div>
-                            ${name}
-                        </div>
-                    </td>
-                `;
-                summaryBody.appendChild(row);
-            });
+            this.populateStructureSummary(data);
 
             // Initialize sortable lists
             this.initializeSortableLists(data);
@@ -369,6 +359,191 @@ class WebAppClient {
         } catch (error) {
             console.error('Results error:', error);
             alert('Failed to load results.');
+        }
+    }
+
+    populateStructureSummary(data) {
+        const summaryBody = document.getElementById('structuresSummaryBody');
+        summaryBody.innerHTML = '';
+
+        const allStructures = [...new Set([...data.rows, ...data.columns])];
+        allStructures.sort((a, b) => a - b);
+
+        allStructures.forEach(roi => {
+            const idx = data.rows.indexOf(roi);
+            const name = idx >= 0 ? data.row_names[idx] :
+                         data.col_names[data.columns.indexOf(roi)];
+
+            // Get data from dictionaries using ROI as key
+            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
+            const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
+            const volume = data.volumes ? (data.volumes[roi] || data.volumes[String(roi)] || 0) : 0;
+            const numRegions = data.num_regions ? (data.num_regions[roi] || data.num_regions[String(roi)] || 0) : 0;
+            const sliceRange = data.slice_ranges ? (data.slice_ranges[roi] || data.slice_ranges[String(roi)] || '') : '';
+
+            // Colors object has string keys in JSON
+            const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
+
+            // Build label with code meaning or name
+            let label = codeMeaning || name;
+
+            const row = document.createElement('tr');
+            row.dataset.roi = roi;
+            row.dataset.type = dicomType;
+            row.dataset.label = label;
+            row.dataset.volume = volume;
+            row.dataset.regions = numRegions;
+
+            row.innerHTML = `
+                <td class="checkbox-cell">
+                    <input type="checkbox" class="row-checkbox" data-roi="${roi}" checked>
+                </td>
+                <td class="checkbox-cell">
+                    <input type="checkbox" class="col-checkbox" data-roi="${roi}" checked>
+                </td>
+                <td class="roi-cell">${roi}</td>
+                <td class="type-cell">${dicomType}</td>
+                <td class="label-cell">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="structure-color" style="background-color: ${color}"></div>
+                        ${label}
+                    </div>
+                </td>
+                <td class="number-cell">${numRegions}</td>
+                <td class="number-cell">${volume.toFixed(2)}</td>
+                <td class="slice-cell">${sliceRange}</td>
+            `;
+            summaryBody.appendChild(row);
+        });
+
+        // Add checkbox event listeners
+        this.initializeSummaryCheckboxes();
+
+        // Add sort listeners
+        this.initializeSorting();
+    }
+
+    initializeSummaryCheckboxes() {
+        // Row checkboxes
+        document.querySelectorAll('.row-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                this.updateListFromCheckbox(e.target, 'row');
+            });
+        });
+
+        // Column checkboxes
+        document.querySelectorAll('.col-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                this.updateListFromCheckbox(e.target, 'col');
+            });
+        });
+    }
+
+    updateListFromCheckbox(checkbox, type) {
+        const roi = parseInt(checkbox.dataset.roi);
+        const isChecked = checkbox.checked;
+
+        const listId = type === 'row' ? 'selectedRowsList' : 'selectedColsList';
+        const availableListId = type === 'row' ? 'availableRowsList' : 'availableColsList';
+
+        const selectedList = document.getElementById(listId);
+        const availableList = document.getElementById(availableListId);
+
+        // Find the item in either list
+        let item = Array.from(selectedList.children).find(child =>
+            parseInt(child.dataset.roi) === roi
+        );
+
+        if (!item) {
+            item = Array.from(availableList.children).find(child =>
+                parseInt(child.dataset.roi) === roi
+            );
+        }
+
+        if (item) {
+            if (isChecked && item.parentElement === availableList) {
+                // Move from available to selected
+                selectedList.appendChild(item);
+            } else if (!isChecked && item.parentElement === selectedList) {
+                // Move from selected to available
+                availableList.appendChild(item);
+            }
+        }
+    }
+
+    initializeSorting() {
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.column;
+                this.sortTable(column);
+            });
+        });
+    }
+
+    sortTable(column) {
+        const tbody = document.getElementById('structuresSummaryBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Determine sort direction
+        const currentSort = this.currentSort || {};
+        const ascending = currentSort.column === column ? !currentSort.ascending : true;
+        this.currentSort = { column, ascending };
+
+        // Sort rows
+        rows.sort((a, b) => {
+            let aVal, bVal;
+
+            switch(column) {
+                case 'roi':
+                    aVal = parseInt(a.dataset.roi);
+                    bVal = parseInt(b.dataset.roi);
+                    break;
+                case 'type':
+                    aVal = a.dataset.type.toLowerCase();
+                    bVal = b.dataset.type.toLowerCase();
+                    break;
+                case 'label':
+                    aVal = a.dataset.label.toLowerCase();
+                    bVal = b.dataset.label.toLowerCase();
+                    break;
+                case 'volume':
+                    aVal = parseFloat(a.dataset.volume);
+                    bVal = parseFloat(b.dataset.volume);
+                    break;
+                case 'regions':
+                    aVal = parseInt(a.dataset.regions);
+                    bVal = parseInt(b.dataset.regions);
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (aVal < bVal) return ascending ? -1 : 1;
+            if (aVal > bVal) return ascending ? 1 : -1;
+            return 0;
+        });
+
+        // Re-append rows in sorted order
+        rows.forEach(row => tbody.appendChild(row));
+
+        // Update sort indicators
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+        });
+        const sortedHeader = document.querySelector(`.sortable[data-column="${column}"]`);
+        sortedHeader.classList.add(ascending ? 'sorted-asc' : 'sorted-desc');
+    }
+
+    toggleSummary() {
+        const content = document.getElementById('summaryContent');
+        const toggle = document.getElementById('summaryToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
         }
     }
 
@@ -390,8 +565,12 @@ class WebAppClient {
             const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
             const name = data.row_names[idx];
 
-            const rowItem = this.createSortableItem(roi, name, color);
-            const colItem = this.createSortableItem(roi, name, color);
+            // Get data from dictionaries using ROI as key
+            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
+            const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
+
+            const rowItem = this.createSortableItem(roi, name, color, dicomType, codeMeaning);
+            const colItem = this.createSortableItem(roi, name, color, dicomType, codeMeaning);
 
             // Add to selected lists by default
             selectedRowsList.appendChild(rowItem);
@@ -426,13 +605,21 @@ class WebAppClient {
         };
     }
 
-    createSortableItem(roi, name, color) {
+    createSortableItem(roi, name, color, dicomType = '', codeMeaning = '') {
         const item = document.createElement('div');
         item.className = 'sortable-item';
         item.dataset.roi = roi;
+
+        // Build label with ROI, Type, and Code Meaning
+        let label = codeMeaning || name;
+        if (dicomType) {
+            label = `${label} (${dicomType})`;
+        }
+
         item.innerHTML = `
             <div class="item-color" style="background-color: ${color}"></div>
-            <div class="item-name">${name}</div>
+            <div class="item-id">${roi}</div>
+            <div class="item-name">${label}</div>
         `;
         return item;
     }
