@@ -279,6 +279,9 @@ class StructureSet:
             if relationship_type.is_symmetric:
                 relationship_matrix.loc[name_b, name_a] = relationship_type
 
+        # Transpose the matrix so that Structure_A is rows and Structure_B is
+        # columns.
+        relationship_matrix = relationship_matrix.T
         # Set index and columns names for clarity
         relationship_matrix.index.name = 'Structure_A'
         relationship_matrix.columns.name = 'Structure_B'
