@@ -12,11 +12,15 @@ dependencies:
   - pygraphviz=1.14
   - pylint=3.3.5
   - pyodbc=5.2.0
-  - pysimplegui=4.60.5
   - pytest=8.3.4
   - python=3.11.11
   - scipy=1.15.3
   - shapely=2.1.1
+  - fastapi
+  - uvicorn
+  - python-multipart
+  - websockets
+  - pydantic
 
 variables:
   PYTHONPATH: /workspaces/StructureRelations:/workspaces/StructureRelations/src:/workspaces/StructureRelations/Tests:/workspaces/StructureRelations/examples:$PYTHONPATH
