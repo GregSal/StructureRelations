@@ -265,6 +265,46 @@ class DicomStructureFile:
             structure_data[ROI_Type(roi.ROINumber)] = str(roi.ROIName)
         return structure_data
 
+    def get_roi_labels(self):
+        '''Get detailed ROI labels and codes from the structure set.
+
+        Returns:
+            pd.DataFrame: DataFrame with ROINumber as index and detailed ROI
+                information as values including:
+                    StructureName and DICOM_Type,
+                If present, also includes:
+                    Code, CodeScheme, and CodeMeaning.
+        '''
+        if not self.is_structure_file():
+            logger.warning('File %s is not a RT Structure file', self.file_name)
+            return pd.DataFrame()
+
+        if not hasattr(self.dataset, 'StructureSetROISequence'):
+            logger.warning("Dataset does not contain StructureSetROISequence")
+            return pd.DataFrame()
+
+        label_list = []
+        obs_seq = self.dataset.get('RTROIObservationsSequence')
+        if not obs_seq:
+            logger.warning("Dataset does not contain RTROIObservationsSequence")
+            return pd.DataFrame()
+        for roi in self.dataset.RTROIObservationsSequence:
+            label_dict = {
+                'ROINumber': roi.ReferencedROINumber,
+                'StructureName': roi.ROIObservationLabel,
+                'DICOM_Type': roi.RTROIInterpretedType
+                }
+            code_seq = roi.get('RTROIIdentificationCodeSequence')
+            if code_seq:
+                roi_label = code_seq[0]
+                label_dict['Code'] = roi_label.CodeValue
+                label_dict['CodeScheme'] = roi_label.CodingSchemeDesignator
+                label_dict['CodeMeaning'] = roi_label.CodeMeaning
+            label_list.append(label_dict)
+        roi_labels = pd.DataFrame(label_list)
+        roi_labels.set_index('ROINumber', inplace=True)
+        return roi_labels
+
     def filter_exclusions(self,
                          exclude_prefixes: List[str] = None,
                          case_sensitive: bool = False,
