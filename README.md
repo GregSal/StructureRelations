@@ -5,22 +5,8 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Improve Structure Selection table
+- It appears that the relationships are being calculated more than once.  This should be optimized to only calculate once per structure set load.
 - Structure Selection should include Structure ID, DICOM Type, and Code Meaning (label)
-- Structure Selection should take up only a single line per structure and be more compact
-- Structure with no contours should not be displayed in Structure Selection
-
-2a Fix StructureSet.Summary() method
-- Round volumes to 2 decimal places
-- Add to include DICOM Type, and Code Meaning
-- Add slice Max and Slice Min
-- Add count of regions per structure
-
-2. Improve Structure Summary table
-- Structure Summary should include DICOM Type, Code Meaning (label), number of regions, total volume, slice range (in the form f'{min_slice} to {max_slice}')
-- Structure Summary should take up less vertical space
-- Structure Summary should be a collapsible block
-- Structure Summary should be sortable by DICOM Type, Label, Volume, etc.
-- Structure Summary should include tick boxes to include or exclude them from the Relationship Matrix row and column selection
 
 3. Enhance Relationship symbol visualization:
 - The symbol font should be about 1.5 times larger
