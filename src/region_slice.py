@@ -5,7 +5,7 @@ Types, Classes and utility function definitions.
 '''
 # %% Imports
 # Type imports
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 # Standard Libraries
 
@@ -15,7 +15,7 @@ import networkx as nx
 import shapely
 
 # Local packages
-from contour_graph import build_contour_lookup, get_region_contours
+from contour_graph import List, build_contour_lookup, get_region_contours
 from types_and_classes import RegionIndex, SliceIndexType
 from utilities import make_multi, make_solid
 
@@ -358,6 +358,22 @@ class RegionSlice():
                                 for boundary in self.boundaries.values())
             return not no_boundaries
         return False
+
+    def get_region_indexes(self, include_boundaries=True,
+                       include_holes=True) -> List[RegionIndex]:
+        '''Get the list of RegionIndexes in the slice.
+
+        Returns:
+            List[RegionIndex]: The list of RegionIndexes in the slice.
+        '''
+        region_keys = set(self.regions.keys())
+        if include_boundaries:
+            boundary_keys = set(self.boundaries.keys())
+            region_keys = region_keys.union(boundary_keys)
+        if include_holes:
+            hole_keys = set(self.open_holes.keys())
+            region_keys = region_keys.union(hole_keys)
+        return list(region_keys)
 
     @property
     def is_empty(self)-> bool:

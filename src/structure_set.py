@@ -12,6 +12,7 @@ from contours import build_contour_table
 from structures import StructureShape
 from relations import DE27IM, RelationshipType
 from dicom import DicomStructureFile
+from utilities import round_value
 
 
 # %% Configure logging if not already configured
@@ -124,6 +125,7 @@ class StructureSet:
         for structure in self.structures.values():
             logger.debug('Finalizing structure for ROI %s', structure.name)
             structure.finalize(self.slice_sequence)
+        self.finalize()
 
     def finalize(self) -> None:
         '''Complete the StructureSet process by calculating relationships.
@@ -154,7 +156,8 @@ class StructureSet:
         as edge attributes.
         '''
         structure_rois = list(self.structures.keys())
-
+        logger.info('Calculating relationships for %d structures',
+                    len(structure_rois))
         # Calculate relationships for all pairs
         for i, roi_a in enumerate(structure_rois):
             for roi_b in structure_rois[i+1:]:
@@ -218,17 +221,29 @@ class StructureSet:
         '''
         summary_data = []
         for roi, structure in self.structures.items():
+            interpolated_regions = structure.region_table.Interpolated
+            original_regions = structure.region_table[~interpolated_regions]
             summary_data.append({
                 'ROI': roi,
                 'Name': structure.name,
-                'Physical_Volume': structure.physical_volume,
-                'Exterior_Volume': structure.exterior_volume,
-                'Hull_Volume': structure.hull_volume,
+                'Physical_Volume': round_value(structure.physical_volume,
+                                               self.tolerance),
+                'Exterior_Volume': round_value(structure.exterior_volume,
+                                              self.tolerance),
+                'Hull_Volume': round_value(structure.hull_volume,
+                                          self.tolerance),
                 'Num_Contours': len(structure.contour_graph),
-                'Num_Slices': len(structure.region_table)
+                'Num_Regions': len(structure.get_region_indexes(include_holes=False)),
+                'Num_Slices': len(original_regions),
+                'Slice_Range': (f"{original_regions['SliceIndex'].min():.2f} to "
+                                f"{original_regions['SliceIndex'].max():.2f}")
             })
+        summary_df = pd.DataFrame(summary_data)
+        if self.dicom_structure_file:
+                summary_df = summary_df.join(
+                    self.dicom_structure_file.get_roi_labels(), on='ROI')
 
-        return pd.DataFrame(summary_data)
+        return summary_df
 
     @property
     def relationship_matrix(self) -> pd.DataFrame:

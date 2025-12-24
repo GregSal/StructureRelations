@@ -1,5 +1,6 @@
 '''Contains the structure class.
 '''
+from typing import List
 from itertools import combinations
 import logging
 
@@ -392,3 +393,23 @@ class StructureShape():
 
             composite_relation.merge(relation)
         return composite_relation
+
+    def get_region_indexes(self, include_boundaries=True,
+                           include_holes=True,
+                           include_interpolated=True)->List[str]:
+        '''Get the list of RegionIndexes in the structure.
+
+        Returns:
+            List[str]: The list of RegionIndexes in the structure.
+        '''
+        region_indexes = set()
+        if not include_interpolated:
+            region_slices = self.region_table.loc[
+                ~self.region_table.Interpolated, 'RegionSlice']
+        else:
+            region_slices = self.region_table['RegionSlice']
+        for region_slice in list(region_slices):
+            region_labels = region_slice.get_region_indexes(include_boundaries,
+                                                            include_holes)
+            region_indexes.update(region_labels)
+        return list(region_indexes)
