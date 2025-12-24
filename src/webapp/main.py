@@ -80,6 +80,11 @@ class MatrixResponse(BaseModel):
     row_names: List[str]
     col_names: List[str]
     colors: dict
+    dicom_types: dict
+    code_meanings: dict
+    volumes: dict
+    num_regions: dict
+    slice_ranges: dict
 
 
 class ProcessRequest(BaseModel):

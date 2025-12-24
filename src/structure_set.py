@@ -440,32 +440,30 @@ class StructureSet:
                 'colors': {}
             }
 
-        # Extract ROI numbers from structure names
+        # Extract ROI numbers from structure names (convert to int for JSON serialization)
         name_to_roi = {struct.name: roi for roi, struct in self.structures.items()}
-        row_rois_list = [name_to_roi[name] for name in matrix.index if name in name_to_roi]
-        col_rois_list = [name_to_roi[name] for name in matrix.columns if name in name_to_roi]
+        row_rois_list = [int(name_to_roi[name]) for name in matrix.index if name in name_to_roi]
+        col_rois_list = [int(name_to_roi[name]) for name in matrix.columns if name in name_to_roi]
 
         # Get all unique ROIs (both rows and columns)
         all_rois = list(set(row_rois_list + col_rois_list))
         all_rois.sort()
 
+        # Get summary data for all structures
+        summary_df = self.summary()
+
         # Extract colors from DICOM file if available
         colors = {}
-        roi_labels = None
-
         if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'dataset'):
             try:
                 for roi_contour in self.dicom_structure_file.dataset.ROIContourSequence:
-                    roi_num = roi_contour.ReferencedROINumber
+                    roi_num = int(roi_contour.ReferencedROINumber)  # Convert to int for JSON
                     if hasattr(roi_contour, 'ROIDisplayColor'):
-                        colors[roi_num] = list(roi_contour.ROIDisplayColor)
+                        colors[roi_num] = [int(c) for c in roi_contour.ROIDisplayColor]  # Convert color values to int
             except AttributeError:
                 pass
 
-            # Get ROI labels for DICOM Type and Code Meaning
-            roi_labels = self.dicom_structure_file.get_roi_labels()
-
-        # Build comprehensive data dictionaries for ALL structures
+        # Build comprehensive data dictionaries from summary DataFrame
         dicom_types_dict = {}
         code_meanings_dict = {}
         volumes_dict = {}
@@ -473,34 +471,32 @@ class StructureSet:
         slice_ranges_dict = {}
 
         for roi in all_rois:
-            # Get DICOM Type and Code Meaning
-            dicom_type = ''
-            code_meaning = ''
-            if roi_labels is not None and not roi_labels.empty and roi in roi_labels.index:
-                dicom_type = roi_labels.loc[roi].get('DICOM_Type', '')
-                code_meaning = roi_labels.loc[roi].get('CodeMeaning', '')
-            dicom_types_dict[roi] = dicom_type
-            code_meanings_dict[roi] = code_meaning
+            # Get row from summary DataFrame for this ROI
+            roi_data = summary_df[summary_df['ROI'] == roi]
 
-            # Get structure data
-            if roi in self.structures:
-                struct = self.structures[roi]
-                volumes_dict[roi] = round(struct.physical_volume, 2)
+            if not roi_data.empty:
+                row = roi_data.iloc[0]
+                # Handle NaN values from DataFrame
+                dicom_type = row['DICOM_Type'] if 'DICOM_Type' in row.index and pd.notna(row['DICOM_Type']) else ''
+                code_meaning = row['CodeMeaning'] if 'CodeMeaning' in row.index and pd.notna(row['CodeMeaning']) else ''
+                volume = row['Physical_Volume'] if pd.notna(row['Physical_Volume']) else 0.0
+                num_regions = int(row['Num_Regions']) if pd.notna(row['Num_Regions']) else 0
+                slice_range = row['Slice_Range'] if pd.notna(row['Slice_Range']) else ''
 
-                # Number of regions: count unique RegionSlice objects
-                num_regions_dict[roi] = len(struct.region_table)
-
-                # Slice range
-                if not struct.region_table.empty:
-                    min_slice = struct.region_table['SliceIndex'].min()
-                    max_slice = struct.region_table['SliceIndex'].max()
-                    slice_ranges_dict[roi] = f'{min_slice:.2f} to {max_slice:.2f}'
-                else:
-                    slice_ranges_dict[roi] = ''
+                # Convert numpy types to Python native types for JSON serialization
+                roi_key = int(roi)
+                dicom_types_dict[roi_key] = dicom_type
+                code_meanings_dict[roi_key] = code_meaning
+                volumes_dict[roi_key] = float(volume)
+                num_regions_dict[roi_key] = int(num_regions)
+                slice_ranges_dict[roi_key] = slice_range
             else:
-                volumes_dict[roi] = 0.0
-                num_regions_dict[roi] = 0
-                slice_ranges_dict[roi] = ''
+                roi_key = int(roi)
+                dicom_types_dict[roi_key] = ''
+                code_meanings_dict[roi_key] = ''
+                volumes_dict[roi_key] = 0.0
+                num_regions_dict[roi_key] = 0
+                slice_ranges_dict[roi_key] = ''
 
         return {
             'rows': row_rois_list,
