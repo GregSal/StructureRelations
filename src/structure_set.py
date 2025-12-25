@@ -154,8 +154,18 @@ class StructureSet:
         This method calculates the DE27IM spatial relationship between every
         pair of structures and stores the results in the relationship_graph
         as edge attributes.
+
+        If relationships have already been calculated, this method does nothing.
         '''
         structure_rois = list(self.structures.keys())
+
+        # Check if relationships have already been calculated
+        # If the graph has the expected number of edges, skip recalculation
+        expected_edges = len(structure_rois) * (len(structure_rois) - 1) // 2
+        if self.relationship_graph.number_of_edges() == expected_edges:
+            logger.debug('Relationships already calculated, skipping recalculation')
+            return
+
         logger.info('Calculating relationships for %d structures',
                     len(structure_rois))
         # Calculate relationships for all pairs

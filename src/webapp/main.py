@@ -9,6 +9,7 @@ import logging
 import uuid
 import asyncio
 import tempfile
+import json
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
@@ -87,6 +88,29 @@ class MatrixResponse(BaseModel):
     slice_ranges: dict
 
 
+class DiagramNode(BaseModel):
+    id: int
+    label: str
+    color: str
+    shape: str
+    title: str  # Tooltip
+
+
+class DiagramEdge(BaseModel):
+    from_node: int
+    to_node: int
+    label: str
+    color: str
+    width: int
+    dashes: bool
+    arrows: Optional[str] = None
+
+
+class DiagramResponse(BaseModel):
+    nodes: List[DiagramNode]
+    edges: List[DiagramEdge]
+
+
 class ProcessRequest(BaseModel):
     session_id: str
     selected_rois: Optional[List[int]] = None
@@ -123,6 +147,53 @@ async def root():
         content='<h1>StructureRelations</h1><p>Static files not found</p>',
         status_code=200
     )
+
+
+@app.get('/api/config/symbols')
+async def get_symbol_config():
+    '''Get the relationship symbol and color configuration.
+
+    Returns:
+        dict: Configuration for relationship symbols, labels, descriptions, and colors.
+    '''
+    config_file = Path(__file__).parent / 'config' / 'relationship_symbols.json'
+
+    try:
+        if config_file.exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config
+        else:
+            # Return default config if file doesn't exist
+            logger.warning(f'Config file not found: {config_file}')
+            return get_default_symbol_config()
+    except Exception as e:
+        logger.error(f'Error loading symbol config: {e}')
+        return get_default_symbol_config()
+
+
+def get_default_symbol_config():
+    '''Get the default relationship symbol configuration.
+
+    Returns:
+        dict: Default configuration for relationship symbols.
+    '''
+    return {
+        "description": "Default relationship symbols and colors",
+        "version": "1.0",
+        "relationships": {
+            "CONTAINS": {"symbol": "⊂", "label": "Contains", "description": "Structure A fully encloses structure B", "color": "#10b981"},
+            "OVERLAPS": {"symbol": "∩", "label": "Overlaps", "description": "Structures share common volume", "color": "#ef4444"},
+            "BORDERS": {"symbol": "|", "label": "Borders", "description": "Structures touch at boundaries", "color": "#3b82f6"},
+            "SURROUNDS": {"symbol": "○", "label": "Surrounds", "description": "Structure B is within a hole in A", "color": "#8b5cf6"},
+            "SHELTERS": {"symbol": "△", "label": "Shelters", "description": "B within convex hull of A, not touching", "color": "#f59e0b"},
+            "PARTITION": {"symbol": "⊕", "label": "Partition", "description": "Structures partition space between them", "color": "#ec4899"},
+            "CONFINES": {"symbol": "⊏", "label": "Confines", "description": "B contacts inner surface of A", "color": "#06b6d4"},
+            "DISJOINT": {"symbol": "∅", "label": "Disjoint", "description": "Structures are completely separated", "color": "#6b7280"},
+            "EQUALS": {"symbol": "=", "label": "Equals", "description": "Same structure", "color": "#000000"},
+            "UNKNOWN": {"symbol": "?", "label": "Unknown", "description": "Relationship not determined", "color": "#9ca3af"}
+        }
+    }
 
 
 @app.post('/api/upload', response_model=UploadResponse)
@@ -475,6 +546,130 @@ async def export_matrix(format: str, session_id: str, row_rois: Optional[str] = 
 
     else:
         raise HTTPException(status_code=400, detail='Invalid format. Use csv, excel, or json')
+
+
+@app.post('/api/diagram', response_model=DiagramResponse)
+async def get_diagram_data(request: MatrixRequest):
+    '''Generate network diagram data for relationship visualization.
+
+    Args:
+        request (MatrixRequest): Contains session_id and optional ROI filters.
+
+    Returns:
+        DiagramResponse: Nodes and edges for network visualization.
+    '''
+    try:
+        session_data = session_manager.load_session(request.session_id)
+        if session_data is None:
+            raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+        if session_data.structure_set is None:
+            raise HTTPException(status_code=400, detail='Structures not yet processed')
+
+        structure_set = session_data.structure_set
+
+        # Define node shapes by DICOM type
+        shape_map = {
+            'GTV': 'star',
+            'CTV': 'hexagon',
+            'PTV': 'diamond',
+            'EXTERNAL': 'box',
+            'ORGAN': 'ellipse',
+            'AVOIDANCE': 'triangle',
+            'BOLUS': 'dot',
+            'SUPPORT': 'square',
+            'FIXATION': 'triangleDown'
+        }
+
+        # Define edge styles by relationship type
+        edge_styles = {
+            'CONTAINS': {'color': '#00CED1', 'width': 4, 'dashes': False, 'arrows': 'to'},
+            'OVERLAPS': {'color': '#FF6347', 'width': 5, 'dashes': False, 'arrows': None},
+            'BORDERS': {'color': '#32CD32', 'width': 3, 'dashes': True, 'arrows': None},
+            'SURROUNDS': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
+            'SHELTERS': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
+            'PARTITION': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': None},
+            'CONFINES': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
+            'DISJOINT': {'color': '#808080', 'width': 1, 'dashes': True, 'arrows': None},
+            'EQUALS': {'color': '#FF0000', 'width': 5, 'dashes': False, 'arrows': 'to;from'}
+        }
+
+        # Get summary data
+        summary_df = structure_set.summary()
+
+        # Extract colors from DICOM file
+        colors = {}
+        if structure_set.dicom_structure_file and hasattr(structure_set.dicom_structure_file, 'dataset'):
+            try:
+                for roi_contour in structure_set.dicom_structure_file.dataset.ROIContourSequence:
+                    roi_num = int(roi_contour.ReferencedROINumber)
+                    if hasattr(roi_contour, 'ROIDisplayColor'):
+                        colors[roi_num] = [int(c) for c in roi_contour.ROIDisplayColor]
+            except AttributeError:
+                pass
+
+        # Build nodes
+        nodes = []
+        for _, row in summary_df.iterrows():
+            roi = int(row['ROI'])
+            name = row['Name']
+            dicom_type = row.get('DICOM_Type', 'NONE')
+
+            # Get color from extracted colors or use default
+            color_rgb = colors.get(roi, [200, 200, 200])  # Default gray if no color
+            color_hex = '#{:02x}{:02x}{:02x}'.format(*color_rgb)
+
+            # Create tooltip with structure info
+            volume = row.get('Physical_Volume', 0)
+            num_regions = row.get('Num_Regions', 0)
+            tooltip = f"{name} (ROI {roi})\\nType: {dicom_type}\\nVolume: {volume:.2f} cm³\\nRegions: {num_regions}"
+
+            nodes.append(DiagramNode(
+                id=roi,
+                label=name,
+                color=color_hex,
+                shape=shape_map.get(dicom_type, 'ellipse'),
+                title=tooltip
+            ))
+
+        # Build edges from relationship matrix
+        edges = []
+        row_rois = request.row_rois if request.row_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+        col_rois = request.col_rois if request.col_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+
+        for row_roi in row_rois:
+            for col_roi in col_rois:
+                if row_roi >= col_roi:  # Avoid duplicates and self-loops
+                    continue
+
+                rel = structure_set.get_relationship(row_roi, col_roi)
+                if rel is None:
+                    continue
+
+                # Get the relationship type from the DE27IM object
+                rel_type = rel.identify_relation().name
+                if rel_type == 'DISJOINT' or rel_type == 'EQUALS':
+                    continue  # Skip disjoint and equals by default
+
+                style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+
+                edges.append(DiagramEdge(
+                    from_node=row_roi,
+                    to_node=col_roi,
+                    label=rel_type,
+                    color=style['color'],
+                    width=style['width'],
+                    dashes=style['dashes'],
+                    arrows=style['arrows']
+                ))
+
+        return DiagramResponse(nodes=nodes, edges=edges)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'Error generating diagram: {e}')
+        raise HTTPException(status_code=500, detail=f'Failed to generate diagram: {str(e)}')
 
 
 @app.websocket('/ws/{session_id}')

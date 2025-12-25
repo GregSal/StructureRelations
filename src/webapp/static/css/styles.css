@@ -11,6 +11,18 @@
     --border-color: #e2e8f0;
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+    /* Relationship colors - can be customized */
+    --rel-contains-color: #10b981;
+    --rel-overlaps-color: #ef4444;
+    --rel-borders-color: #3b82f6;
+    --rel-surrounds-color: #8b5cf6;
+    --rel-shelters-color: #f59e0b;
+    --rel-partition-color: #ec4899;
+    --rel-confines-color: #06b6d4;
+    --rel-disjoint-color: #6b7280;
+    --rel-equals-color: #000000;
+    --rel-unknown-color: #9ca3af;
 }
 
 * {
@@ -247,6 +259,19 @@ header h1 {
     flex-shrink: 0;
 }
 
+.structure-name {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.structure-type {
+    font-weight: 500;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
 .structure-label {
     flex: 1;
     white-space: nowrap;
@@ -268,9 +293,43 @@ header h1 {
     margin-bottom: 1.5rem;
 }
 
+.axis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
 .axis-selector h3 {
     font-size: 1.1rem;
-    margin-bottom: 1rem;
+    margin: 0;
+}
+
+.filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.filter-controls label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.dicom-filter {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.dicom-filter:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .structure-lists {
@@ -475,6 +534,12 @@ tbody tr:hover {
     height: 16px;
 }
 
+.name-cell {
+    font-family: monospace;
+    color: var(--text-primary);
+    min-width: 120px;
+}
+
 .roi-cell {
     font-weight: 600;
     color: var(--primary-color);
@@ -530,7 +595,97 @@ tbody tr:hover {
 
 .matrix-table td {
     font-family: monospace;
-    font-size: 1.1rem;
+    font-size: 1.65rem;  /* 1.5x larger (1.1 * 1.5 = 1.65) */
+    font-weight: 500;
+}
+
+/* Relationship symbol colors - use CSS custom properties */
+.matrix-table td.rel-contains {
+    color: var(--rel-contains-color);
+}
+
+.matrix-table td.rel-overlaps {
+    color: var(--rel-overlaps-color);
+}
+
+.matrix-table td.rel-borders {
+    color: var(--rel-borders-color);
+}
+
+.matrix-table td.rel-surrounds {
+    color: var(--rel-surrounds-color);
+}
+
+.matrix-table td.rel-shelters {
+    color: var(--rel-shelters-color);
+}
+
+.matrix-table td.rel-partition {
+    color: var(--rel-partition-color);
+}
+
+.matrix-table td.rel-confines {
+    color: var(--rel-confines-color);
+}
+
+.matrix-table td.rel-disjoint {
+    color: var(--rel-disjoint-color);
+}
+
+.matrix-table td.rel-equals {
+    color: var(--rel-equals-color);
+}
+
+.matrix-table td.rel-unknown {
+    color: var(--rel-unknown-color);
+}
+
+/* Tooltip on hover */
+.matrix-table td {
+    cursor: help;
+    position: relative;
+}
+
+.matrix-table td:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Legend */
+.legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: var(--bg-color);
+}
+
+.legend-symbol {
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 500;
+    width: 1.5rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.legend-description {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
 }
 
 /* Buttons */
@@ -573,6 +728,25 @@ tbody tr:hover {
     display: flex;
     gap: 0.5rem;
     margin-top: 1rem;
+}
+
+/* Diagram Section */
+.diagram-controls {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: 4px;
+}
+
+.network-diagram {
+    width: 100%;
+    height: 600px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-color);
 }
 
 /* Footer */

@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="/static/css/styles.css?v=6">
+    <link rel="stylesheet" href="static/css/styles.css?v=14">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -87,6 +88,7 @@
                                     <tr>
                                         <th class="sortable" data-column="row">Row</th>
                                         <th class="sortable" data-column="col">Col</th>
+                                        <th class="sortable" data-column="name">Name</th>
                                         <th class="sortable" data-column="roi">ROI</th>
                                         <th class="sortable" data-column="type">Type</th>
                                         <th class="sortable" data-column="label">Label</th>
@@ -101,11 +103,23 @@
                     </div>
                 </div>
 
-                <div class="card">
-                    <h2>Relationship Matrix Configuration</h2>
+                <div class="card collapsible-card">
+                    <div class="card-header" id="matrixConfigHeader">
+                        <h2>Relationship Matrix Configuration</h2>
+                        <button class="collapse-toggle" id="matrixConfigToggle">▼</button>
+                    </div>
+                    <div class="card-content" id="matrixConfigContent">
                     <div class="matrix-config">
                         <div class="axis-selector">
-                            <h3>Matrix Rows</h3>
+                            <div class="axis-header">
+                                <h3>Matrix Rows</h3>
+                                <div class="filter-controls">
+                                    <label for="rowDicomFilter">Filter by Type:</label>
+                                    <select id="rowDicomFilter" class="dicom-filter">
+                                        <option value="">All Types</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="structure-lists">
                                 <div class="list-container">
                                     <p class="list-label">Available</p>
@@ -118,7 +132,15 @@
                             </div>
                         </div>
                         <div class="axis-selector">
-                            <h3>Matrix Columns</h3>
+                            <div class="axis-header">
+                                <h3>Matrix Columns</h3>
+                                <div class="filter-controls">
+                                    <label for="colDicomFilter">Filter by Type:</label>
+                                    <select id="colDicomFilter" class="dicom-filter">
+                                        <option value="">All Types</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="structure-lists">
                                 <div class="list-container">
                                     <p class="list-label">Available</p>
@@ -139,21 +161,104 @@
                         </label>
                         <button class="btn btn-primary" id="updateMatrixBtn">Update Matrix</button>
                     </div>
+                    </div>
                 </div>
 
-                <div class="card">
-                    <h2>Relationship Matrix</h2>
-                    <div class="matrix-info" id="matrixInfo"></div>
-                    <div class="table-container matrix-table-container">
-                        <table id="relationshipMatrix" class="matrix-table">
-                            <thead id="matrixHead"></thead>
-                            <tbody id="matrixBody"></tbody>
-                        </table>
+                <div class="card collapsible-card">
+                    <div class="card-header" id="legendHeader">
+                        <h2>Relationship Symbol Legend</h2>
+                        <button class="collapse-toggle" id="legendToggle">▼</button>
                     </div>
-                    <div class="export-controls">
-                        <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
-                        <button class="btn btn-secondary" id="exportExcelBtn">Export Excel</button>
-                        <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
+                    <div class="card-content" id="legendContent">
+                        <div class="legend-grid">
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-contains">⊂</span>
+                                <span class="legend-label">Contains</span>
+                                <span class="legend-description">Structure A fully encloses structure B</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-overlaps">∩</span>
+                                <span class="legend-label">Overlaps</span>
+                                <span class="legend-description">Structures share common volume</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-borders">|</span>
+                                <span class="legend-label">Borders</span>
+                                <span class="legend-description">Structures touch at boundaries</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-surrounds">○</span>
+                                <span class="legend-label">Surrounds</span>
+                                <span class="legend-description">Structure B is within a hole in A</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-shelters">△</span>
+                                <span class="legend-label">Shelters</span>
+                                <span class="legend-description">B within convex hull of A, not touching</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-partition">⊕</span>
+                                <span class="legend-label">Partition</span>
+                                <span class="legend-description">Structures partition space between them</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-confines">⊏</span>
+                                <span class="legend-label">Confines</span>
+                                <span class="legend-description">B contacts inner surface of A</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-disjoint">∅</span>
+                                <span class="legend-label">Disjoint</span>
+                                <span class="legend-description">Structures are completely separated</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-symbol rel-equals">=</span>
+                                <span class="legend-label">Equals</span>
+                                <span class="legend-description">Same structure (diagonal)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card collapsible-card">
+                    <div class="card-header" id="diagramHeader">
+                        <h2>Relationship Diagram</h2>
+                        <button class="collapse-toggle" id="diagramToggle">▼</button>
+                    </div>
+                    <div class="card-content" id="diagramContent">
+                        <div class="diagram-controls">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="showDisjointToggle">
+                                <span>Show Disjoint</span>
+                            </label>
+                            <label class="toggle-label">
+                                <input type="checkbox" id="showLabelsToggle" checked>
+                                <span>Show Edge Labels</span>
+                            </label>
+                            <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
+                        </div>
+                        <div id="networkDiagram" class="network-diagram"></div>
+                    </div>
+                </div>
+
+                <div class="card collapsible-card">
+                    <div class="card-header" id="matrixHeader">
+                        <h2>Relationship Matrix</h2>
+                        <button class="collapse-toggle" id="matrixToggle">▼</button>
+                    </div>
+                    <div class="card-content" id="matrixContent">
+                        <div class="matrix-info" id="matrixInfo"></div>
+                        <div class="table-container matrix-table-container">
+                            <table id="relationshipMatrix" class="matrix-table">
+                                <thead id="matrixHead"></thead>
+                                <tbody id="matrixBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="export-controls">
+                            <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
+                            <button class="btn btn-secondary" id="exportExcelBtn">Export Excel</button>
+                            <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
+                        </div>
                     </div>
                 </div>
 
@@ -168,6 +273,6 @@
         </footer>
     </div>
 
-    <script src="/static/js/app.js?v=8"></script>
+    <script src="static/js/app.js?v=16"></script>
 </body>
 </html>

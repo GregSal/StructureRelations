@@ -5,8 +5,38 @@ class WebAppClient {
         this.selectedStructures = new Set();
         this.sortableRows = null;
         this.sortableColumns = null;
+        this.symbolConfig = null;  // Will store loaded config
+        this.network = null;  // vis-network instance
 
+        this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
+    }
+
+    async loadSymbolConfig() {
+        try {
+            const response = await fetch('/api/config/symbols');
+            if (response.ok) {
+                this.symbolConfig = await response.json();
+                console.log('Loaded symbol configuration:', this.symbolConfig);
+                this.applySymbolColors();  // Apply custom colors
+            } else {
+                console.warn('Failed to load symbol config, using defaults');
+            }
+        } catch (error) {
+            console.error('Error loading symbol config:', error);
+        }
+    }
+
+    applySymbolColors() {
+        // Apply custom colors from config to CSS custom properties
+        if (!this.symbolConfig || !this.symbolConfig.relationships) return;
+
+        const root = document.documentElement;
+        for (const [relType, config] of Object.entries(this.symbolConfig.relationships)) {
+            if (config.color) {
+                root.style.setProperty(`--rel-${relType.toLowerCase()}-color`, config.color);
+            }
+        }
     }
 
     // Helper to convert RGB array to CSS color string
@@ -79,6 +109,48 @@ class WebAppClient {
         // Collapsible summary
         document.getElementById('summaryToggle').addEventListener('click', () => {
             this.toggleSummary();
+        });
+
+        // Collapsible legend
+        document.getElementById('legendToggle').addEventListener('click', () => {
+            this.toggleLegend();
+        });
+
+        // Collapsible matrix configuration
+        document.getElementById('matrixConfigToggle').addEventListener('click', () => {
+            this.toggleMatrixConfig();
+        });
+
+        // DICOM Type filters
+        document.getElementById('rowDicomFilter').addEventListener('change', (e) => {
+            this.filterStructuresByType('rows', e.target.value);
+        });
+        document.getElementById('colDicomFilter').addEventListener('change', (e) => {
+            this.filterStructuresByType('columns', e.target.value);
+        });
+
+        // Diagram controls
+        document.getElementById('diagramToggle').addEventListener('click', () => {
+            this.toggleDiagram();
+        });
+
+        // Collapsible matrix
+        document.getElementById('matrixToggle').addEventListener('click', () => {
+            this.toggleMatrix();
+        });
+        document.getElementById('refreshDiagramBtn').addEventListener('click', () => {
+            this.refreshDiagram();
+        });
+        document.getElementById('showDisjointToggle').addEventListener('change', () => {
+            this.refreshDiagram();
+        });
+        document.getElementById('showLabelsToggle').addEventListener('change', () => {
+            this.toggleEdgeLabels();
+        });
+
+        // Copy rows to columns button
+        document.getElementById('copyToColumnsBtn').addEventListener('click', () => {
+            this.copyRowsToColumns();
         });
     }
 
@@ -217,11 +289,10 @@ class WebAppClient {
                 const colorArr = struct.color || [128, 128, 128];
                 const colorStr = `rgb(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]})`;
 
-                // Build label: prefer Code Meaning, fallback to name
-                let label = struct.code_meaning || struct.name;
-                if (struct.dicom_type) {
-                    label = `${label} <span style="color: #666;">(${struct.dicom_type})</span>`;
-                }
+                // Build display with name, label, and DICOM type
+                const name = struct.name || '';
+                const label = struct.code_meaning || struct.name;
+                const dicomType = struct.dicom_type || '';
 
                 const item = document.createElement('div');
                 item.className = 'structure-item';
@@ -233,7 +304,9 @@ class WebAppClient {
                          style="background-color: ${colorStr}"></div>
                     <div class="structure-info">
                         <span class="structure-id">${struct.roi}</span>
-                        <span class="structure-label">${label}</span>
+                        <span class="structure-name">${name}</span>
+                        <span class="structure-type" style="color: #666;">${dicomType}</span>
+                        <span class="structure-label" style="color: #888; font-size: 0.9em;">${label}</span>
                         <span class="structure-contours">${struct.num_contours} contour${struct.num_contours !== 1 ? 's' : ''}</span>
                     </div>
                 `;
@@ -353,6 +426,9 @@ class WebAppClient {
             // Display initial matrix
             this.displayMatrix(data);
 
+            // Refresh diagram with initial data
+            this.refreshDiagram();
+
             // Show results stage
             this.showStage('results');
 
@@ -389,6 +465,7 @@ class WebAppClient {
 
             const row = document.createElement('tr');
             row.dataset.roi = roi;
+            row.dataset.name = name;
             row.dataset.type = dicomType;
             row.dataset.label = label;
             row.dataset.volume = volume;
@@ -401,6 +478,7 @@ class WebAppClient {
                 <td class="checkbox-cell">
                     <input type="checkbox" class="col-checkbox" data-roi="${roi}" checked>
                 </td>
+                <td class="name-cell">${name}</td>
                 <td class="roi-cell">${roi}</td>
                 <td class="type-cell">${dicomType}</td>
                 <td class="label-cell">
@@ -547,6 +625,45 @@ class WebAppClient {
         }
     }
 
+    toggleLegend() {
+        const content = document.getElementById('legendContent');
+        const toggle = document.getElementById('legendToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
+    toggleMatrixConfig() {
+        const content = document.getElementById('matrixConfigContent');
+        const toggle = document.getElementById('matrixConfigToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
+    toggleMatrix() {
+        const content = document.getElementById('matrixContent');
+        const toggle = document.getElementById('matrixToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
     initializeSortableLists(data) {
         // Populate selected lists (start with all structures selected)
         const selectedRowsList = document.getElementById('selectedRowsList');
@@ -560,6 +677,10 @@ class WebAppClient {
         availableRowsList.innerHTML = '';
         availableColsList.innerHTML = '';
 
+        // Collect unique DICOM types and create items
+        const dicomTypes = new Set();
+        const items = [];
+
         data.rows.forEach((roi, idx) => {
             // Colors object has string keys in JSON
             const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
@@ -569,10 +690,29 @@ class WebAppClient {
             const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
             const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
 
-            const rowItem = this.createSortableItem(roi, name, color, dicomType, codeMeaning);
-            const colItem = this.createSortableItem(roi, name, color, dicomType, codeMeaning);
+            if (dicomType) {
+                dicomTypes.add(dicomType);
+            }
 
-            // Add to selected lists by default
+            items.push({ roi, name, color, dicomType, codeMeaning });
+        });
+
+        // Populate DICOM type filter dropdowns
+        this.populateDicomTypeFilters(Array.from(dicomTypes).sort());
+
+        // Sort items by DICOM Type, then by name
+        items.sort((a, b) => {
+            if (a.dicomType !== b.dicomType) {
+                return a.dicomType.localeCompare(b.dicomType);
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+        // Add sorted items to selected lists
+        items.forEach(item => {
+            const rowItem = this.createSortableItem(item.roi, item.name, item.color, item.dicomType, item.codeMeaning);
+            const colItem = this.createSortableItem(item.roi, item.name, item.color, item.dicomType, item.codeMeaning);
+
             selectedRowsList.appendChild(rowItem);
             selectedColsList.appendChild(colItem);
         });
@@ -609,9 +749,10 @@ class WebAppClient {
         const item = document.createElement('div');
         item.className = 'sortable-item';
         item.dataset.roi = roi;
+        item.dataset.dicomType = dicomType;
 
-        // Build label with ROI, Type, and Code Meaning
-        let label = codeMeaning || name;
+        // Build label with structure name and optional DICOM Type
+        let label = name;
         if (dicomType) {
             label = `${label} (${dicomType})`;
         }
@@ -622,6 +763,51 @@ class WebAppClient {
             <div class="item-name">${label}</div>
         `;
         return item;
+    }
+
+    populateDicomTypeFilters(types) {
+        const rowFilter = document.getElementById('rowDicomFilter');
+        const colFilter = document.getElementById('colDicomFilter');
+
+        // Clear existing options except "All Types"
+        rowFilter.innerHTML = '<option value="">All Types</option>';
+        colFilter.innerHTML = '<option value="">All Types</option>';
+
+        types.forEach(type => {
+            const rowOption = document.createElement('option');
+            rowOption.value = type;
+            rowOption.textContent = type;
+            rowFilter.appendChild(rowOption);
+
+            const colOption = document.createElement('option');
+            colOption.value = type;
+            colOption.textContent = type;
+            colFilter.appendChild(colOption);
+        });
+    }
+
+    filterStructuresByType(axis, selectedType) {
+        const availableList = axis === 'rows'
+            ? document.getElementById('availableRowsList')
+            : document.getElementById('availableColsList');
+        const selectedList = axis === 'rows'
+            ? document.getElementById('selectedRowsList')
+            : document.getElementById('selectedColsList');
+
+        // Get all items from both lists
+        const allItems = [
+            ...Array.from(availableList.children),
+            ...Array.from(selectedList.children)
+        ];
+
+        allItems.forEach(item => {
+            const itemType = item.dataset.dicomType || '';
+            if (selectedType === '' || itemType === selectedType) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
     }
 
     async updateMatrix() {
@@ -663,6 +849,9 @@ class WebAppClient {
             const data = await response.json();
             this.displayMatrix(data);
 
+            // Also refresh the diagram if it's visible
+            this.refreshDiagram();
+
         } catch (error) {
             console.error('Matrix update error:', error);
             alert('Failed to update matrix.');
@@ -702,11 +891,76 @@ class WebAppClient {
             row.forEach(value => {
                 const td = document.createElement('td');
                 td.textContent = value;
+
+                // Add relationship-specific class for color coding
+                const relClass = this.getRelationshipClass(value);
+                if (relClass) {
+                    td.classList.add(relClass);
+                }
+
+                // Add tooltip with relationship name
+                const relLabel = this.getRelationshipLabel(value);
+                if (relLabel) {
+                    td.title = relLabel;
+                }
+
                 tr.appendChild(td);
             });
 
             tbody.appendChild(tr);
         });
+    }
+
+    getRelationshipClass(symbol) {
+        // Use config if available, otherwise fall back to hardcoded map
+        if (this.symbolConfig && this.symbolConfig.relationships) {
+            for (const [relType, config] of Object.entries(this.symbolConfig.relationships)) {
+                if (config.symbol === symbol) {
+                    return `rel-${relType.toLowerCase()}`;
+                }
+            }
+        }
+
+        // Fallback to hardcoded map
+        const symbolMap = {
+            '⊂': 'rel-contains',
+            '∩': 'rel-overlaps',
+            '|': 'rel-borders',
+            '○': 'rel-surrounds',
+            '△': 'rel-shelters',
+            '⊕': 'rel-partition',
+            '⊏': 'rel-confines',
+            '∅': 'rel-disjoint',
+            '=': 'rel-equals',
+            '?': 'rel-unknown'
+        };
+        return symbolMap[symbol] || null;
+    }
+
+    getRelationshipLabel(symbol) {
+        // Use config if available
+        if (this.symbolConfig && this.symbolConfig.relationships) {
+            for (const config of Object.values(this.symbolConfig.relationships)) {
+                if (config.symbol === symbol) {
+                    return `${config.label} - ${config.description}`;
+                }
+            }
+        }
+
+        // Fallback to hardcoded map
+        const labelMap = {
+            '⊂': 'Contains - Structure A fully encloses structure B',
+            '∩': 'Overlaps - Structures share common volume',
+            '|': 'Borders - Structures touch at boundaries',
+            '○': 'Surrounds - Structure B is within a hole in A',
+            '△': 'Shelters - B within convex hull of A, not touching',
+            '⊕': 'Partition - Structures partition space between them',
+            '⊏': 'Confines - B contacts inner surface of A',
+            '∅': 'Disjoint - Structures are completely separated',
+            '=': 'Equals - Same structure',
+            '?': 'Unknown - Relationship not determined'
+        };
+        return labelMap[symbol] || null;
     }
 
     async exportMatrix(format) {
@@ -734,6 +988,221 @@ class WebAppClient {
             console.error('Export error:', error);
             alert('Failed to export matrix.');
         }
+    }
+
+    toggleDiagram() {
+        const content = document.getElementById('diagramContent');
+        const toggle = document.getElementById('diagramToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+            // Refresh diagram when showing
+            if (!this.network) {
+                this.refreshDiagram();
+            }
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
+    async refreshDiagram() {
+        if (!this.sessionId) {
+            console.warn('No session ID available for diagram');
+            return;
+        }
+
+        try {
+            const selectedRowsList = document.getElementById('selectedRowsList');
+            const selectedColsList = document.getElementById('selectedColsList');
+
+            const rowRois = Array.from(selectedRowsList.children)
+                .map(item => parseInt(item.dataset.roi));
+            const colRois = Array.from(selectedColsList.children)
+                .map(item => parseInt(item.dataset.roi));
+
+            const response = await fetch('/api/diagram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    row_rois: rowRois,
+                    col_rois: colRois
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch diagram data');
+            }
+
+            const data = await response.json();
+            this.renderDiagram(data);
+
+        } catch (error) {
+            console.error('Error refreshing diagram:', error);
+            alert('Failed to generate relationship diagram');
+        }
+    }
+
+    renderDiagram(data) {
+        const container = document.getElementById('networkDiagram');
+        const showLabels = document.getElementById('showLabelsToggle').checked;
+
+        // Prepare nodes for vis-network
+        const nodes = data.nodes.map(node => ({
+            id: node.id,
+            label: node.label,
+            color: {
+                background: node.color,
+                border: this.darkenColor(node.color),
+                highlight: {
+                    background: node.color,
+                    border: this.darkenColor(node.color)
+                }
+            },
+            shape: node.shape,
+            title: node.title,
+            font: {
+                color: this.getTextColor(node.color),
+                size: 14,
+                face: 'Arial'
+            },
+            borderWidth: 2
+        }));
+
+        // Prepare edges for vis-network
+        const edges = data.edges.map(edge => ({
+            from: edge.from_node,
+            to: edge.to_node,
+            label: showLabels ? edge.label : '',
+            color: edge.color,
+            width: edge.width,
+            dashes: edge.dashes,
+            arrows: edge.arrows ? edge.arrows : undefined,
+            font: {
+                size: 12,
+                color: edge.color,
+                strokeWidth: 0
+            },
+            smooth: {
+                type: 'continuous',
+                roundness: 0.5
+            }
+        }));
+
+        // Network options
+        const options = {
+            nodes: {
+                borderWidth: 2,
+                borderWidthSelected: 4
+            },
+            edges: {
+                smooth: {
+                    type: 'continuous'
+                }
+            },
+            physics: {
+                enabled: true,
+                stabilization: {
+                    iterations: 200
+                },
+                barnesHut: {
+                    gravitationalConstant: -2000,
+                    springConstant: 0.04,
+                    springLength: 150
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100,
+                navigationButtons: true,
+                keyboard: true
+            },
+            layout: {
+                improvedLayout: true,
+                hierarchical: false
+            }
+        };
+
+        // Destroy existing network if present
+        if (this.network) {
+            this.network.destroy();
+        }
+
+        // Create new network
+        this.network = new vis.Network(container, { nodes, edges }, options);
+
+        // Add event listeners
+        this.network.on('click', (params) => {
+            if (params.nodes.length > 0) {
+                console.log('Clicked node:', params.nodes[0]);
+            }
+        });
+    }
+
+    toggleEdgeLabels() {
+        if (!this.network) return;
+
+        const showLabels = document.getElementById('showLabelsToggle').checked;
+        const edges = this.network.body.data.edges.get();
+
+        edges.forEach(edge => {
+            this.network.body.data.edges.update({
+                id: edge.id,
+                label: showLabels && edge.originalLabel ? edge.originalLabel : ''
+            });
+        });
+    }
+
+    copyRowsToColumns() {
+        const selectedRowsList = document.getElementById('selectedRowsList');
+        const selectedColsList = document.getElementById('selectedColsList');
+        const availableColsList = document.getElementById('availableColsList');
+
+        // Clear columns lists
+        selectedColsList.innerHTML = '';
+        availableColsList.innerHTML = '';
+
+        // Copy all row items to selected columns
+        Array.from(selectedRowsList.children).forEach(rowItem => {
+            const colItem = rowItem.cloneNode(true);
+            selectedColsList.appendChild(colItem);
+        });
+    }
+
+    darkenColor(hex) {
+        // Remove # if present
+        hex = hex.replace('#', '');
+
+        // Parse RGB
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+
+        // Darken by 30%
+        const darkenedR = Math.floor(r * 0.7);
+        const darkenedG = Math.floor(g * 0.7);
+        const darkenedB = Math.floor(b * 0.7);
+
+        return `#${darkenedR.toString(16).padStart(2, '0')}${darkenedG.toString(16).padStart(2, '0')}${darkenedB.toString(16).padStart(2, '0')}`;
+    }
+
+    getTextColor(bgColor) {
+        // Remove # if present
+        const hex = bgColor.replace('#', '');
+
+        // Parse RGB
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+
+        // Calculate brightness
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+        return brightness > 128 ? '#000000' : '#FFFFFF';
     }
 
     showStage(stageName) {

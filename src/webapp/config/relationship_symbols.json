@@ -1,0 +1,66 @@
+{
+  "description": "Customizable symbols and colors for relationship types",
+  "version": "1.0",
+  "relationships": {
+    "CONTAINS": {
+      "symbol": "⊂",
+      "label": "Contains",
+      "description": "Structure A fully encloses structure B",
+      "color": "#10b981"
+    },
+    "OVERLAPS": {
+      "symbol": "∩",
+      "label": "Overlaps",
+      "description": "Structures share common volume",
+      "color": "#ef4444"
+    },
+    "BORDERS": {
+      "symbol": "|",
+      "label": "Borders",
+      "description": "Structures touch at boundaries",
+      "color": "#3b82f6"
+    },
+    "SURROUNDS": {
+      "symbol": "○",
+      "label": "Surrounds",
+      "description": "Structure B is within a hole in A",
+      "color": "#8b5cf6"
+    },
+    "SHELTERS": {
+      "symbol": "△",
+      "label": "Shelters",
+      "description": "B within convex hull of A, not touching",
+      "color": "#f59e0b"
+    },
+    "PARTITION": {
+      "symbol": "⊕",
+      "label": "Partition",
+      "description": "Structures partition space between them",
+      "color": "#ec4899"
+    },
+    "CONFINES": {
+      "symbol": "⊏",
+      "label": "Confines",
+      "description": "B contacts inner surface of A",
+      "color": "#06b6d4"
+    },
+    "DISJOINT": {
+      "symbol": "∅",
+      "label": "Disjoint",
+      "description": "Structures are completely separated",
+      "color": "#6b7280"
+    },
+    "EQUALS": {
+      "symbol": "=",
+      "label": "Equals",
+      "description": "Same structure",
+      "color": "#000000"
+    },
+    "UNKNOWN": {
+      "symbol": "?",
+      "label": "Unknown",
+      "description": "Relationship not determined",
+      "color": "#9ca3af"
+    }
+  }
+}
