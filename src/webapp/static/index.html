@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=14">
+    <link rel="stylesheet" href="static/css/styles.css?v=18">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -242,6 +242,48 @@
                 </div>
 
                 <div class="card collapsible-card">
+                    <div class="card-header" id="contourPlotHeader">
+                        <h2>Contour Plotting</h2>
+                        <button class="collapse-toggle" id="contourPlotToggle">▼</button>
+                    </div>
+                    <div class="card-content" id="contourPlotContent">
+                        <div class="plot-controls">
+                            <div class="control-group">
+                                <label for="structure1Select">Structure 1:</label>
+                                <select id="structure1Select" class="structure-select">
+                                    <option value="">Select structure...</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="structure2Select">Structure 2 (optional):</label>
+                                <select id="structure2Select" class="structure-select">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <button class="btn btn-primary" id="plotContoursBtn">Plot Contours</button>
+                            </div>
+                        </div>
+                        <div class="plot-container" id="plotContainer">
+                            <div class="plot-loading" id="plotLoading">
+                                <div class="spinner"></div>
+                                <div>Generating plot...</div>
+                            </div>
+                            <img id="contourPlot" class="contour-plot" alt="Contour plot will appear here" />
+                        </div>
+                        <div class="slider-controls">
+                            <label for="sliceSlider">Slice: <span id="sliceValue">0.0</span> cm</label>
+                            <div class="slider-container">
+                                <button class="slider-arrow" id="slicePrevBtn" title="Previous slice">◄</button>
+                                <input type="range" id="sliceSlider" class="slice-slider" min="0" max="0" step="1" value="0">
+                                <button class="slider-arrow" id="sliceNextBtn" title="Next slice">►</button>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card collapsible-card">
                     <div class="card-header" id="matrixHeader">
                         <h2>Relationship Matrix</h2>
                         <button class="collapse-toggle" id="matrixToggle">▼</button>
@@ -273,6 +315,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=16"></script>
+    <script src="static/js/app.js?v=23"></script>
+    <!-- v24: Reorganized contour plot layout - slider below plot, button with structure selects -->
 </body>
 </html>

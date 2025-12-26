@@ -479,6 +479,7 @@ class StructureSet:
         volumes_dict = {}
         num_regions_dict = {}
         slice_ranges_dict = {}
+        structure_slices_dict = {}
 
         for roi in all_rois:
             # Get row from summary DataFrame for this ROI
@@ -500,6 +501,16 @@ class StructureSet:
                 volumes_dict[roi_key] = float(volume)
                 num_regions_dict[roi_key] = int(num_regions)
                 slice_ranges_dict[roi_key] = slice_range
+
+                # Get slice indices for this structure
+                if roi in self.structures:
+                    structure = self.structures[roi]
+                    if not structure.region_table.empty:
+                        structure_slices_dict[roi_key] = sorted(structure.region_table['SliceIndex'].unique().tolist())
+                    else:
+                        structure_slices_dict[roi_key] = []
+                else:
+                    structure_slices_dict[roi_key] = []
             else:
                 roi_key = int(roi)
                 dicom_types_dict[roi_key] = ''
@@ -507,6 +518,7 @@ class StructureSet:
                 volumes_dict[roi_key] = 0.0
                 num_regions_dict[roi_key] = 0
                 slice_ranges_dict[roi_key] = ''
+                structure_slices_dict[roi_key] = []
 
         return {
             'rows': row_rois_list,
@@ -519,5 +531,7 @@ class StructureSet:
             'code_meanings': code_meanings_dict,
             'volumes': volumes_dict,
             'num_regions': num_regions_dict,
-            'slice_ranges': slice_ranges_dict
+            'slice_ranges': slice_ranges_dict,
+            'slice_indices': self.slice_sequence.slices if self.slice_sequence else [],
+            'structure_slices': structure_slices_dict
         }

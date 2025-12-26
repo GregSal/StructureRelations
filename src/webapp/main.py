@@ -20,12 +20,16 @@ from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import pandas as pd
 import io
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dicom import DicomStructureFile
 from structure_set import StructureSet
+from contour_plotting import plot_roi_slice
 from webapp.session_manager import SessionManager, SessionData
 from webapp.websocket_manager import ConnectionManager
 
@@ -86,6 +90,8 @@ class MatrixResponse(BaseModel):
     volumes: dict
     num_regions: dict
     slice_ranges: dict
+    slice_indices: List[float]
+    structure_slices: dict
 
 
 class DiagramNode(BaseModel):
@@ -670,6 +676,62 @@ async def get_diagram_data(request: MatrixRequest):
     except Exception as e:
         logger.error(f'Error generating diagram: {e}')
         raise HTTPException(status_code=500, detail=f'Failed to generate diagram: {str(e)}')
+
+
+class PlotRequest(BaseModel):
+    session_id: str
+    roi_list: List[int]
+    slice_index: float
+
+
+@app.post('/api/plot-contours')
+async def plot_contours(request: PlotRequest):
+    '''Generate a contour plot for selected structures on a specific slice.
+
+    Args:
+        request (PlotRequest): Contains session_id, roi_list (1-2 ROIs), and slice_index.
+
+    Returns:
+        StreamingResponse: PNG image of the contour plot.
+    '''
+    try:
+        session_data = session_manager.load_session(request.session_id)
+        if session_data is None:
+            raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+        if session_data.structure_set is None:
+            raise HTTPException(status_code=400, detail='Structures not yet processed')
+
+        structure_set = session_data.structure_set
+
+        # Validate inputs
+        if len(request.roi_list) == 0 or len(request.roi_list) > 2:
+            raise HTTPException(status_code=400, detail='Must provide 1 or 2 ROI numbers')
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(10, 10))
+        plot_roi_slice(
+            structure_set=structure_set,
+            slice_index=request.slice_index,
+            roi_list=request.roi_list,
+            axes=ax,
+            add_axis=False,
+            tolerance=0.1
+        )
+
+        # Save plot to bytes buffer
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        plt.close(fig)
+
+        return StreamingResponse(buf, media_type='image/png')
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'Error generating contour plot: {e}')
+        raise HTTPException(status_code=500, detail=f'Failed to generate plot: {str(e)}')
 
 
 @app.websocket('/ws/{session_id}')

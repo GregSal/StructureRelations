@@ -7,6 +7,7 @@ class WebAppClient {
         this.sortableColumns = null;
         this.symbolConfig = null;  // Will store loaded config
         this.network = null;  // vis-network instance
+        this.plotAbortController = null;  // Track current plot request
 
         this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
@@ -151,6 +152,29 @@ class WebAppClient {
         // Copy rows to columns button
         document.getElementById('copyToColumnsBtn').addEventListener('click', () => {
             this.copyRowsToColumns();
+        });
+
+        // Contour plotting controls
+        document.getElementById('contourPlotToggle').addEventListener('click', () => {
+            this.toggleContourPlot();
+        });
+        document.getElementById('plotContoursBtn').addEventListener('click', () => {
+            this.plotContours();
+        });
+        document.getElementById('sliceSlider').addEventListener('input', (e) => {
+            this.updateSliceValue(e.target.value);
+            this.updateSliderArrows();
+            // Auto-update plot when slider moves
+            const structure1 = document.getElementById('structure1Select').value;
+            if (structure1) {
+                this.plotContours();
+            }
+        });
+        document.getElementById('slicePrevBtn').addEventListener('click', () => {
+            this.stepSlice(-1);
+        });
+        document.getElementById('sliceNextBtn').addEventListener('click', () => {
+            this.stepSlice(1);
         });
     }
 
@@ -422,6 +446,9 @@ class WebAppClient {
 
             // Initialize sortable lists
             this.initializeSortableLists(data);
+
+            // Populate contour plot controls
+            this.populateContourPlotControls(data);
 
             // Display initial matrix
             this.displayMatrix(data);
@@ -1203,6 +1230,259 @@ class WebAppClient {
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
 
         return brightness > 128 ? '#000000' : '#FFFFFF';
+    }
+
+    toggleContourPlot() {
+        const content = document.getElementById('contourPlotContent');
+        const toggle = document.getElementById('contourPlotToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+
+    populateContourPlotControls(data) {
+        // Store all slice data
+        this.allSliceIndices = data.slice_indices || [];
+        this.structureSlices = data.structure_slices || {};
+        this.sliceIndices = this.allSliceIndices;  // Start with all slices
+
+        // Configure slider with discrete steps
+        const slider = document.getElementById('sliceSlider');
+        if (this.sliceIndices.length > 0) {
+            slider.min = 0;
+            slider.max = this.sliceIndices.length - 1;
+            slider.value = Math.floor(this.sliceIndices.length / 2);
+            slider.step = 1;
+
+            // Set initial slice value
+            const midIndex = Math.floor(this.sliceIndices.length / 2);
+            document.getElementById('sliceValue').textContent = this.sliceIndices[midIndex].toFixed(2);
+        } else {
+            slider.min = 0;
+            slider.max = 0;
+            slider.value = 0;
+            document.getElementById('sliceValue').textContent = '0.0';
+        }
+
+        // Update arrow button states
+        this.updateSliderArrows();
+
+        // Populate structure dropdowns
+        const select1 = document.getElementById('structure1Select');
+        const select2 = document.getElementById('structure2Select');
+
+        // Clear existing options except first
+        select1.innerHTML = '<option value="">Select structure...</option>';
+        select2.innerHTML = '<option value="">None</option>';
+
+        // Add structures
+        data.rows.forEach((roi, idx) => {
+            const name = data.row_names[idx];
+            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
+            const label = dicomType ? `${name} (${dicomType})` : name;
+
+            const option1 = document.createElement('option');
+            option1.value = roi;
+            option1.textContent = label;
+            select1.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = roi;
+            option2.textContent = label;
+            select2.appendChild(option2);
+        });
+
+        // Add event listeners for structure selection changes
+        select1.addEventListener('change', () => this.updateSliceRangeForStructures());
+        select2.addEventListener('change', () => this.updateSliceRangeForStructures());
+    }
+
+    updateSliceRangeForStructures() {
+        const structure1 = document.getElementById('structure1Select').value;
+        const structure2 = document.getElementById('structure2Select').value;
+
+        let filteredSlices = [];
+
+        if (structure1 || structure2) {
+            // Get slices for selected structures
+            const slices1 = structure1 ? (this.structureSlices[parseInt(structure1)] || []) : [];
+            const slices2 = structure2 ? (this.structureSlices[parseInt(structure2)] || []) : [];
+
+            // Combine slices (union of both structures)
+            const slicesSet = new Set([...slices1, ...slices2]);
+            filteredSlices = Array.from(slicesSet).sort((a, b) => a - b);
+        } else {
+            // No structures selected, use all slices
+            filteredSlices = [...this.allSliceIndices];
+        }
+
+        // Get current slice value BEFORE updating the indices
+        const slider = document.getElementById('sliceSlider');
+        const oldSliceIndices = this.sliceIndices || [];
+        let currentSliceValue;
+        const currentIndex = parseInt(slider.value);
+        if (oldSliceIndices.length > currentIndex) {
+            currentSliceValue = oldSliceIndices[currentIndex];
+        } else {
+            currentSliceValue = filteredSlices[Math.floor(filteredSlices.length / 2)];
+        }
+
+        // Update the active slice indices
+        this.sliceIndices = filteredSlices;
+
+        // Reconfigure slider
+        if (filteredSlices.length > 0) {
+            // Update slider range
+            slider.min = 0;
+            slider.max = filteredSlices.length - 1;
+
+            // Find closest slice in new range
+            let closestIndex = 0;
+            let minDiff = Infinity;
+            filteredSlices.forEach((slice, idx) => {
+                const diff = Math.abs(slice - currentSliceValue);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = idx;
+                }
+            });
+
+            slider.value = closestIndex;
+            document.getElementById('sliceValue').textContent = filteredSlices[closestIndex].toFixed(2);
+        } else {
+            slider.min = 0;
+            slider.max = 0;
+            slider.value = 0;
+            document.getElementById('sliceValue').textContent = '0.0';
+        }
+
+        this.updateSliderArrows();
+
+        // Auto-update plot if a structure is selected
+        if (structure1) {
+            this.plotContours();
+        }
+    }
+
+    updateSliceValue(sliderValue) {
+        // Use discrete slice index from stored array
+        if (this.sliceIndices && this.sliceIndices.length > 0) {
+            const index = parseInt(sliderValue);
+            const sliceValue = this.sliceIndices[index];
+            document.getElementById('sliceValue').textContent = sliceValue.toFixed(2);
+        }
+    }
+
+    updateSliderArrows() {
+        const slider = document.getElementById('sliceSlider');
+        const prevBtn = document.getElementById('slicePrevBtn');
+        const nextBtn = document.getElementById('sliceNextBtn');
+
+        const currentValue = parseInt(slider.value);
+        const minValue = parseInt(slider.min);
+        const maxValue = parseInt(slider.max);
+
+        prevBtn.disabled = (currentValue <= minValue);
+        nextBtn.disabled = (currentValue >= maxValue);
+    }
+
+    stepSlice(direction) {
+        const slider = document.getElementById('sliceSlider');
+        const currentValue = parseInt(slider.value);
+        const newValue = currentValue + direction;
+
+        const minValue = parseInt(slider.min);
+        const maxValue = parseInt(slider.max);
+
+        if (newValue >= minValue && newValue <= maxValue) {
+            slider.value = newValue;
+            this.updateSliceValue(newValue);
+            this.updateSliderArrows();
+
+            // Auto-update plot if structure is selected
+            const structure1 = document.getElementById('structure1Select').value;
+            if (structure1) {
+                this.plotContours();
+            }
+        }
+    }
+
+    async plotContours() {
+        const structure1 = document.getElementById('structure1Select').value;
+        const structure2 = document.getElementById('structure2Select').value;
+        const sliderValue = document.getElementById('sliceSlider').value;
+
+        if (!structure1) {
+            alert('Please select at least one structure to plot');
+            return;
+        }
+
+        // Get actual slice value from discrete indices
+        const sliceIndex = this.sliceIndices[parseInt(sliderValue)];
+
+        // Cancel any in-flight request
+        if (this.plotAbortController) {
+            this.plotAbortController.abort();
+        }
+
+        // Create new abort controller for this request
+        this.plotAbortController = new AbortController();
+        const signal = this.plotAbortController.signal;
+
+        // Show loading indicator
+        const loadingOverlay = document.getElementById('plotLoading');
+        loadingOverlay.classList.add('active');
+
+        try {
+            const response = await fetch('/api/plot-contours', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    roi_list: structure2 ? [parseInt(structure1), parseInt(structure2)] : [parseInt(structure1)],
+                    slice_index: sliceIndex
+                }),
+                signal: signal
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate plot');
+            }
+
+            // Get image blob and display it
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            const plotImg = document.getElementById('contourPlot');
+            plotImg.src = imageUrl;
+            plotImg.style.display = 'block';
+
+            // Hide loading indicator
+            loadingOverlay.classList.remove('active');
+
+        } catch (error) {
+            // Hide loading indicator
+            loadingOverlay.classList.remove('active');
+
+            // Don't show error if request was aborted (this is expected)
+            if (error.name === 'AbortError') {
+                console.log('Plot request cancelled');
+                return;
+            }
+
+            console.error('Plot error:', error);
+            alert('Failed to generate contour plot');
+        } finally {
+            // Clear the abort controller
+            this.plotAbortController = null;
+        }
     }
 
     showStage(stageName) {
