@@ -247,7 +247,6 @@ class SliceSequence:
         return self.sequence.loc[index, :].to_dict()
 
     def __iter__(self):
-        # TODO evaluate this function.  Is it returning the appropriate value?
         return iter(self.sequence['ThisSlice'])
 
     def __contains__(self, slice_index: SliceIndexType) -> bool:

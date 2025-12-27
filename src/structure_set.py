@@ -3,6 +3,8 @@
 # %% Imports
 from typing import List, Optional
 import logging
+from pathlib import Path
+import json
 
 import pandas as pd
 import networkx as nx
@@ -18,6 +20,7 @@ from utilities import round_value
 # %% Configure logging if not already configured
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+#logger.setLevel(logging.DEBUG)
 
 
 # %% Class Definition
@@ -54,7 +57,7 @@ class StructureSet:
         '''
         self.structures = {}
         self.slice_sequence = None
-        self.relationship_graph = nx.Graph()
+        self.relationship_graph = nx.DiGraph()
         self.dicom_structure_file = dicom_structure_file
         self.tolerance = tolerance
 
@@ -157,12 +160,13 @@ class StructureSet:
 
         If relationships have already been calculated, this method does nothing.
         '''
-        structure_rois = list(self.structures.keys())
+        sorted_structures = self.get_structures_by_volume()
+        structure_rois = [s.roi for s in sorted_structures]
 
         # Check if relationships have already been calculated
         # If the graph has the expected number of edges, skip recalculation
         expected_edges = len(structure_rois) * (len(structure_rois) - 1) // 2
-        if self.relationship_graph.number_of_edges() == expected_edges:
+        if self.relationship_graph.number_of_edges() >= expected_edges:
             logger.debug('Relationships already calculated, skipping recalculation')
             return
 
@@ -186,7 +190,7 @@ class StructureSet:
                 )
 
                 logger.debug('Calculated relationship between ROI %s and ROI %s:\n%s',
-                             roi_a, roi_b, relationship)
+                             structure_a.name, structure_b.name, relationship.identify_relation())
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> DE27IM:
         '''Get the relationship between two structures.
@@ -250,8 +254,8 @@ class StructureSet:
             })
         summary_df = pd.DataFrame(summary_data)
         if self.dicom_structure_file:
-                summary_df = summary_df.join(
-                    self.dicom_structure_file.get_roi_labels(), on='ROI')
+            summary_df = summary_df.join(
+                self.dicom_structure_file.get_roi_labels(), on='ROI')
 
         return summary_df
 
@@ -268,28 +272,24 @@ class StructureSet:
             return pd.DataFrame()
 
         # Get all unique ROIs and their corresponding names for matrix dimensions
-        all_rois = sorted(list(self.structures.keys()))
+        sorted_structures = self.get_structures_by_volume()
+        all_rois = [s.roi for s in sorted_structures]
         all_names = [self.structures[roi].name for roi in all_rois]
-
-        # Create empty matrix filled with None using structure names
-        relationship_matrix = pd.DataFrame(
-            index=all_names,
-            columns=all_names,
-            dtype='object'
-        )
-        # Fill with None values explicitly
-        relationship_matrix[:] = RelationshipType.UNKNOWN
 
         # Create ROI to name mapping for lookups
         roi_to_name = {roi: self.structures[roi].name for roi in all_rois}
 
-        # Fill diagonal with self-relationships (typically "Equals")
+        # Create empty dict of dicts to hold relationship data
+        relationship_data = {name_a: {name_b: RelationshipType.UNKNOWN
+                                      for name_b in all_names}
+                                      for name_a in all_names}
+
+        # Fill diagonal with self-relationships ("Equals")
         for name in all_names:
-            relationship_matrix.loc[name, name] = RelationshipType.EQUALS
+            relationship_data[name][name] = RelationshipType.EQUALS
 
         # Fill matrix with calculated relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(data=True):
-            #relationship_type = edge_data['relationship_type']
             relationship_obj = edge_data['relationship']
             relationship_type = relationship_obj.identify_relation()
 
@@ -297,19 +297,19 @@ class StructureSet:
             name_a = roi_to_name[roi_a]
             name_b = roi_to_name[roi_b]
 
-            # Set the relationship in the matrix using names
-            relationship_matrix.loc[name_a, name_b] = relationship_type
-
+            # populate the relationship dictionary
+            relationship_data[name_a][name_b] = relationship_type
             # For symmetric relationships, also set the transpose
             if relationship_type.is_symmetric:
-                relationship_matrix.loc[name_b, name_a] = relationship_type
+                relationship_data[name_b][name_a] = relationship_type
+        relationship_matrix = pd.DataFrame(relationship_data)
 
         # Transpose the matrix so that Structure_A is rows and Structure_B is
         # columns.
-        relationship_matrix = relationship_matrix.T
+        #relationship_matrix = relationship_matrix.T
         # Set index and columns names for clarity
-        relationship_matrix.index.name = 'Structure_A'
-        relationship_matrix.columns.name = 'Structure_B'
+        relationship_matrix.index.name = 'Structure_B'
+        relationship_matrix.columns.name = 'Structure_A'
 
         return relationship_matrix
 
@@ -406,7 +406,7 @@ class StructureSet:
             dict: Mapping from RelationshipType to unicode symbols.
         '''
         return {
-            RelationshipType.UNKNOWN: '?',
+            RelationshipType.UNKNOWN: '',
             RelationshipType.EQUALS: '=',
             RelationshipType.CONTAINS: '⊂',
             RelationshipType.OVERLAPS: '∩',
@@ -467,9 +467,11 @@ class StructureSet:
         if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'dataset'):
             try:
                 for roi_contour in self.dicom_structure_file.dataset.ROIContourSequence:
-                    roi_num = int(roi_contour.ReferencedROINumber)  # Convert to int for JSON
+                    # Convert to int for JSON
+                    roi_num = int(roi_contour.ReferencedROINumber)
                     if hasattr(roi_contour, 'ROIDisplayColor'):
-                        colors[roi_num] = [int(c) for c in roi_contour.ROIDisplayColor]  # Convert color values to int
+                        # Convert color values to int
+                        colors[roi_num] = [int(c) for c in roi_contour.ROIDisplayColor]
             except AttributeError:
                 pass
 
@@ -488,11 +490,26 @@ class StructureSet:
             if not roi_data.empty:
                 row = roi_data.iloc[0]
                 # Handle NaN values from DataFrame
-                dicom_type = row['DICOM_Type'] if 'DICOM_Type' in row.index and pd.notna(row['DICOM_Type']) else ''
-                code_meaning = row['CodeMeaning'] if 'CodeMeaning' in row.index and pd.notna(row['CodeMeaning']) else ''
-                volume = row['Physical_Volume'] if pd.notna(row['Physical_Volume']) else 0.0
-                num_regions = int(row['Num_Regions']) if pd.notna(row['Num_Regions']) else 0
-                slice_range = row['Slice_Range'] if pd.notna(row['Slice_Range']) else ''
+                if 'DICOM_Type' in row.index and pd.notna(row['DICOM_Type']):
+                    dicom_type = row['DICOM_Type']
+                else:
+                    dicom_type = ''
+                if 'CodeMeaning' in row.index and pd.notna(row['CodeMeaning']):
+                    code_meaning = row['CodeMeaning']
+                else:
+                    code_meaning = ''
+                if pd.notna(row['Physical_Volume']):
+                    volume = row['Physical_Volume']
+                else:
+                    volume = 0.0
+                if pd.notna(row['Num_Regions']):
+                    num_regions = int(row['Num_Regions'])
+                else:
+                    num_regions = 0
+                if pd.notna(row['Slice_Range']):
+                    slice_range = row['Slice_Range']
+                else:
+                    slice_range = ''
 
                 # Convert numpy types to Python native types for JSON serialization
                 roi_key = int(roi)
@@ -506,7 +523,9 @@ class StructureSet:
                 if roi in self.structures:
                     structure = self.structures[roi]
                     if not structure.region_table.empty:
-                        structure_slices_dict[roi_key] = sorted(structure.region_table['SliceIndex'].unique().tolist())
+                        slice_indexes = structure.region_table['SliceIndex']
+                        slice_index_list = slice_indexes.unique().tolist()
+                        structure_slices_dict[roi_key] = sorted(slice_index_list)
                     else:
                         structure_slices_dict[roi_key] = []
                 else:

@@ -557,7 +557,7 @@ class DicomStructureFile:
                 study_matches = True
                 if match_study:
                     file_study_uid = str(file_dataset.get('StudyInstanceUID', ''))
-                    study_matches = (file_study_uid == study_instance_uid)
+                    study_matches = file_study_uid == study_instance_uid
                     if not study_matches:
                         continue
 

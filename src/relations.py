@@ -80,7 +80,7 @@ class RelationshipType(Enum):
             self.OVERLAPS,
             self.BORDERS,
             self.EQUALS,
-            self.UNKNOWN
+            #self.UNKNOWN
             ]
         return self in symmetric_relations
 

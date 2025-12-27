@@ -162,7 +162,7 @@ async def get_symbol_config():
     Returns:
         dict: Configuration for relationship symbols, labels, descriptions, and colors.
     '''
-    config_file = Path(__file__).parent / 'config' / 'relationship_symbols.json'
+    config_file = Path(__file__).parent.parent / 'relationship_symbols.json'
 
     try:
         if config_file.exists():
