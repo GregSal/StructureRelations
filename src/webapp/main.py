@@ -594,7 +594,7 @@ async def get_diagram_data(request: MatrixRequest):
             'BORDERS': {'color': '#32CD32', 'width': 3, 'dashes': True, 'arrows': None},
             'SURROUNDS': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
             'SHELTERS': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
-            'PARTITION': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': None},
+            'PARTITION': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
             'CONFINES': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
             'DISJOINT': {'color': '#808080', 'width': 1, 'dashes': True, 'arrows': None},
             'EQUALS': {'color': '#FF0000', 'width': 5, 'dashes': False, 'arrows': 'to;from'}
@@ -648,7 +648,10 @@ async def get_diagram_data(request: MatrixRequest):
                 if row_roi >= col_roi:  # Avoid duplicates and self-loops
                     continue
 
-                rel = structure_set.get_relationship(row_roi, col_roi)
+                # Matrix convention: matrix[row, col] means "col contains row"
+                # So we query get_relationship(col_roi, row_roi) to get the relationship
+                # where col_roi is the subject and row_roi is the object
+                rel = structure_set.get_relationship(col_roi, row_roi)
                 if rel is None:
                     continue
 
@@ -659,9 +662,13 @@ async def get_diagram_data(request: MatrixRequest):
 
                 style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
 
+                # Now rel_type describes: col_roi [rel_type] row_roi
+                # For CONTAINS: col_roi contains row_roi
+                # Arrow convention: point from container to contained
+                # So arrow should point from col_roi to row_roi
                 edges.append(DiagramEdge(
-                    from_node=row_roi,
-                    to_node=col_roi,
+                    from_node=col_roi,
+                    to_node=row_roi,
                     label=rel_type,
                     color=style['color'],
                     width=style['width'],
