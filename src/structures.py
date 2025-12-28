@@ -52,7 +52,7 @@ class StructureShape():
         else:
             self.name = name
         self.roi = roi
-        self.contour_graph = nx.Graph()
+        self.contour_graph = nx.DiGraph()
         self.contour_lookup = pd.DataFrame()
         self.region_table = pd.DataFrame()
         self.physical_volume = 0.0
@@ -125,36 +125,37 @@ class StructureShape():
             # Find all edges where the slice index is between the node slices
             edges_to_interpolate = []
             for edge in self.contour_graph.edges():
-                node1, node2 = edge
-                slice1 = self.contour_graph.nodes[node1]['contour'].slice_index
-                slice2 = self.contour_graph.nodes[node2]['contour'].slice_index
+                source, target = edge
+                slice_source = self.contour_graph.nodes[source]['contour'].slice_index
+                slice_target = self.contour_graph.nodes[target]['contour'].slice_index
 
-                # Check if slice_index is between slice1 and slice2
-                if min(slice1, slice2) < slice_index < max(slice1, slice2):
-                    edges_to_interpolate.append((node1, node2))
+                # For directed graph, source should always be < target
+                # Check if slice_index is between them
+                if slice_source < slice_index < slice_target:
+                    edges_to_interpolate.append((source, target))
 
             # For each edge that spans this slice index
-            for node1, node2 in edges_to_interpolate:
-                contour1 = self.contour_graph.nodes[node1]['contour']
-                contour2 = self.contour_graph.nodes[node2]['contour']
+            for source, target in edges_to_interpolate:
+                contour_source = self.contour_graph.nodes[source]['contour']
+                contour_target = self.contour_graph.nodes[target]['contour']
 
                 # Create interpolated polygon
-                slices = [contour1.slice_index, contour2.slice_index]
+                slices = [contour_source.slice_index, contour_target.slice_index]
                 interpolated_polygon = interpolate_polygon(
-                    slices, contour1.polygon, contour2.polygon
+                    slices, contour_source.polygon, contour_target.polygon
                 )
 
-                # Create interpolated contour with parameters from first node
+                # Create interpolated contour with parameters from source node
                 interpolated_contour = Contour(
-                    roi=contour1.roi,
+                    roi=contour_source.roi,
                     slice_index=slice_index,
                     polygon=interpolated_polygon,
                     existing_contours=[],
                     is_interpolated=True,
-                    is_boundary=contour1.is_boundary,
-                    is_hole=contour1.is_hole,
-                    hole_type=contour1.hole_type,
-                    region_index=contour1.region_index
+                    is_boundary=contour_source.is_boundary,
+                    is_hole=contour_source.is_hole,
+                    hole_type=contour_source.hole_type,
+                    region_index=contour_source.region_index
                 )
 
                 # Add the interpolated contour to the graph
@@ -162,26 +163,31 @@ class StructureShape():
                 self.contour_graph.add_node(interpolated_label,
                                           contour=interpolated_contour)
 
-                # Add edges from interpolated contour to both original nodes
-                contour_match1 = ContourMatch(contour1, interpolated_contour)
-                self.contour_graph.add_edge(node1, interpolated_label,
+                # Add directed edges: source -> interpolated -> target
+                # Remove the original edge from source to target
+                self.contour_graph.remove_edge(source, target)
+
+                # Add two new directed edges
+                contour_match1 = ContourMatch(contour_source, interpolated_contour)
+                self.contour_graph.add_edge(source, interpolated_label,
                                           match=contour_match1)
 
-                contour_match2 = ContourMatch(contour2, interpolated_contour)
-                self.contour_graph.add_edge(node2, interpolated_label,
+                contour_match2 = ContourMatch(interpolated_contour, contour_target)
+                self.contour_graph.add_edge(interpolated_label, target,
                                           match=contour_match2)
 
-                # Combine unique related_contours from contour1 and contour2
-                related_contours = set(contour1.related_contours) | set(contour2.related_contours)
+                # Combine unique related_contours from source and target
+                related_contours = (set(contour_source.related_contours) |
+                                  set(contour_target.related_contours))
                 related_contour_ref[interpolated_label] = list(related_contours)
 
-                # Add daughter contour references for node1 and node2
-                if node1 not in daughter_contour_ref:
-                    daughter_contour_ref[node1] = []
-                daughter_contour_ref[node1].append(interpolated_label)
-                if node2 not in daughter_contour_ref:
-                    daughter_contour_ref[node2] = []
-                daughter_contour_ref[node2].append(interpolated_label)
+                # Add daughter contour references
+                if source not in daughter_contour_ref:
+                    daughter_contour_ref[source] = []
+                daughter_contour_ref[source].append(interpolated_label)
+                if target not in daughter_contour_ref:
+                    daughter_contour_ref[target] = []
+                daughter_contour_ref[target].append(interpolated_label)
 
         for key, related_list in related_contour_ref.items():
             # Find all keys in daughter_contour_ref that match items in related_list

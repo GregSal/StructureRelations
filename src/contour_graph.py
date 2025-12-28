@@ -1,6 +1,7 @@
 '''Functions to build a contour graph from a contour table.
-The contour graph is a undirected graph where each node represents a contour
-and edges represent connect matched contours on the next and previous slice.
+The contour graph is a directed graph where each node represents a contour
+and edges are directed from lower to higher slice indices, connecting matched
+contours on adjacent slices.
 '''
 # %% Setup
 from typing import List, Tuple
@@ -111,14 +112,13 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     contour graph.
 
     Args:
-        contour_graph (nx.Graph): The contour graph.
+        contour_graph (nx.DiGraph): The directed contour graph.
         slice_sequence (SliceSequence): The slice sequence.
         starting_contour (ContourIndex): The index of the contour to interpolate
             from.
         interpolated_slice (SliceIndexType, optional): The slice index for the
             interpolated contour. If not provided, starting_contour must
-            reference a graph node with only one neighbour (a boundary slice).
-            If not, raise an InvalidSlice error.
+            reference a boundary node (in_degree=0 or out_degree=0).
 
     Returns:
         shapely.Polygon: An interpolated Polygon.
@@ -126,7 +126,7 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     Raises:
         InvalidContour: If starting_contour is not in the contour graph.
         InvalidSlice: If interpolated_slice is not provided and starting_contour
-            does not reference a graph node with only one neighbour (a boundary
+            is not a boundary node.
             slice).
     '''
     lookup = build_contour_lookup(contour_graph)
@@ -141,8 +141,9 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
                  contour.roi, this_slice)
 
     # Get the neighboring slices of the contour.
+    # For directed graph, combine predecessors (lower slices) and successors (higher slices)
     matched_slices = set()
-    for nbr in contour_graph.adj[starting_contour]:
+    for nbr in list(contour_graph.predecessors(starting_contour)) + list(contour_graph.successors(starting_contour)):
         matched_slices.add(contour_graph.nodes[nbr]['contour'].slice_index)
     # Get the neighbours of the slice in the slice sequence
     # (idx == idx) excludes NaN values
@@ -158,7 +159,13 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
             # on the nearest_neighbour that are matched to the starting
             # contour are used for interpolation.
             matched_contours = []
-            for nbr in contour_graph.adj[starting_contour]:
+            # Check direction: if nearest_neighbour < this_slice, look at predecessors,
+            # otherwise look at successors
+            if nearest_neighbour < this_slice:
+                neighbors_to_check = contour_graph.predecessors(starting_contour)
+            else:
+                neighbors_to_check = contour_graph.successors(starting_contour)
+            for nbr in neighbors_to_check:
                 matched_slice = contour_graph.nodes[nbr]['contour'].slice_index
                 if matched_slice == nearest_neighbour:
                     matched_contours.append(contour_graph.nodes[nbr]['contour'])
@@ -184,9 +191,15 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     # interpolated slice index using the slice index of the neighbouring slice
     # that is not matched to the boundary contour.  Generate the interpolated
     # contour using only the boundary contour.
-    if len(matched_slices) > 1:
+
+    # Check if this is truly a boundary node using in_degree/out_degree
+    is_start_boundary = contour_graph.in_degree(starting_contour) == 0
+    is_end_boundary = contour_graph.out_degree(starting_contour) == 0
+
+    if not (is_start_boundary or is_end_boundary):
         raise InvalidSlice("Without interpolated_slice, starting_contour "
-                            "must reference a boundary slice.")
+                          "must reference a boundary node (in_degree=0 or out_degree=0).")
+
     # Determine the slice index that is not matched to the boundary contour.
     # (This is the slice index that will be used to set the interpolated
     # slice index.)
@@ -198,7 +211,12 @@ def generate_interpolated_polygon(contour_graph: ContourGraph,
     else:
         # Use gap to create an estimated slice index
         gap = neighbors.gap(absolute=False)
-        non_neighbour_slice = this_slice - gap
+        # If start boundary (no predecessors), extrapolate backward
+        # If end boundary (no successors), extrapolate forward
+        if is_start_boundary:
+            non_neighbour_slice = this_slice - abs(gap)
+        else:  # is_end_boundary
+            non_neighbour_slice = this_slice + abs(gap)
         logger.debug('Using gap: %3.2f to create interpolated slice: %5.2f',
                      gap, non_neighbour_slice)
     interpolation_slices = [this_slice, non_neighbour_slice]
@@ -218,14 +236,13 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
     contour graph.
 
     Args:
-        contour_graph (nx.Graph): The contour graph.
+        contour_graph (nx.DiGraph): The directed contour graph.
         slice_sequence (SliceSequence): The slice sequence.
         starting_contour (ContourIndex): The index of the contour to interpolate
             from.
         interpolated_slice (SliceIndexType, optional): The slice index for the
             interpolated contour. If not provided, starting_contour must
-            reference a graph node with only one neighbour (a boundary slice).
-            If not, raise an InvalidSlice error.
+            reference a boundary node (in_degree=0 or out_degree=0).
         contour_parameters (dict): Additional parameters for the contour
             generation. These parameters are passed to the Contour constructor
             and can include properties like is_boundary, related_contours,
@@ -278,13 +295,17 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
     # Add the interpolated contour to the graph
     interpolated_label = new_contour.index
     contour_graph.add_node(interpolated_label, contour=new_contour)
-    # Add edge between original and interpolated
+    # Add directed edge based on slice ordering
     contour_match = ContourMatch(contour, new_contour)
-    contour_graph.add_edge(starting_contour, interpolated_label,
-                           match=contour_match)
+    original_slice = contour.slice_index
+    if interpolated_slice_index < original_slice:
+        # Interpolated slice is before original - edge points from interpolated to original
+        contour_graph.add_edge(interpolated_label, starting_contour, match=contour_match)
+    else:
+        # Interpolated slice is after original - edge points from original to interpolated
+        contour_graph.add_edge(starting_contour, interpolated_label, match=contour_match)
 
     # Update the slice sequence with the interpolated slice
-    original_slice = contour.slice_index
     # Determine the neighbor slice not linked with an edge
     neighbors = slice_sequence.get_neighbors(original_slice)
     # Get the slice index of the neighbouring contours.
@@ -346,19 +367,20 @@ def build_contours(contour_table, roi)-> defaultdict[SliceIndexType, List[Contou
 
 def add_graph_edges(contour_graph: ContourGraph,
                     slice_sequence: SliceSequence) -> ContourGraph:
-    '''Add edges to link Contour Neighbours.
+    '''Add directed edges to link Contour Neighbours.
 
     Edges are added between contours that are neighbours in the slice sequence
-    and have the same hole type.  Matching contours are identified by the
-    intersection of the contours' convex hulls.
+    and have the same hole type. Edges are directed from lower to higher slice
+    indices. Matching contours are identified by the intersection of the
+    contours' convex hulls.
 
     Args:
-        contour_graph (ContourGraph): The graph representation of the contours.
+        contour_graph (ContourGraph): The directed graph representation of the contours.
         slice_sequence (SliceSequence): The slice sequence object containing
             the slice indices and their neighbors.
 
     Returns:
-        nx.Graph: The updated contour graph with edges added.
+        nx.DiGraph: The updated contour graph with directed edges added.
     '''
     # Create the Graph indexer
     contour_lookup = build_contour_lookup(contour_graph)
@@ -399,9 +421,11 @@ def add_boundary_contours(contour_graph: ContourGraph,
             slice_sequence (SliceSequence): The updated slice sequence object
                 with the interpolated slice indices added.
     '''
-    # Select all nodes with only one edge (degree=1)
-    boundary_nodes = {node for node, degree in contour_graph.degree()
-                      if degree == 1}
+    # Select all nodes with in_degree=0 or out_degree=0
+    # in_degree=0: no edges coming in (start boundary - lower slice)
+    # out_degree=0: no edges going out (end boundary - higher slice)
+    boundary_nodes = {node for node in contour_graph.nodes()
+                      if contour_graph.in_degree(node) == 0 or contour_graph.out_degree(node) == 0}
     logger.debug('Found %d boundary contours to interpolate.',
                  len(boundary_nodes))
 
@@ -469,7 +493,8 @@ def set_enclosed_regions(contour_graph: ContourGraph) -> List[ContourGraph]:
     region_counter = 0
     region_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     # Find connected contours in the contour graph.
-    for region_nodes in nx.connected_components(contour_graph):
+    # Use weakly_connected_components for directed graphs.
+    for region_nodes in nx.weakly_connected_components(contour_graph):
         # Create a SubGraph for the connected component.
         enclosed_region = contour_graph.subgraph(region_nodes)
         # Assign a unique RegionIndex to each contour in the SubGraph.
@@ -566,10 +591,11 @@ def set_hole_type(contour_graph: ContourGraph,
         # 4.1.1 Get the slice index of the boundary contour
         this_slice = boundary_contour.slice_index
         # 4.1.2 Get the slice index of the neighbouring contour.
-        neighbouring_nodes = contour_graph.adj[boundary_label].keys()
+        # For directed graph, combine predecessors and successors
+        neighbouring_nodes = list(contour_graph.predecessors(boundary_label)) + list(contour_graph.successors(boundary_label))
         # Because it is a boundary contour, there should only be one
         # neighbouring node.
-        neighbour_slice = [nbr[1] for nbr in neighbouring_nodes][0]
+        neighbour_slice = [contour_graph.nodes[nbr]['contour'].slice_index for nbr in neighbouring_nodes][0]
         # 4.1.3. Use slice_sequence to get the neighbouring slice indexes and
         #        select the one that is not a neighbour of the boundary contour.
         neighbors = slice_sequence.get_neighbors(this_slice).neighbour_list
@@ -627,12 +653,12 @@ def set_hole_type(contour_graph: ContourGraph,
 def build_contour_graph(contour_table: pd.DataFrame,
                         slice_sequence: SliceSequence,
                         roi: ROI_Type) -> Tuple[ContourGraph, SliceSequence]:
-    '''Build a graph of contours for the specified ROI.
+    '''Build a directed graph of contours for the specified ROI.
 
     This is the primary outward facing function of this module.  It creates a
-    graph representation of the contours for a given ROI. Each contour is
-    represented as a node in the graph, and edges indicate matching contours on
-    the previous and next slices.
+    directed graph representation of the contours for a given ROI. Each contour
+    is represented as a node in the graph, and directed edges indicate matching
+    contours on adjacent slices, pointing from lower to higher slice indices.
 
     Matching contours are on neighbouring slices (based on the slice sequence),
     have the same hole type, and have intersecting convex hulls.
@@ -649,15 +675,14 @@ def build_contour_graph(contour_table: pd.DataFrame,
         roi (ROI_Type): The ROI number to filter contours.
 
     Returns:
-        tuple: A tuple containing the contour graph and a lookup table.
-            contour_graph (ContourGraph): The graph representation of the
-                contours.
-            contour_lookup (SliceSequence): A DataFrame serving as a lookup
-                table for contours, including slice index, contour index, and
-                hole type.
+        tuple: A tuple containing the contour graph and slice sequence.
+            contour_graph (ContourGraph): The directed graph representation of
+                the contours with edges pointing from lower to higher slice indices.
+            slice_sequence (SliceSequence): The updated slice sequence with
+                interpolated slices added.
     '''
-    # Create an empty graph
-    contour_graph = nx.Graph()
+    # Create an empty directed graph
+    contour_graph = nx.DiGraph()
     # Get the relevant contours
     logger.debug('Building contour graph for ROI: %s', roi)
     contour_by_slice = build_contours(contour_table, roi)

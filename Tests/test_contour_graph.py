@@ -197,8 +197,8 @@ def hole_test_contour_table():
 def contour_graph_for_testing(contour_table: pd.DataFrame,
                                          roi: ROI_Type) -> ContourGraph:
     contour_by_slice = build_contours(contour_table, roi)
-    # Create an empty graph
-    contour_graph = nx.Graph()
+    # Create an empty directed graph
+    contour_graph = nx.DiGraph()
     # Add nodes to the graph
     for contour_data in contour_by_slice.values():
         for contour in contour_data:
@@ -426,9 +426,11 @@ class TestBoundaryContourGeneration():
         originals = [node for node, data in self.contour_graph.nodes.data('contour')
                      if not data.is_interpolated and not data.is_boundary]
         # Find the original contour for the interpolated contours
-        # Only one adjacent contour should be found (the original contour)
-        original0 = list(self.contour_graph.adj[interpolated[0]])[0]
-        original1 = list(self.contour_graph.adj[interpolated[1]])[0]
+        # For directed graph, combine predecessors and successors to get all adjacent nodes
+        original0 = list(list(self.contour_graph.predecessors(interpolated[0])) +
+                        list(self.contour_graph.successors(interpolated[0])))[0]
+        original1 = list(list(self.contour_graph.predecessors(interpolated[1])) +
+                        list(self.contour_graph.successors(interpolated[1])))[0]
         # Check that the original contours are in the list of originals.
         assert original0 in originals
         assert original1 in originals
@@ -698,23 +700,29 @@ class TestBuildContourGraph():
     def test_build_contour_graph(self):
         # use the hole_test_contour_table function since it is the most complete.
         contour_table, slice_sequence = hole_test_contour_table()
-        # Test for ROI 1
+        # Test for ROI 0
+        # For directed graphs, check boundary nodes by in_degree and out_degree
         contour_graph, _ = build_contour_graph(contour_table,
                                                             slice_sequence,
                                                             roi=0)
+        # Count nodes by total degree (in_degree + out_degree)
         degrees = Counter(dict(contour_graph.degree).values())
-        assert degrees[1] == 2
-        assert degrees[2] == 6
+        assert degrees[1] == 2  # Two boundary nodes
+        assert degrees[2] == 6  # Six interior nodes
+
+        # Test for ROI 1
         contour_graph, _ = build_contour_graph(contour_table,
                                                             slice_sequence,
                                                             roi=1)
         degrees = Counter(dict(contour_graph.degree).values())
-        assert degrees[1] == 4
-        assert degrees[2] == 8
+        assert degrees[1] == 4  # Four boundary nodes
+        assert degrees[2] == 8  # Eight interior nodes
+
+        # Test for ROI 3 - has a bifurcation
         contour_graph, _ = build_contour_graph(contour_table,
                                                             slice_sequence,
                                                             roi=3)
         degrees = Counter(dict(contour_graph.degree).values())
-        assert degrees[1] == 5
-        assert degrees[2] == 6
-        assert degrees[3] == 1
+        assert degrees[1] == 5  # Five boundary nodes
+        assert degrees[2] == 6  # Six nodes with degree 2
+        assert degrees[3] == 1  # One bifurcation node

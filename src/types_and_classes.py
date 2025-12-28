@@ -42,14 +42,14 @@ ContourLink = NewType('ContourLink', Tuple[ContourIndex, ContourIndex])
 # The index of a a unique contiguous 3D region.
 RegionIndex = NewType('RegionIndex', str)
 
-# A Networkx Graph object containing contour information.
+# A Networkx DiGraph object containing contour information.
 # Each node in the graph represents a contour and has a 'contour' attribute
 # that is an instance of the contours.Contour class.  The node labels are
-# ContourIndexes. The graph edges indicate contours that are on neighbouring
-# slices (based on the slice sequence), have the same hole type, and have
-# intersecting convex hulls.  The edges have and has a 'match' attribute that
-# is a contours.ContourMatch object.
-ContourGraph = NewType('ContourGraph', nx.Graph)
+# ContourIndexes. The graph edges are directed from lower to higher slice
+# indices and indicate contours that are on neighbouring slices (based on the
+# slice sequence), have the same hole type, and have intersecting convex hulls.
+# The edges have a 'match' attribute that is a contours.ContourMatch object.
+ContourGraph = NewType('ContourGraph', nx.DiGraph)
 
 # The reference numbers for two different structures to be compared.
 StructurePairType = NewType('StructurePairType', Tuple[ROI_Type, ROI_Type])
