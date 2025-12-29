@@ -107,19 +107,14 @@ class WebAppClient {
             this.exportMatrix('json');
         });
 
-        // Collapsible summary
-        document.getElementById('summaryToggle').addEventListener('click', () => {
-            this.toggleSummary();
-        });
-
-        // Collapsible legend
+        // Legend toggle
         document.getElementById('legendToggle').addEventListener('click', () => {
             this.toggleLegend();
         });
 
-        // Collapsible matrix configuration
-        document.getElementById('matrixConfigToggle').addEventListener('click', () => {
-            this.toggleMatrixConfig();
+        // Analysis config toggle
+        document.getElementById('analysisConfigToggle').addEventListener('click', () => {
+            this.toggleAnalysisConfig();
         });
 
         // DICOM Type filters
@@ -131,14 +126,6 @@ class WebAppClient {
         });
 
         // Diagram controls
-        document.getElementById('diagramToggle').addEventListener('click', () => {
-            this.toggleDiagram();
-        });
-
-        // Collapsible matrix
-        document.getElementById('matrixToggle').addEventListener('click', () => {
-            this.toggleMatrix();
-        });
         document.getElementById('refreshDiagramBtn').addEventListener('click', () => {
             this.refreshDiagram();
         });
@@ -149,15 +136,21 @@ class WebAppClient {
             this.toggleEdgeLabels();
         });
 
-        // Copy rows to columns button
-        document.getElementById('copyToColumnsBtn').addEventListener('click', () => {
-            this.copyRowsToColumns();
+        // Select All/None buttons
+        document.getElementById('selectAllRowsBtn').addEventListener('click', () => {
+            this.selectAllAxisStructures('rows');
+        });
+        document.getElementById('selectNoneRowsBtn').addEventListener('click', () => {
+            this.selectNoneAxisStructures('rows');
+        });
+        document.getElementById('selectAllColsBtn').addEventListener('click', () => {
+            this.selectAllAxisStructures('columns');
+        });
+        document.getElementById('selectNoneColsBtn').addEventListener('click', () => {
+            this.selectNoneAxisStructures('columns');
         });
 
         // Contour plotting controls
-        document.getElementById('contourPlotToggle').addEventListener('click', () => {
-            this.toggleContourPlot();
-        });
         document.getElementById('plotContoursBtn').addEventListener('click', () => {
             this.plotContours();
         });
@@ -175,6 +168,15 @@ class WebAppClient {
         });
         document.getElementById('sliceNextBtn').addEventListener('click', () => {
             this.stepSlice(1);
+        });
+
+        // Navigation buttons
+        document.getElementById('backToUploadBtn').addEventListener('click', () => {
+            this.showStage('upload');
+        });
+        document.getElementById('newAnalysisBtn').addEventListener('click', () => {
+            this.showStage('upload');
+            this.resetApp();
         });
     }
 
@@ -639,58 +641,6 @@ class WebAppClient {
         sortedHeader.classList.add(ascending ? 'sorted-asc' : 'sorted-desc');
     }
 
-    toggleSummary() {
-        const content = document.getElementById('summaryContent');
-        const toggle = document.getElementById('summaryToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-
-    toggleLegend() {
-        const content = document.getElementById('legendContent');
-        const toggle = document.getElementById('legendToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-
-    toggleMatrixConfig() {
-        const content = document.getElementById('matrixConfigContent');
-        const toggle = document.getElementById('matrixConfigToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-
-    toggleMatrix() {
-        const content = document.getElementById('matrixContent');
-        const toggle = document.getElementById('matrixToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-
     initializeSortableLists(data) {
         // Populate selected lists (start with all structures selected)
         const selectedRowsList = document.getElementById('selectedRowsList');
@@ -1017,20 +967,29 @@ class WebAppClient {
         }
     }
 
-    toggleDiagram() {
-        const content = document.getElementById('diagramContent');
-        const toggle = document.getElementById('diagramToggle');
+    toggleLegend() {
+        const content = document.getElementById('legendContent');
+        const toggle = document.getElementById('legendToggle');
 
         if (content.style.display === 'none') {
             content.style.display = 'block';
             toggle.textContent = '▼';
-            // Refresh diagram when showing
-            if (!this.network) {
-                this.refreshDiagram();
-            }
         } else {
             content.style.display = 'none';
-            toggle.textContent = '▶';
+            toggle.textContent = '►';
+        }
+    }
+
+    toggleAnalysisConfig() {
+        const content = document.getElementById('analysisConfigContent');
+        const toggle = document.getElementById('analysisConfigToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '►';
         }
     }
 
@@ -1184,6 +1143,26 @@ class WebAppClient {
         });
     }
 
+    selectAllAxisStructures(axis) {
+        const availableList = document.getElementById(axis === 'rows' ? 'availableRowsList' : 'availableColsList');
+        const selectedList = document.getElementById(axis === 'rows' ? 'selectedRowsList' : 'selectedColsList');
+
+        // Move all items from available to selected
+        while (availableList.firstChild) {
+            selectedList.appendChild(availableList.firstChild);
+        }
+    }
+
+    selectNoneAxisStructures(axis) {
+        const availableList = document.getElementById(axis === 'rows' ? 'availableRowsList' : 'availableColsList');
+        const selectedList = document.getElementById(axis === 'rows' ? 'selectedRowsList' : 'selectedColsList');
+
+        // Move all items from selected to available
+        while (selectedList.firstChild) {
+            availableList.appendChild(selectedList.firstChild);
+        }
+    }
+
     copyRowsToColumns() {
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
@@ -1230,19 +1209,6 @@ class WebAppClient {
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
 
         return brightness > 128 ? '#000000' : '#FFFFFF';
-    }
-
-    toggleContourPlot() {
-        const content = document.getElementById('contourPlotContent');
-        const toggle = document.getElementById('contourPlotToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
     }
 
     populateContourPlotControls(data) {
@@ -1494,9 +1460,57 @@ class WebAppClient {
         // Show selected stage
         document.getElementById(`stage-${stageName}`).style.display = 'block';
     }
+
+    resetApp() {
+        // Reset application state for new analysis
+        this.sessionId = null;
+        this.selectedStructures.clear();
+        if (this.websocket) {
+            this.websocket.close();
+            this.websocket = null;
+        }
+        if (this.network) {
+            this.network.destroy();
+            this.network = null;
+        }
+        this.updateConnectionStatus(false);
+
+        // Clear file input
+        document.getElementById('fileInput').value = '';
+    }
 }
 
 // Initialize app when DOM is ready
+// Tab Switching
+function initializeTabs() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    console.log('Initializing tabs, found', tabButtons.length, 'buttons and', tabContents.length, 'content divs');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.dataset.tab;
+            console.log('Tab clicked:', targetTab);
+
+            // Remove active class from all buttons and contents
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // Add active class to clicked button and corresponding content
+            button.classList.add('active');
+            const targetContent = document.getElementById(`tab-${targetTab}`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+                console.log('Activated tab:', targetTab);
+            } else {
+                console.error('Tab content not found for:', targetTab);
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new WebAppClient();
+    initializeTabs();
 });

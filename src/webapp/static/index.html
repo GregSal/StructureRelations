@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=18">
+    <link rel="stylesheet" href="static/css/styles.css?v=21">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -76,230 +76,240 @@
 
             <!-- Stage 4: Results -->
             <section class="stage" id="stage-results" style="display: none;">
-                <div class="card collapsible-card">
-                    <div class="card-header" id="summaryHeader">
-                        <h2>Structure Summary</h2>
-                        <button class="collapse-toggle" id="summaryToggle">▼</button>
+                <!-- Structure Analysis Selection -->
+                <div class="card collapsible-card" style="margin-bottom: 1rem;">
+                    <div class="card-header" id="analysisConfigHeader">
+                        <h3>Structure Analysis Selection</h3>
+                        <button class="collapse-toggle" id="analysisConfigToggle">▼</button>
                     </div>
-                    <div class="card-content" id="summaryContent">
-                        <div class="table-container">
-                            <table id="structuresSummaryTable" class="sortable-table">
-                                <thead>
-                                    <tr>
-                                        <th class="sortable" data-column="row">Row</th>
-                                        <th class="sortable" data-column="col">Col</th>
-                                        <th class="sortable" data-column="name">Name</th>
-                                        <th class="sortable" data-column="roi">ROI</th>
-                                        <th class="sortable" data-column="type">Type</th>
-                                        <th class="sortable" data-column="label">Label</th>
-                                        <th class="sortable" data-column="regions">Regions</th>
-                                        <th class="sortable" data-column="volume">Volume (cm³)</th>
-                                        <th class="sortable" data-column="slices">Slice Range</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="structuresSummaryBody"></tbody>
-                            </table>
+                    <div class="card-content" id="analysisConfigContent">
+                        <div class="matrix-config">
+                            <div class="axis-selector">
+                                <div class="axis-header">
+                                    <h3>From</h3>
+                                    <div class="filter-controls">
+                                        <label for="colDicomFilter">Filter by Type:</label>
+                                        <select id="colDicomFilter" class="dicom-filter">
+                                            <option value="">All Types</option>
+                                        </select>
+                                    </div>
+                                    <div class="button-group" style="margin-top: 0.5rem;">
+                                        <button class="btn btn-secondary btn-sm" id="selectAllColsBtn">Select All</button>
+                                        <button class="btn btn-secondary btn-sm" id="selectNoneColsBtn">Select None</button>
+                                    </div>
+                                </div>
+                                <div class="structure-lists">
+                                    <div class="list-container">
+                                        <p class="list-label">Available</p>
+                                        <div class="sortable-list" id="availableColsList"></div>
+                                    </div>
+                                    <div class="list-container">
+                                        <p class="list-label">Selected</p>
+                                        <div class="sortable-list" id="selectedColsList"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="axis-selector">
+                                <div class="axis-header">
+                                    <h3>To</h3>
+                                    <div class="filter-controls">
+                                        <label for="rowDicomFilter">Filter by Type:</label>
+                                        <select id="rowDicomFilter" class="dicom-filter">
+                                            <option value="">All Types</option>
+                                        </select>
+                                    </div>
+                                    <div class="button-group" style="margin-top: 0.5rem;">
+                                        <button class="btn btn-secondary btn-sm" id="selectAllRowsBtn">Select All</button>
+                                        <button class="btn btn-secondary btn-sm" id="selectNoneRowsBtn">Select None</button>
+                                    </div>
+                                </div>
+                                <div class="structure-lists">
+                                    <div class="list-container">
+                                        <p class="list-label">Available</p>
+                                        <div class="sortable-list" id="availableRowsList"></div>
+                                    </div>
+                                    <div class="list-container">
+                                        <p class="list-label">Selected</p>
+                                        <div class="sortable-list" id="selectedRowsList"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="matrix-controls">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="useSymbolsToggle" checked>
+                                <span>Use Symbols</span>
+                            </label>
+                            <button class="btn btn-primary" id="updateMatrixBtn">Update Analysis</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="card collapsible-card">
-                    <div class="card-header" id="matrixConfigHeader">
-                        <h2>Relationship Matrix Configuration</h2>
-                        <button class="collapse-toggle" id="matrixConfigToggle">▼</button>
+                <!-- Tab Navigation -->
+                <div class="tab-navigation">
+                    <button class="tab-button active" data-tab="summary">Structure Summary</button>
+                    <button class="tab-button" data-tab="diagram">Relationship Diagram</button>
+                    <button class="tab-button" data-tab="matrix">Relationship Matrix</button>
+                    <button class="tab-button" data-tab="contour-plot">Contour Plotting</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content-container">
+                    <!-- Summary Tab -->
+                    <div class="tab-content active" id="tab-summary">
+                        <div class="card">
+                            <h2>Structure Summary</h2>
+                            <div class="table-container">
+                                <table id="structuresSummaryTable" class="sortable-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" data-column="row">Row</th>
+                                            <th class="sortable" data-column="col">Col</th>
+                                            <th class="sortable" data-column="name">Name</th>
+                                            <th class="sortable" data-column="roi">ROI</th>
+                                            <th class="sortable" data-column="type">Type</th>
+                                            <th class="sortable" data-column="label">Label</th>
+                                            <th class="sortable" data-column="regions">Regions</th>
+                                            <th class="sortable" data-column="volume">Volume (cm³)</th>
+                                            <th class="sortable" data-column="slices">Slice Range</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="structuresSummaryBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-content" id="matrixConfigContent">
-                    <div class="matrix-config">
-                        <div class="axis-selector">
-                            <div class="axis-header">
-                                <h3>Matrix Rows</h3>
-                                <div class="filter-controls">
-                                    <label for="rowDicomFilter">Filter by Type:</label>
-                                    <select id="rowDicomFilter" class="dicom-filter">
-                                        <option value="">All Types</option>
+
+                    <!-- Diagram Tab -->
+                    <div class="tab-content" id="tab-diagram">
+                        <div class="card">
+                            <h2>Relationship Diagram</h2>
+                            <div class="diagram-controls">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="showDisjointToggle">
+                                    <span>Show Disjoint</span>
+                                </label>
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="showLabelsToggle" checked>
+                                    <span>Show Edge Labels</span>
+                                </label>
+                                <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
+                            </div>
+                            <div id="networkDiagram" class="network-diagram"></div>
+                        </div>
+                    </div>
+
+                    <!-- Matrix Tab -->
+                    <div class="tab-content" id="tab-matrix">
+                        <div class="card">
+                            <h2>Relationship Matrix</h2>
+                            <p id="matrixInfo" class="matrix-info"></p>
+                            <div class="table-container matrix-table-container">
+                                <table id="relationshipMatrix" class="matrix-table">
+                                    <thead id="matrixHead"></thead>
+                                    <tbody id="matrixBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="export-controls">
+                                <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
+                                <button class="btn btn-secondary" id="exportExcelBtn">Export Excel</button>
+                                <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
+                            </div>
+                        </div>
+
+                        <div class="card collapsible-card" style="margin-top: 1rem;">
+                            <div class="card-header" id="legendHeader">
+                                <h3>Relationship Symbol Legend</h3>
+                                <button class="collapse-toggle" id="legendToggle">▼</button>
+                            </div>
+                            <div class="card-content" id="legendContent">
+                                <div class="legend-grid">
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-contains">⊂</span>
+                                        <span class="legend-label">Contains</span>
+                                        <span class="legend-description">Structure A fully encloses structure B</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-overlaps">∩</span>
+                                        <span class="legend-label">Overlaps</span>
+                                        <span class="legend-description">Structures share common volume</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-borders">|</span>
+                                        <span class="legend-label">Borders</span>
+                                        <span class="legend-description">Structures touch at boundaries</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-surrounds">○</span>
+                                        <span class="legend-label">Surrounds</span>
+                                        <span class="legend-description">Structure B is within a hole in A</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-shelters">△</span>
+                                        <span class="legend-label">Shelters</span>
+                                        <span class="legend-description">B within convex hull of A, not touching</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-partition">⊕</span>
+                                        <span class="legend-label">Partition</span>
+                                        <span class="legend-description">Structures partition space between them</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-confines">⊏</span>
+                                        <span class="legend-label">Confines</span>
+                                        <span class="legend-description">B contacts inner surface of A</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-disjoint">∅</span>
+                                        <span class="legend-label">Disjoint</span>
+                                        <span class="legend-description">Structures are completely separated</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-symbol rel-equals">=</span>
+                                        <span class="legend-label">Equals</span>
+                                        <span class="legend-description">Same structure (diagonal)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contour Plot Tab -->
+                    <div class="tab-content" id="tab-contour-plot">
+                        <div class="card">
+                            <h2>Contour Plotting</h2>
+                            <div class="plot-controls">
+                                <div class="control-group">
+                                    <label for="structure1Select">Structure 1:</label>
+                                    <select id="structure1Select" class="structure-select">
+                                        <option value="">Select structure...</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="structure-lists">
-                                <div class="list-container">
-                                    <p class="list-label">Available</p>
-                                    <div class="sortable-list" id="availableRowsList"></div>
-                                </div>
-                                <div class="list-container">
-                                    <p class="list-label">Selected</p>
-                                    <div class="sortable-list" id="selectedRowsList"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="axis-selector">
-                            <div class="axis-header">
-                                <h3>Matrix Columns</h3>
-                                <div class="filter-controls">
-                                    <label for="colDicomFilter">Filter by Type:</label>
-                                    <select id="colDicomFilter" class="dicom-filter">
-                                        <option value="">All Types</option>
+                                <div class="control-group">
+                                    <label for="structure2Select">Structure 2 (optional):</label>
+                                    <select id="structure2Select" class="structure-select">
+                                        <option value="">None</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="structure-lists">
-                                <div class="list-container">
-                                    <p class="list-label">Available</p>
-                                    <div class="sortable-list" id="availableColsList"></div>
-                                </div>
-                                <div class="list-container">
-                                    <p class="list-label">Selected</p>
-                                    <div class="sortable-list" id="selectedColsList"></div>
+                                <div class="control-group">
+                                    <button class="btn btn-primary" id="plotContoursBtn">Plot Contours</button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    <div class="matrix-controls">
-                        <button class="btn btn-secondary" id="copyToColumnsBtn">Copy Rows to Columns</button>
-                        <label class="toggle-label">
-                            <input type="checkbox" id="useSymbolsToggle" checked>
-                            <span>Use Symbols</span>
-                        </label>
-                        <button class="btn btn-primary" id="updateMatrixBtn">Update Matrix</button>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="card collapsible-card">
-                    <div class="card-header" id="legendHeader">
-                        <h2>Relationship Symbol Legend</h2>
-                        <button class="collapse-toggle" id="legendToggle">▼</button>
-                    </div>
-                    <div class="card-content" id="legendContent">
-                        <div class="legend-grid">
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-contains">⊂</span>
-                                <span class="legend-label">Contains</span>
-                                <span class="legend-description">Structure A fully encloses structure B</span>
+                            <div class="plot-container" id="plotContainer">
+                                <div class="plot-loading" id="plotLoading">
+                                    <div class="spinner"></div>
+                                    <div>Generating plot...</div>
+                                </div>
+                                <img id="contourPlot" class="contour-plot" alt="Contour plot will appear here" />
                             </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-overlaps">∩</span>
-                                <span class="legend-label">Overlaps</span>
-                                <span class="legend-description">Structures share common volume</span>
+                            <div class="slider-controls">
+                                <label for="sliceSlider">Slice: <span id="sliceValue">0.0</span> cm</label>
+                                <div class="slider-container">
+                                    <button class="slider-arrow" id="slicePrevBtn" title="Previous slice">◄</button>
+                                    <input type="range" id="sliceSlider" class="slice-slider" min="0" max="0" step="1" value="0">
+                                    <button class="slider-arrow" id="sliceNextBtn" title="Next slice">►</button>
+                                </div>
                             </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-borders">|</span>
-                                <span class="legend-label">Borders</span>
-                                <span class="legend-description">Structures touch at boundaries</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-surrounds">○</span>
-                                <span class="legend-label">Surrounds</span>
-                                <span class="legend-description">Structure B is within a hole in A</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-shelters">△</span>
-                                <span class="legend-label">Shelters</span>
-                                <span class="legend-description">B within convex hull of A, not touching</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-partition">⊕</span>
-                                <span class="legend-label">Partition</span>
-                                <span class="legend-description">Structures partition space between them</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-confines">⊏</span>
-                                <span class="legend-label">Confines</span>
-                                <span class="legend-description">B contacts inner surface of A</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-disjoint">∅</span>
-                                <span class="legend-label">Disjoint</span>
-                                <span class="legend-description">Structures are completely separated</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-symbol rel-equals">=</span>
-                                <span class="legend-label">Equals</span>
-                                <span class="legend-description">Same structure (diagonal)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card collapsible-card">
-                    <div class="card-header" id="diagramHeader">
-                        <h2>Relationship Diagram</h2>
-                        <button class="collapse-toggle" id="diagramToggle">▼</button>
-                    </div>
-                    <div class="card-content" id="diagramContent">
-                        <div class="diagram-controls">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="showDisjointToggle">
-                                <span>Show Disjoint</span>
-                            </label>
-                            <label class="toggle-label">
-                                <input type="checkbox" id="showLabelsToggle" checked>
-                                <span>Show Edge Labels</span>
-                            </label>
-                            <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
-                        </div>
-                        <div id="networkDiagram" class="network-diagram"></div>
-                    </div>
-                </div>
-
-                <div class="card collapsible-card">
-                    <div class="card-header" id="contourPlotHeader">
-                        <h2>Contour Plotting</h2>
-                        <button class="collapse-toggle" id="contourPlotToggle">▼</button>
-                    </div>
-                    <div class="card-content" id="contourPlotContent">
-                        <div class="plot-controls">
-                            <div class="control-group">
-                                <label for="structure1Select">Structure 1:</label>
-                                <select id="structure1Select" class="structure-select">
-                                    <option value="">Select structure...</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="structure2Select">Structure 2 (optional):</label>
-                                <select id="structure2Select" class="structure-select">
-                                    <option value="">None</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <button class="btn btn-primary" id="plotContoursBtn">Plot Contours</button>
-                            </div>
-                        </div>
-                        <div class="plot-container" id="plotContainer">
-                            <div class="plot-loading" id="plotLoading">
-                                <div class="spinner"></div>
-                                <div>Generating plot...</div>
-                            </div>
-                            <img id="contourPlot" class="contour-plot" alt="Contour plot will appear here" />
-                        </div>
-                        <div class="slider-controls">
-                            <label for="sliceSlider">Slice: <span id="sliceValue">0.0</span> cm</label>
-                            <div class="slider-container">
-                                <button class="slider-arrow" id="slicePrevBtn" title="Previous slice">◄</button>
-                                <input type="range" id="sliceSlider" class="slice-slider" min="0" max="0" step="1" value="0">
-                                <button class="slider-arrow" id="sliceNextBtn" title="Next slice">►</button>
-                            </div>
-                        </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card collapsible-card">
-                    <div class="card-header" id="matrixHeader">
-                        <h2>Relationship Matrix</h2>
-                        <button class="collapse-toggle" id="matrixToggle">▼</button>
-                    </div>
-                    <div class="card-content" id="matrixContent">
-                        <div class="matrix-info" id="matrixInfo"></div>
-                        <div class="table-container matrix-table-container">
-                            <table id="relationshipMatrix" class="matrix-table">
-                                <thead id="matrixHead"></thead>
-                                <tbody id="matrixBody"></tbody>
-                            </table>
-                        </div>
-                        <div class="export-controls">
-                            <button class="btn btn-secondary" id="exportCsvBtn">Export CSV</button>
-                            <button class="btn btn-secondary" id="exportExcelBtn">Export Excel</button>
-                            <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
                         </div>
                     </div>
                 </div>
@@ -315,7 +325,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=23"></script>
-    <!-- v24: Reorganized contour plot layout - slider below plot, button with structure selects -->
+    <script src="static/js/app.js?v=34"></script>
+    <!-- v34: Fixed method name conflict breaking file upload -->
 </body>
 </html>

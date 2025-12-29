@@ -171,10 +171,10 @@ async def get_symbol_config():
                 return config
         else:
             # Return default config if file doesn't exist
-            logger.warning(f'Config file not found: {config_file}')
+            logger.warning('Config file not found: %s', config_file)
             return get_default_symbol_config()
     except Exception as e:
-        logger.error(f'Error loading symbol config: {e}')
+        logger.error('Error loading symbol config: %s', e)
         return get_default_symbol_config()
 
 
@@ -230,7 +230,7 @@ async def upload_dicom(file: UploadFile = File(...)):
             content = await file.read()
             f.write(content)
 
-        logger.info(f'Uploaded DICOM file {file.filename} for session {session_id}')
+        logger.info('Uploaded DICOM file %s for session %s', file.filename, session_id)
 
         # Create session data
         session_data = SessionData(
@@ -253,7 +253,7 @@ async def upload_dicom(file: UploadFile = File(...)):
         )
 
     except Exception as e:
-        logger.error(f'Error uploading file: {e}')
+        logger.error('Error uploading file: %s', e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -343,7 +343,7 @@ async def preview_structures(request: SessionRequest):
         )
 
     except Exception as e:
-        logger.error(f'Error previewing structures for session {request.session_id}: {e}')
+        logger.error('Error previewing structures for session %s: %s', request.session_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -408,7 +408,7 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
                 cp for cp in dicom_file.contour_points
                 if cp['ROI'] in selected_rois
             ]
-            logger.info(f'Filtered contours from {original_count} to {len(dicom_file.contour_points)} for selected ROIs: {selected_rois}')
+            logger.info('Filtered contours from %d to %d for selected ROIs: %s', original_count, len(dicom_file.contour_points), selected_rois)
 
         # Create structure set with filtered contours
         structure_set = StructureSet(dicom_structure_file=dicom_file)
@@ -449,10 +449,10 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         # Send completion message
         await connection_manager.send_complete(session_id, 'Processing complete')
 
-        logger.info(f'Completed processing for session {session_id}')
+        logger.info('Completed processing for session %s', session_id)
 
     except Exception as e:
-        logger.error(f'Error processing session {session_id}: {e}')
+        logger.error('Error processing session %s: %s', session_id, e)
         await connection_manager.send_error(session_id, f'Processing error: {str(e)}')
 
 
@@ -484,17 +484,17 @@ async def get_relationship_matrix(request: MatrixRequest):
         return MatrixResponse(**matrix_dict)
 
     except Exception as e:
-        logger.error(f'Error generating matrix for session {request.session_id}: {e}')
+        logger.error('Error generating matrix for session %s: %s', request.session_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get('/api/export/{format}/{session_id}')
-async def export_matrix(format: str, session_id: str, row_rois: Optional[str] = None,
+@app.get('/api/export/{export_format}/{session_id}')
+async def export_matrix(export_format: str, session_id: str, row_rois: Optional[str] = None,
                        col_rois: Optional[str] = None, use_symbols: bool = True):
     '''Export relationship matrix in various formats.
 
     Args:
-        format (str): Export format ('csv', 'excel', 'json').
+        export_format (str): Export format ('csv', 'excel', 'json').
         session_id (str): The session ID.
         row_rois (str, optional): Comma-separated list of row ROI numbers.
         col_rois (str, optional): Comma-separated list of column ROI numbers.
@@ -521,17 +521,17 @@ async def export_matrix(format: str, session_id: str, row_rois: Optional[str] = 
         use_symbols=use_symbols
     )
 
-    if format == 'csv':
+    if export_format == 'csv':
         output = io.StringIO()
         matrix_df.to_csv(output)
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode()),
             media_type='text/csv',
-            headers={'Content-Disposition': f'attachment; filename=relationships.csv'}
+            headers={'Content-Disposition': 'attachment; filename=relationships.csv'}
         )
 
-    elif format == 'excel':
+    elif export_format == 'excel':
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             matrix_df.to_excel(writer, sheet_name='Relationships')
@@ -539,10 +539,10 @@ async def export_matrix(format: str, session_id: str, row_rois: Optional[str] = 
         return StreamingResponse(
             output,
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment; filename=relationships.xlsx'}
+            headers={'Content-Disposition': 'attachment; filename=relationships.xlsx'}
         )
 
-    elif format == 'json':
+    elif export_format == 'json':
         matrix_dict = session_data.structure_set.to_dict(
             row_rois=row_rois_list,
             col_rois=col_rois_list,
@@ -681,7 +681,7 @@ async def get_diagram_data(request: MatrixRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f'Error generating diagram: {e}')
+        logger.error('Error generating diagram: %s', e)
         raise HTTPException(status_code=500, detail=f'Failed to generate diagram: {str(e)}')
 
 
@@ -737,7 +737,7 @@ async def plot_contours(request: PlotRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f'Error generating contour plot: {e}')
+        logger.error('Error generating contour plot: %s', e)
         raise HTTPException(status_code=500, detail=f'Failed to generate plot: {str(e)}')
 
 
@@ -769,9 +769,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     except WebSocketDisconnect:
         connection_manager.disconnect(session_id)
-        logger.info(f'Client disconnected from session {session_id}')
+        logger.info('Client disconnected from session %s', session_id)
     except Exception as e:
-        logger.error(f'WebSocket error for session {session_id}: {e}')
+        logger.error('WebSocket error for session %s: %s', session_id, e)
         connection_manager.disconnect(session_id)
 
 
