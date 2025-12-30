@@ -1008,6 +1008,8 @@ class WebAppClient {
             const colRois = Array.from(selectedColsList.children)
                 .map(item => parseInt(item.dataset.roi));
 
+            const showDisjoint = document.getElementById('showDisjointToggle').checked;
+
             const response = await fetch('/api/diagram', {
                 method: 'POST',
                 headers: {
@@ -1016,7 +1018,8 @@ class WebAppClient {
                 body: JSON.stringify({
                     session_id: this.sessionId,
                     row_rois: rowRois,
-                    col_rois: colRois
+                    col_rois: colRois,
+                    show_disjoint: showDisjoint
                 })
             });
 

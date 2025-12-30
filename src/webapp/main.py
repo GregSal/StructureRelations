@@ -76,6 +76,7 @@ class MatrixRequest(BaseModel):
     row_rois: Optional[List[int]] = None
     col_rois: Optional[List[int]] = None
     use_symbols: bool = True
+    show_disjoint: bool = False
 
 
 class MatrixResponse(BaseModel):
@@ -669,7 +670,9 @@ async def get_diagram_data(request: MatrixRequest):
                     continue
 
                 rel_type = rel.identify_relation().name
-                if rel_type == 'DISJOINT' or rel_type == 'EQUALS':
+                if rel_type == 'EQUALS':
+                    continue
+                if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
 
                 if rel_type in symmetric_relations:
@@ -703,7 +706,9 @@ async def get_diagram_data(request: MatrixRequest):
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
 
-                if rel_type == 'DISJOINT' or rel_type == 'EQUALS':
+                if rel_type == 'EQUALS':
+                    continue
+                if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
 
                 if rel_type not in symmetric_relations:
