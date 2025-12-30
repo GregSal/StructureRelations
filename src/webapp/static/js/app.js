@@ -501,12 +501,6 @@ class WebAppClient {
             row.dataset.regions = numRegions;
 
             row.innerHTML = `
-                <td class="checkbox-cell">
-                    <input type="checkbox" class="row-checkbox" data-roi="${roi}" checked>
-                </td>
-                <td class="checkbox-cell">
-                    <input type="checkbox" class="col-checkbox" data-roi="${roi}" checked>
-                </td>
                 <td class="name-cell">${name}</td>
                 <td class="roi-cell">${roi}</td>
                 <td class="type-cell">${dicomType}</td>
@@ -523,59 +517,8 @@ class WebAppClient {
             summaryBody.appendChild(row);
         });
 
-        // Add checkbox event listeners
-        this.initializeSummaryCheckboxes();
-
         // Add sort listeners
         this.initializeSorting();
-    }
-
-    initializeSummaryCheckboxes() {
-        // Row checkboxes
-        document.querySelectorAll('.row-checkbox').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                this.updateListFromCheckbox(e.target, 'row');
-            });
-        });
-
-        // Column checkboxes
-        document.querySelectorAll('.col-checkbox').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                this.updateListFromCheckbox(e.target, 'col');
-            });
-        });
-    }
-
-    updateListFromCheckbox(checkbox, type) {
-        const roi = parseInt(checkbox.dataset.roi);
-        const isChecked = checkbox.checked;
-
-        const listId = type === 'row' ? 'selectedRowsList' : 'selectedColsList';
-        const availableListId = type === 'row' ? 'availableRowsList' : 'availableColsList';
-
-        const selectedList = document.getElementById(listId);
-        const availableList = document.getElementById(availableListId);
-
-        // Find the item in either list
-        let item = Array.from(selectedList.children).find(child =>
-            parseInt(child.dataset.roi) === roi
-        );
-
-        if (!item) {
-            item = Array.from(availableList.children).find(child =>
-                parseInt(child.dataset.roi) === roi
-            );
-        }
-
-        if (item) {
-            if (isChecked && item.parentElement === availableList) {
-                // Move from available to selected
-                selectedList.appendChild(item);
-            } else if (!isChecked && item.parentElement === selectedList) {
-                // Move from selected to available
-                availableList.appendChild(item);
-            }
-        }
     }
 
     initializeSorting() {
