@@ -614,10 +614,23 @@ async def get_diagram_data(request: MatrixRequest):
             except AttributeError:
                 pass
 
-        # Build nodes
+        # Build edges from relationship matrix
+        edges = []
+        row_rois = request.row_rois if request.row_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+        col_rois = request.col_rois if request.col_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+
+        # Get union of all ROIs that should be displayed
+        visible_rois = set(row_rois) | set(col_rois)
+
+        # Build nodes only for visible structures
         nodes = []
         for _, row in summary_df.iterrows():
             roi = int(row['ROI'])
+
+            # Skip structures not in either From or To list
+            if roi not in visible_rois:
+                continue
+
             name = row['Name']
             dicom_type = row.get('DICOM_Type', 'NONE')
 
@@ -640,41 +653,71 @@ async def get_diagram_data(request: MatrixRequest):
 
         # Build edges from relationship matrix
         edges = []
-        row_rois = request.row_rois if request.row_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
-        col_rois = request.col_rois if request.col_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
 
-        for row_roi in row_rois:
-            for col_roi in col_rois:
-                if row_roi >= col_roi:  # Avoid duplicates and self-loops
-                    continue
+        # Define symmetric relationships (no direction)
+        symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUALS'}
 
-                # Matrix convention: matrix[row, col] means "col contains row"
-                # So we query get_relationship(col_roi, row_roi) to get the relationship
-                # where col_roi is the subject and row_roi is the object
-                rel = structure_set.get_relationship(col_roi, row_roi)
+        # For symmetric relationships: check all visible pairs once
+        all_visible_rois = sorted(visible_rois)
+        for i, roi1 in enumerate(all_visible_rois):
+            for roi2 in all_visible_rois[i+1:]:
+                # Check both directions since edges are only stored once
+                rel = structure_set.get_relationship(roi1, roi2)
+                if rel is None:
+                    rel = structure_set.get_relationship(roi2, roi1)
                 if rel is None:
                     continue
 
-                # Get the relationship type from the DE27IM object
                 rel_type = rel.identify_relation().name
                 if rel_type == 'DISJOINT' or rel_type == 'EQUALS':
-                    continue  # Skip disjoint and equals by default
+                    continue
 
-                style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+                if rel_type in symmetric_relations:
+                    # Symmetric relationships: show between any two visible structures
+                    style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+                    edges.append(DiagramEdge(
+                        from_node=roi1,
+                        to_node=roi2,
+                        label=rel_type,
+                        color=style['color'],
+                        width=style['width'],
+                        dashes=style['dashes'],
+                        arrows=style['arrows']
+                    ))
 
-                # Now rel_type describes: col_roi [rel_type] row_roi
-                # For CONTAINS: col_roi contains row_roi
-                # Arrow convention: point from container to contained
-                # So arrow should point from col_roi to row_roi
-                edges.append(DiagramEdge(
-                    from_node=col_roi,
-                    to_node=row_roi,
-                    label=rel_type,
-                    color=style['color'],
-                    width=style['width'],
-                    dashes=style['dashes'],
-                    arrows=style['arrows']
-                ))
+        # For directional relationships: check From->To combinations only
+        for from_roi in col_rois:  # From = Source structures
+            for to_roi in row_rois:  # To = Target structures
+                if from_roi == to_roi:
+                    continue  # Skip self-loops
+
+                # Query the relationship in the From->To direction
+                # get_relationship(from_roi, to_roi) checks if there's an edge from_roi -> to_roi
+                # representing "from_roi [relationship] to_roi"
+                rel = structure_set.get_relationship(from_roi, to_roi)
+                if rel is None:
+                    continue
+
+                rel_type = rel.identify_relation().name
+
+                # Debug logging
+                logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
+
+                if rel_type == 'DISJOINT' or rel_type == 'EQUALS':
+                    continue
+
+                if rel_type not in symmetric_relations:
+                    # Directional relationship: from_roi [rel_type] to_roi
+                    style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+                    edges.append(DiagramEdge(
+                        from_node=from_roi,
+                        to_node=to_roi,
+                        label=rel_type,
+                        color=style['color'],
+                            width=style['width'],
+                            dashes=style['dashes'],
+                            arrows=style['arrows']
+                        ))
 
         return DiagramResponse(nodes=nodes, edges=edges)
 

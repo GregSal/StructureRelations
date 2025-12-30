@@ -196,16 +196,15 @@ class StructureSet:
         '''Get the relationship between two structures.
 
         Args:
-            roi_a (ROI_Type): First structure ROI.
-            roi_b (ROI_Type): Second structure ROI.
+            roi_a (ROI_Type): First structure ROI (subject).
+            roi_b (ROI_Type): Second structure ROI (object).
 
         Returns:
-            DE27IM: The spatial relationship between the structures.
+            DE27IM: The spatial relationship where roi_a is the subject and roi_b is the object.
+                    Returns None if no relationship exists in that specific direction.
         '''
         if self.relationship_graph.has_edge(roi_a, roi_b):
             return self.relationship_graph[roi_a][roi_b]['relationship']
-        elif self.relationship_graph.has_edge(roi_b, roi_a):
-            return self.relationship_graph[roi_b][roi_a]['relationship']
         else:
             return None
 
