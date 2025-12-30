@@ -682,6 +682,33 @@ class WebAppClient {
             <div class="item-id">${roi}</div>
             <div class="item-name">${label}</div>
         `;
+
+        // Add double-click handler to move between selected and available lists
+        item.addEventListener('dblclick', () => {
+            const parentList = item.parentElement;
+            if (parentList && parentList.id === 'selectedRowsList') {
+                // Move from From list to Available From list
+                const availableList = document.getElementById('availableRowsList');
+                availableList.appendChild(item);
+                this.refreshDiagram();
+            } else if (parentList && parentList.id === 'selectedColsList') {
+                // Move from To list to Available To list
+                const availableList = document.getElementById('availableColsList');
+                availableList.appendChild(item);
+                this.refreshDiagram();
+            } else if (parentList && parentList.id === 'availableRowsList') {
+                // Move from Available From list to From list
+                const selectedList = document.getElementById('selectedRowsList');
+                selectedList.appendChild(item);
+                this.refreshDiagram();
+            } else if (parentList && parentList.id === 'availableColsList') {
+                // Move from Available To list to To list
+                const selectedList = document.getElementById('selectedColsList');
+                selectedList.appendChild(item);
+                this.refreshDiagram();
+            }
+        });
+
         return item;
     }
 
@@ -1073,6 +1100,39 @@ class WebAppClient {
                 console.log('Clicked node:', params.nodes[0]);
             }
         });
+
+        // Add double-click handler to remove structure from diagram and lists
+        this.network.on('doubleClick', (params) => {
+            if (params.nodes.length > 0) {
+                const roi = params.nodes[0];
+                this.removeStructureFromDiagram(roi);
+            }
+        });
+    }
+
+    removeStructureFromDiagram(roi) {
+        // Move from From list to Available From list
+        const fromList = document.getElementById('selectedRowsList');
+        const fromItem = Array.from(fromList.children).find(
+            item => parseInt(item.dataset.roi) === roi
+        );
+        if (fromItem) {
+            const availableFromList = document.getElementById('availableRowsList');
+            availableFromList.appendChild(fromItem);
+        }
+
+        // Move from To list to Available To list
+        const toList = document.getElementById('selectedColsList');
+        const toItem = Array.from(toList.children).find(
+            item => parseInt(item.dataset.roi) === roi
+        );
+        if (toItem) {
+            const availableToList = document.getElementById('availableColsList');
+            availableToList.appendChild(toItem);
+        }
+
+        // Refresh diagram to show updated structure lists
+        this.refreshDiagram();
     }
 
     toggleEdgeLabels() {
