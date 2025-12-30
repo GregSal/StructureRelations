@@ -9,6 +9,14 @@ class WebAppClient {
         this.network = null;  // vis-network instance
         this.plotAbortController = null;  // Track current plot request
 
+        // Plot transform state
+        this.plotScale = 1.0;
+        this.plotTranslateX = 0;
+        this.plotTranslateY = 0;
+        this.isDragging = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+
         this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
     }
@@ -154,6 +162,9 @@ class WebAppClient {
         document.getElementById('plotContoursBtn').addEventListener('click', () => {
             this.plotContours();
         });
+
+        // Zoom and pan controls
+        this.initializePlotControls();
         document.getElementById('sliceSlider').addEventListener('input', (e) => {
             this.updateSliceValue(e.target.value);
             this.updateSliderArrows();
@@ -1382,6 +1393,100 @@ class WebAppClient {
                 this.plotContours();
             }
         }
+    }
+
+    initializePlotControls() {
+        const viewport = document.getElementById('plotViewport');
+        const plotImg = document.getElementById('contourPlot');
+
+        // Zoom controls
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            this.zoomPlot(1.2);
+        });
+
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            this.zoomPlot(0.8);
+        });
+
+        document.getElementById('resetZoomBtn').addEventListener('click', () => {
+            this.resetPlotTransform();
+        });
+
+        // Pan controls
+        document.getElementById('panUpBtn').addEventListener('click', () => {
+            this.panPlot(0, 50);
+        });
+
+        document.getElementById('panDownBtn').addEventListener('click', () => {
+            this.panPlot(0, -50);
+        });
+
+        document.getElementById('panLeftBtn').addEventListener('click', () => {
+            this.panPlot(50, 0);
+        });
+
+        document.getElementById('panRightBtn').addEventListener('click', () => {
+            this.panPlot(-50, 0);
+        });
+
+        // Mouse wheel zoom
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.zoomPlot(delta);
+        });
+
+        // Click and drag to pan
+        viewport.addEventListener('mousedown', (e) => {
+            if (plotImg.src) {
+                this.isDragging = true;
+                this.dragStartX = e.clientX - this.plotTranslateX;
+                this.dragStartY = e.clientY - this.plotTranslateY;
+                viewport.classList.add('grabbing');
+            }
+        });
+
+        viewport.addEventListener('mousemove', (e) => {
+            if (this.isDragging) {
+                this.plotTranslateX = e.clientX - this.dragStartX;
+                this.plotTranslateY = e.clientY - this.dragStartY;
+                this.updatePlotTransform();
+            }
+        });
+
+        viewport.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            viewport.classList.remove('grabbing');
+        });
+
+        viewport.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+            viewport.classList.remove('grabbing');
+        });
+    }
+
+    zoomPlot(factor) {
+        this.plotScale *= factor;
+        this.plotScale = Math.max(0.1, Math.min(10, this.plotScale)); // Clamp between 0.1x and 10x
+        this.updatePlotTransform();
+    }
+
+    panPlot(deltaX, deltaY) {
+        this.plotTranslateX += deltaX;
+        this.plotTranslateY += deltaY;
+        this.updatePlotTransform();
+    }
+
+    updatePlotTransform() {
+        const plotImg = document.getElementById('contourPlot');
+        plotImg.style.transform = `translate(${this.plotTranslateX}px, ${this.plotTranslateY}px) scale(${this.plotScale})`;
+    }
+
+    resetPlotTransform() {
+        this.plotScale = 1.0;
+        this.plotTranslateX = 0;
+        this.plotTranslateY = 0;
+        this.updatePlotTransform();
     }
 
     async plotContours() {

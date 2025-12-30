@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=27">
+    <link rel="stylesheet" href="static/css/styles.css?v=30">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -293,12 +293,23 @@
                                     <button class="btn btn-primary" id="plotContoursBtn">Plot Contours</button>
                                 </div>
                             </div>
+                            <div class="diagram-controls">
+                                <button class="btn btn-icon" id="zoomInBtn" title="Zoom In">🔍+</button>
+                                <button class="btn btn-icon" id="zoomOutBtn" title="Zoom Out">🔍−</button>
+                                <button class="btn btn-icon" id="resetZoomBtn" title="Reset View">⟲</button>
+                                <button class="btn btn-icon" id="panUpBtn" title="Pan Up">▲</button>
+                                <button class="btn btn-icon" id="panDownBtn" title="Pan Down">▼</button>
+                                <button class="btn btn-icon" id="panLeftBtn" title="Pan Left">◄</button>
+                                <button class="btn btn-icon" id="panRightBtn" title="Pan Right">►</button>
+                            </div>
                             <div class="plot-container" id="plotContainer">
                                 <div class="plot-loading" id="plotLoading">
                                     <div class="spinner"></div>
                                     <div>Generating plot...</div>
                                 </div>
-                                <img id="contourPlot" class="contour-plot" alt="Contour plot will appear here" />
+                                <div class="plot-viewport" id="plotViewport">
+                                    <img id="contourPlot" class="contour-plot" alt="Contour plot will appear here" />
+                                </div>
                             </div>
                             <div class="slider-controls">
                                 <label for="sliceSlider">Slice: <span id="sliceValue">0.0</span> cm</label>
@@ -323,7 +334,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=35"></script>
+    <script src="static/js/app.js?v=36"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>
