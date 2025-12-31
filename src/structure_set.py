@@ -13,6 +13,7 @@ from types_and_classes import ROI_Type
 from contours import build_contour_table
 from structures import StructureShape
 from relations import DE27IM, RelationshipType
+from relationships import StructureRelationship
 from dicom import DicomStructureFile
 from utilities import round_value
 
@@ -137,8 +138,10 @@ class StructureSet:
         3. Determines the relationships between the StructureShape objects.
         4. Constructs a graph where the nodes are the StructureShape objects
            and the edges are the relationships between them.
+        5. Calculates logical relationship flags based on graph topology.
         '''
         self.calculate_relationships()
+        self.calculate_logical_flags()
 
     def add_structure(self, structure: StructureShape) -> None:
         '''Add a structure to the set.
@@ -178,21 +181,52 @@ class StructureSet:
                 structure_a = self.structures[roi_a]
                 structure_b = self.structures[roi_b]
 
-                # Calculate the relationship
-                relationship = structure_a.relate(structure_b,
-                                                  tolerance=self.tolerance)
+                # Calculate the DE27IM relationship
+                de27im_relationship = structure_a.relate(structure_b,
+                                                         tolerance=self.tolerance)
+
+                # Create StructureRelationship object
+                relationship = StructureRelationship(
+                    de27im=de27im_relationship,
+                    is_identical=False
+                )
 
                 # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
                     roi_a, roi_b,
-                    relationship=relationship,
-                    relationship_type=str(relationship)
+                    relationship=relationship
                 )
 
                 logger.debug('Calculated relationship between ROI %s and ROI %s:\n%s',
-                             structure_a.name, structure_b.name, relationship.identify_relation())
+                             structure_a.name, structure_b.name, relationship.relationship_type)
 
-    def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> DE27IM:
+    def calculate_logical_flags(self) -> None:
+        '''Calculate logical relationship flags based on graph topology.
+
+        This method analyzes the relationship graph structure to identify
+        relationships that are logically derived from the graph topology
+        rather than being direct geometric relationships. For example,
+        relationships implied by transitivity or relationships that exist
+        only through intermediate structures.
+
+        The is_logical flag in StructureRelationship objects will be set
+        to True for relationships identified as logical.
+
+        Note:
+            This is a placeholder for future implementation. The specific
+            algorithm for identifying logical relationships will be developed
+            based on the semantic requirements of the relationship graph.
+        '''
+        logger.info('Calculating logical flags for relationships')
+        logger.debug('Logical flag calculation not yet implemented')
+        # TODO: Implement graph analysis to identify logical relationships
+        # This may involve:
+        # - Transitivity analysis (e.g., A contains B, B contains C)
+        # - Connected component analysis
+        # - Path analysis through relationship graph
+        # - Pattern matching for specific relationship combinations
+
+    def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> Optional[StructureRelationship]:
         '''Get the relationship between two structures.
 
         Args:
@@ -200,8 +234,9 @@ class StructureSet:
             roi_b (ROI_Type): Second structure ROI (object).
 
         Returns:
-            DE27IM: The spatial relationship where roi_a is the subject and roi_b is the object.
-                    Returns None if no relationship exists in that specific direction.
+            Optional[StructureRelationship]: The complete relationship object
+                containing DE27IM, flags, and metrics. Returns None if no
+                relationship exists in that specific direction.
         '''
         if self.relationship_graph.has_edge(roi_a, roi_b):
             return self.relationship_graph[roi_a][roi_b]['relationship']
@@ -264,10 +299,11 @@ class StructureSet:
 
         Returns:
             pd.DataFrame: Matrix with Structure_A as index, Structure_B as columns,
-                and Relationship_Type as values. The matrix is symmetric for
+                and StructureRelationship objects as values. The matrix is symmetric for
                 symmetric relationships.
         '''
-        if not self.relationship_graph.edges():
+        # Return empty DataFrame if no structures
+        if not self.structures:
             return pd.DataFrame()
 
         # Get all unique ROIs and their corresponding names for matrix dimensions
@@ -279,33 +315,36 @@ class StructureSet:
         roi_to_name = {roi: self.structures[roi].name for roi in all_rois}
 
         # Create empty dict of dicts to hold relationship data
-        relationship_data = {name_a: {name_b: RelationshipType.UNKNOWN
+        # Initialize with StructureRelationship objects for unknown relationships
+        relationship_data = {name_a: {name_b: StructureRelationship(
+                                         de27im=None,
+                                         is_identical=False
+                                     )
                                       for name_b in all_names}
                                       for name_a in all_names}
 
-        # Fill diagonal with self-relationships ("Equals")
+        # Fill diagonal with self-relationships (identical structures)
         for name in all_names:
-            relationship_data[name][name] = RelationshipType.EQUALS
+            relationship_data[name][name] = StructureRelationship(
+                de27im=None,
+                is_identical=True
+            )
 
         # Fill matrix with calculated relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(data=True):
             relationship_obj = edge_data['relationship']
-            relationship_type = relationship_obj.identify_relation()
 
             # Get structure names for the ROIs
             name_a = roi_to_name[roi_a]
             name_b = roi_to_name[roi_b]
 
-            # populate the relationship dictionary
-            relationship_data[name_a][name_b] = relationship_type
+            # Store the StructureRelationship object
+            relationship_data[name_a][name_b] = relationship_obj
             # For symmetric relationships, also set the transpose
-            if relationship_type.is_symmetric:
-                relationship_data[name_b][name_a] = relationship_type
+            if relationship_obj.relationship_type.is_symmetric:
+                relationship_data[name_b][name_a] = relationship_obj
         relationship_matrix = pd.DataFrame(relationship_data)
 
-        # Transpose the matrix so that Structure_A is rows and Structure_B is
-        # columns.
-        #relationship_matrix = relationship_matrix.T
         # Set index and columns names for clarity
         relationship_matrix.index.name = 'Structure_B'
         relationship_matrix.columns.name = 'Structure_A'
@@ -325,8 +364,9 @@ class StructureSet:
                 labels or symbols representing the relationship types. The index and columns
                 are structure names.
         '''
-        def to_symbol(relationship_type: RelationshipType) -> str:
-            if relationship_type:
+        def to_symbol(struct_relationship: StructureRelationship) -> str:
+            if struct_relationship:
+                relationship_type = struct_relationship.relationship_type
                 return default_symbol_map[relationship_type]
             return default_symbol_map[RelationshipType.UNKNOWN]
 
@@ -391,10 +431,14 @@ class StructureSet:
         # Apply symbol mapping if requested
         if use_symbols:
             symbol_map = self._get_default_symbol_map()
-            relationship_matrix = relationship_matrix.map(lambda rt: symbol_map.get(rt, '?'))
+            relationship_matrix = relationship_matrix.map(
+                lambda sr: symbol_map.get(sr.relationship_type, '?') if sr else '?'
+            )
         else:
             # Use labels
-            relationship_matrix = relationship_matrix.map(lambda rt: rt.label if rt else 'Unknown')
+            relationship_matrix = relationship_matrix.map(
+                lambda sr: sr.relationship_type.label if sr and sr.relationship_type else 'Unknown'
+            )
 
         return relationship_matrix
 
