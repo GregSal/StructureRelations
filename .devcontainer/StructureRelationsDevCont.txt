@@ -2,10 +2,10 @@ conda config --append channels conda-forge
 conda create -y --name StructureRelations
 conda init
 conda activate StructureRelations
-conda install -y python=3.11 networkx shapely pandas numpy pyodbc pydicom scipy
-conda install -y matplotlib pygraphviz
+conda install -y python=3.11 networkx shapely pygraphviz pandas matplotlib numpy
+conda install -y pydicom scipy
 conda install -y fastapi uvicorn[standard] python-multipart websockets pydantic
-conda install -y matplotlib jupyterlab ipympl pylint pytest selenium
+conda install -y pylint pytest jupyterlab ipympl
 conda env export > /workspaces/StructureRelations/.devcontainer/StructureRelations_FULL.yml
 conda env export --from-history > /workspaces/StructureRelations/.devcontainer/StructureRelations.yml
 
