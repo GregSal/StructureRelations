@@ -669,7 +669,7 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel is None:
                     continue
 
-                rel_type = rel.identify_relation().name
+                rel_type = rel.relationship_type.name
                 if rel_type == 'EQUALS':
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
@@ -701,7 +701,7 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel is None:
                     continue
 
-                rel_type = rel.identify_relation().name
+                rel_type = rel.relationship_type.name
 
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
