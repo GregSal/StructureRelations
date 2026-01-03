@@ -391,12 +391,24 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
             session_id, 'parsing_dicom', 0, '', 'Loading DICOM file...', disk_info['usage_mb']
         )
 
-        # Load DICOM file
-        file_path = Path(dicom_file_path)
-        dicom_file = DicomStructureFile(
-            top_dir=file_path.parent,
-            file_path=file_path
-        )
+        # Load DICOM file with error handling
+        try:
+            file_path = Path(dicom_file_path)
+            if not file_path.exists():
+                raise FileNotFoundError(f'DICOM file not found: {dicom_file_path}')
+
+            dicom_file = DicomStructureFile(
+                top_dir=file_path.parent,
+                file_path=file_path
+            )
+        except FileNotFoundError as e:
+            logger.error('File error in session %s: %s', session_id, e)
+            await connection_manager.send_error(session_id, f'File not found: {str(e)}')
+            return
+        except Exception as e:
+            logger.error('DICOM parsing error in session %s: %s', session_id, e, exc_info=True)
+            await connection_manager.send_error(session_id, f'Failed to parse DICOM file: {str(e)}')
+            return
 
         await connection_manager.send_progress(
             session_id, 'parsing_dicom', 20, '', 'Parsing structures...', disk_info['usage_mb']
@@ -412,7 +424,12 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
             logger.info('Filtered contours from %d to %d for selected ROIs: %s', original_count, len(dicom_file.contour_points), selected_rois)
 
         # Create structure set with filtered contours
-        structure_set = StructureSet(dicom_structure_file=dicom_file)
+        try:
+            structure_set = StructureSet(dicom_structure_file=dicom_file)
+        except Exception as e:
+            logger.error('Structure set creation error in session %s: %s', session_id, e, exc_info=True)
+            await connection_manager.send_error(session_id, f'Failed to create structure set: {str(e)}')
+            return
 
         await connection_manager.send_progress(
             session_id, 'building_graphs', 40, '', 'Building contour graphs...', disk_info['usage_mb']
@@ -434,27 +451,36 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
             session_id, 'calculating_relationships', 70, '', 'Calculating relationships...', disk_info['usage_mb']
         )
 
-        # Calculate relationships
-        structure_set.finalize()
+        # Calculate relationships with error handling
+        try:
+            structure_set.finalize()
+        except Exception as e:
+            logger.error('Relationship calculation error in session %s: %s', session_id, e, exc_info=True)
+            await connection_manager.send_error(session_id, f'Failed to calculate relationships: {str(e)}')
+            return
 
         await connection_manager.send_progress(
             session_id, 'calculating_relationships', 100, '', 'Complete!', disk_info['usage_mb']
         )
 
-        # Save completed session
-        session_data = session_manager.load_session(session_id)
-        if session_data:
-            session_data.structure_set = structure_set
-            session_manager.save_session(session_id, session_data)
+        # Save completed session BEFORE sending complete message
+        # Use dedicated method to avoid race conditions with last_accessed updates
+        if not session_manager.update_session_structure_set(session_id, structure_set):
+            logger.error('Failed to save structure set to session %s', session_id)
+            await connection_manager.send_error(session_id, 'Failed to save results')
+            return
 
-        # Send completion message
+        # Small delay to ensure file system flushes the pickle file
+        await asyncio.sleep(0.1)
+
+        # Send completion message (frontend will immediately request matrix)
         await connection_manager.send_complete(session_id, 'Processing complete')
 
         logger.info('Completed processing for session %s', session_id)
 
     except Exception as e:
-        logger.error('Error processing session %s: %s', session_id, e)
-        await connection_manager.send_error(session_id, f'Processing error: {str(e)}')
+        logger.error('Unexpected error processing session %s: %s', session_id, e, exc_info=True)
+        await connection_manager.send_error(session_id, f'Unexpected processing error: {str(e)}')
 
 
 @app.post('/api/matrix', response_model=MatrixResponse)
@@ -467,11 +493,17 @@ async def get_relationship_matrix(request: MatrixRequest):
     Returns:
         MatrixResponse: The filtered relationship matrix.
     '''
+    logger.debug(f'Matrix request for session {request.session_id}: '
+                f'row_rois={request.row_rois}, col_rois={request.col_rois}, '
+                f'use_symbols={request.use_symbols}')
+
     session_data = session_manager.load_session(request.session_id)
     if session_data is None:
+        logger.error(f'Session {request.session_id} not found or expired')
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
     if session_data.structure_set is None:
+        logger.error(f'Session {request.session_id} has no structure_set')
         raise HTTPException(status_code=400, detail='Structures not yet processed')
 
     try:
@@ -482,10 +514,11 @@ async def get_relationship_matrix(request: MatrixRequest):
             use_symbols=request.use_symbols
         )
 
+        logger.debug(f'Matrix generated successfully for session {request.session_id}')
         return MatrixResponse(**matrix_dict)
 
     except Exception as e:
-        logger.error('Error generating matrix for session %s: %s', request.session_id, e)
+        logger.error('Error generating matrix for session %s: %s', request.session_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

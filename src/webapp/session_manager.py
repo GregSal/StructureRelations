@@ -176,6 +176,37 @@ class SessionManager:
         except OSError:
             return 0
 
+    def update_session_structure_set(self, session_id: str, structure_set) -> bool:
+        '''Update session with structure_set without modifying last_accessed.
+
+        This is used during processing to avoid race conditions with the
+        timestamp update that load_session performs.
+
+        Args:
+            session_id (str): Unique session identifier.
+            structure_set: The built StructureSet object.
+
+        Returns:
+            bool: True if successful, False if session not found.
+        '''
+        if session_id not in self._sessions:
+            logger.error(f'Session {session_id} not found in cache')
+            return False
+
+        session_data = self._sessions[session_id]
+        session_data.structure_set = structure_set
+
+        # Save to disk immediately
+        session_file = self.sessions_dir / f'{session_id}.pkl'
+        try:
+            with open(session_file, 'wb') as f:
+                pickle.dump(session_data, f)
+            logger.info(f'Updated structure_set for session {session_id}')
+            return True
+        except OSError as e:
+            logger.error(f'Failed to save structure_set for session {session_id}: {e}')
+            return False
+
     def save_session(self, session_id: str, session_data: SessionData):
         '''Save a session to disk.
 
