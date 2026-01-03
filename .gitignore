@@ -184,4 +184,5 @@ src/Reference_Code/
 
 # Web Application Sessions
 webapp_sessions/
+# Selenium ChromeDriver
 */ChromeDriver/*
