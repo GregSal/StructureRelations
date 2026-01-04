@@ -2,6 +2,7 @@
 '''
 from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
+from math import isnan
 import warnings
 import logging
 
@@ -269,7 +270,8 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
         float: The calculated new z value.
     '''
     if isinstance(slices, (list, tuple)):
-        new_slice = round_value(np.mean(slices), precision)
+        valid_slices = [s for s in slices if not isnan(s)]
+        new_slice = round_value(np.mean(valid_slices), precision)
         min_slice = min(slices)
         max_slice = max(slices)
         if not min_slice <= new_slice <= max_slice:

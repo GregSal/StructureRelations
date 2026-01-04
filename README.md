@@ -4,6 +4,8 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
+1. update `generate_interpolated_polygon` function to make use of directional graph.
+
 1. Define complimentary relations
 
 2. restructure relationships definitions to to obtain definitions from Jason file along with descriptions and display parameters

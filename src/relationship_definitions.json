@@ -102,6 +102,7 @@
             "src\\Images\\Relationships\\borders.png",
             "src\\Images\\Relationships\\Concave Borders.png"
         ],
+        "complementary_relation": "BORDERS",
         "symmetric": true,
         "transitive": false,
         "pattern": "F***T****\tF***T****\t*********",
@@ -221,7 +222,7 @@
         "color": "#ec4899",
         "reversed_arrow": true,
         "description": "All points of A lie in the interior of B, no points of A lie in the exterior of B, some points in B are exterior to A, and the boundaries of A and B have more than one point in common.",
-        "complementary_relation": "PARTITIONS",
+        "complementary_relation": "PARTITIONED",
         "implied_relation": "WITHIN",
         "symmetric": false,
         "transitive": false
