@@ -27,11 +27,11 @@
         "implied_relation": "",
         "symmetric": true,
         "transitive": false,
-        "pattern": "FF*FF****\t****F*F**\t****F*F**",
+        "pattern": "FF*FF****\t****F*T**\t****F*T**",
         "mask": "0b110110000000010100000010100",
-        "mask_decimal": 454033556,
+        "mask_decimal": 113256468,
         "value": "0b000000000000000100000000100",
-        "value_decimal": 1028
+        "value_decimal": 2052
     },
     {
         "relation_type": "SHELTERS",
@@ -46,9 +46,9 @@
         "transitive": true,
         "pattern": "FF*FF****\t****F*T**\tT*T*F*F**",
         "mask": "0b110110000000010100101010100",
-        "mask_decimal": 454033876,
+        "mask_decimal": 113256788,
         "value": "0b000000000000000100101000000",
-        "value_decimal": 1312
+        "value_decimal": 2368
     },
     {
         "relation_type": "SHELTERED",
@@ -77,9 +77,9 @@
         "transitive": true,
         "pattern": "FF*FF****\tT*T*F*F**\t*********",
         "mask": "0b110110000101010100000000000",
-        "mask_decimal": 454055424,
+        "mask_decimal": 113420288,
         "value": "0b000000000101000000000000000",
-        "value_decimal": 20480
+        "value_decimal": 163840
     },
     {
         "relation_type": "ENCLOSED",
@@ -105,11 +105,11 @@
         "complementary_relation": "BORDERS",
         "symmetric": true,
         "transitive": false,
-        "pattern": "F***T****\tF***T****\t*********",
+        "pattern": "F***T****\t******T**\t*********",
         "mask": "0b100010000000000100000000000",
-        "mask_decimal": 269488128,
+        "mask_decimal": 71305216,
         "value": "0b000010000000000100000000000",
-        "value_decimal": 8388608
+        "value_decimal": 4196352
     },
     {
         "relation_type": "CONFINES",
@@ -128,9 +128,9 @@
         "transitive": false,
         "pattern": "F***T****\tT*T***F**\t*********",
         "mask": "0b100010000101000100000000000",
-        "mask_decimal": 269509632,
+        "mask_decimal": 71469056,
         "value": "0b000010000101000000000000000",
-        "value_decimal": 8409088
+        "value_decimal": 4358144
     },
     {
         "relation_type": "CONFINED",
@@ -158,11 +158,11 @@
         "complementary_relation": "WITHIN",
         "symmetric": false,
         "transitive": true,
-        "pattern": "TF*FF****\tT***F****\tT********",
+        "pattern": "TT*FF*F**\tT********\tT********",
         "mask": "0b110110100100000000100000000",
-        "mask_decimal": 455311488,
+        "mask_decimal": 114426112,
         "value": "0b110000000100000000100000000",
-        "value_decimal": 402915328
+        "value_decimal": 100794624
     },
     {
         "relation_type": "WITHIN",
@@ -187,11 +187,11 @@
         "complementary_relation": "EQUALS",
         "symmetric": true,
         "transitive": true,
-        "pattern": "T*F*T****\tT***T****\tT********",
-        "mask": "0b101010100000000000000000000",
-        "mask_decimal": 356515840,
-        "value": "0b100010000000000000000000000",
-        "value_decimal": 268435456
+        "pattern": "T*F*T*F**\tT***T****\tT********",
+        "mask": "0b101010100100010000100000000",
+        "mask_decimal": 89268480,
+        "value": "0b100010000100010000100000000",
+        "value_decimal": 71442688
     },
     {
         "relation_type": "PARTITIONED",
@@ -209,11 +209,11 @@
         "implied_relation": "CONTAINS",
         "symmetric": false,
         "transitive": false,
-        "pattern": "T*T*T*F**\tT*T*T*F**\tT*T***F**",
+        "pattern": "T*T*T*F**\t*********\t*********",
         "mask": "0b101010100000000000000000000",
-        "mask_decimal": 356515840,
+        "mask_decimal": 89128960,
         "value": "0b101010000000000000000000000",
-        "value_decimal": 352321536
+        "value_decimal": 88080384
     },
     {
         "relation_type": "PARTITIONS",
@@ -243,10 +243,10 @@
         "complementary_relation": "OVERLAPS",
         "symmetric": true,
         "transitive": false,
-        "pattern": "T*T*T*T**\tT*T*T*T**\tT*T***T**",
+        "pattern": "T*****T**\tT********\tT********",
         "mask": "0b100000100100000000100000000",
-        "mask_decimal": 268959872,
+        "mask_decimal": 68288768,
         "value": "0b100000100100000000100000000",
-        "value_decimal": 268959872
+        "value_decimal": 68288768
     }
 ]

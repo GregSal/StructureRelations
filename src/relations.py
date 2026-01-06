@@ -480,7 +480,7 @@ class DE27IM():
                                                               part of the *boundary* of ***A***.
         Contains      TF*FF****    T***F****      T********   ***B*** is fully within ***A***.
         Overlaps      T*T*T*T**    T*T*T*T**      T*T***T**   ***A*** and ***B*** intersect, but neither contains the other.
-        Equals        T*F*T****    T***T****      T********   ***A*** and ***B*** enclose the identical space.
+        Equals        T*F*T****    T***T****      T********   ***A*** and ***B*** enclose the identical
 
     A number of these relationships also have a reciprocal relationship, e.g.
     *Contains* has a reciprocal relationship with *B is fully within A*.

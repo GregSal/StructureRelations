@@ -200,18 +200,30 @@ def pattern_from_mask_value(mask: str, value: str) -> str:
 
 
 def swap_ab(text: str) -> str:
-    '''Swap all occurrences of 'A' and 'B' in text.
+    '''Swap all occurrences of 'A' and 'B' in text, except in phrases "A and B" or "B and A".
 
     Args:
         text: String to swap A and B in.
 
     Returns:
-        String with A and B swapped.
+        String with A and B swapped, preserving "A and B" and "B and A" phrases.
     '''
-    # Use a placeholder to avoid double-swapping
-    temp = text.replace('A', '__TEMP__')
-    temp = temp.replace('B', 'A')
-    temp = temp.replace('__TEMP__', 'B')
+    import re
+
+    # Protect "A and B" and "B and A" patterns
+    temp = text.replace('A and B', '__a&b__')
+    temp = temp.replace('B and A', '__b&a__')
+
+    # Use word boundary regex to swap A and B
+    # Match A or B as whole words (surrounded by non-word chars or start/end)
+    temp = re.sub(r'\bA\b', '__TEMP__', temp)
+    temp = re.sub(r'\bB\b', 'A', temp)
+    temp = re.sub(r'\b__TEMP__\b', 'B', temp)
+
+    # Restore protected patterns
+    temp = temp.replace('__a&b__', 'A and B')
+    temp = temp.replace('__b&a__', 'B and A')
+
     return temp
 
 
