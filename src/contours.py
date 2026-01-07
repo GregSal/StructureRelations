@@ -270,8 +270,7 @@ def calculate_new_slice_index(slices: SliceIndexSequenceType,
         float: The calculated new z value.
     '''
     if isinstance(slices, (list, tuple)):
-        valid_slices = [s for s in slices if not isnan(s)]
-        new_slice = round_value(np.mean(valid_slices), precision)
+        new_slice = round_value(np.mean(slices), precision)
         min_slice = min(slices)
         max_slice = max(slices)
         if not min_slice <= new_slice <= max_slice:
