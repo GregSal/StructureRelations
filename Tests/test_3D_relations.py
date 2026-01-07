@@ -432,7 +432,6 @@ class TestBorders:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RelationshipType.BORDERS
 
-    @pytest.mark.xfail
     def test_inserted_cylinder(self):
         '''This test illustrates the issue that an open hole that is open only
         on one end will be treated as open on both ends for the sake of boundary

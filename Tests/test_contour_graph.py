@@ -707,6 +707,9 @@ class TestBuildContourGraph():
                                                             roi=0)
         # Count nodes by total degree (in_degree + out_degree)
         degrees = Counter(dict(contour_graph.degree).values())
+        # After adding boundary contours:
+        # - 2 boundary nodes with degree=1 (at new slices -0.5 and 5.5)
+        # - 6 interior nodes with degree=2 (original slices 0.0, 1.0, 2.0, 3.0, 4.0, 5.0)
         assert degrees[1] == 2  # Two boundary nodes
         assert degrees[2] == 6  # Six interior nodes
 
