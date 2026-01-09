@@ -4,11 +4,13 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. update `generate_interpolated_polygon` function to make use of directional graph.
-
 2. restructure relationships definitions to to obtain definitions from Jason file along with descriptions and display parameters
 
 3. Identify "Logical" relations
+
+3. Fix issue that an open hole that is open only on one end will be treated as open on both ends for the sake of boundary testing
+
+4. Investigate Issue that Warnings are being returned when calculating some relationships
 
 4. Begin work on Metric Calculations
 
