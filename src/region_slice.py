@@ -250,18 +250,15 @@ class RegionSlice():
                     if contour.hole_type == 'Open':
                         # if the hole is open, add it to the open_hole list
                         open_hole = open_hole.union(contour.polygon)
-                    # Subtract the hole from the region
-                    region = region - contour.polygon
+                        # Open holes should always be subtracted from boundaries
+                        # regardless of whether the hole itself is marked as a boundary
+                        boundary = boundary - contour.polygon
                     # Check whether the contour is a boundary
                     if contour.is_boundary:
                         # Add the hole to the boundary.
                         # At the boundary closed holes and solids are treated
-                        # the same.  Open holes don't make sense as boundaries;
-                        # they are always subtracted.
-                        if contour.hole_type == 'Open':
-                            # if the hole is open, subtract it from the boundary
-                            boundary = boundary - contour.polygon
-                        else:
+                        # the same.  Open holes are already handled above.
+                        if contour.hole_type != 'Open':
                             boundary = boundary.union(contour.polygon)
                 else:
                     # Check whether the contour is a boundary
