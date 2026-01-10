@@ -28,6 +28,13 @@ Test and reports on relationships between DICOM RT Structures
 
 - Webapp edge cases: Should verify that empty matrices, single-structure sets, and filtered matrices still serialize correctly to JSON through to_dict()—the string conversion needs to handle StructureRelationship objects with de27im=None gracefully.
 
+## Relationship definitions
+Currently there are three classes used together to define 3D relationships between structures:
+- RelationshipType
+- RelationshipDefinition
+- DE27IM
+
+I have created a JSON file (structure_relationships.json) that contains the definitions of the relationships used in this package.  This file is read in at runtime to create the RelationshipType and RelationshipDefinition objects used to calculate relationships between structures.
 
 ## Logical Relationships
 Within a set of structures, transitive relationships can result in **Logical**
