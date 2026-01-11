@@ -5,7 +5,7 @@ import shapely
 from contours import Contour, ContourMatch
 from debug_tools import circle_points
 from region_slice import RegionSlice
-from relations import DE9IM, DE27IM
+from relations import DE9IM, DE27IM, RELATIONSHIP_TESTS
 
 
 def build_region_slice(roi=1, radius=2):
@@ -84,9 +84,9 @@ def test_de27im_to_int():
     assert relation_int == int(relation_str, 2)
 
 def test_de27im_identify_relation():
-    relation_int = DE27IM.test_binaries[7].value
+    relation_int = RELATIONSHIP_TESTS[7].value
     de27im = DE27IM(relation_int=relation_int)
-    assert de27im.identify_relation() == DE27IM.test_binaries[7].relation_type
+    assert de27im.identify_relation() == RELATIONSHIP_TESTS[7].relation_type
 
 def test_de27im_merge():
     relation_str1 = '111000000111000000111000000'

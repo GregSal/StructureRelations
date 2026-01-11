@@ -9,7 +9,7 @@ metrics placeholder.
 from typing import Optional, Any
 from dataclasses import dataclass
 
-from relations import DE27IM, RelationshipType
+from relations import DE27IM, RelationshipType, RELATIONSHIP_TYPES
 
 
 # %% Class Definition
@@ -55,6 +55,7 @@ class StructureRelationship:
     is_identical: bool = False
     is_logical: bool = False
     metrics: Optional[Any] = None
+    _override_type: Optional[RelationshipType] = None
 
     @property
     def relationship_type(self) -> RelationshipType:
@@ -62,10 +63,34 @@ class StructureRelationship:
 
         Returns:
             RelationshipType: The classified relationship type. Returns
-                RelationshipType.EQUALS if is_identical is True or de27im
-                is None. Otherwise returns the relationship type identified
-                by the DE27IM object.
+                EQUALS if is_identical is True, UNKNOWN if de27im is None,
+                or the relationship type identified by the DE27IM object.
+                If _override_type is set, returns that.
         '''
-        if self.is_identical or self.de27im is None:
-            return RelationshipType.EQUALS
+        # Check for override first
+        if self._override_type is not None:
+            return self._override_type
+
+        # If this is a self-relationship, return EQUALS
+        if self.is_identical:
+            equals_type = RELATIONSHIP_TYPES.get('EQUALS')
+            if equals_type is None:
+                # Log error but return UNKNOWN to avoid crashing
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    'EQUALS relationship type not found in RELATIONSHIP_TYPES. '
+                    'Available types: %s. '
+                    'This indicates a problem with relationship_definitions.json loading.',
+                    list(RELATIONSHIP_TYPES.keys())
+                )
+                # Return UNKNOWN as fallback
+                return RELATIONSHIP_TYPES.get('UNKNOWN')
+            return equals_type
+
+        # If no DE27IM is available, return UNKNOWN
+        if self.de27im is None:
+            return RELATIONSHIP_TYPES.get('UNKNOWN')
+
+        # Otherwise, identify the relationship from DE27IM
         return self.de27im.identify_relation()

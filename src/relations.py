@@ -2,7 +2,7 @@
 '''
 # %% Imports
 # Type imports
-from typing import List, LiteralString, Tuple, Union, Dict, Optional
+from typing import List, Tuple, Union, Dict, Optional
 
 # Standard Libraries
 from dataclasses import dataclass
@@ -166,7 +166,7 @@ def _load_relationship_definitions() -> List[Dict]:
         )
 
     try:
-        with open(json_path, 'r') as f:
+        with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         return data.get('Relationships', [])
     except (json.JSONDecodeError, KeyError) as e:
@@ -184,18 +184,14 @@ def _initialize_relationships():
 
     definitions = _load_relationship_definitions()
 
-    # Create RelationshipType objects for primary relationships only
+    # Create RelationshipType objects for all relationships
     for defn in definitions:
-        # Skip complementary stubs (reversed_arrow=True)
-        if defn.get('reversed_arrow', False):
-            continue
-
         rel_type = RelationshipType(
             relation_type=defn['relation_type'],
             label=defn['label'],
             symbol=defn['symbol'],
-            color=defn['color'],
-            description=defn['description'],
+            color=defn.get('color', '#000000'),
+            description=defn.get('description', ''),
             complementary_relation=defn.get('complementary_relation', ''),
             implied_relation=defn.get('implied_relation', []),
             symmetric=defn.get('symmetric', False),

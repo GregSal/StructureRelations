@@ -41,7 +41,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
-app = FastAPI(title='StructureRelations', version='1.0.0')
+app = FastAPI(title='StructureRelations', version='1.0.3')
+
+# Add middleware to log all requests
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger.debug(f"=== REQUEST: {request.method} {request.url.path} ===")
+    try:
+        response = await call_next(request)
+        logger.debug(f"=== RESPONSE: {request.method} {request.url.path} - Status: {response.status_code} ===")
+        return response
+    except Exception as e:
+        logger.error(f"=== ERROR in {request.method} {request.url.path}: {e} ===", exc_info=True)
+        raise
 
 # Initialize managers
 session_manager = SessionManager()
@@ -174,7 +186,7 @@ async def get_symbol_config():
             # Return default config if file doesn't exist
             logger.warning('Config file not found: %s', config_file)
             return get_default_symbol_config()
-    except Exception as e:
+    except (IOError, json.JSONDecodeError) as e:
         logger.error('Error loading symbol config: %s', e)
         return get_default_symbol_config()
 
@@ -493,7 +505,8 @@ async def get_relationship_matrix(request: MatrixRequest):
     Returns:
         MatrixResponse: The filtered relationship matrix.
     '''
-    logger.debug(f'Matrix request for session {request.session_id}: '
+    logger.info(f'=== MATRIX REQUEST RECEIVED === session: {request.session_id}')
+    logger.info(f'Matrix request for session {request.session_id}: '
                 f'row_rois={request.row_rois}, col_rois={request.col_rois}, '
                 f'use_symbols={request.use_symbols}')
 
@@ -508,15 +521,28 @@ async def get_relationship_matrix(request: MatrixRequest):
 
     try:
         # Get matrix as dictionary
+        logger.info(f'Generating matrix for session {request.session_id}')
         matrix_dict = session_data.structure_set.to_dict(
             row_rois=request.row_rois,
             col_rois=request.col_rois,
             use_symbols=request.use_symbols
         )
 
-        logger.debug(f'Matrix generated successfully for session {request.session_id}')
-        return MatrixResponse(**matrix_dict)
+        logger.info(f'Matrix dict keys: {matrix_dict.keys()}')
+        logger.info(f'Matrix dict types: {[(k, type(v).__name__) for k, v in matrix_dict.items()]}')
 
+        # Create response
+        try:
+            response = MatrixResponse(**matrix_dict)
+            logger.info(f'Matrix generated successfully for session {request.session_id}')
+            return response
+        except Exception as validation_error:
+            logger.error(f'Error validating MatrixResponse: {validation_error}', exc_info=True)
+            logger.error(f'Matrix dict content: {matrix_dict}')
+            raise HTTPException(status_code=500, detail=f'Response validation error: {str(validation_error)}')
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error('Error generating matrix for session %s: %s', request.session_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -598,6 +624,7 @@ async def get_diagram_data(request: MatrixRequest):
     Returns:
         DiagramResponse: Nodes and edges for network visualization.
     '''
+    logger.info(f'=== DIAGRAM REQUEST RECEIVED === session: {request.session_id}')
     try:
         session_data = session_manager.load_session(request.session_id)
         if session_data is None:
@@ -624,14 +651,20 @@ async def get_diagram_data(request: MatrixRequest):
         # Define edge styles by relationship type
         edge_styles = {
             'CONTAINS': {'color': '#00CED1', 'width': 4, 'dashes': False, 'arrows': 'to'},
+            'WITHIN': {'color': '#00CED1', 'width': 4, 'dashes': False, 'arrows': 'to'},
             'OVERLAPS': {'color': '#FF6347', 'width': 5, 'dashes': False, 'arrows': None},
             'BORDERS': {'color': '#32CD32', 'width': 3, 'dashes': True, 'arrows': None},
             'SURROUNDS': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
+            'ENCLOSED': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
             'SHELTERS': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
-            'PARTITION': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
+            'SHELTERED': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
+            'PARTITIONED': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
+            'PARTITIONS': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
             'CONFINES': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
+            'CONFINED': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
             'DISJOINT': {'color': '#808080', 'width': 1, 'dashes': True, 'arrows': None},
-            'EQUALS': {'color': '#FF0000', 'width': 5, 'dashes': False, 'arrows': 'to;from'}
+            'EQUALS': {'color': '#FF0000', 'width': 5, 'dashes': False, 'arrows': 'to;from'},
+            'UNKNOWN': {'color': '#999999', 'width': 1, 'dashes': True, 'arrows': None}
         }
 
         # Get summary data
@@ -702,7 +735,16 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel is None:
                     continue
 
-                rel_type = rel.relationship_type.name
+                try:
+                    rel_type_obj = rel.relationship_type
+                    if rel_type_obj is None:
+                        logger.warning(f'Relationship type is None for {roi1}-{roi2}')
+                        continue
+                    rel_type = rel_type_obj.relation_type
+                except (AttributeError, KeyError) as e:
+                    logger.error(f'Error getting relationship type for {roi1}-{roi2}: {e}')
+                    continue
+
                 if rel_type == 'EQUALS':
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
@@ -734,7 +776,15 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel is None:
                     continue
 
-                rel_type = rel.relationship_type.name
+                try:
+                    rel_type_obj = rel.relationship_type
+                    if rel_type_obj is None:
+                        logger.warning(f'Relationship type is None for {from_roi}->{to_roi}')
+                        continue
+                    rel_type = rel_type_obj.relation_type
+                except (AttributeError, KeyError) as e:
+                    logger.error(f'Error getting relationship type for {from_roi}->{to_roi}: {e}')
+                    continue
 
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)

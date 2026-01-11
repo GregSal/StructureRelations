@@ -3,8 +3,6 @@
 # %% Imports
 from typing import List, Optional
 import logging
-from pathlib import Path
-import json
 
 import pandas as pd
 import networkx as nx
@@ -12,7 +10,7 @@ import networkx as nx
 from types_and_classes import ROI_Type
 from contours import build_contour_table
 from structures import StructureShape
-from relations import DE27IM, RelationshipType
+from relations import RELATIONSHIP_TYPES
 from relationships import StructureRelationship
 from dicom import DicomStructureFile
 from utilities import round_value
@@ -197,8 +195,13 @@ class StructureSet:
                     relationship=relationship
                 )
 
-                logger.debug('Calculated relationship between ROI %s and ROI %s:\n%s',
-                             structure_a.name, structure_b.name, relationship.relationship_type)
+                try:
+                    rel_type = relationship.relationship_type
+                    logger.debug('Calculated relationship between ROI %s and ROI %s: %s',
+                                 structure_a.name, structure_b.name, rel_type)
+                except (AttributeError, KeyError) as e:
+                    logger.debug('Calculated relationship between ROI %s and ROI %s (error accessing type: %s)',
+                                 structure_a.name, structure_b.name, str(e))
 
     def calculate_logical_flags(self) -> None:
         '''Calculate logical relationship flags based on graph topology.
@@ -334,9 +337,20 @@ class StructureSet:
 
             # Store the StructureRelationship object
             relationship_data[name_a][name_b] = relationship_obj
+
             # For symmetric relationships, also set the transpose
             if relationship_obj.relationship_type.is_symmetric:
                 relationship_data[name_b][name_a] = relationship_obj
+            else:
+                # For non-symmetric relationships, set the complementary relationship
+                complementary_type = relationship_obj.relationship_type.complementary
+                if complementary_type:
+                    complementary_obj = StructureRelationship(
+                        de27im=None,
+                        is_identical=False,
+                        _override_type=complementary_type
+                    )
+                    relationship_data[name_b][name_a] = complementary_obj
         relationship_matrix = pd.DataFrame(relationship_data)
 
         # Set index and columns names for clarity
@@ -346,36 +360,45 @@ class StructureSet:
         return relationship_matrix
 
     def relationship_summary(self, symbol_map=None) -> pd.DataFrame:
-        '''Get a summary of all relationships between structures with optional
-        symbolic notation.
+        '''Get a summary of all relationships between structures.
 
         Args:
             symbol_map (dict, optional): Custom mapping from RelationshipType to
             symbols. Overrides default symbols from relationship_definitions.json.
+            If provided, returns symbols instead of labels.
         Returns:
             pd.DataFrame: Adjacency matrix of a graph where nodes are structures
-                and edges represent relationships. The values of the matrix are either
-                labels or symbols representing the relationship types. The index and columns
-                are structure names.
+                and edges represent relationships. The values of the matrix are
+                labels by default, or symbols if symbol_map is provided. The index
+                and columns are structure names.
         '''
-        def to_symbol(struct_relationship: StructureRelationship) -> str:
+        def to_label_or_symbol(struct_relationship: StructureRelationship) -> str:
             if struct_relationship:
-                relationship_type = struct_relationship.relationship_type
-                # Check custom mapping first, then use relationship's own symbol
-                if symbol_map and relationship_type in symbol_map:
-                    return symbol_map[relationship_type]
-                return relationship_type.symbol if relationship_type else ''
+                try:
+                    relationship_type = struct_relationship.relationship_type
+                    # Check custom mapping first (if provided, use symbols)
+                    if symbol_map and relationship_type in symbol_map:
+                        return symbol_map[relationship_type]
+                    # If no symbol_map, return label; otherwise return symbol
+                    if symbol_map is None:
+                        return relationship_type.label if relationship_type else 'Unknown'
+                    return relationship_type.symbol if relationship_type else ''
+                except (AttributeError, KeyError):
+                    # Fallback for any error accessing relationship_type
+                    return 'Unknown' if symbol_map is None else '?'
             # For empty/unknown relationships
-            from relations import UNKNOWN
-            if symbol_map and UNKNOWN in symbol_map:
-                return symbol_map[UNKNOWN]
-            return UNKNOWN.symbol if UNKNOWN else ''
+            unknown_type = RELATIONSHIP_TYPES.get('UNKNOWN')
+            if symbol_map and unknown_type in symbol_map:
+                return symbol_map[unknown_type]
+            if symbol_map is None:
+                return unknown_type.label if unknown_type else 'Unknown'
+            return unknown_type.symbol if unknown_type else ''
 
         relationship_matrix = self.relationship_matrix
         if relationship_matrix.empty:
             return pd.DataFrame()
-        # Convert matrix to symbols
-        labeled_matrix = relationship_matrix.map(to_symbol)
+        # Convert matrix to labels or symbols
+        labeled_matrix = relationship_matrix.map(to_label_or_symbol)
         return labeled_matrix
 
     def get_relationship_matrix(self, row_rois=None, col_rois=None,
@@ -416,15 +439,35 @@ class StructureSet:
 
         # Apply symbol mapping if requested
         if use_symbols:
-            symbol_map = self._get_default_symbol_map()
-            relationship_matrix = relationship_matrix.map(
-                lambda sr: symbol_map.get(sr.relationship_type, '?') if sr else '?'
-            )
+            def get_symbol(sr):
+                if not sr:
+                    return '?'
+                try:
+                    rel_type = sr.relationship_type
+                    if not rel_type:
+                        return '?'
+                    # Use reversed arrow indicator if applicable
+                    symbol = rel_type.symbol
+                    if rel_type.reversed_arrow:
+                        # Add indicator that this is reversed (e.g., ⊃ for WITHIN)
+                        # For now, we'll flip common symbols
+                        symbol_flip = {'⊂': '⊃', '⊏': '⊐'}
+                        symbol = symbol_flip.get(symbol, symbol)
+                    return symbol
+                except (AttributeError, KeyError):
+                    return '?'
+            relationship_matrix = relationship_matrix.map(get_symbol)
         else:
             # Use labels
-            relationship_matrix = relationship_matrix.map(
-                lambda sr: sr.relationship_type.label if sr and sr.relationship_type else 'Unknown'
-            )
+            def get_label(sr):
+                if not sr:
+                    return 'Unknown'
+                try:
+                    rel_type = sr.relationship_type
+                    return rel_type.label if rel_type else 'Unknown'
+                except (AttributeError, KeyError):
+                    return 'Unknown'
+            relationship_matrix = relationship_matrix.map(get_label)
 
         return relationship_matrix
 
@@ -435,7 +478,6 @@ class StructureSet:
             dict: Mapping from RelationshipType to unicode symbols loaded from
                   relationship_definitions.json.
         '''
-        from relations import RELATIONSHIP_TYPES
         return {rel: rel.symbol for rel in RELATIONSHIP_TYPES.values()}
 
     def to_dict(self, row_rois=None, col_rois=None, use_symbols=True) -> dict:

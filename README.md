@@ -4,8 +4,6 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-2. restructure relationships definitions to to obtain definitions from Jason file along with descriptions and display parameters
-
 3. Identify "Logical" relations
 
 3. Fix issue that an open hole that is open only on one end will be treated as open on both ends for the sake of boundary testing
@@ -28,20 +26,6 @@ Test and reports on relationships between DICOM RT Structures
 
 - Webapp edge cases: Should verify that empty matrices, single-structure sets, and filtered matrices still serialize correctly to JSON through to_dict()—the string conversion needs to handle StructureRelationship objects with de27im=None gracefully.
 
-## Relationship definitions
-Currently there are three classes used together to define 3D relationships between structures:
-- RelationshipType
-- RelationshipDefinition
-- DE27IM
-
-I have created a JSON file (structure_relationships.json) that contains the definitions of the relationships used in this package.  I would like to restructure the code to load the definitions from this file rather than hard-coding them in the RelationshipDefinition class.  This will make it easier to add new relationships in the future without needing to modify the code.
-
-1. The RelationshipType(Enum) class defines the names of the relationships used in the package.  This will need to be modified to load the names from the JSON file.  It will also need to be converted from an Enum to a simple class, so that it can contain other attributes such as description, symbol, etc.
-The is_symmetric and is_transitive properties will need to be modified to load their values from the JSON file as well.
-New methods will need to be added to link complementary and implied relationships.
-2. The RelationshipTest just supplies a container for the three DE-9IM tests that make up a DE-27IM relationship.  This class does not need to be modified.
-3. The DE27IM class contains the hard-coded definitions of the DE-27IM relationship strings used to define each relationship.  This will need to be modified to load the definitions from the JSON file at run time
-4. The structure_relationships.json file should also replace the relationship_symbols,json file, used by the webapp.
 
 ## Logical Relationships
 Within a set of structures, transitive relationships can result in **Logical** relationships, which exists out of necessity due to other relationships in the structure set. The simplest example is one where A *Contains* B and B *Contains* C, therefore the relationship A *Contains* C is a **Logical** one since it is a requirement of the other two relationships.  **Logical** relationships can also be chained further. For example, if C *Contains* D, the relationships A *Contains* D and B *Contains* D are both **Logical**.
