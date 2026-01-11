@@ -463,25 +463,6 @@ class DE27IM():
     relationship between the second polygon and the *convex hull* of the first
     polygon.
 
-    From this 27-bit string, a number of physical relationship can be derived.
-    The relationships are defined as follows:
-
-        Relationship  Region Test  Exterior Test  Hull Test   Description
-        ----------------------------------------------------  -----------
-        Disjoint      FF*FF****    F***F****      F***F****   No there is no overlap between ***A*** and ***B***.
-        Shelters      FF*FF****    F***F****      T***F****   The Convex Hull of ***A*** contains ***B***.
-        Surrounds     FF*FF****    T***F****      *********   The Exterior of ***A*** contains ***B***.
-        Borders       F***T****    F***T****      *********   Part of the *exterior* boundary of ***A***
-                                                              touches the exterior boundary of ***B***.
-        Confines      F***T****    T*T***F**      *********   Part of the *interior* boundary of ***A***
-                                                              touches the exterior boundary of ***B***.
-        Partitions    T*T*T*F**    T*T*T*F**      T*T***F**   ***A*** contains ***B*** and
-                                                              part of the *boundary* of ***B*** touches
-                                                              part of the *boundary* of ***A***.
-        Contains      TF*FF****    T***F****      T********   ***B*** is fully within ***A***.
-        Overlaps      T*T*T*T**    T*T*T*T**      T*T***T**   ***A*** and ***B*** intersect, but neither contains the other.
-        Equals        T*F*T****    T***T****      T********   ***A*** and ***B*** enclose the identical
-
     A number of these relationships also have a reciprocal relationship, e.g.
     *Contains* has a reciprocal relationship with *B is fully within A*.
     However, by requiring that the primary polygon (**A**) is larger than the

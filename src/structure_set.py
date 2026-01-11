@@ -219,12 +219,6 @@ class StructureSet:
         '''
         logger.info('Calculating logical flags for relationships')
         logger.debug('Logical flag calculation not yet implemented')
-        # TODO: Implement graph analysis to identify logical relationships
-        # This may involve:
-        # - Transitivity analysis (e.g., A contains B, B contains C)
-        # - Connected component analysis
-        # - Path analysis through relationship graph
-        # - Pattern matching for specific relationship combinations
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> Optional[StructureRelationship]:
         '''Get the relationship between two structures.
