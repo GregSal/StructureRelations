@@ -2,11 +2,12 @@
 '''
 # %% Imports
 # Type imports
-from typing import List, LiteralString, Tuple, Union
+from typing import List, LiteralString, Tuple, Union, Dict, Optional
 
 # Standard Libraries
-from enum import Enum, auto
 from dataclasses import dataclass
+from pathlib import Path
+import json
 
 # Shared Packages
 import shapely
@@ -29,79 +30,200 @@ AllPolygonType = Union[RegionSlice, SinglePolygonType]
 
 
 # %% Relationship Type Definitions
-class RelationshipType(Enum):
-    '''The names for defined relationship types.
+@dataclass
+class RelationshipType:
+    '''Relationship type definition loaded from relationship_definitions.json.
 
-    The relationship types are based on the DE-9IM relationship between two
-    structures.  The relationship types are defined as follows:
-    DISJOINT: The two structures have no regions in common.
-    SURROUNDS: One structure resides completely within a hole in another
-                structure.
-    SHELTERS: One structure is within the convex outline of the other.
-    BORDERS: The two structures share a common exterior boundary.
-    CONFINES: The two structures share a common boundary and one is
-                        within the other.
-    OVERLAPS: The two structures share a common region.
-    PARTITION: The two structures share a common region and one is within the
-                other.
-    CONTAINS: One structure contains the other.
-    EQUALS: The two structures are identical.
-    LOGICAL: The relationship is based on a logical combination of other
-                relationships.
-    UNKNOWN: The relationship has not been identified.
+    Each relationship type contains metadata and pattern-matching definitions
+    for identifying spatial relationships between structures using DE-27IM.
 
-    The class also includes properties to check if the relationship is
-    symmetric, and / or transitive.
-
-    Text formatting is provided by the label and __str__ properties.
+    Attributes:
+        relation_type: Unique identifier (e.g., 'CONTAINS', 'OVERLAPS')
+        label: Human-readable label (e.g., 'Contains', 'Overlaps')
+        symbol: Unicode symbol for relationship (e.g., '⊃', '∩')
+        color: Hex color code for visualization (e.g., '#FF0000')
+        description: Detailed description of relationship
+        complementary_relation: Name of complementary relationship or empty string
+        implied_relation: List of implied relationship names
+        symmetric: Whether relationship is symmetric (A rel B ⇒ B rel A)
+        transitive: Whether relationship is transitive (A rel B and B rel C ⇒ A rel C)
+        reversed_arrow: Whether this is a complementary stub (True) or primary (False/None)
+        pattern: DE-27IM pattern string (29 chars: T/F/* with tabs at pos 9, 19)
+        mask: Binary mask as string (e.g., '0b111000111000111000111000111')
+        value: Binary value as string (e.g., '0b111000000000111000000000000')
+        mask_decimal: Integer value of mask
+        value_decimal: Integer value of value
+        examples: List of example scenarios
     '''
-    DISJOINT = auto()
-    SURROUNDS = auto()
-    SHELTERS = auto()
-    BORDERS = auto()
-    CONFINES = auto()
-    OVERLAPS = auto()
-    PARTITION = auto()
-    CONTAINS = auto()
-    EQUALS = auto()
-    LOGICAL = auto()
-    UNKNOWN = 999  # Used for initialization
+    relation_type: str
+    label: str
+    symbol: str
+    color: str
+    description: str
+    complementary_relation: str
+    implied_relation: List[str]
+    symmetric: bool
+    transitive: bool
+    reversed_arrow: bool
+    pattern: str
+    mask: str
+    value: str
+    mask_decimal: int
+    value_decimal: int
+    examples: List[str]
 
-    def __bool__(self):
-        if self == self.UNKNOWN:
-            return False
-        return True
+    def __bool__(self) -> bool:
+        '''Return False for UNKNOWN, True for all others.'''
+        return self.relation_type != 'UNKNOWN'
 
     @property
     def is_symmetric(self) -> bool:
         '''Check if the relationship is symmetric.'''
-        symmetric_relations = [
-            self.DISJOINT,
-            self.OVERLAPS,
-            self.BORDERS,
-            self.EQUALS,
-            #self.UNKNOWN
-            ]
-        return self in symmetric_relations
+        return self.symmetric
 
     @property
     def is_transitive(self) -> bool:
         '''Check if the relationship is transitive.'''
-        transitive_relations = [
-            self.EQUALS,
-            self.SHELTERS,
-            self.SURROUNDS,
-            self.CONTAINS,
-            ]
-        return self in transitive_relations
+        return self.transitive
 
     @property
-    def label(self) -> LiteralString:
-        '''Get the capitalized name of the relationship type.'''
-        return self.name.capitalize()
+    def complementary(self) -> Optional['RelationshipType']:
+        '''Get the complementary relationship.
 
-    def __str__(self) -> LiteralString:
+        Returns:
+            RelationshipType object for complementary relationship, or None
+        '''
+        if not self.complementary_relation:
+            return None
+        return RELATIONSHIP_TYPES.get(self.complementary_relation)
+
+    @property
+    def implied(self) -> List['RelationshipType']:
+        '''Get list of implied relationships.
+
+        Returns:
+            List of RelationshipType objects that are implied by this relationship
+        '''
+        result = []
+        for rel_name in self.implied_relation:
+            rel_type = RELATIONSHIP_TYPES.get(rel_name)
+            if rel_type:
+                result.append(rel_type)
+        return result
+
+    def __str__(self) -> str:
         return f'Relationship: {self.label}'
+
+    def __repr__(self) -> str:
+        return f'RelationshipType({self.relation_type})'
+
+    def __eq__(self, other) -> bool:
+        '''Compare relationships by relation_type.'''
+        if isinstance(other, RelationshipType):
+            return self.relation_type == other.relation_type
+        elif isinstance(other, str):
+            return self.relation_type == other
+        return False
+
+    def __hash__(self) -> int:
+        '''Hash by relation_type for use in sets and dicts.'''
+        return hash(self.relation_type)
+
+
+# === Module-level Registry ===
+# These will be populated when relationships are loaded from JSON
+RELATIONSHIP_TYPES: Dict[str, RelationshipType] = {}
+_relationship_tests: List['RelationshipTest'] = []
+
+
+def get_relationship_type(name: str) -> Optional[RelationshipType]:
+    '''Get relationship type by name.
+
+    Args:
+        name: Relationship type name (e.g., 'CONTAINS', 'OVERLAPS')
+
+    Returns:
+        RelationshipType object or None if not found
+    '''
+    return RELATIONSHIP_TYPES.get(name)
+
+
+def _load_relationship_definitions() -> List[Dict]:
+    '''Load relationship definitions from JSON file.
+
+    Returns:
+        List of relationship definitions from JSON
+
+    Raises:
+        ImportError: If relationship_definitions.json is not found or cannot be loaded
+    '''
+    json_path = Path(__file__).parent / 'relationship_definitions.json'
+
+    if not json_path.exists():
+        raise ImportError(
+            f'relationship_definitions.json not found at {json_path}. '
+            'This file is required for the relations module to function.'
+        )
+
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return data.get('Relationships', [])
+    except (json.JSONDecodeError, KeyError) as e:
+        raise ImportError(
+            f'Error loading relationship_definitions.json: {e}'
+        ) from e
+
+
+def _initialize_relationships():
+    '''Initialize relationship types and tests from JSON definitions.
+
+    This function is called automatically on module import.
+    '''
+    global RELATIONSHIP_TYPES, _relationship_tests
+
+    definitions = _load_relationship_definitions()
+
+    # Create RelationshipType objects for primary relationships only
+    for defn in definitions:
+        # Skip complementary stubs (reversed_arrow=True)
+        if defn.get('reversed_arrow', False):
+            continue
+
+        rel_type = RelationshipType(
+            relation_type=defn['relation_type'],
+            label=defn['label'],
+            symbol=defn['symbol'],
+            color=defn['color'],
+            description=defn['description'],
+            complementary_relation=defn.get('complementary_relation', ''),
+            implied_relation=defn.get('implied_relation', []),
+            symmetric=defn.get('symmetric', False),
+            transitive=defn.get('transitive', False),
+            reversed_arrow=defn.get('reversed_arrow', False),
+            pattern=defn.get('pattern', ''),
+            mask=defn.get('mask', ''),
+            value=defn.get('value', ''),
+            mask_decimal=defn.get('mask_decimal', 0),
+            value_decimal=defn.get('value_decimal', 0),
+            examples=defn.get('examples', [])
+        )
+
+        RELATIONSHIP_TYPES[rel_type.relation_type] = rel_type
+
+        # Create RelationshipTest for relationships with patterns
+        if rel_type.mask and rel_type.value:
+            _relationship_tests.append(
+                RelationshipTest(
+                    relation_type=rel_type,
+                    mask=rel_type.mask_decimal,
+                    value=rel_type.value_decimal
+                )
+            )
+
+
+# Special LOGICAL flag (not a relationship type)
+LOGICAL = False  # Used as a boolean flag for logical combinations
 
 
 @dataclass()
@@ -141,7 +263,7 @@ class RelationshipTest:
     binary is equal to the result of the `relationship_integer & mask`
     operation.
     '''
-    relation_type: RelationshipType = RelationshipType.UNKNOWN
+    relation_type: RelationshipType
     mask: int = 0b000000000000000000000000000
     value: int = 0b000000000000000000000000000
 
@@ -526,37 +648,16 @@ class DE27IM():
 
     '''
 
+    # Relationship Test Definitions - loaded from JSON via _relationship_tests
+    @property
+    def test_binaries(self):
+        '''Get the list of relationship tests.
 
-    # Relationship Test Definitions
-    test_binaries = [
-        RelationshipTest(RelationshipType.DISJOINT,
-                         0b110110000000010100000010100,
-                         0b000000000000000100000000100),
-        RelationshipTest(RelationshipType.SHELTERS,
-                         0b110110000000010100101010100,
-                         0b000000000000000100101000000),
-        RelationshipTest(RelationshipType.SURROUNDS,
-                         0b110110000101010100000000000,
-                         0b000000000101000000000000000),
-        RelationshipTest(RelationshipType.BORDERS,
-                         0b100010000000000100000000000,
-                         0b000010000000000100000000000),
-        RelationshipTest(RelationshipType.CONFINES,
-                         0b100010000101000100000000000,
-                         0b000010000101000000000000000),
-        RelationshipTest(RelationshipType.CONTAINS,
-                         0b110110100100000000100000000,
-                         0b110000000100000000100000000),
-        RelationshipTest(RelationshipType.EQUALS,
-                         0b101010100000000000000000000,
-                         0b100010000000000000000000000),
-        RelationshipTest(RelationshipType.PARTITION,
-                         0b101010100000000000000000000,
-                         0b101010000000000000000000000),
-        RelationshipTest(RelationshipType.OVERLAPS,
-                         0b100000100100000000100000000,
-                         0b100000100100000000100000000)
-            ]
+        Returns:
+            List of RelationshipTest objects loaded from relationship_definitions.json
+        '''
+        return _relationship_tests
+
     # padding is a DE9IM object built from a string of 'FFFFFFFFF', which
     # becomes 9 zeros when converted to binary.  Padding is used in cases where
     # Exterior and Hull relationships are not relevant.
@@ -952,7 +1053,8 @@ class DE27IM():
             result = rel_def.test(relation_binary)
             if result:
                 return result
-        return RelationshipType.UNKNOWN
+        # Return UNKNOWN relationship type
+        return RELATIONSHIP_TYPES.get('UNKNOWN', None)
 
     def __eq__(self, value):
         if isinstance(value, self.__class__):
@@ -968,3 +1070,16 @@ class DE27IM():
 
     def __repr__(self):
         return f'<DE27IM>: {self.relation}'
+
+
+# %% Module Initialization
+# Load relationship definitions and create module-level constants
+_initialize_relationships()
+
+# Create module-level constants for backward compatibility
+# These allow: from relations import CONTAINS, OVERLAPS, etc.
+for _name, _rel_type in RELATIONSHIP_TYPES.items():
+    globals()[_name] = _rel_type
+
+# Make RELATIONSHIP_TESTS available at module level
+RELATIONSHIP_TESTS = _relationship_tests

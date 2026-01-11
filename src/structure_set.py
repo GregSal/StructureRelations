@@ -351,38 +351,30 @@ class StructureSet:
 
         Args:
             symbol_map (dict, optional): Custom mapping from RelationshipType to
-            symbols.
+            symbols. Overrides default symbols from relationship_definitions.json.
         Returns:
             pd.DataFrame: Adjacency matrix of a graph where nodes are structures
-                and edges represent relationships. The values of teh matrix are either
+                and edges represent relationships. The values of the matrix are either
                 labels or symbols representing the relationship types. The index and columns
                 are structure names.
         '''
         def to_symbol(struct_relationship: StructureRelationship) -> str:
             if struct_relationship:
                 relationship_type = struct_relationship.relationship_type
-                return default_symbol_map[relationship_type]
-            return default_symbol_map[RelationshipType.UNKNOWN]
-
-        default_symbol_map = {
-            RelationshipType.UNKNOWN: RelationshipType.UNKNOWN.label,
-            RelationshipType.DISJOINT: RelationshipType.DISJOINT.label,
-            RelationshipType.EQUALS: RelationshipType.EQUALS.label,
-            RelationshipType.OVERLAPS: RelationshipType.OVERLAPS.label,
-            RelationshipType.CONTAINS: RelationshipType.CONTAINS.label,
-            RelationshipType.SURROUNDS: RelationshipType.SURROUNDS.label,
-            RelationshipType.SHELTERS: RelationshipType.SHELTERS.label,
-            RelationshipType.BORDERS: RelationshipType.BORDERS.label,
-            RelationshipType.CONFINES: RelationshipType.CONFINES.label,
-            RelationshipType.PARTITION: RelationshipType.PARTITION.label
-        }
-        if symbol_map:
-            default_symbol_map.update(symbol_map)
+                # Check custom mapping first, then use relationship's own symbol
+                if symbol_map and relationship_type in symbol_map:
+                    return symbol_map[relationship_type]
+                return relationship_type.symbol if relationship_type else ''
+            # For empty/unknown relationships
+            from relations import UNKNOWN
+            if symbol_map and UNKNOWN in symbol_map:
+                return symbol_map[UNKNOWN]
+            return UNKNOWN.symbol if UNKNOWN else ''
 
         relationship_matrix = self.relationship_matrix
         if relationship_matrix.empty:
             return pd.DataFrame()
-        # Convert matrix to labels for better readability
+        # Convert matrix to symbols
         labeled_matrix = relationship_matrix.map(to_symbol)
         return labeled_matrix
 
@@ -440,20 +432,11 @@ class StructureSet:
         '''Get the default symbol map for relationship types.
 
         Returns:
-            dict: Mapping from RelationshipType to unicode symbols.
+            dict: Mapping from RelationshipType to unicode symbols loaded from
+                  relationship_definitions.json.
         '''
-        return {
-            RelationshipType.UNKNOWN: '',
-            RelationshipType.EQUALS: '=',
-            RelationshipType.CONTAINS: '⊂',
-            RelationshipType.OVERLAPS: '∩',
-            RelationshipType.PARTITION: '⊕',
-            RelationshipType.BORDERS: '|',
-            RelationshipType.SURROUNDS: '○',
-            RelationshipType.SHELTERS: '△',
-            RelationshipType.DISJOINT: '∅',
-            RelationshipType.CONFINES: '⊏'
-        }
+        from relations import RELATIONSHIP_TYPES
+        return {rel: rel.symbol for rel in RELATIONSHIP_TYPES.values()}
 
     def to_dict(self, row_rois=None, col_rois=None, use_symbols=True) -> dict:
         '''Convert relationship matrix to dictionary for JSON serialization.

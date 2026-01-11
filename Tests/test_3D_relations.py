@@ -4,7 +4,11 @@ import shapely
 
 from structure_set import StructureSet
 from contours import ContourPoints
-from relations import DE27IM, RelationshipType
+from relations import (
+    DE27IM, RelationshipType,
+    CONTAINS, OVERLAPS, DISJOINT, BORDERS, CONFINES,
+    SURROUNDS, SHELTERS, PARTITIONED, EQUALS, UNKNOWN
+)
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
 from debug_tools import make_sphere, make_box, box_points, circle_points
 from debug_tools import make_slice_list
@@ -33,7 +37,7 @@ class TestContains:
         # combine the contours
         slice_data = sphere6 + sphere3 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONTAINS
+        assert relation_type == CONTAINS
 
     def test_contains_simple_cylinders(self):
         slice_spacing = 0.1
@@ -52,7 +56,7 @@ class TestContains:
         # combine the contours
         slice_data = body + primary_cylinder + contained_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONTAINS
+        assert relation_type == CONTAINS
 
     def test_embedded_boxes(self):
         slice_spacing = 0.5
@@ -65,7 +69,7 @@ class TestContains:
         # combine the contours
         slice_data = cube6 + cube3 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONTAINS
+        assert relation_type == CONTAINS
 
     def test_parallel_cylinders_example(self):
         slice_spacing = 1
@@ -86,7 +90,7 @@ class TestContains:
         # combine the contours
         slice_data = body + left_cylinder + right_cylinder + right_middle_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONTAINS
+        assert relation_type == CONTAINS
 
     def test_nested_spheres(self):
         slice_spacing = 1
@@ -101,7 +105,7 @@ class TestContains:
         # combine the contours
         slice_data = body + sphere12 + hole10 + sphere8 + sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONTAINS
+        assert relation_type == CONTAINS
 
 class TestSurrounds:
     def test_surrounded_cylinder(self):
@@ -119,7 +123,7 @@ class TestSurrounds:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SURROUNDS
+        assert relation_type == SURROUNDS
 
     def test_surrounded_horizontal_cylinder(self):
         slice_spacing = 1
@@ -136,7 +140,7 @@ class TestSurrounds:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SURROUNDS
+        assert relation_type == SURROUNDS
 
     def test_sphere_in_shell(self):
         slice_spacing = 1
@@ -150,7 +154,7 @@ class TestSurrounds:
         # combine the contours
         slice_data = body + sphere12 + hole10 + sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SURROUNDS
+        assert relation_type == SURROUNDS
 
     def test_sphere_in_cylinders_in_box(self):
         slice_spacing = 1
@@ -171,7 +175,7 @@ class TestSurrounds:
         # combine the contours
         slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SURROUNDS
+        assert relation_type == SURROUNDS
 
 class TestShelters:
     def test_shelters_horizontal_cylinder_single_side(self):
@@ -191,7 +195,7 @@ class TestShelters:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SHELTERS
+        assert relation_type == SHELTERS
 
     def test_shelters_sphere_in_cylinders_in_box(self):
         slice_spacing = 0.5
@@ -212,7 +216,7 @@ class TestShelters:
         # combine the contours
         slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SHELTERS
+        assert relation_type == SHELTERS
 
     def test_shelters_cylinder(self):
         slice_spacing = 1
@@ -229,7 +233,7 @@ class TestShelters:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SHELTERS
+        assert relation_type == SHELTERS
 
     def test_sphere_in_cylinders_in_box(self):
         slice_spacing = 1
@@ -250,7 +254,7 @@ class TestShelters:
         # combine the contours
         slice_data = body + cube6 + left_cylinder + right_cylinder + right_sphere
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.SHELTERS
+        assert relation_type == SHELTERS
 
 class TestDisjoint:
     def test_disjoint_boxes(self):
@@ -266,7 +270,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = left_cube + right_cube + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
     def test_extended_inner_cylinder(self):
         slice_spacing = 1
@@ -282,7 +286,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
     def test_disjoint_horizontal_cylinder(self):
         slice_spacing = 1
@@ -299,7 +303,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = outer_cylinder + cylinder_hole + surrounded_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
     def test_parallel_disjoint_cylinder(self):
         slice_spacing = 1
@@ -318,7 +322,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder + disjoint_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
     def test_axial_disjoint_cylinder(self):
         slice_spacing = 1
@@ -337,7 +341,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = body + outer_cylinder + cylinder_hole + inner_cylinder + disjoint_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
     def test_disjoint_concentric_cylinders(self):
         slice_spacing = 1
@@ -359,7 +363,7 @@ class TestDisjoint:
         # combine the contours
         slice_data = body + primary_cylinder + upper_cylinder1 + lower_cylinder2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.DISJOINT
+        assert relation_type == DISJOINT
 
 class TestBorders:
     def test_bordering_concentric_cylinders(self):
@@ -382,7 +386,7 @@ class TestBorders:
         # combine the contours
         slice_data = body + primary_cylinder + bordering_cylinder1 + bordering_cylinder2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.BORDERS
+        assert relation_type == BORDERS
 
     def test_lateral_borders_boxes(self):
         slice_spacing = 0.1
@@ -397,7 +401,7 @@ class TestBorders:
         # combine the contours
         slice_data = left_cube + right_cube + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.BORDERS
+        assert relation_type == BORDERS
 
     def test_concentric_cylinders_sup_offset(self):
         slice_spacing = 0.1
@@ -413,7 +417,7 @@ class TestBorders:
         # combine the contours
         slice_data = body + primary_cylinder + sup_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.BORDERS
+        assert relation_type == BORDERS
 
     def test_lateral_borders_two_boxes(self):
         slice_spacing = 0.1
@@ -430,7 +434,7 @@ class TestBorders:
         # combine the contours
         slice_data = left_cube + right_cube + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.BORDERS
+        assert relation_type == BORDERS
 
     def test_inserted_cylinder(self):
         '''This test illustrates the issue that an open hole that is open only
@@ -454,7 +458,7 @@ class TestBorders:
         # combine the contours
         slice_data = body + primary_cylinder + center_hole + middle_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.BORDERS
+        assert relation_type == BORDERS
 
 class TestConfines:
     def test_confined_bordering_boxes(self):
@@ -470,7 +474,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + box6 + hole4 + Box4
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_confines_dual_cylinders(self):
         slice_spacing = 0.1
@@ -492,7 +496,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + primary_cylinder + left_hole + right_hole + confines_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_embedded_cylinder(self):
         slice_spacing = 0.1
@@ -511,7 +515,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + primary_cylinder + center_hole + middle_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_embedded_spheres(self):
         slice_spacing = 0.1
@@ -529,7 +533,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + sphere12 + hole10 + sphere8 + sphere10 + hole8
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_confined_box_z_border(self):
         slice_spacing = 0.1
@@ -544,7 +548,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + box6 + hole4 + Box2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_confined_box_y_border(self):
         slice_spacing = 0.1
@@ -559,7 +563,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + box6 + hole4 + Box2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
     def test_confines_partial_cylinder(self):
         slice_spacing = 0.1
@@ -589,7 +593,7 @@ class TestConfines:
         # combine the contours
         slice_data = body + primary_cylinder + hole_cylinder + slice_list_b
         relation_type = get_relation_type(slice_data, tolerance=resolution)
-        assert relation_type == RelationshipType.CONFINES
+        assert relation_type == CONFINES
 
 
 class TestPartition:
@@ -604,7 +608,7 @@ class TestPartition:
         # combine the contours
         slice_data = box6 + box6_3 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_partition_embedded_box_on_z_surface(self):
         slice_spacing = 0.5
@@ -618,7 +622,7 @@ class TestPartition:
         # combine the contours
         slice_data = box6 + box6_3 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_horizontal_cylinders(self):
         slice_spacing = 0.1
@@ -632,7 +636,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + cylinder1h + cylinder2h
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_vertical_concentric_cylinders(self):
         slice_spacing = 0.5
@@ -646,7 +650,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + cylinder6 + cylinder4
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_concentric_cylinders_same_start(self):
         slice_spacing = 0.5
@@ -663,7 +667,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + primary_cylinder + sup_partition
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_concentric_cylinders_same_end(self):
         slice_spacing = 0.5
@@ -679,7 +683,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + primary_cylinder + inf_partition
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_concentric_cylinders_same_start_end(self):
         slice_spacing = 0.05
@@ -695,7 +699,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + primary_cylinder + mid_partition
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_partition_sphere_island(self):
         slice_spacing = 0.1
@@ -712,7 +716,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + sphere12 + hole8 + sphere4 + sphere4_2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
     def test_partitions_partial_cylinder(self):
         '''Tests the use of boundary margins for relationships.'''
@@ -741,7 +745,7 @@ class TestPartition:
         # combine the contours
         slice_data = body + primary_cylinder + slice_list_b
         relation_type = get_relation_type(slice_data, tolerance=resolution)
-        assert relation_type == RelationshipType.PARTITION
+        assert relation_type == PARTITIONED
 
 class TestOverlaps:
     def test_overlapping_spheres_example(self):
@@ -758,7 +762,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = body + right_sphere6 + left_sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_overlapping_boxes_y(self):
         slice_spacing = 0.1
@@ -772,7 +776,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = box6 + box6_y + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_overlapping_boxes_z(self):
         slice_spacing = 0.1
@@ -786,7 +790,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = box6 + box6_y + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_stacked_boxes(self):
         slice_spacing = 0.1
@@ -800,7 +804,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = box6 + box6_y + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_overlapping_concentric_cylinders_example(self):
         slice_spacing = 1
@@ -822,7 +826,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = body + primary_cylinder + overlapping_cylinder1 + overlapping_cylinder2
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_overlapping_cubes_inf_rt(self):
         slice_spacing = 0.5
@@ -836,7 +840,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = body + cube6 + cube6_inf_rt
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
     def test_overlapping_extended_cylinder(self):
         slice_spacing = 0.1
@@ -855,7 +859,7 @@ class TestOverlaps:
         # combine the contours
         slice_data = body + primary_cylinder + overlapping_cylinder
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.OVERLAPS
+        assert relation_type == OVERLAPS
 
 
 class TestEquals:
@@ -873,7 +877,7 @@ class TestEquals:
         # combine the contours
         slice_data = body + a_sphere6 + b_sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.EQUALS
+        assert relation_type == EQUALS
 
     def test_equal_boxes(self):
         slice_spacing = 0.1
@@ -886,7 +890,7 @@ class TestEquals:
         # combine the contours
         slice_data = a_box6 + b_box6 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.EQUALS
+        assert relation_type == EQUALS
 
     def test_equal_boxes_by_crop(self):
         def apply_crop(p):
@@ -929,4 +933,4 @@ class TestEquals:
         cropped_box = get_cropped_box(box8)
         slice_data = body + box4 + cropped_box
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RelationshipType.EQUALS
+        assert relation_type == EQUALS
