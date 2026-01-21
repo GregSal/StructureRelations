@@ -10,6 +10,11 @@ Test and reports on relationships between DICOM RT Structures
 
 4. Investigate Issue that Warnings are being returned when calculating some relationships
 
+5. Add a unit attribute to StructureSet
+    - Populate it from DICOM data
+    - For manually entered contours accept a unit parameter
+    - set a default value
+
 4. Begin work on Metric Calculations
 
 
@@ -21,6 +26,15 @@ Test and reports on relationships between DICOM RT Structures
 - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
 
 - If CT images are available, add option to show/hide CT background in Contour Plotting area
+
+**Web App Updates**
+- What other options are available for formatting edge lines?
+
+- More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
+
+- Hide of shade logical relations
+
+- Logical relations include brackets around symbol or label
 
 - I will likely want to display some of the additional information in the relationship matrix within the webapp.  What will need to change to make it easy to customize what is displayed?  (this may become something in the configuration, settings or selectable within the web page - I haven't decided what to do here yet)
 
@@ -42,3 +56,58 @@ This may involve:
 - Connected component analysis
 - Path analysis through relationship graph
 - Pattern matching for specific relationship combinations
+
+
+## Metrics
+- 4 kinds of Metrics
+    - Distance 
+        - Units of cm or mm
+        - Distance between contours of two structures
+        - Direction any of 3D (perpendicular to contour), or orthogonal directions (L, R, Ant, Post, Sup, Inf)
+        - Aggregate methods Max, Min, Ave
+        - Not defined for a single structure
+    - Volume 
+        - Units of $cm^3$, cc, ml
+        - Volume of overlap ($A \cap B$), or difference ($A - B$) between two structures
+        - For a single structure this is teh volume of that structure
+    - Surface Area
+        - Units of $cm^2$, $mm^2$
+        - Overlapping surfaces ($A_{boundary} \cap B_{boundary}$) Surface of B within A ($[A - B]_{boundary}$)
+        - For a single structure this is the surface area of that structure.
+    -Ratio
+        - Ratio of two other metrics
+        - The two metrics must be of the same type and units
+        - The two metrics can be the same of from different structures
+        - Ratios have no units (None) or \%
+
+
+### Classes
+#### Metric abstract class
+##### Attributes
+- Class Attribute: default_tolerance (float) Used if tolerance is not supplied or derived for individual objects
+- Abstract Class Attribute: metric_type (str) valid values are: ['Distance', 'Volume', 'Area', 'Ratio']
+- Abstract Class Attribute: metric_arg_list (List[Tuple]) Lists of possible valid arguments e.g. [(ROI,ROI), (ROI)] *(one or two structure IDs)*
+- Abstract Class Attribute: name (str) metric name
+- Abstract Class Attribute: description (str, optional) Description of metric
+
+- value (float)
+- unit (str)
+- tolerance (float) minimum increment of value (used for rounding)
+##### Methods
+- Abstract Method: calculate_metric takes one or two structures, and returns value and unit
+- \_\_init\_\_ 
+    - Takes StructureSet and one or two of structure IDs or Metrics according to type, optional tolerance, optional units
+    - calls validate_args
+    - if unit supplied, calls validate_units
+    - sets tolerance from argument, StructureSet or from default tolerance
+    - calls calculate_metric and sets value and unit
+    - if unit supplied, calls convert_unit
+    - rounds value by tolerance
+
+- validate_args: Checks supplied arguments against valid list of arguments for the metric
+- validate_units: checks whether optional supplied unit is valid for the metric type.
+
+- convert_unit 
+    - takes a unit and modifies value and unit accordingly.
+    - Raises error if the unit and type are not compatible
+- default method \_\_str\_\_ returns a formatted string with f'{name}: {value} {unit}'
