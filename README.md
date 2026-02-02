@@ -4,6 +4,8 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
+1. Add intermediate_structures attribute to StructureRelationship that is used when is_logical is True to identify the structures that form the logical path.  This will be a list of structure ROIs (default empty list).  If the relationship is logical and "Hide Logical Relations" is selected in the webapp, then this relationship will not be displayed if all of the intermediate structures are shown.  If any one of the intermediate structures is not shown, then the logical relationship will be displayed because the relationship is not logical based on the displayed relations.
+
 1. Identify "Logical" relations
 
 2. Fix issue that an open hole that is open only on one end will be treated as open on both ends for the sake of boundary testing
@@ -78,6 +80,12 @@ This may involve:
 - Connected component analysis
 - Path analysis through relationship graph
 - Pattern matching for specific relationship combinations
+
+
+If a relationship is identified as Logical, then Intermediate Structures are identified as the ROIs of the structures that form the longest path between the Starting and ending structures of the relationship.
+
+If the relationship is logical and "Hide Logical Relations" is selected in the webapp, then this relationship will not be displayed if all of the intermediate structures are shown. If any one of the intermediate structures is not shown, then the logical relationship will be displayed because the relationship is not logical based on the displayed relations.
+
 
 ## Metrics
 
