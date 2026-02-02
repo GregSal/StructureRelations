@@ -63,6 +63,14 @@ does not exist.
 
 To identify **Logical** *Contains* relationships, one must construct a directed graph of the structure relations where the edges are all the *Contains* relationships in the structure set and all **Implied** *Contains* relationships (*Partitioned*) in the structure set. Next, for each *Contains* relationship, check for an alternate path between the two structures. Next, eliminate any path that is not composed *entirely* of **Implied** *Contains* relationships. If an alternate path exists, then the relationship is **Logical**.
 
+### The special case of Equals
+The *Equals* relationship is a special case since it is both symmetric and
+transitive. Therefore, if A *Equals* B and B *Contains* C, then A *Contains* C is
+**Logical**. Similarly, if A *Equals* B and B *Is Partitioned by* C, then A
+*Is Partitioned by* C is **Logical**. This can be extended to chains of
+*Equals* relationships of any length.
+
+### Implementation Plan
 I want to use graph analysis make the structure_set.calculate_logical_flags method apply this logic to identify **Logical** relationships within a structure set.
 This may involve:
 
