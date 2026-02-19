@@ -27,10 +27,19 @@ start_webapp.bat
 ```
 
 #### Manual Start
-```bash
-conda activate StructureRelations
+```bat
+rem set WORKSPACE_FOLDER="..."
+cd "%WORKSPACE_FOLDER%"
 cd src/webapp
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+REM Activate conda environment
+CALL ...\anaconda3\Scripts\activate.bat D:\anaconda3
+CALL conda activate StructureRelations
+
+REM Start FastAPI server
+CALL uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+pause
 ```
 
 The application will be available at: http://localhost:8000
