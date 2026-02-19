@@ -279,19 +279,16 @@ class DicomStructureFile:
             logger.warning('File %s is not a RT Structure file', self.file_name)
             return pd.DataFrame()
 
-        if not hasattr(self.dataset, 'StructureSetROISequence'):
-            logger.warning("Dataset does not contain StructureSetROISequence")
-            return pd.DataFrame()
-
         label_list = []
         obs_seq = self.dataset.get('RTROIObservationsSequence')
         if not obs_seq:
             logger.warning("Dataset does not contain RTROIObservationsSequence")
             return pd.DataFrame()
         for roi in self.dataset.RTROIObservationsSequence:
+            roi_number = roi.ReferencedROINumber
             label_dict = {
-                'ROINumber': roi.ReferencedROINumber,
-                'StructureName': roi.ROIObservationLabel,
+                'ROINumber': roi_number,
+                'StructureName': self.structure_names.get(roi_number, ''),
                 'DICOM_Type': roi.RTROIInterpretedType
                 }
             code_seq = roi.get('RTROIIdentificationCodeSequence')
