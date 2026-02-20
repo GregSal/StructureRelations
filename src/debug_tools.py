@@ -12,7 +12,7 @@ from math import ceil, sin, cos, radians, sqrt
 import numpy as np
 import pandas as pd
 
-from types_and_classes import SliceIndexType
+from types_and_classes import SliceIndexType, PolygonType
 from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE, SLICE_INDEX_PRECISION
 from utilities import round_value
 from contours import ContourPoints
@@ -508,6 +508,48 @@ def make_horizontal_cylinder(radius: float, length: float, spacing: float = 0.1,
                                    offset_x, offset_y, offset_z,
                                    contour_tolerance, slice_tolerance)
     for slice_idx, xy_points in points_dict.items():
+        roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
+        slice_list.append(roi_slice)
+    return slice_list
+
+
+def extrude_poly(polygon: PolygonType, length: float,
+                 spacing: float = 0.1, offset_z: float = 0,
+                 slice_tolerance=DEFAULT_TOLERANCE,
+                 roi_num=0) -> List[ContourPoints]:
+    '''Generate contour slices by extruding a supplied polygon along z.
+
+    The polygon is replicated at each slice through the specified length,
+    centered on ``offset_z``.
+
+    Args:
+        polygon (PolygonType): A Shapely polygon to extrude.
+        length (float): The z-length of the extrusion.
+        spacing (float, optional): The spacing between slices. Defaults to 0.1.
+        offset_z (float, optional): The z position of the extrusion center.
+            Defaults to 0.
+        slice_tolerance (float, optional): Precision used for slice indexes.
+            Defaults to DEFAULT_TOLERANCE (0.01).
+        roi_num (int, optional): The structure index number. Defaults to 0.
+
+    Returns:
+        List[ContourPoints]: A list of contour slices for the extruded polygon.
+    '''
+    try:
+        polygon_points = list(polygon.exterior.coords)
+    except AttributeError as err:
+        raise TypeError('polygon must be a Shapely Polygon.') from err
+
+    if len(polygon_points) > 1 and polygon_points[0] == polygon_points[-1]:
+        polygon_points = polygon_points[:-1]
+
+    xy_points = [(float(x), float(y)) for x, y, *_ in polygon_points]
+
+    starting_z = offset_z - length / 2
+    z_coord = make_slice_list(height=length, spacing=spacing, start=starting_z,
+                              precision=slice_tolerance)
+    slice_list = []
+    for slice_idx in z_coord:
         roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
     return slice_list
