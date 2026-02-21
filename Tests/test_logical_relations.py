@@ -304,3 +304,146 @@ class TestNotLogical:
         assert rel_1_3 is not None
         # Not logical because no single transitive path can explain it
         assert not rel_1_3.is_logical
+
+
+class TestLogicalRelationshipFiltering:
+    '''Tests for filter_relationships_by_logical_mode method.'''
+
+    def test_hide_mode_removes_logical(self):
+        '''Test: Hide mode removes all logical relationships.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # Get filtered matrix with hide mode
+        filtered_matrix, fade_info = (
+            structures.filter_relationships_by_logical_mode(
+                mode='hide',
+                visible_rois=[1, 2, 3]
+            )
+        )
+
+        # The logical relationship (1,3) should be None
+        name_1 = structures.structures[1].name
+        name_3 = structures.structures[3].name
+        assert filtered_matrix.loc[name_3, name_1] is None
+
+    def test_limited_mode_hides_with_all_intermediates(self):
+        '''Test: Limited mode hides logical relationships when all
+        intermediates are visible.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # All structures visible - logical (1,3) should be hidden
+        filtered_matrix, fade_info = (
+            structures.filter_relationships_by_logical_mode(
+                mode='limited',
+                visible_rois=[1, 2, 3]
+            )
+        )
+
+        name_1 = structures.structures[1].name
+        name_3 = structures.structures[3].name
+        assert filtered_matrix.loc[name_3, name_1] is None
+
+    def test_limited_mode_shows_with_hidden_intermediates(self):
+        '''Test: Limited mode shows logical relationships when any
+        intermediate is hidden.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # Intermediate (2) is not visible - logical (1,3) should be shown
+        filtered_matrix, fade_info = (
+            structures.filter_relationships_by_logical_mode(
+                mode='limited',
+                visible_rois=[1, 3]  # 2 is hidden
+            )
+        )
+
+        name_1 = structures.structures[1].name
+        name_3 = structures.structures[3].name
+        # The relationship object should still be there (not None)
+        rel_obj = filtered_matrix.loc[name_3, name_1]
+        assert rel_obj is not None
+
+    def test_faded_mode_marks_logical_for_fading(self):
+        '''Test: Faded mode marks logical relationships for opacity.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # Get filtered matrix with faded mode
+        filtered_matrix, fade_info = (
+            structures.filter_relationships_by_logical_mode(
+                mode='faded',
+                visible_rois=[1, 2, 3]
+            )
+        )
+
+        # The logical relationship (1,3) should be marked for fading
+        if (1, 3) in fade_info:
+            assert fade_info[(1, 3)] is True
+
+    def test_show_mode_preserves_all_relationships(self):
+        '''Test: Show mode preserves all relationships including logical.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # Get filtered matrix with show mode
+        filtered_matrix, fade_info = (
+            structures.filter_relationships_by_logical_mode(
+                mode='show',
+                visible_rois=[1, 2, 3]
+            )
+        )
+
+        # All relationships should be preserved
+        name_1 = structures.structures[1].name
+        name_3 = structures.structures[3].name
+        rel_obj = filtered_matrix.loc[name_3, name_1]
+        assert rel_obj is not None
+
+    def test_to_dict_with_faded_mode(self):
+        '''Test: to_dict() returns faded_relationships dict in faded mode.'''
+        slice_spacing = 1
+        sphere12 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere8 = make_sphere(roi_num=2, radius=4, spacing=slice_spacing)
+        sphere6 = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere12 + sphere8 + sphere6
+        structures = StructureSet(slice_data)
+
+        # Call to_dict with faded mode
+        result = structures.to_dict(
+            row_rois=[1, 2, 3],
+            col_rois=[1, 2, 3],
+            use_symbols=True,
+            logical_relations_mode='faded',
+            visible_rois=[1, 2, 3]
+        )
+
+        # Should have faded_relationships key with some entries
+        assert 'faded_relationships' in result

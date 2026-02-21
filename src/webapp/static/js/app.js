@@ -8,6 +8,7 @@ class WebAppClient {
         this.symbolConfig = null;  // Will store loaded config
         this.network = null;  // vis-network instance
         this.plotAbortController = null;  // Track current plot request
+        this.logicalRelationsMode = 'limited';  // Default: limited mode
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -98,6 +99,10 @@ class WebAppClient {
 
         // Matrix controls - use correct IDs from HTML
         document.getElementById('useSymbolsToggle').addEventListener('change', () => {
+            this.updateMatrix();
+        });
+        document.getElementById('logicalRelationsMode').addEventListener('change', (e) => {
+            this.logicalRelationsMode = e.target.value;
             this.updateMatrix();
         });
         document.getElementById('updateMatrixBtn').addEventListener('click', () => {
@@ -796,7 +801,8 @@ class WebAppClient {
                     session_id: this.sessionId,
                     row_rois: rowRois,
                     col_rois: colRois,
-                    use_symbols: useSymbols
+                    use_symbols: useSymbols,
+                    logical_relations_mode: this.logicalRelationsMode
                 })
             });
 
@@ -846,7 +852,7 @@ class WebAppClient {
             tr.appendChild(th);
 
             // Data cells
-            row.forEach(value => {
+            row.forEach((value, colIdx) => {
                 const td = document.createElement('td');
                 td.textContent = value;
 
@@ -854,6 +860,14 @@ class WebAppClient {
                 const relClass = this.getRelationshipClass(value);
                 if (relClass) {
                     td.classList.add(relClass);
+                }
+
+                // Apply faded class if this relationship should be faded
+                if (data.faded_relationships) {
+                    const fadeKey = `${rowIdx}_${colIdx}`;
+                    if (data.faded_relationships[fadeKey]) {
+                        td.classList.add('rel-faded');
+                    }
                 }
 
                 // Add tooltip with relationship name
@@ -1000,7 +1014,8 @@ class WebAppClient {
                     session_id: this.sessionId,
                     row_rois: rowRois,
                     col_rois: colRois,
-                    show_disjoint: showDisjoint
+                    show_disjoint: showDisjoint,
+                    logical_relations_mode: this.logicalRelationsMode
                 })
             });
 

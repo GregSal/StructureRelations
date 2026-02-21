@@ -89,6 +89,7 @@ class MatrixRequest(BaseModel):
     col_rois: Optional[List[int]] = None
     use_symbols: bool = True
     show_disjoint: bool = False
+    logical_relations_mode: str = 'limited'  # 'hide', 'limited', 'show', 'faded'
 
 
 class MatrixResponse(BaseModel):
@@ -105,6 +106,7 @@ class MatrixResponse(BaseModel):
     slice_ranges: dict
     slice_indices: List[float]
     structure_slices: dict
+    faded_relationships: Optional[dict] = None
 
 
 class DiagramNode(BaseModel):
@@ -508,7 +510,8 @@ async def get_relationship_matrix(request: MatrixRequest):
     logger.info(f'=== MATRIX REQUEST RECEIVED === session: {request.session_id}')
     logger.info(f'Matrix request for session {request.session_id}: '
                 f'row_rois={request.row_rois}, col_rois={request.col_rois}, '
-                f'use_symbols={request.use_symbols}')
+                f'use_symbols={request.use_symbols}, '
+                f'logical_relations_mode={request.logical_relations_mode}')
 
     session_data = session_manager.load_session(request.session_id)
     if session_data is None:
@@ -520,12 +523,25 @@ async def get_relationship_matrix(request: MatrixRequest):
         raise HTTPException(status_code=400, detail='Structures not yet processed')
 
     try:
+        # Build visible_rois list from row and col rois for limited mode
+        visible_rois = None
+        if request.logical_relations_mode == 'limited':
+            visible_rois = []
+            if request.row_rois:
+                visible_rois.extend(request.row_rois)
+            if request.col_rois:
+                visible_rois.extend(request.col_rois)
+            if visible_rois:
+                visible_rois = list(set(visible_rois))  # Remove duplicates
+
         # Get matrix as dictionary
         logger.info(f'Generating matrix for session {request.session_id}')
         matrix_dict = session_data.structure_set.to_dict(
             row_rois=request.row_rois,
             col_rois=request.col_rois,
-            use_symbols=request.use_symbols
+            use_symbols=request.use_symbols,
+            logical_relations_mode=request.logical_relations_mode,
+            visible_rois=visible_rois
         )
 
         logger.info(f'Matrix dict keys: {matrix_dict.keys()}')

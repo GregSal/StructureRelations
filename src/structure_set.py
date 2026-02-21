@@ -474,6 +474,100 @@ class StructureSet:
 
         return relationship_matrix
 
+    def filter_relationships_by_logical_mode(
+            self,
+            mode: str = 'limited',
+            visible_rois: list = None
+    ) -> tuple[pd.DataFrame, dict]:
+        '''Filter relationships based on logical display mode.
+
+        Filters relationships in the relationship matrix based on the
+        specified logical display mode and currently visible ROIs.
+
+        Args:
+            mode (str): Display mode for logical relationships.
+                - 'hide': No logical relationships are displayed
+                - 'limited' (default): Logical relationships not shown if all
+                  intermediates are visible; shown when any intermediate is hidden
+                - 'show': All relationships shown normally
+                - 'faded': Logical relationships shown with reduced opacity
+
+            visible_rois (list, optional): List of ROI numbers currently visible
+                in the diagram. Used for 'limited' mode to determine whether to
+                show logical relationships dynamically. If None, all ROIs are
+                assumed visible. Defaults to None.
+
+        Returns:
+            tuple: (filtered_matrix, logical_info_dict)
+                - filtered_matrix: pd.DataFrame with relationships filtered
+                  according to mode. For 'hide' mode, logical relationships
+                  are replaced with None.
+                - logical_info_dict: Dict mapping (roi_a, roi_b) tuples to
+                  'should_fade' boolean. Used by frontend to apply styling.
+        '''
+        if not visible_rois:
+            # Default to all ROIs visible
+            visible_rois = list(self.structures.keys())
+
+        # Get base relationship matrix
+        matrix = self.relationship_matrix.copy()
+
+        # Dict to track which relationships should be faded
+        fade_info = {}
+
+        for roi_a in self.structures:
+            for roi_b in self.structures:
+                if roi_a == roi_b:
+                    continue
+
+                # Get the relationship object
+                name_a = self.structures[roi_a].name
+                name_b = self.structures[roi_b].name
+
+                try:
+                    rel_obj = matrix.loc[name_b, name_a]
+                except KeyError:
+                    continue
+
+                if not rel_obj or not hasattr(rel_obj, 'is_logical'):
+                    continue
+
+                # Skip non-logical relationships
+                if not rel_obj.is_logical:
+                    fade_info[(roi_a, roi_b)] = False
+                    continue
+
+                # Handle logical relationship based on mode
+                if mode == 'hide':
+                    # Hide all logical relationships
+                    matrix.loc[name_b, name_a] = None
+                    fade_info[(roi_a, roi_b)] = False
+
+                elif mode == 'limited':
+                    # Check if all intermediate structures are visible
+                    intermediates = rel_obj.intermediate_structures
+                    all_intermediates_visible = all(
+                        roi in visible_rois for roi in intermediates
+                    )
+
+                    if all_intermediates_visible:
+                        # Hide because all intermediates are shown
+                        matrix.loc[name_b, name_a] = None
+                        fade_info[(roi_a, roi_b)] = False
+                    else:
+                        # Show because at least one intermediate is hidden
+                        fade_info[(roi_a, roi_b)] = False
+
+                elif mode == 'faded':
+                    # Mark for fading (frontend will apply opacity)
+                    fade_info[(roi_a, roi_b)] = True
+
+                elif mode == 'show':
+                    # Show all relationships normally
+                    fade_info[(roi_a, roi_b)] = False
+
+        return matrix, fade_info
+
     def relationship_summary(self, symbol_map=None) -> pd.DataFrame:
         '''Get a summary of all relationships between structures.
 
@@ -595,30 +689,43 @@ class StructureSet:
         '''
         return {rel: rel.symbol for rel in RELATIONSHIP_TYPES.values()}
 
-    def to_dict(self, row_rois=None, col_rois=None, use_symbols=True) -> dict:
+    def to_dict(self, row_rois=None, col_rois=None, use_symbols=True,
+                logical_relations_mode='limited', visible_rois=None) -> dict:
         '''Convert relationship matrix to dictionary for JSON serialization.
 
         Args:
             row_rois (List[ROI_Type], optional): List of ROI numbers for matrix rows.
             col_rois (List[ROI_Type], optional): List of ROI numbers for matrix columns.
             use_symbols (bool, optional): If True, use symbolic notation.
+            logical_relations_mode (str, optional): How to display logical relationships.
+                - 'hide': Hide all logical relationships
+                - 'limited' (default): Hide logical if all intermediates visible
+                - 'show': Show all relationships
+                - 'faded': Show logical relationships with reduced opacity
+            visible_rois (List[ROI_Type], optional): Currently visible ROI numbers
+                for 'limited' mode. Defaults to None (all visible).
 
         Returns:
-            dict: Dictionary with structure:
+            dict: Dictionary with structure including faded_relationships field
+                when logical_relations_mode is not 'show'.
                 {
                     'rows': [roi_numbers],
                     'columns': [roi_numbers],
                     'data': [[relationship_values]],
                     'row_names': [structure_names],
                     'col_names': [structure_names],
-                    'colors': {roi: [r, g, b]}
+                    'colors': {roi: [r, g, b]},
+                    'faded_relationships': {matrix_position: bool}
                 }
         '''
+        # Extract ROI numbers from structure names early
+        name_to_roi = {struct.name: roi for roi, struct in self.structures.items()}
+
         # Get filtered matrix
         matrix = self.get_relationship_matrix(row_rois, col_rois, use_symbols)
 
         if matrix.empty:
-            return {
+            result = {
                 'rows': [],
                 'columns': [],
                 'data': [],
@@ -626,9 +733,40 @@ class StructureSet:
                 'col_names': [],
                 'colors': {}
             }
+            if logical_relations_mode == 'faded':
+                result['faded_relationships'] = {}
+            return result
 
-        # Extract ROI numbers from structure names (convert to int for JSON serialization)
-        name_to_roi = {struct.name: roi for roi, struct in self.structures.items()}
+        # Apply logical relationships filtering if not in 'show' mode
+        faded_relationships = {}
+        if logical_relations_mode != 'show':
+            # Build visible_rois list from row and col rois
+            if visible_rois is None:
+                visible_rois = list(self.structures.keys())
+
+            # Filter relationships based on logical mode
+            filtered_matrix, fade_info = (
+                self.filter_relationships_by_logical_mode(
+                    mode=logical_relations_mode,
+                    visible_rois=visible_rois
+                )
+            )
+
+            # Build matrix with filtered relationships
+            matrix = self.get_relationship_matrix(row_rois, col_rois, use_symbols)
+
+            # Create fade info keyed by matrix position (row_index, col_index)
+            if logical_relations_mode == 'faded':
+                faded_relationships = {}
+                for idx, row_name in enumerate(matrix.index):
+                    for jdx, col_name in enumerate(matrix.columns):
+                        row_roi = name_to_roi.get(row_name)
+                        col_roi = name_to_roi.get(col_name)
+                        if row_roi and col_roi and (col_roi, row_roi) in fade_info:
+                            key = f"{idx}_{jdx}"
+                            faded_relationships[key] = fade_info[(col_roi, row_roi)]
+
+        # Convert ROI numbers list for results (convert to int for JSON serialization)
         row_rois_list = [int(name_to_roi[name]) for name in matrix.index if name in name_to_roi]
         col_rois_list = [int(name_to_roi[name]) for name in matrix.columns if name in name_to_roi]
 
@@ -729,5 +867,6 @@ class StructureSet:
             'num_regions': num_regions_dict,
             'slice_ranges': slice_ranges_dict,
             'slice_indices': self.slice_sequence.slices if self.slice_sequence else [],
-            'structure_slices': structure_slices_dict
+            'structure_slices': structure_slices_dict,
+            'faded_relationships': faded_relationships if logical_relations_mode == 'faded' else None
         }

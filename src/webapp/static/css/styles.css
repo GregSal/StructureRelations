@@ -407,6 +407,38 @@ header h1 {
     display: flex;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.logical-relations-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logical-relations-control label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.logical-mode-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.logical-mode-select:hover {
+    border-color: var(--primary-color);
+}
+
+.logical-mode-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .toggle-label {
@@ -645,6 +677,11 @@ tbody tr:hover {
 
 .matrix-table td.rel-unknown {
     color: var(--rel-unknown-color);
+}
+
+/* Faded logical relationships - applied with reduced opacity */
+.matrix-table td.rel-faded {
+    opacity: 0.5;
 }
 
 /* Tooltip on hover */

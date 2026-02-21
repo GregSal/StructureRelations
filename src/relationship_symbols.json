@@ -1,6 +1,10 @@
 {
   "description": "Customizable symbols and colors for relationship types",
   "version": "1.0",
+  "logical_relationships": {
+    "transparency": 50,
+    "description": "Settings for logical relationship display. transparency is a percentage (0-100) for opacity in Faded mode"
+  },
   "relationships": {
     "CONTAINS": {
       "symbol": "⊂",

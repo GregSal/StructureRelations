@@ -4,18 +4,7 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Add intermediate_structures attribute to StructureRelationship that is used
-when is_logical is True to identify the structures that form the logical path.
-This will be a list of structure ROIs (default empty list).  If the relationship
-is logical and "Hide Logical Relations" is selected in the webapp, then this
-relationship will not be displayed if all of the intermediate structures are
-shown.  If any one of the intermediate structures is not shown, then the logical
-relationship will be displayed because the relationship is not logical based on
-the displayed relations.
-
-2. Identify "Logical" relations
-
-3. Fix issue that an open hole that is open only on one end will be treated as
+1. Fix issue that an open hole that is open only on one end will be treated as
 open on both ends for the sake of boundary testing.
 
 4. Investigate Issue that Warnings are being returned when calculating some
@@ -86,61 +75,6 @@ and filtered matrices still serialize correctly to JSON through to_dict()
 
 — The string conversion needs to handle StructureRelationship objects with
 de27im=None gracefully.
-
-## Logical Relationships
-
-Within a set of structures, transitive relationships can result in **Logical**
-relationships, which exists out of necessity due to other relationships in the
-structure set. The simplest example is one where:
- A *Contains* B and B *Contains* C,
- therefore the relationship A *Contains* C is a **Logical** one since it is a
- requirement of the other two relationships.  **Logical** relationships can also
- be chained further. For example, if C *Contains* D, the relationships
- A *Contains* D and B *Contains* D are both **Logical**.
-
-### Implied relationships
-
-Identifying **Logical** relationships is complicated by the fact that some
-relationships **Imply** other ones.  For example, *Partitioned* is not
-transitive, but it **Implies** the *Contains* relationship, so the following
-scenario is possible: If A *Is Partitioned by* B and B *Contains* C
-the relationship A *Contains* C is **Logical**.
-However, If A *Is Partitioned by* B and B *Is Partitioned by* C
-either the relationship A *Contains* C or the relationship
-A *Is Partitioned by* C are possible, so a **Logical** relationship does not exist.
-
-### The special case of Equals
-
-The *Equals* relationship is a special case since it is both symmetric and
-transitive. Therefore, if A *Equals* B then regardless of the relationship
-between B and C, the same relationship between  A and C is **Logical**.
-
-The other challenge with *Equals* is that identifying which relationships are
- **Logical** and which are the **Defining** relationships can be ambiguous. In
- the  relationship graph, larger structures come before smaller ones, providing
- a clear order for **Defining** and **Logical** relationships. However, with
- *Equals* relationships, there is no size difference to provide an order. We
- will need to include some other sorting criteria to provide a consistent order
- for these structures.  In addition we should provide an option to manually
- reorder equals relationships.
-
-### Implementation Plan
-
-1. Construct a directed graph of the structure relations where the edges are
-all the **Transitive** or **Implied** relationships in the structure set.
-
-2. Identify all cases of multiple paths between two structures in the graph.
-
-3. Eliminate paths that are not composed *entirely* of **Implied** relationships.
-
-4. For all remaining paths, mark the shortest path (single edge) as a
-**Logical** relationship.
-
-5. Identify the ROIs of the Intermediate Structures for the longest path
-between the Starting and Ending structures of the **Logical** relationship.
-
-6. Identify all *Equals* relationships and designate the outgoing relationships
-of the "downstream" structure as **Logical** relationships.
 
 ## Metrics
 
