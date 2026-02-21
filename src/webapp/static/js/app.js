@@ -102,6 +102,7 @@ class WebAppClient {
             this.updateMatrix();
         });
         document.getElementById('logicalRelationsMode').addEventListener('change', (e) => {
+            console.log('Logical relations mode changed to:', e.target.value);
             this.logicalRelationsMode = e.target.value;
             this.updateMatrix();
         });
@@ -1005,18 +1006,21 @@ class WebAppClient {
 
             const showDisjoint = document.getElementById('showDisjointToggle').checked;
 
+            const diagramRequest = {
+                session_id: this.sessionId,
+                row_rois: rowRois,
+                col_rois: colRois,
+                show_disjoint: showDisjoint,
+                logical_relations_mode: this.logicalRelationsMode
+            };
+            console.log('Sending diagram request:', diagramRequest);
+
             const response = await fetch('/api/diagram', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    session_id: this.sessionId,
-                    row_rois: rowRois,
-                    col_rois: colRois,
-                    show_disjoint: showDisjoint,
-                    logical_relations_mode: this.logicalRelationsMode
-                })
+                body: JSON.stringify(diagramRequest)
             });
 
             if (!response.ok) {
@@ -1024,6 +1028,8 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            console.log('Diagram response received:', { nodes: data.nodes.length, edges: data.edges.length });
+            console.log('Diagram edges:', data.edges.map(e => `(${e.from_node}->${e.to_node}): ${e.label}`));
             this.renderDiagram(data);
 
         } catch (error) {

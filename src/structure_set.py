@@ -225,12 +225,53 @@ class StructureSet:
             if relationship.is_identical:
                 continue
             rel_type = relationship.relationship_type
+            if not rel_type:
+                continue
+
             # Add edge if transitive
-            if rel_type and rel_type.is_transitive:
+            if rel_type.is_transitive:
                 transitive_graph.add_edge(roi_a, roi_b,
-                                         relationship=relationship)
+                                          relationship=relationship)
+                if rel_type.is_symmetric:
+                    transitive_graph.add_edge(roi_b, roi_a,
+                                              relationship=relationship)
 
         return transitive_graph
+
+    def _build_implied_subgraph(
+        self,
+        target_relation: 'RelationshipType'
+    ) -> nx.DiGraph:
+        '''Build a directed graph of implied relationships for a target type.
+
+        Args:
+            target_relation (RelationshipType): The relationship to infer
+                from implied edges (e.g., CONTAINS implied by PARTITIONED).
+
+        Returns:
+            nx.DiGraph: Subgraph with edges that imply the target relation.
+        '''
+        implied_graph = nx.DiGraph()
+        implied_graph.add_nodes_from(self.relationship_graph.nodes())
+
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+            if relationship.is_identical:
+                continue
+
+            rel_type = relationship.relationship_type
+            if not rel_type or rel_type == target_relation:
+                continue
+
+            if target_relation in rel_type.implied:
+                implied_graph.add_edge(roi_a, roi_b,
+                                       relationship=relationship)
+                if rel_type.is_symmetric or target_relation.is_symmetric:
+                    implied_graph.add_edge(roi_b, roi_a,
+                                           relationship=relationship)
+
+        return implied_graph
 
     def calculate_logical_flags(self) -> None:
         '''Calculate logical relationship flags based on graph topology.
@@ -302,6 +343,54 @@ class StructureSet:
                 pass
             except nx.NodeNotFound:
                 # Node doesn't exist, skip
+                pass
+
+        # Find logical relationships via implied-only paths
+        implied_graph_cache = {}
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+
+            # Skip self-relationships and already marked logical
+            if relationship.is_identical or relationship.is_logical:
+                continue
+
+            rel_type = relationship.relationship_type
+            if not rel_type:
+                continue
+
+            if rel_type.relation_type not in implied_graph_cache:
+                implied_graph_cache[rel_type.relation_type] = (
+                    self._build_implied_subgraph(rel_type)
+                )
+
+            implied_graph = implied_graph_cache[rel_type.relation_type]
+            if implied_graph.number_of_edges() == 0:
+                continue
+
+            try:
+                implied_paths = list(nx.all_simple_paths(
+                    implied_graph, roi_a, roi_b
+                ))
+                if implied_paths:
+                    longest_path = max(implied_paths, key=len)
+                    intermediate_rois = longest_path[1:-1]
+                    intermediate_structures = [ROI_Type(roi)
+                                              for roi in intermediate_rois]
+
+                    relationship.is_logical = True
+                    relationship.intermediate_structures = (
+                        intermediate_structures
+                    )
+
+                    logger.debug(
+                        'Identified implied logical relationship: ROI %d -> '
+                        'ROI %d (intermediates: %s)',
+                        roi_a, roi_b, intermediate_structures
+                    )
+            except nx.NetworkXNoPath:
+                pass
+            except nx.NodeNotFound:
                 pass
 
         # Handle EQUALS relationships

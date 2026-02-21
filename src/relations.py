@@ -104,8 +104,16 @@ class RelationshipType:
         Returns:
             List of RelationshipType objects that are implied by this relationship
         '''
+        if not self.implied_relation:
+            return []
+
+        if isinstance(self.implied_relation, str):
+            implied_names = [self.implied_relation]
+        else:
+            implied_names = list(self.implied_relation)
+
         result = []
-        for rel_name in self.implied_relation:
+        for rel_name in implied_names:
             rel_type = RELATIONSHIP_TYPES.get(rel_name)
             if rel_type:
                 result.append(rel_type)

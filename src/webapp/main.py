@@ -35,7 +35,7 @@ from webapp.websocket_manager import ConnectionManager
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -641,6 +641,9 @@ async def get_diagram_data(request: MatrixRequest):
         DiagramResponse: Nodes and edges for network visualization.
     '''
     logger.info(f'=== DIAGRAM REQUEST RECEIVED === session: {request.session_id}')
+    logger.info(f'    logical_relations_mode: {request.logical_relations_mode}')
+    logger.info(f'    row_rois: {request.row_rois}')
+    logger.info(f'    col_rois: {request.col_rois}')
     try:
         session_data = session_manager.load_session(request.session_id)
         if session_data is None:
@@ -683,6 +686,28 @@ async def get_diagram_data(request: MatrixRequest):
             'UNKNOWN': {'color': '#999999', 'width': 1, 'dashes': True, 'arrows': None}
         }
 
+        config_file = Path(__file__).parent.parent / 'relationship_symbols.json'
+        logical_opacity = 0.5
+        if config_file.exists():
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    transparency = config.get('logical_relationships', {}).get(
+                        'transparency', 50
+                    )
+                    logical_opacity = max(0.0, min(1.0, transparency / 100.0))
+            except (IOError, json.JSONDecodeError):
+                logger.warning('Failed to load logical relationship config')
+
+        def hex_to_rgba(color_hex: str, alpha: float) -> str:
+            color_hex = color_hex.lstrip('#')
+            if len(color_hex) != 6:
+                return color_hex
+            red = int(color_hex[0:2], 16)
+            green = int(color_hex[2:4], 16)
+            blue = int(color_hex[4:6], 16)
+            return f'rgba({red}, {green}, {blue}, {alpha:.3f})'
+
         # Get summary data
         summary_df = structure_set.summary()
 
@@ -704,6 +729,38 @@ async def get_diagram_data(request: MatrixRequest):
 
         # Get union of all ROIs that should be displayed
         visible_rois = set(row_rois) | set(col_rois)
+
+        def should_include_logical(rel_obj) -> bool:
+            if rel_obj is None:
+                return False
+
+            is_logical = getattr(rel_obj, 'is_logical', False)
+            intermediates = getattr(rel_obj, 'intermediate_structures', [])
+
+            logger.debug(f'should_include: is_logical={is_logical}, intermediates={intermediates}, mode={request.logical_relations_mode}, visible={sorted(visible_rois)}')
+
+            if request.logical_relations_mode == 'show':
+                logger.debug('Mode is "show" - including all relationships')
+                return True
+
+            if not is_logical:
+                logger.debug('Not a logical relationship - including')
+                return True
+
+            if request.logical_relations_mode == 'hide':
+                logger.debug('Mode is "hide" and relationship is logical - excluding')
+                return False
+
+            if request.logical_relations_mode == 'limited':
+                # Convert numpy types to Python ints for comparison
+                intermediates_set = {int(roi) for roi in intermediates}
+                all_visible = intermediates_set.issubset(visible_rois)
+                should_include = not all_visible
+                logger.debug(f'Limited mode: all_visible={all_visible}, should_include={should_include}, intermediates={intermediates_set}')
+                return should_include
+
+            logger.debug(f'Default include for mode: {request.logical_relations_mode}')
+            return True
 
         # Build nodes only for visible structures
         nodes = []
@@ -761,6 +818,11 @@ async def get_diagram_data(request: MatrixRequest):
                     logger.error(f'Error getting relationship type for {roi1}-{roi2}: {e}')
                     continue
 
+                logger.debug(f'Symmetric pair ({roi1},{roi2}): type={rel_type}, is_logical={rel.is_logical}')
+                if not should_include_logical(rel):
+                    logger.debug(f'  Filtering out {rel_type} relationship ({roi1},{roi2})')
+                    continue
+
                 if rel_type == 'EQUALS':
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
@@ -769,11 +831,14 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel_type in symmetric_relations:
                     # Symmetric relationships: show between any two visible structures
                     style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+                    edge_color = style['color']
+                    if request.logical_relations_mode == 'faded' and rel.is_logical:
+                        edge_color = hex_to_rgba(edge_color, logical_opacity)
                     edges.append(DiagramEdge(
                         from_node=roi1,
                         to_node=roi2,
                         label=rel_type,
-                        color=style['color'],
+                        color=edge_color,
                         width=style['width'],
                         dashes=style['dashes'],
                         arrows=style['arrows']
@@ -802,6 +867,13 @@ async def get_diagram_data(request: MatrixRequest):
                     logger.error(f'Error getting relationship type for {from_roi}->{to_roi}: {e}')
                     continue
 
+                logger.debug(f'Directional ({from_roi}->{to_roi}): type={rel_type}, is_logical={rel.is_logical}')
+                if not should_include_logical(rel):
+                    logger.debug(f'  Filtering out {rel_type} relationship ({from_roi}->{to_roi})')
+                    continue
+
+                logger.debug(f'  INCLUDING {rel_type} relationship ({from_roi}->{to_roi})')
+
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
 
@@ -813,16 +885,20 @@ async def get_diagram_data(request: MatrixRequest):
                 if rel_type not in symmetric_relations:
                     # Directional relationship: from_roi [rel_type] to_roi
                     style = edge_styles.get(rel_type, {'color': '#999999', 'width': 2, 'dashes': False, 'arrows': None})
+                    edge_color = style['color']
+                    if request.logical_relations_mode == 'faded' and rel.is_logical:
+                        edge_color = hex_to_rgba(edge_color, logical_opacity)
                     edges.append(DiagramEdge(
                         from_node=from_roi,
                         to_node=to_roi,
                         label=rel_type,
-                        color=style['color'],
+                        color=edge_color,
                             width=style['width'],
                             dashes=style['dashes'],
                             arrows=style['arrows']
                         ))
 
+        logger.info(f'Diagram response: {len(nodes)} nodes, {len(edges)} edges (mode={request.logical_relations_mode})')
         return DiagramResponse(nodes=nodes, edges=edges)
 
     except HTTPException:

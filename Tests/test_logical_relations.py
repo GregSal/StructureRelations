@@ -108,10 +108,10 @@ class TestLogicalConfines:
         # Check (1,3) relationship
         rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
         assert rel_1_3 is not None
-        # Should have Surrounds or a transitive relationship
-        assert rel_1_3.relationship_type.is_transitive or \
-               rel_1_3.relationship_type.relation_type in [
-                   'SURROUNDS', 'CONFINES']
+        assert rel_1_3.is_logical
+        assert rel_1_3.relationship_type.relation_type in [
+            'SURROUNDS', 'CONFINES'
+        ]
 
 
 class TestLogicalEquals:
