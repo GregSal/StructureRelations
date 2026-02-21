@@ -203,6 +203,35 @@ class StructureSet:
                     logger.debug('Calculated relationship between ROI %s and ROI %s (error accessing type: %s)',
                                  structure_a.name, structure_b.name, str(e))
 
+    def _build_transitive_subgraph(self) -> nx.DiGraph:
+        '''Build a directed graph containing only transitive relationships.
+
+        This subgraph includes all edges where the relationship type is
+        transitive (e.g., CONTAINS, SHELTERS, SURROUNDS, EQUALS).
+
+        Returns:
+            nx.DiGraph: Subgraph with same nodes as relationship_graph but
+                containing only transitive relationship edges.
+        '''
+        transitive_graph = nx.DiGraph()
+        # Add all nodes
+        transitive_graph.add_nodes_from(self.relationship_graph.nodes())
+
+        # Add transitive edges
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+            # Skip self-relationships
+            if relationship.is_identical:
+                continue
+            rel_type = relationship.relationship_type
+            # Add edge if transitive
+            if rel_type and rel_type.is_transitive:
+                transitive_graph.add_edge(roi_a, roi_b,
+                                         relationship=relationship)
+
+        return transitive_graph
+
     def calculate_logical_flags(self) -> None:
         '''Calculate logical relationship flags based on graph topology.
 
@@ -213,15 +242,101 @@ class StructureSet:
         only through intermediate structures.
 
         The is_logical flag in StructureRelationship objects will be set
-        to True for relationships identified as logical.
+        to True for relationships identified as logical. The
+        intermediate_structures field will contain ROI numbers of structures
+        forming the logical path.
 
-        Note:
-            This is a placeholder for future implementation. The specific
-            algorithm for identifying logical relationships will be developed
-            based on the semantic requirements of the relationship graph.
+        Algorithm:
+        1. Build a subgraph of transitive relationships
+        2. For each edge in the original graph:
+           - If multiple paths exist in transitive subgraph, mark as logical
+           - Extract ROIs from longest path as intermediate structures
+        3. Handle EQUALS relationships: mark downstream edges as logical
         '''
         logger.info('Calculating logical flags for relationships')
-        logger.debug('Logical flag calculation not yet implemented')
+
+        # Build transitive subgraph
+        transitive_graph = self._build_transitive_subgraph()
+
+        # Find logical relationships via transitivity
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+
+            # Skip self-relationships and already marked logical
+            if relationship.is_identical or relationship.is_logical:
+                continue
+
+            # Check if both ROIs exist in transitive subgraph
+            if (roi_a not in transitive_graph or
+                    roi_b not in transitive_graph):
+                continue
+
+            try:
+                # Find all simple paths between structures in transitive graph
+                all_paths = list(nx.all_simple_paths(
+                    transitive_graph, roi_a, roi_b
+                ))
+
+                # If multiple paths exist, the direct edge is logical
+                if len(all_paths) > 1:
+                    # Find the longest path for intermediate structures
+                    longest_path = max(all_paths, key=len)
+                    # Extract intermediate ROIs (exclude first and last)
+                    intermediate_rois = longest_path[1:-1]
+                    # Convert to ROI_Type list
+                    intermediate_structures = [ROI_Type(roi)
+                                              for roi in intermediate_rois]
+
+                    relationship.is_logical = True
+                    relationship.intermediate_structures = \
+                        intermediate_structures
+
+                    logger.debug(
+                        'Identified logical relationship: ROI %d -> ROI %d '
+                        '(intermediates: %s)',
+                        roi_a, roi_b, intermediate_structures
+                    )
+            except nx.NetworkXNoPath:
+                # No path exists in transitive subgraph, not logical
+                pass
+            except nx.NodeNotFound:
+                # Node doesn't exist, skip
+                pass
+
+        # Handle EQUALS relationships
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+            if relationship.is_identical:
+                continue
+
+            rel_type = relationship.relationship_type
+            if not rel_type or rel_type.relation_type != 'EQUALS':
+                continue
+
+            # Determine downstream (higher ROI number)
+            upstream_roi = min(roi_a, roi_b)
+            downstream_roi = max(roi_a, roi_b)
+
+            # Mark all outgoing edges from downstream as logical
+            for next_roi in self.relationship_graph.successors(
+                    downstream_roi):
+                if next_roi != upstream_roi:
+                    next_relationship = self.relationship_graph[
+                        downstream_roi][next_roi]['relationship']
+                    if not next_relationship.is_identical:
+                        next_relationship.is_logical = True
+                        next_relationship.intermediate_structures = [
+                            ROI_Type(upstream_roi)]
+                        logger.debug(
+                            'Identified EQUALS-derived logical '
+                            'relationship: ROI %d -> ROI %d '
+                            '(via EQUALS with ROI %d)',
+                            downstream_roi, next_roi, upstream_roi
+                        )
+
+        logger.info('Logical flag calculation complete')
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> Optional[StructureRelationship]:
         '''Get the relationship between two structures.

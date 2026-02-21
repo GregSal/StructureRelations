@@ -6,10 +6,11 @@ including the DE27IM relationship, identity flag, logical flag, and
 metrics placeholder.
 '''
 # %% Imports
-from typing import Optional, Any
-from dataclasses import dataclass
+from typing import Optional, Any, List
+from dataclasses import dataclass, field
 
 from relations import DE27IM, RelationshipType, RELATIONSHIP_TYPES
+from types_and_classes import ROI_Type
 
 
 # %% Class Definition
@@ -33,6 +34,16 @@ class StructureRelationship:
             relationship graph topology rather than being a direct geometric
             relationship. This flag is calculated by analyzing the graph
             structure in the finalize() method. Defaults to False.
+        intermediate_structures (List[ROI_Type]): List of ROI numbers for
+            structures that form the logical path between the two structures
+            in this relationship. Only populated when is_logical is True.
+            When the webapp's "Hide Logical Relations" option is enabled,
+            this relationship will be hidden from display if all intermediate
+            structures are currently shown, but will be displayed if any
+            intermediate structure is hidden (since the relationship is no
+            longer logically derivable from visible relationships). Will be
+            populated by the calculate_logical_flags() implementation.
+            Defaults to empty list.
         metrics (Optional[Any]): Placeholder for relationship metrics object.
             Will hold calculated metrics such as distances, volume ratios,
             overlap percentages, etc. The specific type and content will be
@@ -54,6 +65,7 @@ class StructureRelationship:
     de27im: Optional[DE27IM] = None
     is_identical: bool = False
     is_logical: bool = False
+    intermediate_structures: List[ROI_Type] = field(default_factory=list)
     metrics: Optional[Any] = None
     _override_type: Optional[RelationshipType] = None
 
