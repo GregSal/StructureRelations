@@ -11,6 +11,7 @@ The `/api/config/symbols` endpoint dynamically extracts symbol, color, and label
 ## Files
 
 - `relationship_definitions.json` (in parent src/ directory) - Main configuration file for all relationship properties including symbols, colors, and styling
+- `diagram_settings.json` - Configuration for network diagram node shapes and visualization settings
 
 ## Customization Guide
 
@@ -117,6 +118,56 @@ Colors are specified in hex format (#RRGGBB). Recommended color schemes:
     "width": 5,
     "dashes": false,
     "arrows": null
+  }
+}
+```
+
+### Diagram Settings Configuration
+
+The `diagram_settings.json` file defines node shapes for the network diagram visualization:
+
+```json
+{
+  "description": "Configuration for network diagram visualization",
+  "version": "1.0.0",
+  "node_shapes": {
+    "description": "Node shapes mapped to DICOM structure types",
+    "shape_map": {
+      "GTV": "star",
+      "CTV": "hexagon",
+      "PTV": "diamond",
+      "EXTERNAL": "box",
+      "ORGAN": "ellipse",
+      "AVOIDANCE": "triangle",
+      "BOLUS": "dot",
+      "SUPPORT": "square",
+      "FIXATION": "triangleDown"
+    },
+    "default_shape": "ellipse"
+  }
+}
+```
+
+**Available Shapes**:
+- `star` - Star shape
+- `hexagon` - Six-sided polygon
+- `diamond` - Diamond/rhombus shape
+- `box` - Rectangle/square
+- `ellipse` - Oval/circle (default)
+- `triangle` - Upward pointing triangle
+- `triangleDown` - Downward pointing triangle
+- `dot` - Small circle
+- `square` - Square with rounded corners
+
+**Customization Example**:
+To change all ORGAN structures to use a triangle shape:
+```json
+{
+  "node_shapes": {
+    "shape_map": {
+      "ORGAN": "triangle"
+    },
+    "default_shape": "ellipse"
   }
 }
 ```

@@ -1,0 +1,19 @@
+{
+  "description": "Configuration for network diagram visualization in StructureRelations webapp",
+  "version": "1.0.0",
+  "node_shapes": {
+    "description": "Node shapes mapped to DICOM structure types for network diagram visualization. Valid shapes: star, hexagon, diamond, box, ellipse, triangle, triangleDown, dot, square",
+    "shape_map": {
+      "GTV": "star",
+      "CTV": "hexagon",
+      "PTV": "diamond",
+      "EXTERNAL": "box",
+      "ORGAN": "ellipse",
+      "AVOIDANCE": "triangle",
+      "BOLUS": "dot",
+      "SUPPORT": "square",
+      "FIXATION": "triangleDown"
+    },
+    "default_shape": "ellipse"
+  }
+}
