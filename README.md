@@ -4,32 +4,11 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Fix issue that an open hole that is open only on one end will be treated as
-open on both ends for the sake of boundary testing.
-
-4. Investigate Issue that Warnings are being returned when calculating some
-relationships:
-
-  ``` cmd
-  d:\.conda\envs\StructureRelations\Lib\site-packages\shapely\predicates.py:1171:
-  RuntimeWarning: divide by zero encountered in relate
-  return lib.relate(a, b, **kwargs)
-  DEBUG:structure_set:Calculated relationship between ROI Lung B and ROI Lung R:
-  Relationship: Partition
-  d:\.conda\envs\StructureRelations\Lib\site-packages\shapely\predicates.py:1171:
-  RuntimeWarning: invalid value encountered in relate
-  return lib.relate(a, b, **kwargs)
-  d:\.conda\envs\StructureRelations\Lib\site-packages\shapely\predicates.py:1171:
-  RuntimeWarning: divide by zero encountered in relate
-  return lib.relate(a, b, **kwargs)
-  DEBUG:structure_set:Calculated relationship between ROI Lung B and ROI Lung L:
-  Relationship: Overlaps
-  d:\.conda\envs\StructureRelations\Lib\site-packages\shapely\predicates.py:1171:
-  RuntimeWarning: divide by zero encountered in relate
-  return lib.relate(a, b, **kwargs)
-  DEBUG:structure_set:Calculated relationship between ROI PTV Cavity and ROI eval PTV:
-  Relationship: Partition
-  ```
+1. Web App Updates
+    - Include brackets around symbol or label for logical relations
+    - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
+    - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
+    - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
 
 5. Add a unit attribute to StructureSet
     - Populate it from DICOM data
@@ -38,43 +17,6 @@ relationships:
 
 6. Begin work on Metric Calculations
 
-## Web App Updates
-
-- Identify or Hide logical relations
-
-  - If the relationship is logical and "Hide Logical Relations" is selected
-    in the webapp, then this relationship will not be displayed if all of the
-    intermediate structures are shown. If any one of the intermediate structures
-    is not shown, then the logical relationship will be displayed because the
-    relationship is not logical based on the displayed relations.
-
-  - Logical relations include brackets around symbol or label
-
-- Expand options for formatting edge lines
-
-- More flexibility in diagram layout so that nodes can be dragged without
-pulling the entire diagram
-
-- Add a status bar to the webapp to show current status, messages, etc.
-put logging.info() messages there.
-
-- Make the progress bar update during long operations (loading structures,
-calculating relationships, etc.)
-
-- If CT images are available, add option to show/hide CT background in Contour
-Plotting area
-
-- I will likely want to display some of the additional information in the
-relationship matrix within the webapp.  What will need to change to make it
-easy to customize what is displayed?  (this may become something in the
-configuration, settings or selectable within the web page - I haven't decided
-what to do here yet)
-
-- Webapp edge cases: Should verify that empty matrices, single-structure sets,
-and filtered matrices still serialize correctly to JSON through to_dict()
-
-— The string conversion needs to handle StructureRelationship objects with
-de27im=None gracefully.
 
 ## Metrics
 

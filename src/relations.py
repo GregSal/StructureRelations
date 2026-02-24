@@ -174,6 +174,10 @@ class RelationshipTest:
     every '*' or 'F' bit as a '0'. The relationship is identified when value
     binary is equal to the result of the `relationship_integer & mask`
     operation.
+
+    Future work includes a `transpose` function that transposes each 9-bit
+    segment of the 27-bit binaries.  This represents the reciprocal
+    relationship, i.e. B vs. A instead of A vs. B.
     '''
     relation_type: RelationshipType
     mask: int = 0b000000000000000000000000000
@@ -626,6 +630,9 @@ class DE27IM():
         '''Initialize relationship types and tests from JSON definitions.
 
         This function is called automatically on module import.
+        Future work includes generating complementary relationship tests from
+        primary relationship tests, using the RelationshipTest.transpose method,
+        (which currently is not implemented).
         '''
         def _load_relationship_definitions() -> List[Dict]:
             '''Load relationship definitions from JSON file.
