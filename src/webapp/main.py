@@ -834,10 +834,12 @@ async def get_diagram_data(request: MatrixRequest):
                     edge_color = style['color']
                     if request.logical_relations_mode == 'faded' and rel.is_logical:
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
+                    # Add brackets around label for logical relationships
+                    edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
                     edges.append(DiagramEdge(
                         from_node=roi1,
                         to_node=roi2,
-                        label=rel_type,
+                        label=edge_label,
                         color=edge_color,
                         width=style['width'],
                         dashes=style['dashes'],
@@ -888,10 +890,12 @@ async def get_diagram_data(request: MatrixRequest):
                     edge_color = style['color']
                     if request.logical_relations_mode == 'faded' and rel.is_logical:
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
+                    # Add brackets around label for logical relationships
+                    edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
                     edges.append(DiagramEdge(
                         from_node=from_roi,
                         to_node=to_roi,
-                        label=rel_type,
+                        label=edge_label,
                         color=edge_color,
                             width=style['width'],
                             dashes=style['dashes'],

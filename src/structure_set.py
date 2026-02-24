@@ -751,6 +751,9 @@ class StructureSet:
                         # For now, we'll flip common symbols
                         symbol_flip = {'⊂': '⊃', '⊏': '⊐'}
                         symbol = symbol_flip.get(symbol, symbol)
+                    # Add brackets around logical relationships
+                    if getattr(sr, 'is_logical', False):
+                        symbol = f'[{symbol}]'
                     return symbol
                 except (AttributeError, KeyError):
                     return '?'
@@ -762,7 +765,11 @@ class StructureSet:
                     return 'Unknown'
                 try:
                     rel_type = sr.relationship_type
-                    return rel_type.label if rel_type else 'Unknown'
+                    label = rel_type.label if rel_type else 'Unknown'
+                    # Add brackets around logical relationships
+                    if getattr(sr, 'is_logical', False):
+                        label = f'[{label}]'
+                    return label
                 except (AttributeError, KeyError):
                     return 'Unknown'
             relationship_matrix = relationship_matrix.map(get_label)
