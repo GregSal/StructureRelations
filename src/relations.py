@@ -138,98 +138,6 @@ class RelationshipType:
         return hash(self.relation_type)
 
 
-# === Module-level Registry ===
-# These will be populated when relationships are loaded from JSON
-RELATIONSHIP_TYPES: Dict[str, RelationshipType] = {}
-_relationship_tests: List['RelationshipTest'] = []
-
-
-def get_relationship_type(name: str) -> Optional[RelationshipType]:
-    '''Get relationship type by name.
-
-    Args:
-        name: Relationship type name (e.g., 'CONTAINS', 'OVERLAPS')
-
-    Returns:
-        RelationshipType object or None if not found
-    '''
-    return RELATIONSHIP_TYPES.get(name)
-
-
-def _load_relationship_definitions() -> List[Dict]:
-    '''Load relationship definitions from JSON file.
-
-    Returns:
-        List of relationship definitions from JSON
-
-    Raises:
-        ImportError: If relationship_definitions.json is not found or cannot be loaded
-    '''
-    json_path = Path(__file__).parent / 'relationship_definitions.json'
-
-    if not json_path.exists():
-        raise ImportError(
-            f'relationship_definitions.json not found at {json_path}. '
-            'This file is required for the relations module to function.'
-        )
-
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data.get('Relationships', [])
-    except (json.JSONDecodeError, KeyError) as e:
-        raise ImportError(
-            f'Error loading relationship_definitions.json: {e}'
-        ) from e
-
-
-def _initialize_relationships():
-    '''Initialize relationship types and tests from JSON definitions.
-
-    This function is called automatically on module import.
-    '''
-    global RELATIONSHIP_TYPES, _relationship_tests
-
-    definitions = _load_relationship_definitions()
-
-    # Create RelationshipType objects for all relationships
-    for defn in definitions:
-        rel_type = RelationshipType(
-            relation_type=defn['relation_type'],
-            label=defn['label'],
-            symbol=defn['symbol'],
-            color=defn.get('color', '#000000'),
-            description=defn.get('description', ''),
-            complementary_relation=defn.get('complementary_relation', ''),
-            implied_relation=defn.get('implied_relation', []),
-            symmetric=defn.get('symmetric', False),
-            transitive=defn.get('transitive', False),
-            reversed_arrow=defn.get('reversed_arrow', False),
-            pattern=defn.get('pattern', ''),
-            mask=defn.get('mask', ''),
-            value=defn.get('value', ''),
-            mask_decimal=defn.get('mask_decimal', 0),
-            value_decimal=defn.get('value_decimal', 0),
-            examples=defn.get('examples', [])
-        )
-
-        RELATIONSHIP_TYPES[rel_type.relation_type] = rel_type
-
-        # Create RelationshipTest for relationships with patterns
-        if rel_type.mask and rel_type.value:
-            _relationship_tests.append(
-                RelationshipTest(
-                    relation_type=rel_type,
-                    mask=rel_type.mask_decimal,
-                    value=rel_type.value_decimal
-                )
-            )
-
-
-# Special LOGICAL flag (not a relationship type)
-LOGICAL = False  # Used as a boolean flag for logical combinations
-
-
 @dataclass()
 class RelationshipTest:
     '''The test binaries used to identify a relationship type.
@@ -490,7 +398,7 @@ class DE9IM():
         relation_str = ''.join(r_matrix)
         return relation_str
 
-    def test_relation(self, mask: int, value: int)->RelationshipType:
+    def test_relation(self, mask: int, value: int)->bool:
         '''Apply the defined test to the supplied relation binary.
 
         Args:
@@ -651,17 +559,12 @@ class DE27IM():
             the 27-bit relationship for two structures on a given slice.
 
     '''
-
-    # Relationship Test Definitions - loaded from JSON via _relationship_tests
-    @property
-    def test_binaries(self):
-        '''Get the list of relationship tests.
-
-        Returns:
-            List of RelationshipTest objects loaded from relationship_definitions.json
-        '''
-        return _relationship_tests
-
+    # These will be populated when relationships are loaded from JSON
+    # A dictionary of relationship type definitions loaded from JSON,
+    # keyed by relation_type.
+    relationship_definitions: Dict[str, RelationshipType] = {}
+    # Relationship Test Definitions - loaded from JSON
+    test_binaries: List[RelationshipTest] = []
     # padding is a DE9IM object built from a string of 'FFFFFFFFF', which
     # becomes 9 zeros when converted to binary.  Padding is used in cases where
     # Exterior and Hull relationships are not relevant.
@@ -717,6 +620,70 @@ class DE27IM():
             # Initialize the relationship with all padding.
             relation_group = tuple([self.padding] * 3)
             self.relation = self.combine_groups(relation_group)
+
+    @classmethod
+    def _initialize_relationships(cls):
+        '''Initialize relationship types and tests from JSON definitions.
+
+        This function is called automatically on module import.
+        '''
+        def _load_relationship_definitions() -> List[Dict]:
+            '''Load relationship definitions from JSON file.
+
+            Returns:
+                List of relationship definitions from JSON
+
+            Raises:
+                ImportError: If relationship_definitions.json is not found or
+                    cannot be loaded
+            '''
+            json_path = Path(__file__).parent / 'relationship_definitions.json'
+            if not json_path.exists():
+                raise ImportError(
+                    f'relationship_definitions.json not found at {json_path}. '
+                    'This file is required for the relations module to function.'
+                )
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data.get('Relationships', [])
+            except (json.JSONDecodeError, KeyError) as err:
+                raise ImportError(
+                    f'Error loading relationship_definitions.json: {err}'
+                ) from err
+
+        definitions = _load_relationship_definitions()
+        # Create RelationshipType objects for all relationships
+        for defn in definitions:
+            rel_type = RelationshipType(
+                relation_type=defn['relation_type'],
+                label=defn['label'],
+                symbol=defn['symbol'],
+                color=defn.get('color', '#000000'),
+                description=defn.get('description', ''),
+                complementary_relation=defn.get('complementary_relation', ''),
+                implied_relation=defn.get('implied_relation', []),
+                symmetric=defn.get('symmetric', False),
+                transitive=defn.get('transitive', False),
+                reversed_arrow=defn.get('reversed_arrow', False),
+                pattern=defn.get('pattern', ''),
+                mask=defn.get('mask', ''),
+                value=defn.get('value', ''),
+                mask_decimal=defn.get('mask_decimal', 0),
+                value_decimal=defn.get('value_decimal', 0),
+                examples=defn.get('examples', [])
+            )
+            cls.relationship_definitions[rel_type.relation_type] = rel_type
+            # Create RelationshipTest for relationships with patterns
+            if rel_type.mask and rel_type.value:
+                cls.test_binaries.append(
+                    RelationshipTest(
+                        relation_type=rel_type,
+                        mask=rel_type.mask_decimal,
+                        value=rel_type.value_decimal
+                    )
+                )
+
 
     @property
     def is_null(self)->bool:
@@ -1058,7 +1025,7 @@ class DE27IM():
             if result:
                 return result
         # Return UNKNOWN relationship type
-        return RELATIONSHIP_TYPES.get('UNKNOWN', None)
+        return self.relationship_definitions.get('UNKNOWN', None)
 
     def __eq__(self, value):
         if isinstance(value, self.__class__):
@@ -1076,14 +1043,15 @@ class DE27IM():
         return f'<DE27IM>: {self.relation}'
 
 
-# %% Module Initialization
-# Load relationship definitions and create module-level constants
-_initialize_relationships()
-
+# === Module-level Registry ===
 # Create module-level constants for backward compatibility
 # These allow: from relations import CONTAINS, OVERLAPS, etc.
-for _name, _rel_type in RELATIONSHIP_TYPES.items():
-    globals()[_name] = _rel_type
+#for _name, _rel_type in RELATIONSHIP_TYPES.items():
+#    globals()[_name] = _rel_type
+
+# === Module Initialization ===
+# Initialize relationship types and tests on module import
+DE27IM._initialize_relationships()
 
 # Make RELATIONSHIP_TESTS available at module level
-RELATIONSHIP_TESTS = _relationship_tests
+RELATIONSHIP_TYPES = DE27IM.relationship_definitions

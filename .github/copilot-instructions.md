@@ -8,7 +8,10 @@ This project analyzes spatial relationships between DICOM RT (Radiotherapy) stru
 - Prefer limiting lines to 80 characters, accept lines up to 100 characters
 - use single quotes for strings unless double quotes are needed for interpolation or nested quotes
 - use google style docstring for functions and classes
+- Don't add a newline at the beginning of a doc string
 - use type hints for function arguments and return values
+- Use f-string for string formatting except for logging statements where lazy formatting is preferred
+- Use str.join() for string concatenation instead of + operator
 
 ## Architecture
 
