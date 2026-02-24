@@ -176,45 +176,56 @@ async def get_symbol_config():
 
     Returns:
         dict: Configuration for relationship symbols, labels, descriptions, and colors.
+
+    Raises:
+        HTTPException: If relationship_definitions.json is not found or fails to load.
     '''
-    config_file = Path(__file__).parent.parent / 'relationship_symbols.json'
+    config_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+
+    if not config_file.exists():
+        logger.error('Configuration file not found: %s', config_file)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Configuration file not found: relationship_definitions.json'
+        )
 
     try:
-        if config_file.exists():
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                return config
-        else:
-            # Return default config if file doesn't exist
-            logger.warning('Config file not found: %s', config_file)
-            return get_default_symbol_config()
-    except (IOError, json.JSONDecodeError) as e:
-        logger.error('Error loading symbol config: %s', e)
-        return get_default_symbol_config()
-
-
-def get_default_symbol_config():
-    '''Get the default relationship symbol configuration.
-
-    Returns:
-        dict: Default configuration for relationship symbols.
-    '''
-    return {
-        "description": "Default relationship symbols and colors",
-        "version": "1.0",
-        "relationships": {
-            "CONTAINS": {"symbol": "⊂", "label": "Contains", "description": "Structure A fully encloses structure B", "color": "#10b981"},
-            "OVERLAPS": {"symbol": "∩", "label": "Overlaps", "description": "Structures share common volume", "color": "#ef4444"},
-            "BORDERS": {"symbol": "|", "label": "Borders", "description": "Structures touch at boundaries", "color": "#3b82f6"},
-            "SURROUNDS": {"symbol": "○", "label": "Surrounds", "description": "Structure B is within a hole in A", "color": "#8b5cf6"},
-            "SHELTERS": {"symbol": "△", "label": "Shelters", "description": "B within convex hull of A, not touching", "color": "#f59e0b"},
-            "PARTITION": {"symbol": "⊕", "label": "Partition", "description": "Structures partition space between them", "color": "#ec4899"},
-            "CONFINES": {"symbol": "⊏", "label": "Confines", "description": "B contacts inner surface of A", "color": "#06b6d4"},
-            "DISJOINT": {"symbol": "∅", "label": "Disjoint", "description": "Structures are completely separated", "color": "#6b7280"},
-            "EQUALS": {"symbol": "=", "label": "Equals", "description": "Same structure", "color": "#000000"},
-            "UNKNOWN": {"symbol": "?", "label": "Unknown", "description": "Relationship not determined", "color": "#9ca3af"}
-        }
-    }
+        with open(config_file, 'r', encoding='utf-8') as f:
+            definitions = json.load(f)
+            # Transform relationship definitions to symbol config format
+            relationships = {}
+            for rel in definitions.get('Relationships', []):
+                rel_type = rel.get('relation_type')
+                if rel_type:
+                    relationships[rel_type] = {
+                        'symbol': rel.get('symbol', '?'),
+                        'label': rel.get('label', rel_type),
+                        'description': rel.get('description', ''),
+                        'color': rel.get('color', '#9ca3af')
+                    }
+            # Include logical relationships config
+            config = {
+                'description': definitions.get('Introduction', ''),
+                'version': '1.0',
+                'logical_relationships': definitions.get('logical_relationships', {
+                    'transparency': 20,
+                    'description': 'Settings for logical relationship display'
+                }),
+                'relationships': relationships
+            }
+            return config
+    except json.JSONDecodeError as e:
+        logger.error('Invalid JSON in configuration file: %s', e)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Invalid JSON in relationship_definitions.json: {str(e)}'
+        )
+    except IOError as e:
+        logger.error('Error reading configuration file: %s', e)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Error reading relationship_definitions.json: {str(e)}'
+        )
 
 
 @app.post('/api/upload', response_model=UploadResponse)
@@ -667,37 +678,39 @@ async def get_diagram_data(request: MatrixRequest):
             'FIXATION': 'triangleDown'
         }
 
-        # Define edge styles by relationship type
-        edge_styles = {
-            'CONTAINS': {'color': '#00CED1', 'width': 4, 'dashes': False, 'arrows': 'to'},
-            'WITHIN': {'color': '#00CED1', 'width': 4, 'dashes': False, 'arrows': 'to'},
-            'OVERLAPS': {'color': '#FF6347', 'width': 5, 'dashes': False, 'arrows': None},
-            'BORDERS': {'color': '#32CD32', 'width': 3, 'dashes': True, 'arrows': None},
-            'SURROUNDS': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
-            'ENCLOSED': {'color': '#4169E1', 'width': 3, 'dashes': False, 'arrows': 'to'},
-            'SHELTERS': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
-            'SHELTERED': {'color': '#9370DB', 'width': 2, 'dashes': True, 'arrows': 'to'},
-            'PARTITIONED': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
-            'PARTITIONS': {'color': '#FFD700', 'width': 4, 'dashes': False, 'arrows': 'to'},
-            'CONFINES': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
-            'CONFINED': {'color': '#FF1493', 'width': 3, 'dashes': False, 'arrows': 'to'},
-            'DISJOINT': {'color': '#808080', 'width': 1, 'dashes': True, 'arrows': None},
-            'EQUALS': {'color': '#FF0000', 'width': 5, 'dashes': False, 'arrows': 'to;from'},
-            'UNKNOWN': {'color': '#999999', 'width': 1, 'dashes': True, 'arrows': None}
-        }
-
-        config_file = Path(__file__).parent.parent / 'relationship_symbols.json'
-        logical_opacity = 0.5
-        if config_file.exists():
+        # Load relationship definitions including edge styles
+        definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+        edge_styles = {}
+        if definitions_file.exists():
             try:
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    transparency = config.get('logical_relationships', {}).get(
-                        'transparency', 50
+                with open(definitions_file, 'r', encoding='utf-8') as f:
+                    definitions = json.load(f)
+                    for rel in definitions.get('Relationships', []):
+                        rel_type = rel.get('relation_type')
+                        relation_style = rel.get('relation_style', {
+                            'color': '#999999',
+                            'width': 2,
+                            'dashes': False,
+                            'arrows': None
+                        })
+                        if rel_type:
+                            edge_styles[rel_type] = relation_style
+            except (IOError, json.JSONDecodeError) as e:
+                logger.warning('Failed to load relationship definitions: %s', e)
+
+        # Load transparency settings from relationship definitions
+        logical_opacity = 0.2  # Default 20% opacity
+        definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+        if definitions_file.exists():
+            try:
+                with open(definitions_file, 'r', encoding='utf-8') as f:
+                    definitions = json.load(f)
+                    transparency = definitions.get('logical_relationships', {}).get(
+                        'transparency', 20
                     )
                     logical_opacity = max(0.0, min(1.0, transparency / 100.0))
             except (IOError, json.JSONDecodeError):
-                logger.warning('Failed to load logical relationship config')
+                logger.warning('Failed to load logical relationship transparency settings')
 
         def hex_to_rgba(color_hex: str, alpha: float) -> str:
             color_hex = color_hex.lstrip('#')
