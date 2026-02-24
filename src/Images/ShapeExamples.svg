@@ -1,0 +1,208 @@
+<svg width="1100" height="1400" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="14">
+
+  <!-- White background -->
+  <rect x="0" y="0" width="1100" height="1400" fill="white"/>
+
+  <!-- Filter Definitions -->
+  <defs>
+    <!-- Glow Effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Drop Shadow -->
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="3" dy="3" result="offsetblur"/>
+      <feMerge>
+        <feMergeNode in="offsetblur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Emboss/3D Effect -->
+    <filter id="emboss" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feMerge>
+        <feMergeNode in="offsetblur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Motion Blur -->
+    <filter id="motionBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5,0"/>
+    </filter>
+
+    <!-- Neon Glow -->
+    <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur1"/>
+      <feGaussianBlur stdDeviation="8" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Gradient for stroke -->
+    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff0000;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#00ff00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0000ff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="550" y="40" text-anchor="middle" font-size="24" font-weight="bold">
+    SVG Shape and Line Style Reference
+  </text>
+
+  <!-- =======================
+       NODE SHAPES
+       ======================= -->
+  <text x="50" y="90" font-size="20" font-weight="bold">Node Shapes</text>
+
+  <!-- Ellipse -->
+  <ellipse cx="150" cy="150" rx="50" ry="30" fill="#3399ff" stroke="black" stroke-width="2"/>
+  <text x="150" y="155" text-anchor="middle">Ellipse</text>
+
+  <!-- Rectangle -->
+  <rect x="270" y="125" width="110" height="50" fill="#00CED1" stroke="black" stroke-width="2"/>
+  <text x="325" y="155" text-anchor="middle">Rectangle</text>
+
+  <!-- Rounded Rectangle -->
+  <rect x="440" y="125" width="180" height="50" rx="15" ry="15" fill="#90EE90" stroke="black" stroke-width="2"/>
+  <text x="530" y="155" text-anchor="middle">Rounded Rectangle</text>
+
+  <!-- Diamond -->
+  <polygon points="705,150 750,115 795,150 750,185" fill="#FFFF00" stroke="black" stroke-width="2"/>
+  <text x="750" y="155" text-anchor="middle">Diamond</text>
+
+  <!-- Hexagon -->
+  <polygon points="900,155 930,135 960,155 960,185 930,205 900,185" fill="#FFA500" stroke="black" stroke-width="2"/>
+  <text x="930" y="175" text-anchor="middle">Hexagon</text>
+
+  <!-- Circle -->
+  <circle cx="150" cy="280" r="35" fill="#FFB6C1" stroke="black" stroke-width="2"/>
+  <text x="150" y="285" text-anchor="middle">Circle</text>
+
+  <!-- Parallelogram -->
+  <polygon points="260,255 400,255 440,305 300,305" fill="#E6E6FA" stroke="black" stroke-width="2"/>
+  <text x="350" y="285" text-anchor="middle">Parallelogram</text>
+
+  <!-- Triangle -->
+  <polygon points="505,305 560,250 615,305" fill="#87CEEB" stroke="black" stroke-width="2"/>
+  <text x="560" y="290" text-anchor="middle">Triangle</text>
+
+  <!-- =======================
+       EDGE STYLES
+       ======================= -->
+  <text x="50" y="430" font-size="20" font-weight="bold">Edge Styles</text>
+
+  <!-- Solid -->
+  <line x1="100" y1="480" x2="300" y2="480" stroke="black" stroke-width="2"/>
+  <text x="200" y="505" text-anchor="middle">Solid</text>
+
+  <!-- Dashed -->
+  <line x1="100" y1="530" x2="300" y2="530" stroke="black" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="200" y="555" text-anchor="middle">Dashed</text>
+
+  <!-- Dotted -->
+  <line x1="100" y1="580" x2="300" y2="580" stroke="black" stroke-width="2" stroke-dasharray="2 6"/>
+  <text x="200" y="605" text-anchor="middle">Dotted</text>
+
+  <!-- Bold -->
+  <line x1="100" y1="630" x2="300" y2="630" stroke="black" stroke-width="5"/>
+  <text x="200" y="655" text-anchor="middle">Bold</text>
+
+  <!-- Curved Solid -->
+  <path d="M100 700 C150 650, 250 750, 300 700" stroke="black" stroke-width="2" fill="none"/>
+  <text x="200" y="730" text-anchor="middle">Curved Solid</text>
+
+  <!-- Curved Dashed -->
+  <path d="M100 760 C150 710, 250 810, 300 760" stroke="black" stroke-width="2" stroke-dasharray="8 6" fill="none"/>
+  <text x="200" y="790" text-anchor="middle">Curved Dashed</text>
+
+  <!-- Curved Dotted -->
+  <path d="M100 820 C150 770, 250 870, 300 820" stroke="black" stroke-width="2" stroke-dasharray="2 6" fill="none"/>
+  <text x="200" y="850" text-anchor="middle">Curved Dotted</text>
+
+  <!-- Glow Effect -->
+  <line x1="400" y1="480" x2="600" y2="480" stroke="#0066ff" stroke-width="4"/>
+  <line x1="400" y1="480" x2="600" y2="480" stroke="#66aaff" stroke-width="8" opacity="0.5"/>
+  <text x="500" y="505" text-anchor="middle">Glow</text>
+
+  <!-- Drop Shadow -->
+  <line x1="403" y1="533" x2="603" y2="533" stroke="#999999" stroke-width="3"/>
+  <line x1="400" y1="530" x2="600" y2="530" stroke="black" stroke-width="3"/>
+  <text x="500" y="555" text-anchor="middle">Drop Shadow</text>
+
+  <!-- Embossed -->
+  <line x1="399" y1="579" x2="599" y2="579" stroke="#cccccc" stroke-width="4"/>
+  <line x1="401" y1="581" x2="601" y2="581" stroke="#333333" stroke-width="4"/>
+  <line x1="400" y1="580" x2="600" y2="580" stroke="#666666" stroke-width="3"/>
+  <text x="500" y="605" text-anchor="middle">Embossed</text>
+
+  <!-- Neon Effect -->
+  <line x1="400" y1="630" x2="600" y2="630" stroke="#ff00ff" stroke-width="10" opacity="0.3"/>
+  <line x1="400" y1="630" x2="600" y2="630" stroke="#ff66ff" stroke-width="6" opacity="0.6"/>
+  <line x1="400" y1="630" x2="600" y2="630" stroke="#ff00ff" stroke-width="2"/>
+  <text x="500" y="655" text-anchor="middle">Neon</text>
+
+  <!-- Double Line -->
+  <line x1="400" y1="698" x2="600" y2="698" stroke="black" stroke-width="2"/>
+  <line x1="400" y1="702" x2="600" y2="702" stroke="black" stroke-width="2"/>
+  <text x="500" y="730" text-anchor="middle">Double Line</text>
+
+  <!-- Motion Blur -->
+  <line x1="395" y1="760" x2="605" y2="760" stroke="#666666" stroke-width="8" opacity="0.3"/>
+  <line x1="398" y1="760" x2="602" y2="760" stroke="#999999" stroke-width="5" opacity="0.5"/>
+  <line x1="400" y1="760" x2="600" y2="760" stroke="black" stroke-width="3"/>
+  <text x="500" y="790" text-anchor="middle">Motion Blur</text>
+
+  <!-- Gradient Stroke (alternative if gradient doesn't render) -->
+  <line x1="400" y1="820" x2="467" y2="820" stroke="#ff0000" stroke-width="4"/>
+  <line x1="467" y1="820" x2="533" y2="820" stroke="#00ff00" stroke-width="4"/>
+  <line x1="533" y1="820" x2="600" y2="820" stroke="#0000ff" stroke-width="4"/>
+  <text x="500" y="850" text-anchor="middle">Gradient</text>
+  <!-- =======================
+       ARROWHEADS
+       ======================= -->
+  <text x="50" y="920" font-size="20" font-weight="bold">Arrowheads</text>
+
+  <!-- Normal -->
+  <line x1="100" y1="970" x2="250" y2="970" stroke="black" stroke-width="2"/>
+  <polygon points="250,970 235,960 235,980" fill="black"/>
+  <text x="180" y="1000" text-anchor="middle">Normal</text>
+
+  <!-- Vee -->
+  <line x1="100" y1="1020" x2="250" y2="1020" stroke="black" stroke-width="2"/>
+  <polygon points="250,1020 235,1005 235,1035" fill="none" stroke="black" stroke-width="2"/>
+  <text x="180" y="1050" text-anchor="middle">Vee</text>
+
+  <!-- Diamond -->
+  <line x1="100" y1="1070" x2="250" y2="1070" stroke="black" stroke-width="2"/>
+  <polygon points="250,1070 240,1060 230,1070 240,1080" fill="white" stroke="black" stroke-width="2"/>
+  <text x="180" y="1100" text-anchor="middle">Diamond</text>
+
+  <!-- Dot -->
+  <line x1="100" y1="1120" x2="250" y2="1120" stroke="black" stroke-width="2"/>
+  <circle cx="250" cy="1120" r="6" fill="black"/>
+  <text x="180" y="1150" text-anchor="middle">Dot</text>
+
+  <!-- Tee -->
+  <line x1="100" y1="1170" x2="250" y2="1170" stroke="black" stroke-width="2"/>
+  <line x1="250" y1="1160" x2="250" y2="1180" stroke="black" stroke-width="2"/>
+  <text x="180" y="1200" text-anchor="middle">Tee</text>
+
+  <!-- None -->
+  <line x1="100" y1="1220" x2="250" y2="1220" stroke="black" stroke-width="2"/>
+  <text x="180" y="1250" text-anchor="middle">None (Undirected)</text>
+
+</svg>
