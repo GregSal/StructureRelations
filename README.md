@@ -5,8 +5,14 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Web App Updates
-    - Include brackets around symbol or label for logical relations
+    - Move shape definitions to a json file
+    - implement expanded options for line types
+        - Different dash types
+        - double lines
+        - glow
+    - Move display options to a separate definitions file from the relationship definitions
     - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
+        - Move parameters for layout algorithm to json file.
     - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
     - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
 

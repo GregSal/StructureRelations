@@ -665,18 +665,21 @@ async def get_diagram_data(request: MatrixRequest):
 
         structure_set = session_data.structure_set
 
-        # Define node shapes by DICOM type
-        shape_map = {
-            'GTV': 'star',
-            'CTV': 'hexagon',
-            'PTV': 'diamond',
-            'EXTERNAL': 'box',
-            'ORGAN': 'ellipse',
-            'AVOIDANCE': 'triangle',
-            'BOLUS': 'dot',
-            'SUPPORT': 'square',
-            'FIXATION': 'triangleDown'
-        }
+        # Load node shape definitions
+        diagram_settings_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
+        shape_map = {}
+        default_shape = 'ellipse'
+        if diagram_settings_file.exists():
+            try:
+                with open(diagram_settings_file, 'r', encoding='utf-8') as f:
+                    diagram_settings = json.load(f)
+                    node_shapes = diagram_settings.get('node_shapes', {})
+                    shape_map = node_shapes.get('shape_map', {})
+                    default_shape = node_shapes.get('default_shape', 'ellipse')
+            except (IOError, json.JSONDecodeError) as e:
+                logger.warning('Failed to load diagram settings, using ellipse as default shape: %s', e)
+        else:
+            logger.warning('Diagram settings file not found: %s, using ellipse as default shape', diagram_settings_file)
 
         # Load relationship definitions including edge styles
         definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
@@ -800,7 +803,7 @@ async def get_diagram_data(request: MatrixRequest):
                 id=roi,
                 label=name,
                 color=color_hex,
-                shape=shape_map.get(dicom_type, 'ellipse'),
+                shape=shape_map.get(dicom_type, default_shape),
                 title=tooltip
             ))
 
