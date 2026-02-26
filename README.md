@@ -5,16 +5,39 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Web App Updates
-    - Move shape definitions to a json file
-    - implement expanded options for line types
-        - Different dash types
-        - double lines
-        - glow
-    - Move display options to a separate definitions file from the relationship definitions
-    - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
-        - Move parameters for layout algorithm to json file.
-    - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
-    - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
+    1. Cosmetic Changes
+        - Tool Tips need to use <br> instead of /n
+        - Need tooltips for edges
+        - Put Structure Set info at the top of the form
+        - Make Diagram the first tab and open to it by default
+    2. Relation (Edge) Updates
+        - Move shape definitions to a json file
+        - Move display options to a separate definitions file from the relationship definitions
+        - implement expanded options for line types
+            - Different dash types
+            - double lines
+            - glow
+    3. General Diagram Updates
+        - Make separate selectors for matrix and diagram
+            - Include "Copy from matrix" and "Copy from diagram" buttons
+        - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
+            - Move parameters for layout algorithm to json file.
+    4. Processing Updates
+        - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
+        - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
+    5. Plot Contours update
+        - Add a toggle-able legend to Plot Contours
+        - Allow Plot contours to select more than two structures in an orderable list
+        - Add option to use 3 contours for relationship mode to show the relationship between three structures (e.g. A, B, and A-B)
+        - Add option to enable or disable plotting margins (tolerance) around contours
+        - Allow Plot contours to toggle between contour mode and relationship mode
+            - In contour mode structures are displayed as outlines in their assigned colours (or from a default list if no colours assigned).
+            - In relationship mode contours are plotted filled with colours assigned based on the relationship between the structures.
+            - In relationship mode, only the first two or three structures are used
+        - provide a dropdown list to select slice
+            - this complements the slider bar
+            - The drop down includes what structures are present and the relationships between the structures on that slice. This allows users to quickly jump to slices of interest.
+            - Keep a record of the relationships calculated for every slice and for boundary slices
 
 5. Add a unit attribute to StructureSet
     - Populate it from DICOM data
