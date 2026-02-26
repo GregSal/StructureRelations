@@ -6,7 +6,7 @@ Test and reports on relationships between DICOM RT Structures
 
 1. Web App Updates
     1. Cosmetic Changes
-        - Tool Tips need to use <br> instead of /n
+        - Tool Tips need to use `<br>` instead of /n
         - Need tooltips for edges
         - Put Structure Set info at the top of the form
         - Make Diagram the first tab and open to it by default
