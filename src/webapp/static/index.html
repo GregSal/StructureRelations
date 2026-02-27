@@ -76,83 +76,7 @@
 
             <!-- Stage 4: Results -->
             <section class="stage" id="stage-results" style="display: none;">
-                <!-- Structure Analysis Selection -->
-                <div class="card collapsible-card" style="margin-bottom: 1rem;">
-                    <div class="card-header" id="analysisConfigHeader">
-                        <h3>Structure Analysis Selection</h3>
-                        <button class="collapse-toggle" id="analysisConfigToggle">▼</button>
-                    </div>
-                    <div class="card-content" id="analysisConfigContent">
-                        <div class="matrix-config">
-                            <div class="axis-selector">
-                                <div class="axis-header">
-                                    <h3>From</h3>
-                                    <div class="filter-controls">
-                                        <label for="colDicomFilter">Filter by Type:</label>
-                                        <select id="colDicomFilter" class="dicom-filter">
-                                            <option value="">All Types</option>
-                                        </select>
-                                    </div>
-                                    <div class="button-group" style="margin-top: 0.5rem;">
-                                        <button class="btn btn-secondary btn-sm" id="selectAllColsBtn">Select All</button>
-                                        <button class="btn btn-secondary btn-sm" id="selectNoneColsBtn">Select None</button>
-                                    </div>
-                                </div>
-                                <div class="structure-lists">
-                                    <div class="list-container">
-                                        <p class="list-label">Available</p>
-                                        <div class="sortable-list" id="availableColsList"></div>
-                                    </div>
-                                    <div class="list-container">
-                                        <p class="list-label">Selected</p>
-                                        <div class="sortable-list" id="selectedColsList"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="axis-selector">
-                                <div class="axis-header">
-                                    <h3>To</h3>
-                                    <div class="filter-controls">
-                                        <label for="rowDicomFilter">Filter by Type:</label>
-                                        <select id="rowDicomFilter" class="dicom-filter">
-                                            <option value="">All Types</option>
-                                        </select>
-                                    </div>
-                                    <div class="button-group" style="margin-top: 0.5rem;">
-                                        <button class="btn btn-secondary btn-sm" id="selectAllRowsBtn">Select All</button>
-                                        <button class="btn btn-secondary btn-sm" id="selectNoneRowsBtn">Select None</button>
-                                    </div>
-                                </div>
-                                <div class="structure-lists">
-                                    <div class="list-container">
-                                        <p class="list-label">Available</p>
-                                        <div class="sortable-list" id="availableRowsList"></div>
-                                    </div>
-                                    <div class="list-container">
-                                        <p class="list-label">Selected</p>
-                                        <div class="sortable-list" id="selectedRowsList"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="matrix-controls">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="useSymbolsToggle" checked>
-                                <span>Use Symbols</span>
-                            </label>
-                            <div class="logical-relations-control">
-                                <label for="logicalRelationsMode">Logical Relations:</label>
-                                <select id="logicalRelationsMode" class="logical-mode-select">
-                                    <option value="hide">Hide</option>
-                                    <option value="limited" selected>Limited (Default)</option>
-                                    <option value="show">Show All</option>
-                                    <option value="faded">Faded</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" id="updateMatrixBtn">Update Analysis</button>
-                        </div>
-                    </div>
-                </div>
+                <div class="structure-set-info" id="structureSetInfo" style="display: none;"></div>
 
                 <!-- Tab Navigation -->
                 <div class="tab-navigation">
@@ -166,6 +90,33 @@
                 <div class="tab-content-container">
                     <!-- Diagram Tab -->
                     <div class="tab-content active" id="tab-diagram">
+                        <div class="card collapsible-card" style="margin-bottom: 1rem;">
+                            <div class="card-header" id="diagramConfigHeader">
+                                <h3>Select Structures to Display</h3>
+                                <button class="collapse-toggle" id="diagramConfigToggle">►</button>
+                            </div>
+                            <div class="card-content" id="diagramConfigContent" style="display: none;">
+                                <div class="diagram-search">
+                                    <label for="diagramSearchInput">Search:</label>
+                                    <input type="text" id="diagramSearchInput" placeholder="Search ID or type...">
+                                </div>
+                                <div class="diagram-structure-list" id="diagramStructureList"></div>
+                                <div class="diagram-config-controls">
+                                    <div class="logical-relations-control">
+                                        <label for="diagramLogicalRelationsMode">Logical Relations:</label>
+                                        <select id="diagramLogicalRelationsMode" class="logical-mode-select">
+                                            <option value="hide">Hide</option>
+                                            <option value="limited" selected>Limited (Default)</option>
+                                            <option value="show">Show All</option>
+                                            <option value="faded">Faded</option>
+                                        </select>
+                                    </div>
+                                    <div class="button-group">
+                                        <button class="btn btn-secondary" id="copyFromMatrixBtn">Copy from matrix</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="card">
                             <h2>Relationship Diagram</h2>
                             <div class="diagram-controls">
@@ -177,7 +128,7 @@
                                     <input type="checkbox" id="showLabelsToggle" checked>
                                     <span>Show Edge Labels</span>
                                 </label>
-                                <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
+                                <button class="btn btn-primary" id="applyDiagramBtn" disabled>Apply</button>
                             </div>
                             <div id="networkDiagram" class="network-diagram"></div>
                         </div>
@@ -208,6 +159,76 @@
 
                     <!-- Matrix Tab -->
                     <div class="tab-content" id="tab-matrix">
+                        <div class="card collapsible-card" style="margin-bottom: 1rem;">
+                            <div class="card-header" id="analysisConfigHeader">
+                                <h3>Select Matrix Elements</h3>
+                                <button class="collapse-toggle" id="analysisConfigToggle">►</button>
+                            </div>
+                            <div class="card-content" id="analysisConfigContent" style="display: none;">
+                                <div class="matrix-config">
+                                    <div class="axis-selector">
+                                        <div class="axis-header">
+                                            <h3>From</h3>
+                                            <div class="filter-controls">
+                                                <label for="colDicomFilter">Filter by Type:</label>
+                                                <select id="colDicomFilter" class="dicom-filter">
+                                                    <option value="">All Types</option>
+                                                </select>
+                                            </div>
+                                            <div class="button-group" style="margin-top: 0.5rem;">
+                                                <button class="btn btn-secondary btn-sm" id="selectAllColsBtn">Select All</button>
+                                                <button class="btn btn-secondary btn-sm" id="selectNoneColsBtn">Select None</button>
+                                            </div>
+                                        </div>
+                                        <div class="structure-lists">
+                                            <div class="list-container">
+                                                <p class="list-label">Available</p>
+                                                <div class="sortable-list" id="availableColsList"></div>
+                                            </div>
+                                            <div class="list-container">
+                                                <p class="list-label">Selected</p>
+                                                <div class="sortable-list" id="selectedColsList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="axis-selector">
+                                        <div class="axis-header">
+                                            <h3>To</h3>
+                                            <div class="filter-controls">
+                                                <label for="rowDicomFilter">Filter by Type:</label>
+                                                <select id="rowDicomFilter" class="dicom-filter">
+                                                    <option value="">All Types</option>
+                                                </select>
+                                            </div>
+                                            <div class="button-group" style="margin-top: 0.5rem;">
+                                                <button class="btn btn-secondary btn-sm" id="selectAllRowsBtn">Select All</button>
+                                                <button class="btn btn-secondary btn-sm" id="selectNoneRowsBtn">Select None</button>
+                                            </div>
+                                        </div>
+                                        <div class="structure-lists">
+                                            <div class="list-container">
+                                                <p class="list-label">Available</p>
+                                                <div class="sortable-list" id="availableRowsList"></div>
+                                            </div>
+                                            <div class="list-container">
+                                                <p class="list-label">Selected</p>
+                                                <div class="sortable-list" id="selectedRowsList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="matrix-controls">
+                                    <label class="toggle-label">
+                                        <input type="checkbox" id="useSymbolsToggle" checked>
+                                        <span>Use Symbols</span>
+                                    </label>
+                                    <div class="button-group">
+                                        <button class="btn btn-secondary" id="copyFromDiagramBtn">Copy from diagram</button>
+                                        <button class="btn btn-primary" id="updateMatrixBtn">Update Analysis</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="card">
                             <h2>Relationship Matrix</h2>
                             <p id="matrixInfo" class="matrix-info"></p>

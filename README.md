@@ -6,16 +6,16 @@ Test and reports on relationships between DICOM RT Structures
 
 1. Web App Updates
     1. Cosmetic Changes
-        - Put Structure Set info at the top of the form
+        - Need tooltips for edges
+        - Add a legend for edge colors and styles
+        - Add a legend for node colors and shapes
+        - Add a legend for relationship symbols
     2. Relation (Edge) Updates
         - implement expanded options for line types
             - Different dash types
             - double lines
             - glow
     3. General Diagram Updates
-        - Make separate selectors for matrix and diagram
-            - Include "Copy from matrix" and "Copy from diagram" buttons
-            - Add a copy selection between rows and columns for the matrix
         - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
             - Move parameters for layout algorithm to json file.
     4. Processing Updates

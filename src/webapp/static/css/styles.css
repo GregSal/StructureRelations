@@ -410,10 +410,26 @@ header h1 {
     flex-wrap: wrap;
 }
 
+.button-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
 .logical-relations-control {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.diagram-config-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
 }
 
 .logical-relations-control label {
@@ -452,6 +468,80 @@ header h1 {
     width: 18px;
     height: 18px;
     cursor: pointer;
+}
+
+.diagram-structure-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.5rem 1rem;
+}
+
+.diagram-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.diagram-search input {
+    flex: 1;
+    min-width: 220px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.diagram-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.diagram-structure-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--bg-color);
+    padding: 0.4rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.diagram-structure-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.diagram-structure-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.1;
+}
+
+.diagram-structure-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.structure-set-info {
+    background-color: var(--bg-color);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.structure-set-line {
+    margin: 0.25rem 0;
+}
+
+.structure-set-label {
+    font-weight: 600;
+    margin-right: 0.35rem;
 }
 
 .matrix-info {
@@ -760,6 +850,13 @@ tbody tr:hover {
 
 .btn-secondary:hover {
     background-color: var(--border-color);
+}
+
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--border-color);
+    color: var(--text-secondary);
 }
 
 .action-buttons {

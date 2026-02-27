@@ -8,7 +8,16 @@ class WebAppClient {
         this.symbolConfig = null;  // Will store loaded config
         this.network = null;  // vis-network instance
         this.plotAbortController = null;  // Track current plot request
-        this.logicalRelationsMode = 'limited';  // Default: limited mode
+        this.diagramLogicalRelationsMode = 'limited';  // Default: limited mode
+        this.diagramLogicalRelationsModeApplied = 'limited';
+        this.diagramShowDisjointApplied = false;
+        this.diagramShowLabelsApplied = true;
+        this.diagramSelection = new Set();
+        this.diagramAppliedSelection = new Set();
+        this.diagramSelectionPending = false;
+        this.patientInfo = null;
+        this.structureItems = [];
+        this.structureItemsByRoi = new Map();
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -101,13 +110,11 @@ class WebAppClient {
         document.getElementById('useSymbolsToggle').addEventListener('change', () => {
             this.updateMatrix();
         });
-        document.getElementById('logicalRelationsMode').addEventListener('change', (e) => {
-            console.log('Logical relations mode changed to:', e.target.value);
-            this.logicalRelationsMode = e.target.value;
-            this.updateMatrix();
-        });
         document.getElementById('updateMatrixBtn').addEventListener('click', () => {
             this.updateMatrix();
+        });
+        document.getElementById('copyFromDiagramBtn').addEventListener('click', () => {
+            this.copyFromDiagramToMatrix();
         });
 
         // Export - use correct IDs from HTML
@@ -131,6 +138,11 @@ class WebAppClient {
             this.toggleAnalysisConfig();
         });
 
+        // Diagram config toggle
+        document.getElementById('diagramConfigToggle').addEventListener('click', () => {
+            this.toggleDiagramConfig();
+        });
+
         // DICOM Type filters
         document.getElementById('rowDicomFilter').addEventListener('change', (e) => {
             this.filterStructuresByType('rows', e.target.value);
@@ -140,14 +152,25 @@ class WebAppClient {
         });
 
         // Diagram controls
-        document.getElementById('refreshDiagramBtn').addEventListener('click', () => {
-            this.refreshDiagram();
-        });
         document.getElementById('showDisjointToggle').addEventListener('change', () => {
-            this.refreshDiagram();
+            this.updateDiagramPendingState();
         });
         document.getElementById('showLabelsToggle').addEventListener('change', () => {
-            this.toggleEdgeLabels();
+            this.updateDiagramPendingState();
+        });
+        document.getElementById('diagramLogicalRelationsMode').addEventListener('change', (e) => {
+            console.log('Diagram logical relations mode changed to:', e.target.value);
+            this.diagramLogicalRelationsMode = e.target.value;
+            this.updateDiagramPendingState();
+        });
+        document.getElementById('applyDiagramBtn').addEventListener('click', () => {
+            this.applyDiagramSelection();
+        });
+        document.getElementById('copyFromMatrixBtn').addEventListener('click', () => {
+            this.copyFromMatrixToDiagram();
+        });
+        document.getElementById('diagramSearchInput').addEventListener('input', (e) => {
+            this.filterDiagramSelectionList(e.target.value);
         });
 
         // Select All/None buttons
@@ -317,6 +340,7 @@ class WebAppClient {
             // Update patient info
             const patientInfo = document.getElementById('patientInfo');
             const pInfo = data.patient_info || {};
+            this.patientInfo = pInfo;
             patientInfo.innerHTML = `
                 <div><strong>Patient ID:</strong> ${pInfo.patient_id || 'N/A'}</div>
                 <div><strong>Patient Name:</strong> ${pInfo.patient_name || 'N/A'}</div>
@@ -466,14 +490,20 @@ class WebAppClient {
             // Initialize sortable lists
             this.initializeSortableLists(data);
 
+            // Initialize diagram selection list
+            this.initializeDiagramSelection(data);
+
             // Populate contour plot controls
             this.populateContourPlotControls(data);
 
             // Display initial matrix
             this.displayMatrix(data);
 
+            // Render structure set info above tabs
+            this.renderStructureSetInfo();
+
             // Refresh diagram with initial data
-            this.refreshDiagram();
+            this.applyDiagramSelection();
 
             // Show results stage
             this.showStage('results');
@@ -536,6 +566,35 @@ class WebAppClient {
 
         // Add sort listeners
         this.initializeSorting();
+    }
+
+    renderStructureSetInfo() {
+        const container = document.getElementById('structureSetInfo');
+        if (!container) return;
+
+        const pInfo = this.patientInfo || {};
+        const lines = [];
+
+        if (pInfo.patient_name) {
+            lines.push({ label: 'Patient Name', value: pInfo.patient_name });
+        }
+        if (pInfo.patient_id) {
+            lines.push({ label: 'Patient ID', value: pInfo.patient_id });
+        }
+        if (pInfo.structure_set) {
+            lines.push({ label: 'Structure Set', value: pInfo.structure_set });
+        }
+
+        if (lines.length === 0) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = lines.map(line => (
+            `<div class="structure-set-line"><span class="structure-set-label">${line.label}:</span> ${line.value}</div>`
+        )).join('');
+        container.style.display = 'block';
     }
 
     initializeSorting() {
@@ -645,6 +704,12 @@ class WebAppClient {
             return a.name.localeCompare(b.name);
         });
 
+        this.structureItems = items;
+        this.structureItemsByRoi = new Map();
+        items.forEach(item => {
+            this.structureItemsByRoi.set(parseInt(item.roi), item);
+        });
+
         // Add sorted items to selected lists
         items.forEach(item => {
             const rowItem = this.createSortableItem(item.roi, item.name, item.color, item.dicomType, item.codeMeaning);
@@ -707,22 +772,18 @@ class WebAppClient {
                 // Move from From list to Available From list
                 const availableList = document.getElementById('availableRowsList');
                 availableList.appendChild(item);
-                this.refreshDiagram();
             } else if (parentList && parentList.id === 'selectedColsList') {
                 // Move from To list to Available To list
                 const availableList = document.getElementById('availableColsList');
                 availableList.appendChild(item);
-                this.refreshDiagram();
             } else if (parentList && parentList.id === 'availableRowsList') {
                 // Move from Available From list to From list
                 const selectedList = document.getElementById('selectedRowsList');
                 selectedList.appendChild(item);
-                this.refreshDiagram();
             } else if (parentList && parentList.id === 'availableColsList') {
                 // Move from Available To list to To list
                 const selectedList = document.getElementById('selectedColsList');
                 selectedList.appendChild(item);
-                this.refreshDiagram();
             }
         });
 
@@ -802,8 +863,7 @@ class WebAppClient {
                     session_id: this.sessionId,
                     row_rois: rowRois,
                     col_rois: colRois,
-                    use_symbols: useSymbols,
-                    logical_relations_mode: this.logicalRelationsMode
+                    use_symbols: useSymbols
                 })
             });
 
@@ -813,9 +873,6 @@ class WebAppClient {
 
             const data = await response.json();
             this.displayMatrix(data);
-
-            // Also refresh the diagram if it's visible
-            this.refreshDiagram();
 
         } catch (error) {
             console.error('Matrix update error:', error);
@@ -989,6 +1046,164 @@ class WebAppClient {
         }
     }
 
+    toggleDiagramConfig() {
+        const content = document.getElementById('diagramConfigContent');
+        const toggle = document.getElementById('diagramConfigToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '►';
+        }
+    }
+
+    initializeDiagramSelection(data) {
+        const list = document.getElementById('diagramStructureList');
+        list.innerHTML = '';
+
+        this.diagramSelection = new Set();
+        this.diagramAppliedSelection = new Set();
+
+        this.structureItems.forEach(item => {
+            const listItem = this.createDiagramListItem(item);
+            list.appendChild(listItem);
+            this.diagramSelection.add(parseInt(item.roi));
+        });
+
+        this.diagramAppliedSelection = new Set(this.diagramSelection);
+        this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
+        this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
+        this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
+        this.updateDiagramPendingState();
+
+        if (data && data.rows && data.rows.length > 0) {
+            this.updateDiagramPendingState();
+        }
+    }
+
+    createDiagramListItem(item) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'diagram-structure-item';
+        wrapper.dataset.roi = item.roi;
+        wrapper.dataset.name = item.name.toLowerCase();
+        wrapper.dataset.dicomType = (item.dicomType || '').toLowerCase();
+        wrapper.dataset.codeMeaning = (item.codeMeaning || '').toLowerCase();
+
+        const metaParts = [];
+        if (item.dicomType) {
+            metaParts.push(item.dicomType);
+        }
+        if (item.codeMeaning && item.codeMeaning !== item.name) {
+            metaParts.push(item.codeMeaning);
+        }
+
+        const metaText = metaParts.join(' • ');
+
+        wrapper.innerHTML = `
+            <input type="checkbox" data-roi="${item.roi}" checked>
+            <span class="item-color" style="background-color: ${item.color}"></span>
+            <span class="item-id">${item.roi}</span>
+            <span class="diagram-structure-text">
+                <span class="item-name">${item.name}</span>
+                ${metaText ? `<span class="diagram-structure-meta">${metaText}</span>` : ''}
+            </span>
+        `;
+
+        const checkbox = wrapper.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', (e) => {
+            const roi = parseInt(e.target.dataset.roi);
+            if (e.target.checked) {
+                this.diagramSelection.add(roi);
+            } else {
+                this.diagramSelection.delete(roi);
+            }
+            this.updateDiagramPendingState();
+        });
+
+        return wrapper;
+    }
+
+    filterDiagramSelectionList(query) {
+        const normalized = query.trim().toLowerCase();
+        const tokens = normalized.split(/\s+/).filter(Boolean);
+        const items = document.querySelectorAll('.diagram-structure-item');
+
+        items.forEach(item => {
+            if (!normalized) {
+                item.style.display = '';
+                return;
+            }
+
+            const roiText = item.dataset.roi || '';
+            const nameText = item.dataset.name || '';
+            const typeText = item.dataset.dicomType || '';
+            const labelText = item.dataset.codeMeaning || '';
+            const haystack = [roiText, nameText, typeText, labelText].join(' ');
+            const matchesAny = tokens.some(token => haystack.includes(token));
+
+            item.style.display = matchesAny ? '' : 'none';
+        });
+    }
+
+    applyDiagramSelection() {
+        this.diagramAppliedSelection = new Set(this.diagramSelection);
+        this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
+        this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
+        this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
+        this.updateDiagramPendingState();
+        this.refreshDiagram();
+    }
+
+    setDiagramPending(isPending) {
+        this.diagramSelectionPending = isPending;
+        const applyButton = document.getElementById('applyDiagramBtn');
+        applyButton.disabled = !isPending;
+    }
+
+    updateDiagramPendingState() {
+        const selectionChanged = !this.areSetsEqual(
+            this.diagramSelection,
+            this.diagramAppliedSelection
+        );
+        const showDisjoint = document.getElementById('showDisjointToggle').checked;
+        const showLabels = document.getElementById('showLabelsToggle').checked;
+        const togglesChanged =
+            showDisjoint !== this.diagramShowDisjointApplied ||
+            showLabels !== this.diagramShowLabelsApplied;
+        const logicalChanged =
+            this.diagramLogicalRelationsMode !== this.diagramLogicalRelationsModeApplied;
+
+        this.setDiagramPending(selectionChanged || togglesChanged || logicalChanged);
+    }
+
+    getDiagramAppliedRois() {
+        const applied = this.diagramAppliedSelection;
+        return this.structureItems
+            .map(item => parseInt(item.roi))
+            .filter(roi => applied.has(roi));
+    }
+
+    areSetsEqual(a, b) {
+        if (a.size !== b.size) return false;
+        for (const value of a) {
+            if (!b.has(value)) return false;
+        }
+        return true;
+    }
+
+    syncDiagramSelection(newSelection) {
+        this.diagramSelection = new Set(newSelection);
+        this.updateDiagramPendingState();
+
+        const checkboxes = document.querySelectorAll('#diagramStructureList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            const roi = parseInt(cb.dataset.roi);
+            cb.checked = this.diagramSelection.has(roi);
+        });
+    }
+
     async refreshDiagram() {
         if (!this.sessionId) {
             console.warn('No session ID available for diagram');
@@ -996,22 +1211,20 @@ class WebAppClient {
         }
 
         try {
-            const selectedRowsList = document.getElementById('selectedRowsList');
-            const selectedColsList = document.getElementById('selectedColsList');
+            const selectedRois = this.getDiagramAppliedRois();
+            if (selectedRois.length === 0) {
+                alert('Please select at least one structure for the diagram');
+                return;
+            }
 
-            const rowRois = Array.from(selectedRowsList.children)
-                .map(item => parseInt(item.dataset.roi));
-            const colRois = Array.from(selectedColsList.children)
-                .map(item => parseInt(item.dataset.roi));
-
-            const showDisjoint = document.getElementById('showDisjointToggle').checked;
+            const showDisjoint = this.diagramShowDisjointApplied;
 
             const diagramRequest = {
                 session_id: this.sessionId,
-                row_rois: rowRois,
-                col_rois: colRois,
+                row_rois: selectedRois,
+                col_rois: selectedRois,
                 show_disjoint: showDisjoint,
-                logical_relations_mode: this.logicalRelationsMode
+                logical_relations_mode: this.diagramLogicalRelationsModeApplied
             };
             console.log('Sending diagram request:', diagramRequest);
 
@@ -1040,7 +1253,7 @@ class WebAppClient {
 
     renderDiagram(data) {
         const container = document.getElementById('networkDiagram');
-        const showLabels = document.getElementById('showLabelsToggle').checked;
+        const showLabels = this.diagramShowLabelsApplied;
 
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => ({
@@ -1143,28 +1356,14 @@ class WebAppClient {
     }
 
     removeStructureFromDiagram(roi) {
-        // Move from From list to Available From list
-        const fromList = document.getElementById('selectedRowsList');
-        const fromItem = Array.from(fromList.children).find(
-            item => parseInt(item.dataset.roi) === roi
+        const checkbox = document.querySelector(
+            `#diagramStructureList input[type="checkbox"][data-roi="${roi}"]`
         );
-        if (fromItem) {
-            const availableFromList = document.getElementById('availableRowsList');
-            availableFromList.appendChild(fromItem);
+        if (checkbox) {
+            checkbox.checked = false;
+            this.diagramSelection.delete(parseInt(roi));
+            this.updateDiagramPendingState();
         }
-
-        // Move from To list to Available To list
-        const toList = document.getElementById('selectedColsList');
-        const toItem = Array.from(toList.children).find(
-            item => parseInt(item.dataset.roi) === roi
-        );
-        if (toItem) {
-            const availableToList = document.getElementById('availableColsList');
-            availableToList.appendChild(toItem);
-        }
-
-        // Refresh diagram to show updated structure lists
-        this.refreshDiagram();
     }
 
     toggleEdgeLabels() {
@@ -1214,6 +1413,45 @@ class WebAppClient {
         Array.from(selectedRowsList.children).forEach(rowItem => {
             const colItem = rowItem.cloneNode(true);
             selectedColsList.appendChild(colItem);
+        });
+    }
+
+    copyFromMatrixToDiagram() {
+        const selectedRowsList = document.getElementById('selectedRowsList');
+        const selectedColsList = document.getElementById('selectedColsList');
+
+        const rowRois = Array.from(selectedRowsList.children)
+            .map(item => parseInt(item.dataset.roi));
+        const colRois = Array.from(selectedColsList.children)
+            .map(item => parseInt(item.dataset.roi));
+
+        const combined = new Set([...rowRois, ...colRois]);
+        this.syncDiagramSelection(combined);
+    }
+
+    copyFromDiagramToMatrix() {
+        const selectedRowsList = document.getElementById('selectedRowsList');
+        const selectedColsList = document.getElementById('selectedColsList');
+        const availableRowsList = document.getElementById('availableRowsList');
+        const availableColsList = document.getElementById('availableColsList');
+
+        selectedRowsList.innerHTML = '';
+        selectedColsList.innerHTML = '';
+        availableRowsList.innerHTML = '';
+        availableColsList.innerHTML = '';
+
+        const selectionSet = new Set(this.diagramSelection);
+        this.structureItems.forEach(item => {
+            const rowItem = this.createSortableItem(item.roi, item.name, item.color, item.dicomType, item.codeMeaning);
+            const colItem = this.createSortableItem(item.roi, item.name, item.color, item.dicomType, item.codeMeaning);
+
+            if (selectionSet.has(parseInt(item.roi))) {
+                selectedRowsList.appendChild(rowItem);
+                selectedColsList.appendChild(colItem);
+            } else {
+                availableRowsList.appendChild(rowItem);
+                availableColsList.appendChild(colItem);
+            }
         });
     }
 
@@ -1597,6 +1835,9 @@ class WebAppClient {
         // Reset application state for new analysis
         this.sessionId = null;
         this.selectedStructures.clear();
+        this.patientInfo = null;
+        this.diagramSelection.clear();
+        this.diagramAppliedSelection.clear();
         if (this.websocket) {
             this.websocket.close();
             this.websocket = null;
@@ -1606,6 +1847,12 @@ class WebAppClient {
             this.network = null;
         }
         this.updateConnectionStatus(false);
+
+        const structureSetInfo = document.getElementById('structureSetInfo');
+        if (structureSetInfo) {
+            structureSetInfo.innerHTML = '';
+            structureSetInfo.style.display = 'none';
+        }
 
         // Clear file input
         document.getElementById('fileInput').value = '';
