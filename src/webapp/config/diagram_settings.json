@@ -15,5 +15,98 @@
       "FIXATION": "triangleDown"
     },
     "default_shape": "ellipse"
+  },
+  "relationship_styles": {
+    "description": "Line styles for relationship edges in network diagram",
+    "UNKNOWN": {
+      "color": "#999999",
+      "width": 1,
+      "dashes": true,
+      "arrows": null
+    },
+    "DISJOINT": {
+      "color": "#808080",
+      "width": 1,
+      "dashes": true,
+      "arrows": null
+    },
+    "SHELTERS": {
+      "color": "#9370DB",
+      "width": 2,
+      "dashes": true,
+      "arrows": "to"
+    },
+    "SHELTERED": {
+      "color": "#9370DB",
+      "width": 2,
+      "dashes": true,
+      "arrows": "to"
+    },
+    "SURROUNDS": {
+      "color": "#4169E1",
+      "width": 3,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "ENCLOSED": {
+      "color": "#4169E1",
+      "width": 3,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "BORDERS": {
+      "color": "#32CD32",
+      "width": 3,
+      "dashes": true,
+      "arrows": null
+    },
+    "CONFINES": {
+      "color": "#FF1493",
+      "width": 3,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "CONFINED": {
+      "color": "#FF1493",
+      "width": 3,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "CONTAINS": {
+      "color": "#00CED1",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "WITHIN": {
+      "color": "#00CED1",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "EQUALS": {
+      "color": "#FF0000",
+      "width": 5,
+      "dashes": false,
+      "arrows": "to;from"
+    },
+    "PARTITIONED": {
+      "color": "#FFD700",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "PARTITIONS": {
+      "color": "#FFD700",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    },
+    "OVERLAPS": {
+      "color": "#FF6347",
+      "width": 5,
+      "dashes": false,
+      "arrows": null
+    }
   }
 }

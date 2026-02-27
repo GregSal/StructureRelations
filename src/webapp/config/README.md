@@ -4,20 +4,24 @@ This directory documents the configuration for relationship visualization in the
 
 ## Configuration Source
 
-Relationship symbols and colors are now defined in **`src/relationship_definitions.json`** (consolidated with relationship type definitions).
+Relationship definitions are split between two files:
+- **`src/relationship_definitions.json`** - Core relationship types, symbols, labels, and logical definitions
+- **`src/webapp/config/diagram_settings.json`** - Visual styling including colors and edge styles for network diagrams
 
-The `/api/config/symbols` endpoint dynamically extracts symbol, color, and label information from this file.
+The `/api/config/symbols` endpoint dynamically extracts symbol and label
+information from relationship_definitions.json, and colors from
+diagram_settings.json.
 
 ## Files
 
-- `relationship_definitions.json` (in parent src/ directory) - Main configuration file for all relationship properties including symbols, colors, and styling
-- `diagram_settings.json` - Configuration for network diagram node shapes and visualization settings
+- `relationship_definitions.json` (in parent src/ directory) - Main configuration file for all relationship type definitions
+- `diagram_settings.json` - Visual styling for diagrams including colors, edge styles, and node shapes
 
 ## Customization Guide
 
 ### Configuration Structure
 
-The `relationship_definitions.json` file defines all properties for each relationship type:
+The `relationship_definitions.json` file defines the core properties for each relationship type:
 
 ```json
 {
@@ -32,15 +36,26 @@ The `relationship_definitions.json` file defines all properties for each relatio
       "symbol": "Unicode character or ASCII",
       "label": "Display name",
       "description": "Explanation shown in tooltip",
-      "color": "#RRGGBB hex color code",
-      "relation_style": {
-        "color": "#RRGGBB",
-        "width": 2,
-        "dashes": false,
-        "arrows": "to"
-      }
+      "pattern": "DE-9IM pattern",
+      "mask": "Binary mask",
+      "value": "Binary value"
     }
   ]
+}
+```
+
+The `diagram_settings.json` file contains visual styling:
+
+```json
+{
+  "relationship_styles": {
+    "RELATIONSHIP_TYPE": {
+      "color": "#RRGGBB",
+      "width": 2,
+      "dashes": false,
+      "arrows": "to"
+    }
+  }
 }
 ```
 
@@ -68,7 +83,9 @@ You can change the symbol for any relationship type. Common Unicode symbols:
 
 ### Customizing Colors
 
-Colors are specified in hex format (#RRGGBB). Recommended color schemes:
+Colors for matrix display are specified in `diagram_settings.json` under
+`relationship_styles.*.color` in hex format (#RRGGBB). Edge styles for network
+diagrams are defined in `relationship_styles`. Recommended color schemes:
 
 **Semantic (Default)**:
 - Green (#10b981) - Positive/contains
@@ -88,48 +105,73 @@ Colors are specified in hex format (#RRGGBB). Recommended color schemes:
 
 ### Example Modifications
 
-#### Change CONTAINS to use a different symbol and color
+#### Change CONTAINS to use a different symbol
+In `src/relationship_definitions.json`:
 ```json
 {
   "relation_type": "CONTAINS",
   "symbol": "⊃",
   "label": "Contains",
-  "description": "Structure A fully encloses structure B",
-  "color": "#22c55e",
-  "relation_style": {
-    "color": "#22c55e",
-    "width": 4,
-    "dashes": false,
-    "arrows": "to"
+  "description": "Structure A fully encloses structure B"
+}
+```
+
+#### Change CONTAINS color and edge style
+In `src/webapp/config/diagram_settings.json`:
+```json
+{
+  "relationship_styles": {
+    "CONTAINS": {
+      "color": "#22c55e",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    }
   }
 }
 ```
 
 #### Use ASCII characters instead of Unicode
+In `src/relationship_definitions.json`:
 ```json
 {
   "relation_type": "OVERLAPS",
   "symbol": "X",
   "label": "Overlaps",
-  "description": "Structures share common volume",
-  "color": "#dc2626",
-  "relation_style": {
-    "color": "#dc2626",
-    "width": 5,
-    "dashes": false,
-    "arrows": null
+  "description": "Structures share common volume"
+}
+```
+
+Then update the style in `src/webapp/config/diagram_settings.json`:
+```json
+{
+  "relationship_styles": {
+    "OVERLAPS": {
+      "color": "#dc2626",
+      "width": 5,
+      "dashes": false,
+      "arrows": null
+    }
   }
 }
 ```
 
 ### Diagram Settings Configuration
 
-The `diagram_settings.json` file defines node shapes for the network diagram visualization:
+The `diagram_settings.json` file defines colors and edge styles for relationships:
 
 ```json
 {
   "description": "Configuration for network diagram visualization",
   "version": "1.0.0",
+  "relationship_styles": {
+    "CONTAINS": {
+      "color": "#00CED1",
+      "width": 4,
+      "dashes": false,
+      "arrows": "to"
+    }
+  },
   "node_shapes": {
     "description": "Node shapes mapped to DICOM structure types",
     "shape_map": {
@@ -174,20 +216,23 @@ To change all ORGAN structures to use a triangle shape:
 
 ### Applying Changes
 
-1. Edit `src/relationship_definitions.json`
-2. Save the file
-3. Refresh the webapp in your browser
-4. The new symbols, colors, and styles will be loaded automatically
+1. Edit `src/relationship_definitions.json` for symbol, label, and description changes
+2. Edit `src/webapp/config/diagram_settings.json` for color and style changes
+3. Save both files
+4. Refresh the webapp in your browser
+5. The new symbols, colors, and styles will be loaded automatically
 
-**Note**: If the configuration file is invalid JSON or missing, the webapp will fall back to default symbols and colors.
+**Note**: If the configuration files are invalid JSON or missing, the webapp will fall back to default symbols and colors.
 
 ### Validation
 
-To validate your JSON configuration:
+To validate your JSON configurations:
 - Use a JSON validator (e.g., jsonlint.com)
-- Ensure all required fields are present
-- Use valid hex color codes
+- Ensure all required fields are present in `relationship_definitions.json`
+- For visual customizations, edit `diagram_settings.json`
+- Use valid hex color codes (#RRGGBB format)
 - Unicode symbols should be properly encoded in UTF-8
+- Verify relationship type names match exactly between both files
 
 ### Troubleshooting
 

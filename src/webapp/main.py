@@ -178,53 +178,69 @@ async def get_symbol_config():
         dict: Configuration for relationship symbols, labels, descriptions, and colors.
 
     Raises:
-        HTTPException: If relationship_definitions.json is not found or fails to load.
+        HTTPException: If relationship_definitions.json or diagram_settings.json not found.
     '''
-    config_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+    definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+    diagram_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
 
-    if not config_file.exists():
-        logger.error('Configuration file not found: %s', config_file)
+    if not definitions_file.exists():
+        logger.error('Configuration file not found: %s', definitions_file)
         raise HTTPException(
             status_code=500,
             detail=f'Configuration file not found: relationship_definitions.json'
         )
 
-    try:
-        with open(config_file, 'r', encoding='utf-8') as f:
-            definitions = json.load(f)
-            # Transform relationship definitions to symbol config format
-            relationships = {}
-            for rel in definitions.get('Relationships', []):
-                rel_type = rel.get('relation_type')
-                if rel_type:
-                    relationships[rel_type] = {
-                        'symbol': rel.get('symbol', '?'),
-                        'label': rel.get('label', rel_type),
-                        'description': rel.get('description', ''),
-                        'color': rel.get('color', '#9ca3af')
-                    }
-            # Include logical relationships config
-            config = {
-                'description': definitions.get('Introduction', ''),
-                'version': '1.0',
-                'logical_relationships': definitions.get('logical_relationships', {
-                    'transparency': 20,
-                    'description': 'Settings for logical relationship display'
-                }),
-                'relationships': relationships
-            }
-            return config
-    except json.JSONDecodeError as e:
-        logger.error('Invalid JSON in configuration file: %s', e)
+    if not diagram_file.exists():
+        logger.error('Diagram settings file not found: %s', diagram_file)
         raise HTTPException(
             status_code=500,
-            detail=f'Invalid JSON in relationship_definitions.json: {str(e)}'
+            detail=f'Configuration file not found: diagram_settings.json'
+        )
+
+    try:
+        with open(definitions_file, 'r', encoding='utf-8') as f:
+            definitions = json.load(f)
+
+        with open(diagram_file, 'r', encoding='utf-8') as f:
+            diagram_settings = json.load(f)
+
+        relationship_styles = diagram_settings.get('relationship_styles', {})
+
+        # Transform relationship definitions to symbol config format
+        relationships = {}
+        for rel in definitions.get('Relationships', []):
+            rel_type = rel.get('relation_type')
+            if rel_type:
+                relationships[rel_type] = {
+                    'symbol': rel.get('symbol', '?'),
+                    'label': rel.get('label', rel_type),
+                    'description': rel.get('description', ''),
+                    'color': relationship_styles.get(rel_type, {}).get(
+                        'color', '#9ca3af'
+                    )
+                }
+        # Include logical relationships config
+        config = {
+            'description': definitions.get('Introduction', ''),
+            'version': '1.0',
+            'logical_relationships': definitions.get('logical_relationships', {
+                'transparency': 20,
+                'description': 'Settings for logical relationship display'
+            }),
+            'relationships': relationships
+        }
+        return config
+    except json.JSONDecodeError as e:
+        logger.error('Invalid JSON in configuration files: %s', e)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Invalid JSON in configuration files: {str(e)}'
         )
     except IOError as e:
-        logger.error('Error reading configuration file: %s', e)
+        logger.error('Error reading configuration files: %s', e)
         raise HTTPException(
             status_code=500,
-            detail=f'Error reading relationship_definitions.json: {str(e)}'
+            detail=f'Error reading configuration files: {str(e)}'
         )
 
 
@@ -665,10 +681,12 @@ async def get_diagram_data(request: MatrixRequest):
 
         structure_set = session_data.structure_set
 
-        # Load node shape definitions
+        # Load node shape definitions and edge styles from diagram settings
         diagram_settings_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
         shape_map = {}
         default_shape = 'ellipse'
+        edge_styles = {}
+
         if diagram_settings_file.exists():
             try:
                 with open(diagram_settings_file, 'r', encoding='utf-8') as f:
@@ -676,30 +694,13 @@ async def get_diagram_data(request: MatrixRequest):
                     node_shapes = diagram_settings.get('node_shapes', {})
                     shape_map = node_shapes.get('shape_map', {})
                     default_shape = node_shapes.get('default_shape', 'ellipse')
+                    rel_styles = diagram_settings.get('relationship_styles', {})
+                    for rel_type, style in rel_styles.items():
+                        edge_styles[rel_type] = style
             except (IOError, json.JSONDecodeError) as e:
-                logger.warning('Failed to load diagram settings, using ellipse as default shape: %s', e)
+                logger.warning('Failed to load diagram settings: %s', e)
         else:
-            logger.warning('Diagram settings file not found: %s, using ellipse as default shape', diagram_settings_file)
-
-        # Load relationship definitions including edge styles
-        definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
-        edge_styles = {}
-        if definitions_file.exists():
-            try:
-                with open(definitions_file, 'r', encoding='utf-8') as f:
-                    definitions = json.load(f)
-                    for rel in definitions.get('Relationships', []):
-                        rel_type = rel.get('relation_type')
-                        relation_style = rel.get('relation_style', {
-                            'color': '#999999',
-                            'width': 2,
-                            'dashes': False,
-                            'arrows': None
-                        })
-                        if rel_type:
-                            edge_styles[rel_type] = relation_style
-            except (IOError, json.JSONDecodeError) as e:
-                logger.warning('Failed to load relationship definitions: %s', e)
+            logger.warning('Diagram settings file not found: %s, using defaults', diagram_settings_file)
 
         # Load transparency settings from relationship definitions
         logical_opacity = 0.2  # Default 20% opacity

@@ -20,6 +20,7 @@ Test and reports on relationships between DICOM RT Structures
     3. General Diagram Updates
         - Make separate selectors for matrix and diagram
             - Include "Copy from matrix" and "Copy from diagram" buttons
+            - Add a copy selection between rows and columns for the matrix
         - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
             - Move parameters for layout algorithm to json file.
     4. Processing Updates
