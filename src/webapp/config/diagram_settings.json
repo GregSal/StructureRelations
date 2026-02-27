@@ -4,17 +4,17 @@
   "node_shapes": {
     "description": "Node shapes mapped to DICOM structure types for network diagram visualization. Valid shapes: star, hexagon, diamond, box, ellipse, triangle, triangleDown, dot, square",
     "shape_map": {
-      "GTV": "star",
-      "CTV": "hexagon",
-      "PTV": "diamond",
+      "GTV": "ellipse",
+      "CTV": "ellipse",
+      "PTV": "ellipse",
       "EXTERNAL": "box",
-      "ORGAN": "ellipse",
-      "AVOIDANCE": "triangle",
-      "BOLUS": "dot",
-      "SUPPORT": "square",
-      "FIXATION": "triangleDown"
+      "ORGAN": "box",
+      "AVOIDANCE": "box",
+      "BOLUS": "box",
+      "SUPPORT": "box",
+      "FIXATION": "box"
     },
-    "default_shape": "ellipse"
+    "default_shape": "box"
   },
   "relationship_styles": {
     "description": "Line styles for relationship edges in network diagram",

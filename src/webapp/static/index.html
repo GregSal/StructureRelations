@@ -156,16 +156,35 @@
 
                 <!-- Tab Navigation -->
                 <div class="tab-navigation">
-                    <button class="tab-button active" data-tab="summary">Structure Summary</button>
-                    <button class="tab-button" data-tab="diagram">Relationship Diagram</button>
+                    <button class="tab-button active" data-tab="diagram">Relationship Diagram</button>
+                    <button class="tab-button" data-tab="summary">Structure Summary</button>
                     <button class="tab-button" data-tab="matrix">Relationship Matrix</button>
                     <button class="tab-button" data-tab="contour-plot">Contour Plotting</button>
                 </div>
 
                 <!-- Tab Content -->
                 <div class="tab-content-container">
+                    <!-- Diagram Tab -->
+                    <div class="tab-content active" id="tab-diagram">
+                        <div class="card">
+                            <h2>Relationship Diagram</h2>
+                            <div class="diagram-controls">
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="showDisjointToggle">
+                                    <span>Show Disjoint</span>
+                                </label>
+                                <label class="toggle-label">
+                                    <input type="checkbox" id="showLabelsToggle" checked>
+                                    <span>Show Edge Labels</span>
+                                </label>
+                                <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
+                            </div>
+                            <div id="networkDiagram" class="network-diagram"></div>
+                        </div>
+                    </div>
+
                     <!-- Summary Tab -->
-                    <div class="tab-content active" id="tab-summary">
+                    <div class="tab-content" id="tab-summary">
                         <div class="card">
                             <h2>Structure Summary</h2>
                             <div class="table-container">
@@ -184,25 +203,6 @@
                                     <tbody id="structuresSummaryBody"></tbody>
                                 </table>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Diagram Tab -->
-                    <div class="tab-content" id="tab-diagram">
-                        <div class="card">
-                            <h2>Relationship Diagram</h2>
-                            <div class="diagram-controls">
-                                <label class="toggle-label">
-                                    <input type="checkbox" id="showDisjointToggle">
-                                    <span>Show Disjoint</span>
-                                </label>
-                                <label class="toggle-label">
-                                    <input type="checkbox" id="showLabelsToggle" checked>
-                                    <span>Show Edge Labels</span>
-                                </label>
-                                <button class="btn btn-secondary" id="refreshDiagramBtn">Refresh Diagram</button>
-                            </div>
-                            <div id="networkDiagram" class="network-diagram"></div>
                         </div>
                     </div>
 

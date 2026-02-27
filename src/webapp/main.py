@@ -13,16 +13,17 @@ import json
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
+import io
 
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import pandas as pd
-import io
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
+
+matplotlib.use('Agg')  # Use non-interactive backend
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -187,14 +188,14 @@ async def get_symbol_config():
         logger.error('Configuration file not found: %s', definitions_file)
         raise HTTPException(
             status_code=500,
-            detail=f'Configuration file not found: relationship_definitions.json'
+            detail='Configuration file not found: relationship_definitions.json'
         )
 
     if not diagram_file.exists():
         logger.error('Diagram settings file not found: %s', diagram_file)
         raise HTTPException(
             status_code=500,
-            detail=f'Configuration file not found: diagram_settings.json'
+            detail='Configuration file not found: diagram_settings.json'
         )
 
     try:
@@ -235,13 +236,13 @@ async def get_symbol_config():
         raise HTTPException(
             status_code=500,
             detail=f'Invalid JSON in configuration files: {str(e)}'
-        )
+        ) from e
     except IOError as e:
         logger.error('Error reading configuration files: %s', e)
         raise HTTPException(
             status_code=500,
             detail=f'Error reading configuration files: {str(e)}'
-        )
+        ) from e
 
 
 @app.post('/api/upload', response_model=UploadResponse)
@@ -798,7 +799,7 @@ async def get_diagram_data(request: MatrixRequest):
             # Create tooltip with structure info
             volume = row.get('Physical_Volume', 0)
             num_regions = row.get('Num_Regions', 0)
-            tooltip = f"{name} (ROI {roi})\\nType: {dicom_type}\\nVolume: {volume:.2f} cm³\\nRegions: {num_regions}"
+            tooltip = f"{name} (ROI {roi})\nType: {dicom_type}\nVolume: {volume:.2f} cm³\nRegions: {num_regions}"
 
             nodes.append(DiagramNode(
                 id=roi,
