@@ -5,6 +5,17 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Web App Updates
+    0. Fix relationship identification for 'RS.CNS_FSRT_2_GTV.BRAI.dcm'
+        1. Tolerance needs to be reduced.
+            Currently the tolerance is set to 0.1, based on the *Body* contour.
+            This need to be set to 0.05 ( half the current tolerance).
+        2. The relationship between *PTV Total* and *GTV 1 xxGy* is currently
+            being identified as **OVERLAPS** because an interpolated contour
+            of the *PTV 1_24Gyin3* related region of *PTV Total* is not
+            appearing on the boundary slice for the *PTV 2_24Gyin3* related
+            region, while an interpolated contour of *GTV 1 xxGy* is appearing
+            on the slice.
+
     1. Cosmetic Changes
         - Need tooltips for edges
         - Add a legend for edge colors and styles

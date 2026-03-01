@@ -152,7 +152,7 @@ class StructureSet:
         # Add structure to relationship graph
         self.relationship_graph.add_node(structure.roi, structure=structure)
 
-    def calculate_relationships(self) -> None:
+    def calculate_relationships(self, force=False) -> None:
         '''Calculate relationships between all structure pairs.
 
         This method calculates the DE27IM spatial relationship between every
@@ -168,8 +168,12 @@ class StructureSet:
         # If the graph has the expected number of edges, skip recalculation
         expected_edges = len(structure_rois) * (len(structure_rois) - 1) // 2
         if self.relationship_graph.number_of_edges() >= expected_edges:
-            logger.debug('Relationships already calculated, skipping recalculation')
-            return
+            if not force:
+                logger.debug('Relationships already calculated, skipping recalculation')
+                return
+            logger.debug('Force recalculation enabled, recalculating relationships')
+            # Clear existing edges but keep nodes for recalculation
+            self.relationship_graph.clear_edges()
 
         logger.info('Calculating relationships for %d structures',
                     len(structure_rois))
