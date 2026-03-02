@@ -599,9 +599,9 @@ class DicomStructureFile:
 
         Finds matching image files and calculates resolution as:
         resolution = image_diameter / (2 * image_x_pixels)
-
         Where image_diameter is the field of view diameter and image_x_pixels
         is the number of pixels in the x-direction.
+        This implies that the resolution is half of the distance between pixels.
 
         Args:
             modalities (List[str], optional): List of modalities to search for.
@@ -744,9 +744,12 @@ class DicomStructureFile:
                                               ) -> Optional[float]:
         '''Calculate resolution using BODY or EXTERNAL structure dimensions.
 
-        Falls back to using structure contour dimensions when image files are
-        not available. Searches for BODY or EXTERNAL structures and calculates
-        diameter from their extent.
+        Using contour dimensions when image files are not available. Searches
+        for BODY or EXTERNAL structures. If BODY or EXTERNAL structure is not
+        found, falls back to using the largest structure.  The maximum x or y
+        dimension of the structure is used to estimate the pixel resolution.
+        maximum dimension / (2 *  # pixels) = resolution in cm/pixel.
+        This implies that the resolution is half of the distance between pixels.
 
         Args:
             default_pixels (int, optional): Default number of pixels to assume.
@@ -836,11 +839,11 @@ class DicomStructureFile:
         x_extent = x_max - x_min  # in cm (contour coordinates are in cm)
         y_extent = y_max - y_min  # in cm
 
-        # Calculate diameter using sqrt(x^2 + y^2)
-        diameter_cm = np.sqrt(x_extent**2 + y_extent**2)
+        # Calculate the maximum dimension
+        max_dimension = max(x_extent, y_extent)
 
-        # Calculate resolution: diameter / (2 * default_pixels)
-        resolution = diameter_cm / (2.0 * default_pixels)
+        # Calculate resolution in cm/pixel: maximum dimension / ( 2 * # pixels)
+        resolution = max_dimension / ( 2 * default_pixels)
 
         # Round up to single decimal place
         resolution = math.ceil(resolution * 10) / 10
@@ -848,11 +851,9 @@ class DicomStructureFile:
         body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
         logger.info('Calculated resolution from structure %r: %.1f cm/pixel',
                     body_name, resolution)
-        logger.info('Calculated resolution from structure %r: %.1f cm/pixel',
-                    body_name, resolution)
         logger.debug('Structure extents: x=%.2f cm, y=%.2f cm, '
-                     'diameter=%.2f cm, pixels=%d',
-                     x_extent, y_extent, diameter_cm, default_pixels)
+                     'maximum dimension=%.2f cm, pixels=%d',
+                     x_extent, y_extent, max_dimension, default_pixels)
         return resolution
 
     def round_contour_points(self) -> None:
