@@ -8,7 +8,9 @@
     "python.testing.pytestEnabled": true,
     "pythonTestExplorer.testFramework": "pytest",
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/src"
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/Tests",
+        "${workspaceFolder}/examples"
     ],
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": false,
@@ -33,5 +35,11 @@
     "notebook.diff.ignoreOutputs": true,
     "jupyter.notebookFileRoot": "${workspaceFolder}",
     "jupyter.showVariableViewWhenDebugging": true,
-    "python.REPL.sendToNativeREPL": true
+    "python.REPL.sendToNativeREPL": true,
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": [],
+    "cSpell.words": [
+        "DICOM"
+    ]
 }
