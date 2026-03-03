@@ -9,12 +9,25 @@ Test and reports on relationships between DICOM RT Structures
         1. Tolerance needs to be reduced.
             Currently the tolerance is set to 0.1, based on the *Body* contour.
             This need to be set to 0.05 ( half the current tolerance).
+            - Now using *maximum dimension* of the *Body* contour instead of its
+            diameter.
         2. The relationship between *PTV Total* and *GTV 1 xxGy* is currently
             being identified as **OVERLAPS** because an interpolated contour
             of the *PTV 1_24Gyin3* related region of *PTV Total* is not
             appearing on the boundary slice for the *PTV 2_24Gyin3* related
             region, while an interpolated contour of *GTV 1 xxGy* is appearing
             on the slice.
+            StructureShape.finalize() should only be called after all structures
+            have been added to the StructureSet, so that all interpolated
+            contours are generated and available for relationship calculations.
+        3. with 'RS.4Field_Logic.BRER.dcm':
+             PTV Cavity->Partitioned by->eval PTV and
+             eval PTV->Partitioned by->CTV Cavity.
+
+             PTV Cavity->Contains by->CTV Cavity
+            is being treated as Logical, but this is wrong because it could also be:
+             PTV Cavity->Partitioned by by->CTV Cavity
+
 
     1. Cosmetic Changes
         - Need tooltips for edges
