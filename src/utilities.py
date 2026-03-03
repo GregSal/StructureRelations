@@ -3,8 +3,8 @@
 # Type imports
 from typing import List, Tuple
 
+import math
 import logging
-
 
 # Shared Packages
 import shapely
@@ -45,6 +45,27 @@ def round_value(number: float, tolerance: float) -> float:
     rounded_value = round(round(number / tolerance, decimal_places) * tolerance, decimal_places)
 
     return rounded_value
+
+
+def round_one_up(x: float) -> float:
+    '''Rounds a number up to one significant digit.
+
+    Args:
+        x: Input floating-point value.
+
+    Returns:
+        The value rounded upward to one significant digit.
+    '''
+    if x == 0.0:
+        return 0.0
+
+    sign = 1.0 if x > 0 else -1.0
+    ax = abs(x)
+
+    exp = math.floor(math.log10(ax))
+    scale = 10.0 ** exp
+
+    return sign * math.ceil(ax / scale) * scale
 
 
 def round_contour_points(contour_points: ContourPointsType,

@@ -4,12 +4,12 @@
 from typing import Optional, List
 from pathlib import Path
 import logging
-import math
 
 import numpy as np
 import pandas as pd
 import pydicom
 
+from utilities import round_one_up
 from contours import ContourPoints
 from types_and_classes import ROI_Type, SliceIndexType
 
@@ -732,7 +732,7 @@ class DicomStructureFile:
         resolution = image_diameter_cm / (2.0 * image_x_pixels)
 
         # Round up to single decimal place
-        resolution = math.ceil(resolution * 10) / 10
+        resolution = round_one_up(resolution)
 
         logger.info('Calculated resolution: %.1f cm/pixel from image %s',
                     resolution, selected_file.name)
@@ -843,17 +843,17 @@ class DicomStructureFile:
         # Calculate the maximum dimension
         max_dimension = max(x_extent, y_extent)
 
-        logger.info('Structure extents: x=%.2f cm, y=%.2f cm, '
+        logger.debug('Structure extents: x=%.2f cm, y=%.2f cm, '
                      'maximum dimension=%.2f cm, pixels=%d',
                      x_extent, y_extent, max_dimension, default_pixels)
         # Calculate resolution in cm/pixel: maximum dimension / ( 2 * # pixels)
         resolution = max_dimension / ( 2 * default_pixels)
-        logger.info('Un-Rounded Resolution calculated as: %.2f cm', resolution)
+        logger.debug('Un-Rounded Resolution calculated as: %.4f cm', resolution)
         # Round up to single decimal place
-        resolution = math.ceil(resolution * 10) / 10
+        resolution = round_one_up(resolution)
 
         body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
-        logger.info('Calculated resolution from structure %r: %.1f cm/pixel',
+        logger.info('Calculated resolution from structure %r: %.3f cm/pixel',
                     body_name, resolution)
 
         return resolution
