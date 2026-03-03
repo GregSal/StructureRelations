@@ -452,23 +452,56 @@ class StructureSet:
         else:
             return None
 
-    def get_structures_by_volume(self, volume_type: str = 'hull') -> List[StructureShape]:
+    def get_structures_by_volume(
+            self,
+            volume_type: str | List[str] | None = None
+    ) -> List[StructureShape]:
         '''Get structures sorted by volume.
 
         Args:
-            volume_type (str): Type of volume to sort by ('physical', 'exterior', 'hull').
+            volume_type (str | List[str] | None): Volume type(s) to sort by.
+                - If str, sort by that single type.
+                - If list, sort by the list order as priority.
+                - If None, defaults to ['hull', 'exterior', 'physical'].
+                Allowed values are 'physical', 'exterior', and 'hull'.
 
         Returns:
             List[StructureShape]: Structures sorted by volume (descending).
         '''
-        if volume_type == 'physical':
-            return sorted(self.structures.values(), key=lambda s: s.physical_volume, reverse=True)
-        elif volume_type == 'exterior':
-            return sorted(self.structures.values(), key=lambda s: s.exterior_volume, reverse=True)
-        elif volume_type == 'hull':
-            return sorted(self.structures.values(), key=lambda s: s.hull_volume, reverse=True)
+        if volume_type is None:
+            volume_types = ['hull', 'exterior', 'physical']
+        elif isinstance(volume_type, str):
+            volume_types = [volume_type]
         else:
-            raise ValueError(f"Unknown volume type: {volume_type}")
+            volume_types = list(volume_type)
+
+        if not volume_types:
+            raise ValueError('At least one volume type must be provided.')
+
+        # Define functions that return the relevant volume type for a structure.
+        volume_getters = {
+            'physical': lambda structure: structure.physical_volume,
+            'exterior': lambda structure: structure.exterior_volume,
+            'hull': lambda structure: structure.hull_volume,
+        }
+        # Verify that all provided volume types are one of the defined types.
+        invalid_types = [
+            vol_type for vol_type in volume_types
+            if vol_type not in volume_getters
+        ]
+        if invalid_types:
+            raise ValueError(
+                f"Unknown volume type(s): {', '.join(invalid_types)}"
+            )
+
+        return sorted(
+            self.structures.values(),
+            key=lambda structure: tuple(
+                volume_getters[vol_type](structure)
+                for vol_type in volume_types
+            ),
+            reverse=True
+        )
 
     def summary(self) -> pd.DataFrame:
         '''Get a summary of all structures in the set.
