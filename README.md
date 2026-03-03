@@ -4,14 +4,13 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 0. Add tests for interpolated structures creation
-  0. `resolution = math.ceil(resolution * 10) / 10` is not an appropriate rounding method
   1. When boundary slices from different structures are added.
   2. When regions start and end on neighbouring slices.
   3. When there are two regions  on the same slices, but one ends before the other.
       - Regions are not yet identified when interpolation is done.
 
-1. Sort structures first by hull volume then by external volume, then by physical volume.
-  - This is needed for hull and opt structures to be ordered correctly.
+1. Add complimentary relationships tests
+1. Drop Sorting structures.
 
 
 1. Web App Updates

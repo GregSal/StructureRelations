@@ -217,7 +217,12 @@
         "complementary_relation": "PARTITIONED",
         "implied_relation": "WITHIN",
         "symmetric": false,
-        "transitive": false
+        "transitive": false,
+        "pattern": "T*F*T*T**\t*********\t*********",
+        "mask": "0b101010100000000000000000000",
+        "mask_decimal": 89128960,
+        "value": "0b100010100000000000000000000",
+        "value_decimal": 72351744
     },
     {
         "relation_type": "OVERLAPS",
