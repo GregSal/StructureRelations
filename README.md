@@ -3,6 +3,16 @@
 Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
+0. Add tests for interpolated structures creation
+  0. `resolution = math.ceil(resolution * 10) / 10` is not an appropriate rounding method
+  1. When boundary slices from different structures are added.
+  2. When regions start and end on neighbouring slices.
+  3. When there are two regions  on the same slices, but one ends before the other.
+      - Regions are not yet identified when interpolation is done.
+
+1. Sort structures first by hull volume then by external volume, then by physical volume.
+  - This is needed for hull and opt structures to be ordered correctly.
+
 
 1. Web App Updates
     0. Fix relationship identification for 'RS.CNS_FSRT_2_GTV.BRAI.dcm'
@@ -20,6 +30,7 @@ Test and reports on relationships between DICOM RT Structures
             StructureShape.finalize() should only be called after all structures
             have been added to the StructureSet, so that all interpolated
             contours are generated and available for relationship calculations.
+            - This is already being done.  The problem may be that there is already a contour on the slice from the boundary of another region, so it doesn't recognize that it needs to add another contour.
         3. with 'RS.4Field_Logic.BRER.dcm':
              PTV Cavity->Partitioned by->eval PTV and
              eval PTV->Partitioned by->CTV Cavity.

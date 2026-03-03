@@ -324,6 +324,7 @@ class StructureShape():
         self.calculate_physical_volume()
         self.calculate_exterior_volume()
         self.calculate_hull_volume()
+
         self.build_region_table()
 
     def get_contour(self, label: ContourIndex) -> Contour:

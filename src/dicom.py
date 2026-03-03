@@ -14,7 +14,8 @@ from contours import ContourPoints
 from types_and_classes import ROI_Type, SliceIndexType
 
 # Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -842,18 +843,19 @@ class DicomStructureFile:
         # Calculate the maximum dimension
         max_dimension = max(x_extent, y_extent)
 
+        logger.info('Structure extents: x=%.2f cm, y=%.2f cm, '
+                     'maximum dimension=%.2f cm, pixels=%d',
+                     x_extent, y_extent, max_dimension, default_pixels)
         # Calculate resolution in cm/pixel: maximum dimension / ( 2 * # pixels)
         resolution = max_dimension / ( 2 * default_pixels)
-
+        logger.info('Un-Rounded Resolution calculated as: %.2f cm', resolution)
         # Round up to single decimal place
         resolution = math.ceil(resolution * 10) / 10
 
         body_name = structure_names.get(body_roi, f"ROI_{body_roi}")
         logger.info('Calculated resolution from structure %r: %.1f cm/pixel',
                     body_name, resolution)
-        logger.debug('Structure extents: x=%.2f cm, y=%.2f cm, '
-                     'maximum dimension=%.2f cm, pixels=%d',
-                     x_extent, y_extent, max_dimension, default_pixels)
+
         return resolution
 
     def round_contour_points(self) -> None:

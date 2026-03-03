@@ -17,7 +17,8 @@ from utilities import round_value
 
 
 # %% Configure logging if not already configured
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 #logger.setLevel(logging.DEBUG)
 
@@ -109,6 +110,7 @@ class StructureSet:
                 structure_name = f'Structure_{roi}'
                 logger.debug('Using generic name for ROI %s: %s', roi, structure_name)
 
+            logger.info('Adding structure %s (%s)', structure_name, roi)
             structure = StructureShape(roi=roi, name=structure_name)
             self.slice_sequence = structure.add_contour_graph(
                 contour_table,
@@ -125,7 +127,7 @@ class StructureSet:
 
         # 2.3 & 2.4. Use the SliceSequence to add interpolated contours and generate RegionSlices
         for structure in self.structures.values():
-            logger.debug('Finalizing structure for ROI %s', structure.name)
+            logger.debug('Finalizing structure %s (%s)', structure.name, structure.roi)
             structure.finalize(self.slice_sequence)
         self.finalize()
 
@@ -182,11 +184,13 @@ class StructureSet:
             for roi_b in structure_rois[i+1:]:
                 structure_a = self.structures[roi_a]
                 structure_b = self.structures[roi_b]
-
                 # Calculate the DE27IM relationship
                 de27im_relationship = structure_a.relate(structure_b,
                                                          tolerance=self.tolerance)
-
+                relation_type = de27im_relationship.identify_relation()
+                logger.info('Calculated relationships between %s (ROI %s) and %s (ROI %s) as: %s',
+                            structure_a.name, structure_a.roi,
+                            structure_b.name, structure_b.roi, relation_type.label)
                 # Create StructureRelationship object
                 relationship = StructureRelationship(
                     de27im=de27im_relationship,
