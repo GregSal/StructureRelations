@@ -10,6 +10,7 @@ from debug_tools import box_points
 from contours import ContourPoints, build_contour_table
 
 from region_slice import RegionSlice
+from structure_set import StructureSet
 
 class TestRegionSlice:
     '''Test cases for the RegionSlice class'''
@@ -501,3 +502,48 @@ class TestRegionSlice:
             assert len(indexes) == 2
         # is_interpolated should be True
         assert region_slice.is_interpolated is True
+
+def test_region_slice_two_different_regions_on_same_slice(self):
+    '''Test a complex scenario where two different regions overlap are on the
+    same and a boundary slice is created for one of them, the other region is
+    also present on the slice.'''
+    # Box1 and box2 are offset horizontally (x = -5, x = +5), but overlap
+    # vertically (slices 0 to 4) vs (slices -3 to 1)
+    # The contained_box is inside box2.
+    # A boundary slice should be created at -0.5 for box2, and box1
+    # should also be present on that slice.
+    box1 = box_points(width=4, offset_x=-5)
+    box2 = box_points(width=4, offset_x=5)
+    contained_box = box_points(width=2, offset_x=-5)
+    slice_data = [
+        ContourPoints(box1, roi=1, slice_index=0.0),
+        ContourPoints(box1, roi=1, slice_index=1.0),
+        ContourPoints(box1, roi=1, slice_index=2.0),
+        ContourPoints(box1, roi=1, slice_index=3.0),
+        ContourPoints(box1, roi=1, slice_index=4.0),
+        ContourPoints(box2, roi=1, slice_index=1.0),
+        ContourPoints(box2, roi=1, slice_index=0.0),
+        ContourPoints(box2, roi=1, slice_index=-1.0),
+        ContourPoints(box2, roi=1, slice_index=-2.0),
+        ContourPoints(box2, roi=1, slice_index=-3.0),
+        ContourPoints(contained_box, roi=2, slice_index=0.0),
+        ContourPoints(contained_box, roi=2, slice_index=-1.0),
+        ContourPoints(contained_box, roi=2, slice_index=-2.0),
+    ]
+    structure_set = StructureSet(slice_data)
+    # There should be a boundary slice at -0.5
+    assert structure_set.slice_sequence.sequence.at[-0.5,'Original'] == False
+    # The region should have one non-empty boundary contour and
+    # one non-empty regular contour.
+    region_slice = structure_set.structures[1].get_slice(-0.5)
+    boundaries = [contour for contour in region_slice.boundaries.values()
+                if not contour.is_empty]
+    regions = [region for region in region_slice.regions.values()
+                if not region.is_empty]
+    region_holes = [hole for hole in region_slice.region_holes.values()
+                    if not hole.is_empty]
+    assert len(boundaries) == 1
+    assert len(regions) == 1
+    assert len(region_holes) == 0
+    # Contour indexes should contain two ContourIndexes
+    assert len(region_slice.contour_indexes) == 2
