@@ -113,22 +113,12 @@ class StructureShape():
             # indexes in the contour graph, continue
             if slice_index < min_slice or slice_index > max_slice:
                 continue
-
-            # If the slice index is already in the contour graph, continue
-            slice_exists = any(
-                self.contour_graph.nodes[node]['contour'].slice_index == slice_index
-                for node in self.contour_graph.nodes
-            )
-            if slice_exists:
-                continue
-
             # Find all edges where the slice index is between the node slices
             edges_to_interpolate = []
             for edge in self.contour_graph.edges():
                 source, target = edge
                 slice_source = self.contour_graph.nodes[source]['contour'].slice_index
                 slice_target = self.contour_graph.nodes[target]['contour'].slice_index
-
                 # For directed graph, source should always be < target
                 # Check if slice_index is between them
                 if slice_source < slice_index < slice_target:
@@ -144,6 +134,23 @@ class StructureShape():
                 interpolated_polygon = interpolate_polygon(
                     slices, contour_source.polygon, contour_target.polygon
                 )
+
+                # Skip only true duplicates. Multiple contours on the same
+                # slice can legitimately share region/role metadata.
+                duplicate_exists = any(
+                    existing.slice_index == slice_index
+                    and existing.region_index == contour_source.region_index
+                    and existing.is_boundary == contour_source.is_boundary
+                    and existing.is_hole == contour_source.is_hole
+                    and existing.hole_type == contour_source.hole_type
+                    and existing.polygon.equals(interpolated_polygon)
+                    for existing in (
+                        self.contour_graph.nodes[node]['contour']
+                        for node in self.contour_graph.nodes
+                    )
+                )
+                if duplicate_exists:
+                    continue
 
                 # Create interpolated contour with parameters from source node
                 interpolated_contour = Contour(
