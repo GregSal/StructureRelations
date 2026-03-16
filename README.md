@@ -8,10 +8,13 @@ Test and reports on relationships between DICOM RT Structures
   2. When regions start and end on neighbouring slices.
   3. When there are two regions  on the same slices, but one ends before the other.
       - Regions are not yet identified when interpolation is done.
+
 - Patched `structures.py`, but this resulted in new errors.  Probably should
 rethink the entire process for creating interpolated contours.
+
+1. Relationship tests on boundary slices should only check for boundary related parts of the DE27IM
 1. Add complimentary relationships tests
-1. Drop Sorting structures.
+1. ????Drop Sorting structures.????
 
 
 1. Web App Updates
