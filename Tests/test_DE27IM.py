@@ -1,11 +1,15 @@
 '''Test the DE27IM class.'''
+import json
+from pathlib import Path
+
 import networkx as nx
+import pytest
 import shapely
 
 from contours import Contour, ContourMatch
 from debug_tools import circle_points
 from region_slice import RegionSlice
-from relations import DE9IM, DE27IM
+from relations import DE9IM, DE27IM, RELATIONSHIP_TYPES
 
 
 def build_region_slice(roi=1, radius=2):
@@ -167,3 +171,75 @@ def test_de9im_apply_adjustments_transpose():
                             DE9IM(relation_str='2FF1FF212'),
                             DE9IM(relation_str='2FF1FF212'))
     assert adjusted_de27im == transpose_adjustment
+
+
+def _transpose_27bit(value: int) -> int:
+    bits = list(f'{value:027b}')
+    for offset in (0, 9, 18):
+        for idx_a, idx_b in ((1, 3), (2, 6), (5, 7)):
+            a = offset + idx_a
+            b = offset + idx_b
+            bits[a], bits[b] = bits[b], bits[a]
+    return int(''.join(bits), 2)
+
+
+def _find_primary_test(relation_name: str):
+    relation_type = RELATIONSHIP_TYPES[relation_name]
+    for test_binary in DE27IM.test_binaries:
+        if test_binary.relation_type.relation_type != relation_name:
+            continue
+        if test_binary.relation_type.reversed_arrow:
+            continue
+        return relation_type, test_binary
+    raise AssertionError(f'Primary test binary missing for {relation_name}')
+
+
+class TestRelationshipDefinitionTranspose:
+    @pytest.mark.parametrize(
+        'relation_name',
+        [
+            relation.relation_type
+            for relation in RELATIONSHIP_TYPES.values()
+            if relation.symmetric and relation.relation_type != 'UNKNOWN'
+        ],
+    )
+    def test_runtime_transpose_identity_for_symmetric(self, relation_name):
+        relation_type, primary_test = _find_primary_test(relation_name)
+        transposed = primary_test.transpose(relation_type=relation_type)
+        assert transposed.mask == primary_test.mask
+        assert transposed.value == primary_test.value
+
+    @pytest.mark.parametrize(
+        'relation_name',
+        ['DISJOINT', 'BORDERS', 'EQUAL', 'OVERLAPS'],
+    )
+    def test_symmetric_core_set_identity(self, relation_name):
+        relation_type, primary_test = _find_primary_test(relation_name)
+        transposed = primary_test.transpose(relation_type=relation_type)
+        assert transposed.mask == primary_test.mask
+        assert transposed.value == primary_test.value
+
+    def test_json_symmetric_definitions_are_transpose_invariant(self):
+        json_path = Path(__file__).resolve().parents[1] / 'src' / 'relationship_definitions.json'
+        data = json.loads(json_path.read_text(encoding='utf-8'))
+        for definition in data['Relationships']:
+            if definition.get('relation_type') == 'UNKNOWN':
+                continue
+            if not definition.get('symmetric', False):
+                continue
+            mask_str = definition.get('mask', '')
+            value_str = definition.get('value', '')
+            if not mask_str or not value_str:
+                continue
+            mask = int(mask_str, 2)
+            value = int(value_str, 2)
+            assert _transpose_27bit(mask) == mask
+            assert _transpose_27bit(value) == value
+
+    def test_asymmetric_control_contains_to_within(self):
+        contains_type, contains_primary = _find_primary_test('CONTAINS')
+        within_type = RELATIONSHIP_TYPES['WITHIN']
+        transposed = contains_primary.transpose(relation_type=within_type)
+        assert ((transposed.mask != contains_primary.mask) or
+                (transposed.value != contains_primary.value))
+        assert transposed.relation_type != contains_type

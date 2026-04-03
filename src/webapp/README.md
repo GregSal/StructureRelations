@@ -64,7 +64,7 @@ The application will be available at: http://localhost:8000
    - Relationship matrix displays with default symbol notation
    - Drag structures between "Available" and "Selected" lists to customize matrix axes
    - Rows and columns can display different structures
-   - Toggle between symbols (?, =, ⊂, etc.) and labels (UNKNOWN, EQUALS, CONTAINS, etc.)
+   - Toggle between symbols (?, =, ⊂, etc.) and labels (UNKNOWN, EQUAL, CONTAINS, etc.)
    - Click "Update Matrix" to refresh display
 
 5. **Export**
@@ -112,7 +112,7 @@ Test coverage includes:
 | Symbol | Relationship Type | Description |
 |--------|------------------|-------------|
 | ?      | UNKNOWN          | Relationship not determined |
-| =      | EQUALS           | Identical structures |
+| =      | EQUAL            | Identical structures |
 | ⊂      | CONTAINS         | One inside the other |
 | ∩      | OVERLAPS         | Partial intersection |
 | ⊕      | PARTITION        | Adjacent without overlap |

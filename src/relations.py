@@ -6,8 +6,10 @@ from typing import List, Tuple, Union, Dict, Optional
 
 # Standard Libraries
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 import json
+import logging
 
 # Shared Packages
 import shapely
@@ -15,8 +17,28 @@ import shapely
 # Local packages
 from contours import Contour, ContourMargin
 from region_slice import RegionSlice, empty_structure
-from types_and_classes import PolygonType
+from types_and_classes import PolygonType, HoleType
 from utilities import make_solid, int2matrix
+
+
+RELATION_SCHEMA_VERSION = 2
+
+
+class AmbiguousRelationshipError(ValueError):
+    '''Raised when a relationship matches multiple relationship definitions.'''
+
+
+BOUNDARY_TOKEN = HoleType.BOUNDARY.value.lower()
+
+
+class AdjustmentType(str, Enum):
+    '''Internal adjustment tokens applied to DE-9IM bands before merge.'''
+
+    BOUNDARY_A = f'{BOUNDARY_TOKEN}_a'
+    BOUNDARY_B = f'{BOUNDARY_TOKEN}_b'
+    HOLE_A = 'hole_a'
+    HOLE_B = 'hole_b'
+    TRANSPOSE = 'transpose'
 
 # An object that can be used for obtaining DE9IM relationships.
 # Either a polygon or and object that contains a polygon attribute.
@@ -51,8 +73,6 @@ class RelationshipType:
         pattern: DE-27IM pattern string (29 chars: T/F/* with tabs at pos 9, 19)
         mask: Binary mask as string (e.g., '0b111000111000111000111000111')
         value: Binary value as string (e.g., '0b111000000000111000000000000')
-        mask_decimal: Integer value of mask
-        value_decimal: Integer value of value
         examples: List of example scenarios
     '''
     relation_type: str
@@ -68,8 +88,6 @@ class RelationshipType:
     pattern: str
     mask: str
     value: str
-    mask_decimal: int
-    value_decimal: int
     examples: List[str]
 
     def __bool__(self) -> bool:
@@ -85,6 +103,20 @@ class RelationshipType:
     def is_transitive(self) -> bool:
         '''Check if the relationship is transitive.'''
         return self.transitive
+
+    @property
+    def mask_decimal(self) -> int:
+        '''Return the integer value of mask.'''
+        if not self.mask:
+            return 0
+        return int(self.mask, 2)
+
+    @property
+    def value_decimal(self) -> int:
+        '''Return the integer value of value.'''
+        if not self.value:
+            return 0
+        return int(self.value, 2)
 
     @property
     def complementary(self) -> Optional['RelationshipType']:
@@ -174,10 +206,6 @@ class RelationshipTest:
     every '*' or 'F' bit as a '0'. The relationship is identified when value
     binary is equal to the result of the `relationship_integer & mask`
     operation.
-
-    Future work includes a `transpose` function that transposes each 9-bit
-    segment of the 27-bit binaries.  This represents the reciprocal
-    relationship, i.e. B vs. A instead of A vs. B.
     '''
     relation_type: RelationshipType
     mask: int = 0b000000000000000000000000000
@@ -219,6 +247,42 @@ class RelationshipTest:
             '\n'
             ])
         return test_str
+
+    @staticmethod
+    def _transpose_segment(bits: str) -> str:
+        '''Transpose a 9-bit DE-9IM segment by swapping A/B positions.'''
+        if len(bits) != 9:
+            raise ValueError(f'Expected 9 bits, got {len(bits)} bits')
+        bit_list = list(bits)
+        for idx_a, idx_b in ((1, 3), (2, 6), (5, 7)):
+            bit_list[idx_a], bit_list[idx_b] = bit_list[idx_b], bit_list[idx_a]
+        return ''.join(bit_list)
+
+    @classmethod
+    def _transpose_27bit(cls, value: int) -> int:
+        '''Transpose each 9-bit DE-9IM segment in a 27-bit integer.'''
+        full_bits = f'{value:027b}'
+        segments = [full_bits[0:9], full_bits[9:18], full_bits[18:27]]
+        transposed = ''.join(cls._transpose_segment(segment)
+                             for segment in segments)
+        return int(transposed, 2)
+
+    def transpose(self, relation_type: RelationshipType) -> 'RelationshipTest':
+        '''Create a transposed test definition for reciprocal relation lookup.
+
+        Args:
+            relation_type (RelationshipType): Relationship type for the
+                transposed test (usually the complementary relationship).
+
+        Returns:
+            RelationshipTest: A new relationship test with transposed mask
+                and value binaries.
+        '''
+        return RelationshipTest(
+            relation_type=relation_type,
+            mask=self._transpose_27bit(self.mask),
+            value=self._transpose_27bit(self.value),
+        )
 
 
 class DE9IM():
@@ -659,6 +723,8 @@ class DE27IM():
                     f'Error loading relationship_definitions.json: {err}'
                 ) from err
 
+        cls.relationship_definitions.clear()
+        cls.test_binaries.clear()
         definitions = _load_relationship_definitions()
         # Create RelationshipType objects for all relationships
         for defn in definitions:
@@ -676,13 +742,11 @@ class DE27IM():
                 pattern=defn.get('pattern', ''),
                 mask=defn.get('mask', ''),
                 value=defn.get('value', ''),
-                mask_decimal=defn.get('mask_decimal', 0),
-                value_decimal=defn.get('value_decimal', 0),
                 examples=defn.get('examples', [])
             )
             cls.relationship_definitions[rel_type.relation_type] = rel_type
             # Create RelationshipTest for relationships with patterns
-            if rel_type.mask and rel_type.value:
+            if rel_type.mask and rel_type.value and not rel_type.reversed_arrow:
                 cls.test_binaries.append(
                     RelationshipTest(
                         relation_type=rel_type,
@@ -690,6 +754,19 @@ class DE27IM():
                         value=rel_type.value_decimal
                     )
                 )
+
+        primary_tests_by_name = {
+            test.relation_type.relation_type: test
+            for test in cls.test_binaries
+        }
+        for rel_type in cls.relationship_definitions.values():
+            if not rel_type.reversed_arrow:
+                continue
+            complementary_name = rel_type.complementary_relation
+            primary_test = primary_tests_by_name.get(complementary_name)
+            if primary_test is None:
+                continue
+            cls.test_binaries.append(primary_test.transpose(rel_type))
 
 
     @property
@@ -746,6 +823,14 @@ class DE27IM():
             'hole_b': Adjust the relationship matrix for the hole (negative space)
                 of structure_b.
         '''
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            'relate_contours start schema=%s type_a=%s type_b=%s tolerance=%s',
+            RELATION_SCHEMA_VERSION,
+            type(region_a).__name__,
+            type(region_b).__name__,
+            tolerance,
+        )
         # If structure_a and structure_b are both RegionSlices, then get the
         # full 27 bit relationship.
         if isinstance(region_a, RegionSlice):
@@ -776,44 +861,57 @@ class DE27IM():
                 if region_a.has_regions():
                     # Get the 27 bit relationship for the combined regions in
                     # region_a with all regions and boundaries in region_b.
-                    poly_a = shapely.union_all(list(region_a.regions.values()))
-                    exterior = shapely.union_all(list(region_a.exterior.values()))
-                    hull = shapely.union_all(list(region_a.hull.values()))
+                    poly_a = region_a.merged_region
+                    exterior = region_a.merged_exterior
+                    hull = region_a.merged_hull
                     if region_b.has_regions():
-                        poly_b = shapely.union_all(list(
-                            region_b.regions.values()))
-                        self.relate_poly(poly_a, poly_b, exterior, hull,
-                                         adjustments=adjustments,
-                                         tolerance=tolerance)
+                        poly_b = region_b.merged_region
+                        exterior_b = region_b.merged_exterior
+                        hull_b = region_b.merged_hull
+                        self.relate_poly(
+                            poly_a,
+                            poly_b,
+                            external_polygon_a=exterior,
+                            hull_polygon_a=hull,
+                            external_polygon_b=exterior_b,
+                            hull_polygon_b=hull_b,
+                            adjustments=adjustments,
+                            tolerance=tolerance,
+                        )
                     if region_b.has_boundaries():
-                        adjustments.append('boundary_b')
-                        boundary_b = shapely.union_all(list(
-                            region_b.boundaries.values()))
-                        self.relate_poly(poly_a, boundary_b,
-                                         adjustments=adjustments,
-                                         tolerance=tolerance)
+                        adjustments.append(AdjustmentType.BOUNDARY_B)
+                        boundary_b = region_b.merged_boundary
+                        self.relate_poly(
+                            poly_a,
+                            boundary_b,
+                            adjustments=adjustments,
+                            tolerance=tolerance,
+                        )
                 adjustments = []
                 if region_a.has_boundaries():
                     # Get the 27 bit relationship for the combined boundaries in
                     # region_a with all regions and boundaries in region_b.
-                    adjustments.append('boundary_a')
-                    boundary_a = shapely.union_all(list(
-                        region_a.boundaries.values()))
+                    adjustments.append(AdjustmentType.BOUNDARY_A)
+                    boundary_a = region_a.merged_boundary
                     if region_b.has_regions():
-                        poly_b = shapely.union_all(list(
-                            region_b.regions.values()))
-                        self.relate_poly(boundary_a, poly_b,
-                                         adjustments=adjustments,
-                                         tolerance=tolerance)
+                        poly_b = region_b.merged_region
+                        self.relate_poly(
+                            boundary_a,
+                            poly_b,
+                            adjustments=adjustments,
+                            tolerance=tolerance,
+                        )
                     if region_b.has_boundaries():
                         # Add the boundary_b adjustment to the existing
                         # 'boundary_a' adjustment.
-                        adjustments.append('boundary_b')
-                        boundary_b = shapely.union_all(list(
-                            region_b.boundaries.values()))
-                        self.relate_poly(boundary_a, boundary_b,
-                                         adjustments=adjustments,
-                                         tolerance=tolerance)
+                        adjustments.append(AdjustmentType.BOUNDARY_B)
+                        boundary_b = region_b.merged_boundary
+                        self.relate_poly(
+                            boundary_a,
+                            boundary_b,
+                            adjustments=adjustments,
+                            tolerance=tolerance,
+                        )
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
@@ -846,9 +944,13 @@ class DE27IM():
                     ]))
             if isinstance(region_b, Contour):
                 poly_b = region_b.polygon
+                external_polygon_b = make_solid(region_b.polygon)
+                hull_polygon_b = region_b.hull
             elif isinstance(region_b, (shapely.Polygon,
                                           shapely.MultiPolygon)):
                 poly_b = region_b
+                external_polygon_b = make_solid(region_b)
+                hull_polygon_b = region_b.convex_hull
             else:
                 raise ValueError(''.join([
                     'Region_a and region_b must both be RegionSlice, ',
@@ -856,12 +958,22 @@ class DE27IM():
                     f'Region_a input was: {str(type(region_a))}\t',
                     f'Region_b input was: {str(type(region_b))}'
                     ]))
-            self.relate_poly(poly_a, poly_b, external_polygon, hull_polygon,
-                             adjustments=adjustments, tolerance=tolerance)
+            self.relate_poly(
+                poly_a,
+                poly_b,
+                external_polygon_a=external_polygon,
+                hull_polygon_a=hull_polygon,
+                external_polygon_b=external_polygon_b,
+                hull_polygon_b=hull_polygon_b,
+                adjustments=adjustments,
+                tolerance=tolerance,
+            )
 
     def relate_poly(self, poly_a: PolygonType, poly_b: PolygonType,
-                    external_polygon: PolygonType = None,
-                    hull_polygon: PolygonType = None,
+                    external_polygon_a: PolygonType = None,
+                    hull_polygon_a: PolygonType = None,
+                    external_polygon_b: PolygonType = None,
+                    hull_polygon_b: PolygonType = None,
                     adjustments: List[str] = None,
                     tolerance=0.0):
         '''Calculate the DE-27IM relationship for two polygons.
@@ -870,17 +982,22 @@ class DE27IM():
           relationships:
             1. The DE-9IM relationship between the two polygons (contour).
             2. The DE-9IM relationship between the *exterior* of the first
-                polygon (external) and the second polygon.
+                polygon (external) and the *exterior* of the second polygon.
             3. The DE-9IM relationship between the *convex hull* of the first
-                polygon (convex_hull) and the second polygon.
+                polygon (convex_hull) and the *convex hull* of the second
+                polygon.
 
         Args:
             poly_a (PolygonType): The first polygon.
             poly_b (PolygonType): The second polygon.
-            external_polygon (PolygonType): The external polygon of the first
+            external_polygon_a (PolygonType): The external polygon of the first
                 polygon. If not supplied, self.padding is used.
-            hull_polygon (PolygonType): The convex hull polygon of the first
+            hull_polygon_a (PolygonType): The convex hull polygon of the first
                 polygon. If not supplied, self.padding is used.
+            external_polygon_b (PolygonType): The external polygon of the
+                second polygon. If not supplied, poly_b is used.
+            hull_polygon_b (PolygonType): The convex hull polygon of the
+                second polygon. If not supplied, poly_b is used.
             adjustments (List[str]): A list of strings that define the
                    adjustments to be applied to the DE-9IM relationships before
                    combining them into a DE-27IM relationship string.
@@ -894,18 +1011,24 @@ class DE27IM():
                     - 'transpose': Apply transpose adjustments to both DE-9IMs.
         '''
         contour = DE9IM(poly_a, poly_b, tolerance=tolerance)
-        # If an external polygon is supplied, create a DE9IM relationship for
-        # the external polygon.
-        if external_polygon is None:
+        # If external polygons are supplied, create a DE9IM relationship for
+        # the exterior band.
+        if external_polygon_a is None:
             external = self.padding
         else:
-            external = DE9IM(external_polygon, poly_b, tolerance=tolerance)
-        # If a hull polygon is supplied, create a DE9IM relationship for the
-        # hull polygon.
-        if hull_polygon is None:
+            poly_b_exterior = (
+                poly_b if external_polygon_b is None else external_polygon_b
+            )
+            external = DE9IM(external_polygon_a, poly_b_exterior,
+                             tolerance=tolerance)
+        # If hull polygons are supplied, create a DE9IM relationship for the
+        # hull band.
+        if hull_polygon_a is None:
             convex_hull = self.padding
         else:
-            convex_hull = DE9IM(hull_polygon, poly_b, tolerance=tolerance)
+            poly_b_hull = poly_b if hull_polygon_b is None else hull_polygon_b
+            convex_hull = DE9IM(hull_polygon_a, poly_b_hull,
+                                tolerance=tolerance)
         # Create a tuple of the three DE-9IM relationships.
         # The order is important: (contour, external, convex_hull).
         relation_group = (contour, external, convex_hull)
@@ -914,8 +1037,11 @@ class DE27IM():
         # Merge the relationship into the DE27IM object.
         self.merge(self.to_int(relation_str))
 
-    def apply_adjustments(self, relation_group: Tuple[DE9IM, DE9IM, DE9IM],
-                          adjustments: List[str])-> tuple[DE9IM, DE9IM, DE9IM]:
+    def apply_adjustments(
+        self,
+        relation_group: Tuple[DE9IM, DE9IM, DE9IM],
+        adjustments: List[Union[str, AdjustmentType]],
+    ) -> tuple[DE9IM, DE9IM, DE9IM]:
         '''Apply adjustments to the DE-9IM relationship matrix.
 
         Three types of adjustments can be applied to the DE-9IM relationship
@@ -939,29 +1065,31 @@ class DE27IM():
         When hole adjustments are applied, only the "contour" bits are relevant,
         the external and hull bits are set to 'FFFFFFFFF'.
         '''
+        normalized = {AdjustmentType(item) if isinstance(item, str) else item
+                      for item in adjustments}
         # Apply Boundary Adjustments
-        if 'boundary_a' in adjustments:
+        if AdjustmentType.BOUNDARY_A in normalized:
             relation_group = tuple(de9im.boundary_adjustment('a')
                                    for de9im in relation_group)
-        if 'boundary_b' in adjustments:
+        if AdjustmentType.BOUNDARY_B in normalized:
             relation_group = tuple(de9im.boundary_adjustment('b')
                                    for de9im in relation_group)
         # Apply Hole Adjustments
-        if 'hole_a' in adjustments:
+        if AdjustmentType.HOLE_A in normalized:
             contour, external, convex_hull = relation_group
             contour = contour.hole_adjustment('a')
             external = self.padding
             convex_hull = self.padding
             relation_group = (contour, external, convex_hull)
             self.to_int(self.relation)
-        if 'hole_b' in adjustments:
+        if AdjustmentType.HOLE_B in normalized:
             contour, external, convex_hull = relation_group
             contour = contour.hole_adjustment('b')
             external = self.padding
             convex_hull = self.padding
             relation_group = (contour, external, convex_hull)
         # Apply Transpose Adjustment
-        if 'transpose' in adjustments:
+        if AdjustmentType.TRANSPOSE in normalized:
             relation_group = tuple(de9im.transpose()
                                    for de9im in relation_group)
         return relation_group
@@ -1027,10 +1155,21 @@ class DE27IM():
                 passes, otherwise RelationshipType.UNKNOWN.
         '''
         relation_binary = self.int
+        matches: Dict[str, RelationshipType] = {}
         for rel_def in self.test_binaries:
             result = rel_def.test(relation_binary)
             if result:
-                return result
+                matches[result.relation_type] = result
+        unique_matches = list(matches.values())
+        if len(unique_matches) == 1:
+            return unique_matches[0]
+        if len(unique_matches) > 1:
+            match_names = ', '.join(
+                match.relation_type for match in unique_matches
+            )
+            raise AmbiguousRelationshipError(
+                f'Multiple relationships matched: {match_names}'
+            )
         # Return UNKNOWN relationship type
         return self.relationship_definitions.get('UNKNOWN', None)
 

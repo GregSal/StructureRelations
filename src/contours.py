@@ -2,7 +2,6 @@
 '''
 from typing import List, Tuple, Union, Dict, Any
 from dataclasses import dataclass
-from math import isnan
 import warnings
 import logging
 
@@ -10,6 +9,7 @@ import numpy as np
 import pandas as pd
 import shapely
 from shapely.geometry import Polygon
+from shapely.errors import GEOSException
 
 from types_and_classes import ROI_Type, SliceIndexType, ContourPointsType
 from types_and_classes import ContourIndex
@@ -388,6 +388,95 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             new_cords.append(ptn)
         return new_cords
 
+    def polygon_from_points(points):
+        coords = []
+        for point in points:
+            if hasattr(point, 'x') and hasattr(point, 'y'):
+                coords.append((float(point.x), float(point.y)))
+            else:
+                coords.append((float(point[0]), float(point[1])))
+        return Polygon(coords)
+
+    def largest_polygon(geometry):
+        if isinstance(geometry, shapely.Polygon):
+            return geometry
+        if isinstance(geometry, shapely.MultiPolygon):
+            if len(geometry.geoms) == 0:
+                return Polygon()
+            return max(geometry.geoms, key=lambda poly: poly.area)
+        if hasattr(geometry, 'geoms'):
+            polygons = [
+                geom for geom in geometry.geoms
+                if isinstance(geom, (shapely.Polygon, shapely.MultiPolygon))
+            ]
+            if not polygons:
+                return Polygon()
+            flat_polys = []
+            for poly in polygons:
+                if isinstance(poly, shapely.MultiPolygon):
+                    flat_polys.extend(list(poly.geoms))
+                else:
+                    flat_polys.append(poly)
+            return max(flat_polys, key=lambda poly: poly.area)
+        return Polygon()
+
+    def repair_polygon(polygon):
+        if polygon.is_empty:
+            return polygon
+        if polygon.is_valid:
+            return largest_polygon(polygon)
+        try:
+            repaired = shapely.make_valid(polygon)
+        except (AttributeError, GEOSException, ValueError):
+            repaired = polygon.buffer(0)
+        repaired_poly = largest_polygon(repaired)
+        if repaired_poly.is_empty:
+            return polygon.buffer(0)
+        return repaired_poly
+
+    def resample_boundary(boundary, count):
+        return [
+            shapely.force_2d(boundary.interpolate(i / count, normalized=True))
+            for i in range(count)
+        ]
+
+    def interpolate_boundaries_resampled(boundary1, boundary2):
+        count = max(len(boundary1.coords), len(boundary2.coords), 24)
+        sampled_1 = resample_boundary(boundary1, count)
+        sampled_2 = resample_boundary(boundary2, count)
+
+        reversed_boundary = shapely.LinearRing(list(boundary2.coords)[::-1])
+        sampled_2_rev = resample_boundary(reversed_boundary, count)
+
+        normal_score = sum(
+            p1.distance(p2)
+            for p1, p2 in zip(sampled_1, sampled_2)
+        )
+        reversed_score = sum(
+            p1.distance(p2)
+            for p1, p2 in zip(sampled_1, sampled_2_rev)
+        )
+
+        if reversed_score < normal_score:
+            sampled_2 = sampled_2_rev
+
+        return [
+            ((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0)
+            for p1, p2 in zip(sampled_1, sampled_2)
+        ]
+
+    def build_interpolated_geometry(boundary_builder):
+        shell_points = boundary_builder(aligned_poly1.exterior,
+                                        aligned_poly2.exterior)
+        candidate_poly = polygon_from_points(shell_points)
+        matched_holes_local = match_holes(p1, p2)
+        for hole1, hole2 in matched_holes_local:
+            hole_points = boundary_builder(hole1, hole2)
+            hole_poly = polygon_from_points(hole_points)
+            candidate_poly = candidate_poly - hole_poly
+        candidate_poly = repair_polygon(candidate_poly)
+        return candidate_poly
+
     # Get the z value for the new polygon.
     new_z = calculate_new_slice_index(slices)
     # Error Checking
@@ -423,16 +512,17 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     # boundary and boundary 2.
     boundary1 = aligned_poly1.exterior
     boundary2 = aligned_poly2.exterior
-    new_cords = interpolate_boundaries(boundary1, boundary2)
-    # Build the new polygon from the interpolated coordinates.
-    itp_poly = shapely.Polygon(new_cords)
-    # Strip the Z coordinate from the polygon so that is can be replaced with new_z
-    itp_poly = Polygon(shapely.get_coordinates(itp_poly))
-    # Subtract the holes from the new polygon.
-    matched_holes = match_holes(p1, p2)
-    for hole1, hole2 in matched_holes:
-        new_hole = interpolate_boundaries(hole1, hole2)
-        itp_poly = itp_poly - Polygon(new_hole)
+    # Build candidate polygon from nearest-boundary interpolation.
+    itp_poly = build_interpolated_geometry(interpolate_boundaries)
+    # Fallback to robust resampling interpolation when topology is invalid.
+    if itp_poly.is_empty or not itp_poly.is_valid:
+        itp_poly = build_interpolated_geometry(interpolate_boundaries_resampled)
+
+    # Ensure the output remains a polygon-like geometry for downstream contour use.
+    itp_poly = largest_polygon(itp_poly)
+    if itp_poly.is_empty:
+        itp_poly = Polygon(shapely.get_coordinates(p1.exterior))
+
     # Add the z value to the polygon.
     itp_poly = shapely.force_3d(itp_poly, new_z)
     return itp_poly
@@ -646,8 +736,12 @@ class Contour:
 
     @property
     def index(self) -> ContourIndex:
-        '''Return a tuple representing (ROI, SliceIndex, ContourIndex).'''
-        return (self.roi, self.slice_index, self.contour_index)
+        '''Return a dataclass key for this contour.'''
+        return ContourIndex(
+            roi=self.roi,
+            slice_index=self.slice_index,
+            uniqueness_int=self.contour_index,
+        )
 
     @property
     def area(self) -> float:

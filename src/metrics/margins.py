@@ -659,6 +659,6 @@ metric_match = {
     RelationshipType.SHELTERS: MarginMetric,
     RelationshipType.SURROUNDS: MarginMetric,
     RelationshipType.CONTAINS: MarginMetric,
-    RelationshipType.EQUALS: NoMetric,
+    RelationshipType.EQUAL: NoMetric,
     RelationshipType.UNKNOWN: NoMetric,
     }

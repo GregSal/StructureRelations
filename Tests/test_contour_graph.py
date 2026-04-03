@@ -6,6 +6,7 @@ import pytest
 
 from contours import ContourPoints, build_contour_table, Contour
 from debug_tools import box_points, circle_points
+from types_and_classes import ContourIndex
 
 from contour_graph import *
 
@@ -654,10 +655,10 @@ class TestBuildContourLookup():
             lookup['Label'], lookup['ROI'], lookup['SliceIndex'],
             lookup['ContourIndex']
         ):
-            assert isinstance(label, tuple)
-            assert label[0] == roi
-            assert label[1] == slice_idx
-            assert label[2] == contour_idx
+            assert isinstance(label, ContourIndex)
+            assert label.roi == roi
+            assert label.slice_index == slice_idx
+            assert label.uniqueness_int == contour_idx
 
         # ROI 1 should have boundaries on slice 0.5 and 4.5
         boundary_slices = lookup.loc[lookup['Boundary'], 'SliceIndex'].tolist()

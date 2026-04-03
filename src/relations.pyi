@@ -32,8 +32,6 @@ class RelationshipType:
         pattern: DE-27IM pattern string (29 chars: T/F/* with tabs at pos 9, 19)
         mask: Binary mask as string (e.g., '0b111000111000111000111000111')
         value: Binary value as string (e.g., '0b111000000000111000000000000')
-        mask_decimal: Integer value of mask
-        value_decimal: Integer value of value
         examples: List of example scenarios
     '''
     relation_type: str
@@ -49,9 +47,15 @@ class RelationshipType:
     pattern: str
     mask: str
     value: str
-    mask_decimal: int
-    value_decimal: int
     examples: List[str]
+
+    @property
+    def mask_decimal(self) -> int:
+        ...
+
+    @property
+    def value_decimal(self) -> int:
+        ...
 
     @property
     def is_symmetric(self) -> bool:
@@ -145,7 +149,7 @@ BORDERS: RelationshipType  # Borders
 CONFINES: RelationshipType  # Confines
 CONTAINS: RelationshipType  # Contains
 DISJOINT: RelationshipType  # Disjoint
-EQUALS: RelationshipType  # Equals
+EQUAL: RelationshipType  # Equal
 OVERLAPS: RelationshipType  # Overlaps
 PARTITIONED: RelationshipType  # Partitioned by
 SHELTERS: RelationshipType  # Shelters

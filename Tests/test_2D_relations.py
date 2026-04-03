@@ -5,11 +5,19 @@ algorithm, specifically for 2D spatial relations using Shapely geometries.
 import shapely
 import pytest
 
-from relations import (
-    DE27IM, RelationshipType, RELATIONSHIP_TYPES
-)
+from relations import DE27IM, RELATIONSHIP_TYPES
 from debug_tools import circle_points, box_points
 from utilities import poly_round
+from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
+
+
+def get_relation_matches(a, b):
+    relation = DE27IM(a, b)
+    return {
+        test_binary.relation_type.relation_type
+        for test_binary in DE27IM.test_binaries
+        if test_binary.test(relation.int)
+    }
 
 class TestContains:
     '''Tests for the "contains" relationship between geometries.'''
@@ -252,21 +260,16 @@ class TestPartition:
         relation_type = DE27IM(ring, cropped_ring).identify_relation()
         assert relation_type == RELATIONSHIP_TYPES['PARTITIONED']
 
-    @pytest.mark.xfail
     def test_partition_embedded_circle(self):
         '''Test the "partition" relationship with a circle that is partitioned
-        by another circle, creating an island.
-
-        Note: This test exposes a known bug that is likely related to rounding
-        errors. The expected relation type is "PARTITIONED", but due to the bug
-        it may not return the correct result.'''
-        # This test exposes a known bug that is likely related to rounding errors.
-        # Rounding required because of floating point inaccuracies.
+        by another circle, creating an island.'''
         circle6 = poly_round(shapely.Polygon(circle_points(3)))
         circle4_offset = shapely.Polygon(circle_points(2, offset_x=2))
         cropped_circle = poly_round(shapely.intersection(circle6,
                                                          circle4_offset))
-        relation_type = DE27IM(circle6, cropped_circle).identify_relation()
+        relation = DE27IM(circle6, cropped_circle,
+                          tolerance=DEFAULT_TRANSVERSE_TOLERANCE)
+        relation_type = relation.identify_relation()
         assert relation_type == RELATIONSHIP_TYPES['PARTITIONED']
 
 class TestOverlaps:
@@ -283,7 +286,9 @@ class TestOverlaps:
         overlap.'''
         circle6 = shapely.Polygon(circle_points(3))
         box6_offset = shapely.Polygon(box_points(6, offset_x=3))
-        relation_type = DE27IM(circle6, box6_offset).identify_relation()
+        relation = DE27IM(circle6, box6_offset,
+                          tolerance=DEFAULT_TRANSVERSE_TOLERANCE)
+        relation_type = relation.identify_relation()
         assert relation_type == RELATIONSHIP_TYPES['OVERLAPS']
 
     def test_overlaps_circles(self):
@@ -370,7 +375,7 @@ class TestEquals:
         '''Test the "equals" relationship with two boxes that are equal.'''
         box6 = shapely.Polygon(box_points(6))
         relation_type = DE27IM(box6, box6).identify_relation()
-        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
+        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
 
     def test_equals_circle(self):
         '''Test the "equals" relationship with two circles that are equal.'''
@@ -378,4 +383,110 @@ class TestEquals:
         circle5 = shapely.Polygon(circle_points(2.5))
         cropped_circle = shapely.intersection(circle6, circle5)
         relation_type = DE27IM(circle5, cropped_circle).identify_relation()
-        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
+        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+
+
+class TestWithin:
+    '''Tests for the "within" complementary relationship.'''
+
+    def test_within_centered(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle2 = shapely.Polygon(circle_points(1))
+        matches = get_relation_matches(circle2, circle6)
+        assert 'WITHIN' in matches
+
+
+class TestSheltered:
+    '''Tests for the "sheltered" complementary relationship.'''
+
+    def test_sheltered_circle(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle3 = shapely.Polygon(circle_points(1.5, offset_x=1.6))
+        crescent = shapely.difference(circle6, circle3)
+        circle2 = shapely.Polygon(circle_points(1, offset_x=1.5))
+        matches = get_relation_matches(circle2, crescent)
+        assert 'SHELTERED' in matches
+
+
+class TestEnclosed:
+    '''Tests for the "enclosed" complementary relationship.'''
+
+    def test_enclosed_simple(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        ring = circle6 - circle4
+        circle2 = shapely.Polygon(circle_points(1))
+        matches = get_relation_matches(circle2, ring)
+        assert 'ENCLOSED' in matches
+
+
+class TestConfined:
+    '''Tests for the "confined" complementary relationship.'''
+
+    def test_confined_circle(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle4 = shapely.Polygon(circle_points(2))
+        box4_offset = shapely.Polygon(box_points(4, offset_x=2))
+        ring = shapely.difference(circle6, circle4)
+        cropped_circle = shapely.difference(circle4, box4_offset)
+        matches = get_relation_matches(cropped_circle, ring)
+        assert 'CONFINED' in matches
+
+
+class TestPartitions:
+    '''Tests for the "partitions" complementary relationship.'''
+
+    def test_partitions_simple(self):
+        box4 = shapely.Polygon(box_points(4))
+        box4_cropped = shapely.Polygon(box_points(2, 4, offset_x=-1))
+        matches = get_relation_matches(box4_cropped, box4)
+        assert 'PARTITIONS' in matches
+
+class TestMultipleRelationships:
+    '''Tests for cases where multiple relationships apply, to ensure the most
+    general relationship is selected.'''
+
+    def test_surrounds_disjoint(self):
+        circle6_left = shapely.Polygon(circle_points(6, offset_x=-6.5))
+        circle4_left = shapely.Polygon(circle_points(4, offset_x=-6.5))
+        circle3_left = shapely.Polygon(circle_points(3, offset_x=-6.5))
+        circle3_right = shapely.Polygon(circle_points(3, offset_x=3.5))
+        a = circle6_left - circle4_left
+        b = shapely.union_all([circle3_left, circle3_right])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RELATIONSHIP_TYPES['DISJOINT']
+
+    def test_contains_overlaps(self):
+        circle6_left = shapely.Polygon(circle_points(6, offset_x=-6.5))
+        circle3_left = shapely.Polygon(circle_points(3, offset_x=-6.5))
+        circle3_right = shapely.Polygon(circle_points(3, offset_x=3.5))
+        a = circle6_left
+        b = shapely.union_all([circle3_left, circle3_right])
+        relation_type = DE27IM(a, b).identify_relation()
+        assert relation_type == RELATIONSHIP_TYPES['OVERLAPS']
+
+class TestSymmetricOrderInvariance:
+    '''Verify symmetric relationships are order invariant in 2D.'''
+
+    def test_disjoint_order_invariance(self):
+        left = shapely.Polygon(circle_points(4, offset_x=-4.5))
+        right = shapely.Polygon(circle_points(4, offset_x=4.5))
+        assert DE27IM(left, right).identify_relation() == RELATIONSHIP_TYPES['DISJOINT']
+        assert DE27IM(right, left).identify_relation() == RELATIONSHIP_TYPES['DISJOINT']
+
+    def test_borders_order_invariance(self):
+        left = shapely.Polygon(box_points(4, offset_x=-2))
+        right = shapely.Polygon(box_points(4, offset_x=2))
+        assert DE27IM(left, right).identify_relation() == RELATIONSHIP_TYPES['BORDERS']
+        assert DE27IM(right, left).identify_relation() == RELATIONSHIP_TYPES['BORDERS']
+
+    def test_overlaps_order_invariance(self):
+        circle6 = shapely.Polygon(circle_points(3))
+        circle6_offset = shapely.Polygon(circle_points(3, offset_x=2))
+        assert DE27IM(circle6, circle6_offset).identify_relation() == RELATIONSHIP_TYPES['OVERLAPS']
+        assert DE27IM(circle6_offset, circle6).identify_relation() == RELATIONSHIP_TYPES['OVERLAPS']
+
+    def test_equals_order_invariance(self):
+        box6 = shapely.Polygon(box_points(6))
+        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUAL']
+        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUAL']

@@ -24,12 +24,25 @@ class SessionData:
         created_at (datetime): When the session was created.
         last_accessed (datetime): When the session was last accessed.
         app_version (str): Application version for compatibility checking.
+        job_status (str): Processing status
+            (idle/running/completed/failed/cancelled).
+        job_progress (float): Processing percentage from 0.0 to 100.0.
+        job_message (str): Human-readable processing status.
+        job_error (Optional[str]): Last processing error message, if any.
+        job_computed_at (Optional[datetime]): Timestamp of latest completed job.
+        job_provenance (dict): Additional job metadata for API responses.
     '''
     dicom_file_path: str
     structure_set: Optional[object] = None
     created_at: datetime = field(default_factory=datetime.now)
     last_accessed: datetime = field(default_factory=datetime.now)
     app_version: str = '1.0.0'
+    job_status: str = 'idle'
+    job_progress: float = 0.0
+    job_message: str = ''
+    job_error: Optional[str] = None
+    job_computed_at: Optional[datetime] = None
+    job_provenance: dict = field(default_factory=dict)
 
 
 class SessionManager:
@@ -205,6 +218,34 @@ class SessionManager:
             return True
         except OSError as e:
             logger.error(f'Failed to save structure_set for session {session_id}: {e}')
+            return False
+
+    def update_session_job_state(self, session_id: str, **state_updates) -> bool:
+        '''Update job-state fields for a session without touching timestamps.
+
+        Args:
+            session_id (str): Unique session identifier.
+            **state_updates: SessionData fields to update.
+
+        Returns:
+            bool: True if saved successfully, False otherwise.
+        '''
+        if session_id not in self._sessions:
+            logger.error(f'Session {session_id} not found in cache')
+            return False
+
+        session_data = self._sessions[session_id]
+        for key, value in state_updates.items():
+            if hasattr(session_data, key):
+                setattr(session_data, key, value)
+
+        session_file = self.sessions_dir / f'{session_id}.pkl'
+        try:
+            with open(session_file, 'wb') as f:
+                pickle.dump(session_data, f)
+            return True
+        except OSError as e:
+            logger.error(f'Failed to save job state for session {session_id}: {e}')
             return False
 
     def save_session(self, session_id: str, session_data: SessionData):

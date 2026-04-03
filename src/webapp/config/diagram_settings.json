@@ -84,7 +84,7 @@
       "dashes": false,
       "arrows": "to"
     },
-    "EQUALS": {
+    "EQUAL": {
       "color": "#FF0000",
       "width": 5,
       "dashes": false,

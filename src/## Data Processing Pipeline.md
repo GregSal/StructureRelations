@@ -142,7 +142,7 @@ For each pair of structures (ROI_A, ROI_B):
    - **Method:** `DE27IM.identify_relation()`
    - Tests 27-bit pattern against `RelationshipTest` definitions
    - Each test has mask and value for bit-pattern matching
-   - Returns one of: CONTAINS, OVERLAPS, SURROUNDS, SHELTERS, CONFINES, BORDERS, PARTITIONED, DISJOINT, EQUALS, or UNKNOWN
+   - Returns one of: CONTAINS, OVERLAPS, SURROUNDS, SHELTERS, CONFINES, BORDERS, PARTITIONED, DISJOINT, EQUAL, or UNKNOWN
 
 4. **Store Result:**
    - Creates `StructureRelationship` object

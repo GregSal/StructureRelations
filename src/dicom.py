@@ -167,6 +167,18 @@ class DicomStructureFile:
                     f'for patient {info.get("PatientID", "Unknown")}')
         return f"DICOM file: {self.file_name}"
 
+    def __enter__(self) -> 'DicomStructureFile':
+        '''Support context manager usage for controlled dataset lifecycle.'''
+        if not hasattr(self, 'dataset') or self.dataset is None:
+            self._load_dataset()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        '''Release dataset reference when leaving a context manager block.'''
+        if hasattr(self, 'dataset'):
+            del self.dataset
+        return False
+
     def get_contour_points(self) -> List[ContourPoints]:
         '''Extract all contour points from the DICOM structure dataset.
 

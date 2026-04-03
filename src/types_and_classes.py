@@ -4,6 +4,8 @@
 # %% Imports
 # Type imports
 from typing import List, NewType, Union, Tuple
+from enum import Enum
+from dataclasses import dataclass
 
 # Shared Packages
 import networkx as nx
@@ -29,11 +31,28 @@ Coordinate = Union[Tuple[float, float], Tuple[float, float, float]]
 ContourPointsType = NewType('ContourPointsType', List[Coordinate])
 
 # The index for an individual contour.
-# The index is a tuple of:
+# The index contains:
 #   - The Region's ROI number,
-#   - The Region's The slice index,
+#   - The Region's slice index,
 #   - An indexer value to force unique nodes.
-ContourIndex = NewType('ContourIndex', Tuple[ROI_Type, SliceIndexType, int])
+@dataclass(frozen=True, order=True)
+class ContourIndex:
+    '''Stable contour identifier used as graph node labels and dict keys.'''
+
+    roi: ROI_Type
+    slice_index: SliceIndexType
+    uniqueness_int: int
+
+    def __iter__(self):
+        yield self.roi
+        yield self.slice_index
+        yield self.uniqueness_int
+
+    def __getitem__(self, idx: int):
+        return (self.roi, self.slice_index, self.uniqueness_int)[idx]
+
+    def __len__(self) -> int:
+        return 3
 
 # A link between two contours.
 # The link is a tuple of two ContourIndexes.
@@ -61,6 +80,15 @@ PolygonType = Union[shapely.Polygon, shapely.MultiPolygon]
 DEFAULT_TRANSVERSE_TOLERANCE = 0.01  # The default resolution in the transverse plane in cm
 SLICE_INDEX_PRECISION = 0.01  # The default precision for slice indexes in cm
 PRECISION = 3
+
+
+class HoleType(str, Enum):
+    '''Canonical hole/boundary labels used across contour processing.'''
+
+    NONE = 'None'
+    OPEN = 'Open'
+    CLOSED = 'Closed'
+    BOUNDARY = 'Boundary'
 
 # Exception Types
 class StructuresException(Exception):

@@ -115,10 +115,10 @@ class TestLogicalConfines:
 
 
 class TestLogicalEquals:
-    '''Tests for logical relationships derived from EQUALS.'''
+    '''Tests for logical relationships derived from EQUAL.'''
 
     def test_equals_borders_logical(self):
-        '''Test: A Equals B, B Borders C => A Borders C is logical.'''
+        '''Test: A is Equal to B, B Borders C => A Borders C is logical.'''
         slice_spacing = 0.5
         bottom_box1 = make_box(
             roi_num=1, width=5, length=5, height=2,
@@ -139,9 +139,9 @@ class TestLogicalEquals:
         slice_data = bottom_box1 + bottom_box2 + top_box
         structures = StructureSet(slice_data)
 
-        # Check (1,2) is EQUALS
+        # Check (1,2) is EQUAL
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
-        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
+        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
 
         # Check (2,3) is logical
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
@@ -149,7 +149,7 @@ class TestLogicalEquals:
         assert rel_2_3.is_logical
 
     def test_equals_disjoint_logical(self):
-        '''Test: A Equals B, B Disjoint C => A Disjoint C is logical.'''
+        '''Test: A is Equal to B, B Disjoint C => A Disjoint C is logical.'''
         slice_spacing = 0.5
         cylinder_a = make_vertical_cylinder(
             roi_num=1, radius=2, length=8,
@@ -170,9 +170,9 @@ class TestLogicalEquals:
         slice_data = cylinder_a + cylinder_b + cylinder_c
         structures = StructureSet(slice_data)
 
-        # Check (1,2) is EQUALS
+        # Check (1,2) is EQUAL
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
-        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
+        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
 
         # Check (2,3) is logical
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))

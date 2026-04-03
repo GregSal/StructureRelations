@@ -12,7 +12,11 @@ from dicom import DicomStructureFile
 from structure_set import StructureSet
 
 # Load a test DICOM file
-test_file = Path(__file__).parent / 'Tests' / 'RS.GJS_Struct_Tests.BRBL BH.dcm'
+test_file = (
+    Path(__file__).resolve().parent.parent
+    / 'tests'
+    / 'RS.GJS_Struct_Tests.BRBL BH.dcm'
+)
 print(f'Loading DICOM file: {test_file}')
 
 dicom_file = DicomStructureFile(

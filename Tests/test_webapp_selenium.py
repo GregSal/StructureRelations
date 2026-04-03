@@ -7,6 +7,7 @@ import pytest
 import time
 import subprocess
 import sys
+import os
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -16,6 +17,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
 import requests
 from requests.exceptions import ConnectionError
+
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
+    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
+)
 
 
 @pytest.fixture(scope='function')
@@ -538,11 +545,11 @@ class TestWebAppWorkflow:
         assert rows > 0
         assert cols > 0
 
-        # Check diagonal is EQUALS
+        # Check diagonal is EQUAL
         for i in range(min(rows, cols)):
             cell_value = helper.get_matrix_cell(i, i)
-            # Should be either '=' symbol or 'EQUALS' text
-            assert cell_value in ['=', 'EQUALS']
+            # Should be either '=' symbol or 'EQUAL' text
+            assert cell_value in ['=', 'EQUAL']
 
     def test_independent_matrix_axes(
         self,

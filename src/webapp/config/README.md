@@ -69,7 +69,7 @@ The `diagram_settings.json` file contains visual styling:
 - **PARTITION** - Structures partition space between them
 - **CONFINES** - B contacts inner surface of A
 - **DISJOINT** - Structures are completely separated
-- **EQUALS** - Same structure (diagonal of matrix)
+- **EQUAL** - Same structure (diagonal of matrix)
 - **UNKNOWN** - Relationship not determined
 
 ### Customizing Symbols

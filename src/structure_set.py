@@ -1,8 +1,9 @@
 '''StructureSet class for managing multiple structures and their relationships.
 '''
 # %% Imports
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional
 import logging
+from pathlib import Path
 
 import pandas as pd
 import networkx as nx
@@ -60,6 +61,14 @@ class StructureSet:
         self.relationship_graph = nx.DiGraph()
         self.dicom_structure_file = dicom_structure_file
         self.tolerance = tolerance
+        self.relationship_progress: Dict[str, float | int | str] = {
+            'current_pair': 0,
+            'total_pairs': 0,
+            'current_slice': 0,
+            'total_slices': 0,
+            'status': 'idle',
+            'percent_complete': 0.0,
+        }
 
         # Prioritize dicom_structure_file over slice_data
         if dicom_structure_file is not None:
@@ -154,12 +163,19 @@ class StructureSet:
         # Add structure to relationship graph
         self.relationship_graph.add_node(structure.roi, structure=structure)
 
-    def calculate_relationships(self, force=False) -> None:
+    def calculate_relationships(
+            self,
+            force=False,
+            progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> None:
         '''Calculate relationships between all structure pairs.
 
         This method calculates the DE27IM spatial relationship between every
         pair of structures and stores the results in the relationship_graph
         as edge attributes.
+
+        When supplied, progress_callback is called after each structure pair
+        completes with (completed_pairs, total_pairs).
 
         If relationships have already been calculated, this method does nothing.
         '''
@@ -169,9 +185,21 @@ class StructureSet:
         # Check if relationships have already been calculated
         # If the graph has the expected number of edges, skip recalculation
         expected_edges = len(structure_rois) * (len(structure_rois) - 1) // 2
+        self.relationship_progress.update({
+            'current_pair': 0,
+            'total_pairs': expected_edges,
+            'current_slice': 0,
+            'total_slices': 0,
+            'status': 'starting',
+            'percent_complete': 0.0,
+        })
         if self.relationship_graph.number_of_edges() >= expected_edges:
             if not force:
                 logger.debug('Relationships already calculated, skipping recalculation')
+                self.relationship_progress.update({
+                    'status': 'already calculated',
+                    'percent_complete': 100.0 if expected_edges else 0.0,
+                })
                 return
             logger.debug('Force recalculation enabled, recalculating relationships')
             # Clear existing edges but keep nodes for recalculation
@@ -179,14 +207,49 @@ class StructureSet:
 
         logger.info('Calculating relationships for %d structures',
                     len(structure_rois))
+        completed_pairs = 0
+        total_pairs = expected_edges
+
         # Calculate relationships for all pairs
         for i, roi_a in enumerate(structure_rois):
             for roi_b in structure_rois[i+1:]:
                 structure_a = self.structures[roi_a]
                 structure_b = self.structures[roi_b]
+
+                current_pair = completed_pairs + 1
+                pair_status = (
+                    f'pair {current_pair}/{total_pairs}: '
+                    f'{structure_a.name} vs {structure_b.name}'
+                )
+                self.relationship_progress.update({
+                    'current_pair': current_pair,
+                    'status': pair_status,
+                })
+
+                def update_slice_progress(
+                    current_slice_index: int,
+                    total_slices: int,
+                ) -> None:
+                    self.relationship_progress['current_slice'] = current_slice_index
+                    self.relationship_progress['total_slices'] = total_slices
+                    if total_pairs <= 0:
+                        self.relationship_progress['percent_complete'] = 100.0
+                        return
+                    pair_fraction = (
+                        current_slice_index / total_slices
+                        if total_slices > 0
+                        else 1.0
+                    )
+                    self.relationship_progress['percent_complete'] = (
+                        (completed_pairs + pair_fraction) * 100.0 / total_pairs
+                    )
+
                 # Calculate the DE27IM relationship
-                de27im_relationship = structure_a.relate(structure_b,
-                                                         tolerance=self.tolerance)
+                de27im_relationship = structure_a.relate_to(
+                    structure_b,
+                    tolerance=self.tolerance,
+                    progress_callback=update_slice_progress,
+                )
                 relation_type = de27im_relationship.identify_relation()
                 logger.info('Calculated relationships between %s (ROI %s) and %s (ROI %s) as: %s',
                             structure_a.name, structure_a.roi,
@@ -203,6 +266,20 @@ class StructureSet:
                     relationship=relationship
                 )
 
+                completed_pairs += 1
+                self.relationship_progress.update({
+                    'current_pair': completed_pairs,
+                    'current_slice': self.relationship_progress.get('total_slices', 0),
+                    'status': 'running',
+                    'percent_complete': (
+                        (completed_pairs * 100.0 / total_pairs)
+                        if total_pairs > 0
+                        else 100.0
+                    ),
+                })
+                if progress_callback is not None:
+                    progress_callback(completed_pairs, total_pairs)
+
                 try:
                     rel_type = relationship.relationship_type
                     logger.debug('Calculated relationship between ROI %s and ROI %s: %s',
@@ -211,11 +288,57 @@ class StructureSet:
                     logger.debug('Calculated relationship between ROI %s and ROI %s (error accessing type: %s)',
                                  structure_a.name, structure_b.name, str(e))
 
+        self.relationship_progress.update({
+            'status': 'complete',
+            'percent_complete': 100.0,
+        })
+
+    def calculate_relationships_with_progress(self, force=False) -> None:
+        '''Calculate relationships with optional tqdm terminal progress output.
+
+        Uses tqdm when available. If tqdm is not installed, logs progress at
+        info level after each completed pair.
+        '''
+        try:
+            from tqdm import tqdm  # type: ignore[import-not-found]
+        except ImportError:
+            logger.info('tqdm not available; using logging-based progress output')
+
+            def log_progress(completed_pairs: int, total_pairs: int) -> None:
+                if total_pairs <= 0:
+                    percent = 100.0
+                else:
+                    percent = completed_pairs * 100.0 / total_pairs
+                logger.info(
+                    'Relationship progress: %d/%d pairs (%.1f%%)',
+                    completed_pairs,
+                    total_pairs,
+                    percent,
+                )
+
+            self.calculate_relationships(
+                force=force,
+                progress_callback=log_progress,
+            )
+            return
+
+        total_pairs = len(self.structures) * (len(self.structures) - 1) // 2
+        with tqdm(total=total_pairs, desc='Relationships', unit='pair') as pbar:
+            def tqdm_progress(completed_pairs: int, total_pairs: int) -> None:
+                pbar.total = total_pairs
+                pbar.n = completed_pairs
+                pbar.refresh()
+
+            self.calculate_relationships(
+                force=force,
+                progress_callback=tqdm_progress,
+            )
+
     def _build_transitive_subgraph(self) -> nx.DiGraph:
         '''Build a directed graph containing only transitive relationships.
 
         This subgraph includes all edges where the relationship type is
-        transitive (e.g., CONTAINS, SHELTERS, SURROUNDS, EQUALS).
+        transitive (e.g., CONTAINS, SHELTERS, SURROUNDS, EQUAL).
 
         Returns:
             nx.DiGraph: Subgraph with same nodes as relationship_graph but
@@ -300,7 +423,7 @@ class StructureSet:
         2. For each edge in the original graph:
            - If multiple paths exist in transitive subgraph, mark as logical
            - Extract ROIs from longest path as intermediate structures
-        3. Handle EQUALS relationships: mark downstream edges as logical
+        3. Handle EQUAL relationships: mark downstream edges as logical
         '''
         logger.info('Calculating logical flags for relationships')
 
@@ -401,7 +524,7 @@ class StructureSet:
             except nx.NodeNotFound:
                 pass
 
-        # Handle EQUALS relationships
+        # Handle EQUAL relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
             relationship = edge_data['relationship']
@@ -409,7 +532,7 @@ class StructureSet:
                 continue
 
             rel_type = relationship.relationship_type
-            if not rel_type or rel_type.relation_type != 'EQUALS':
+            if not rel_type or rel_type.relation_type != 'EQUAL':
                 continue
 
             # Determine downstream (higher ROI number)
@@ -427,9 +550,9 @@ class StructureSet:
                         next_relationship.intermediate_structures = [
                             ROI_Type(upstream_roi)]
                         logger.debug(
-                            'Identified EQUALS-derived logical '
+                            'Identified EQUAL-derived logical '
                             'relationship: ROI %d -> ROI %d '
-                            '(via EQUALS with ROI %d)',
+                            '(via EQUAL with ROI %d)',
                             downstream_roi, next_roi, upstream_roi
                         )
 
@@ -480,9 +603,9 @@ class StructureSet:
 
         # Define functions that return the relevant volume type for a structure.
         volume_getters = {
-            'physical': lambda structure: structure.physical_volume,
-            'exterior': lambda structure: structure.exterior_volume,
-            'hull': lambda structure: structure.hull_volume,
+            'physical': lambda structure: structure.volume_metrics.physical,
+            'exterior': lambda structure: structure.volume_metrics.exterior,
+            'hull': lambda structure: structure.volume_metrics.hull,
         }
         # Verify that all provided volume types are one of the defined types.
         invalid_types = [
@@ -516,11 +639,11 @@ class StructureSet:
             summary_data.append({
                 'ROI': roi,
                 'Name': structure.name,
-                'Physical_Volume': round_value(structure.physical_volume,
+                'Physical_Volume': round_value(structure.volume_metrics.physical,
                                                self.tolerance),
-                'Exterior_Volume': round_value(structure.exterior_volume,
+                'Exterior_Volume': round_value(structure.volume_metrics.exterior,
                                               self.tolerance),
-                'Hull_Volume': round_value(structure.hull_volume,
+                'Hull_Volume': round_value(structure.volume_metrics.hull,
                                           self.tolerance),
                 'Num_Contours': len(structure.contour_graph),
                 'Num_Regions': len(structure.get_region_indexes(include_holes=False)),
@@ -1007,3 +1130,34 @@ class StructureSet:
             'structure_slices': structure_slices_dict,
             'faded_relationships': faded_relationships if logical_relations_mode == 'faded' else None
         }
+
+
+class StructureSetBuilder:
+    '''Fluent builder for StructureSet creation from DICOM inputs.'''
+
+    def __init__(self):
+        self._dicom_file: Optional[DicomStructureFile] = None
+        self._tolerance: float = 0.0
+
+    def with_dicom_file(self, path: str | Path) -> 'StructureSetBuilder':
+        '''Set the DICOM RTSTRUCT file to use for StructureSet creation.'''
+        file_path = Path(path)
+        self._dicom_file = DicomStructureFile(
+            top_dir=file_path.parent,
+            file_path=file_path,
+        )
+        return self
+
+    def with_tolerance(self, tol: float) -> 'StructureSetBuilder':
+        '''Set relationship tolerance used by the constructed StructureSet.'''
+        self._tolerance = tol
+        return self
+
+    def build(self) -> StructureSet:
+        '''Build and return the configured StructureSet instance.'''
+        if self._dicom_file is None:
+            raise ValueError('A DICOM file must be provided before calling build().')
+        return StructureSet(
+            dicom_structure_file=self._dicom_file,
+            tolerance=self._tolerance,
+        )

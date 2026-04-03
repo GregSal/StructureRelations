@@ -8,6 +8,7 @@ Types, Classes and utility function definitions.
 from typing import Dict, Union, List
 
 # Standard Libraries
+import functools
 
 # Shared Packages
 import pandas as pd
@@ -137,6 +138,8 @@ class RegionSlice():
         self.region_holes = {}
         self.embedded_regions = {}
         self.contour_indexes = {}
+        # These dictionaries are treated as immutable after __init__ and are
+        # safe to use with cached_property-derived geometry caches.
         interpolated_contours = []
 
         # Extract the a subset of the contour_lookup table limited to contours
@@ -285,7 +288,7 @@ class RegionSlice():
         # interpolated.
         self.is_interpolated = all(interpolated_contours)
 
-    @property
+    @functools.cached_property
     def exterior(self)-> Dict[RegionIndex, shapely.MultiPolygon]:
         '''The solid exterior contour MultiPolygon.
 
@@ -306,7 +309,7 @@ class RegionSlice():
             exterior_regions[region_index] = ext_poly
         return exterior_regions
 
-    @property
+    @functools.cached_property
     def hull(self)-> Dict[RegionIndex, shapely.MultiPolygon]:
         '''A list of bounding polygons generated from each region.
 
@@ -331,6 +334,34 @@ class RegionSlice():
                 hull_poly = make_multi(hull)
                 hull_regions[region_index] = hull_poly
         return hull_regions
+
+    @functools.cached_property
+    def merged_region(self) -> shapely.MultiPolygon:
+        '''Return all regions merged into one MultiPolygon.'''
+        if not self.has_regions():
+            return shapely.MultiPolygon()
+        return make_multi(shapely.union_all(list(self.regions.values())))
+
+    @functools.cached_property
+    def merged_exterior(self) -> shapely.MultiPolygon:
+        '''Return all exteriors merged into one MultiPolygon.'''
+        if not self.has_regions():
+            return shapely.MultiPolygon()
+        return make_multi(shapely.union_all(list(self.exterior.values())))
+
+    @functools.cached_property
+    def merged_hull(self) -> shapely.MultiPolygon:
+        '''Return all hulls merged into one MultiPolygon.'''
+        if not self.has_regions():
+            return shapely.MultiPolygon()
+        return make_multi(shapely.union_all(list(self.hull.values())))
+
+    @functools.cached_property
+    def merged_boundary(self) -> shapely.MultiPolygon:
+        '''Return all boundaries merged into one MultiPolygon.'''
+        if not self.has_boundaries():
+            return shapely.MultiPolygon()
+        return make_multi(shapely.union_all(list(self.boundaries.values())))
 
     def has_regions(self) -> bool:
         '''Check if the slice has any regions.

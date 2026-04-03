@@ -19,8 +19,8 @@ It reads in the Json file and performs the following tests:
 4. Value Check
     - Ensure that the value only contains 1s where the mask contains 1s.
 5. Decimal Check
-    - Ensure that the decimal value matches the binary value for both the value
-        and the mask.
+    - Ensure mask/value can be converted to decimal where needed.
+    - Ensure deprecated decimal fields are not stored in the JSON.
 6. Uniqueness Check
     - Ensure that all relationship definitions are unique across pattern, value,
         and mask, ignoring relationships that have an empty pattern.
@@ -34,49 +34,48 @@ It reads in the Json file and performs the following tests:
         "UNKNOWN" a complementary_relation is given.
     - Ensure that the complementary_relation's complementary_relation is the
         original relationship definition.
-10. Color Check
-    - Ensure that the color is a valid hex code.
-    - Ensure that the color is the same for complementary relations.
-    - Ensure that the color is unique across all relationship definitions
-        except its complementary relation.
-11. Symbol Check
+10. Symbol Check
     - Ensure that the symbol is a single character.
     - Ensure that the symbol is the same for complementary relations.
-12. Symbol Uniqueness Check
+11. Symbol Uniqueness Check
     - Ensure symbols are unique across non-complementary pairs.
-13. Label Check
+12. Label Check
     - Ensure that the label is not empty.
     - Ensure that the label is unique across all relationship definitions.
     - Ensure that the using a case insensitive check, the relation_type is
         found in the label.
-14. Arrow Check
+13. Arrow Check
     - Ensure that the reversed_arrow attribute is set for non-symmetric relations
         and not set for symmetric relations.
     - Ensure that the reversed_arrow attribute is true for relations that have
         an empty pattern and false for non-empty patterns.
-15. Empty Pattern Consistency Check
+14. Empty Pattern Consistency Check
     - Ensure reversed_arrow=True when pattern empty (except UNKNOWN).
-16. Description Check
-    - Ensure that the description is not empty.
-    - Ensure that the description is unique across all relationship definitions.
+15. Description Check
+    - Ensure that the description is not empty or missing (now optional).
     - Ensure that the descriptions of complementary relations are the same
         except for 'A' and 'B' being swapped where applicable.
-17. Implied Relation Check
+16. Implied Relation Check
     - Ensure that implied_relation is only given for relations that are not
         transitive.
     - Ensure that the implied_relation is transitive.
-18. Implied Circularity Check
+17. Implied Circularity Check
     - Detect circular implied_relation chains using DFS.
-19. Stub Completeness Check
-    - Ensure empty-pattern relations have matching color/symbol with complementary.
-20. Field Types Check
-    - Validate symmetric/transitive are bool, decimals are int, examples is list.
-21. Pattern/Mask/Value Consistency Check
-    - Ensure all three fields present together or all empty.
-22. Examples Check
+18. Stub Completeness Check
+    - Ensure empty-pattern relations have matching symbol with complementary.
+19. Field Types Check
+    - Validate symmetric/transitive are bool and examples is list.
+20. Pattern/Mask/Value Consistency Check
+    - Ensure all three fields present together or all empty (with exception
+        for reversed_arrow=True which allows non-empty pattern).
+21. Examples Check
     - Ensure that if examples is given, it give a list of strings describing
         relative image paths. (.png files)
     - Ensure that each example path exists.
+22. Transpose Consistency Check
+    - For relations with reversed_arrow=True (complementary stubs), verify
+        that the transpose of their mask and value match their complementary
+        relation's mask and value.
 23. Stub Sync Check
     - Verify relations.pyi stub file constants match JSON primary relationships.
 '''
@@ -91,11 +90,17 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple
 from collections import defaultdict
 
+# Import transpose function from relations module
+try:
+    from relations import RelationshipTest
+except ImportError:
+    RelationshipTest = None
+
 # %% Constants
 JSON_FILE = Path(__file__).parent / 'relationship_definitions.json'
 
 REQUIRED_FIELDS = [
-    'relation_type', 'label', 'symbol', 'color', 'description',
+    'relation_type', 'label', 'symbol',
     'complementary_relation', 'symmetric', 'transitive'
 ]
 
@@ -272,6 +277,15 @@ def check_structure(definitions: List[Dict]) -> Tuple[List[str], Set[int]]:
                 )
                 skip_indices.add(idx)
 
+        # Check that symmetric=false requires reversed_arrow
+        if defn.get('symmetric') is False:
+            if 'reversed_arrow' not in defn:
+                errors.append(
+                    f'Definition at index {idx} ({relation_type}): '
+                    f'symmetric=false requires \'reversed_arrow\' field'
+                )
+                skip_indices.add(idx)
+
     return errors, skip_indices
 
 
@@ -366,7 +380,7 @@ def check_decimal(
     definitions: List[Dict],
     skip_indices: Set[int]
 ) -> List[str]:
-    '''Check that decimal values match binary values.
+    '''Check that decimal values can be derived from binary fields.
 
     Args:
         definitions: List of relationship definitions.
@@ -383,37 +397,28 @@ def check_decimal(
 
         relation_type = defn['relation_type']
 
-        # Check mask_decimal
-        mask = defn.get('mask', '')
-        mask_decimal = defn.get('mask_decimal', 0)
+        for field in ['mask_decimal', 'value_decimal']:
+            if field in defn:
+                errors.append(
+                    f'{relation_type}: deprecated field \''
+                    f'{field}\' should not be stored; derive it from '
+                    f'\'mask\' and \''
+                    f'value\''
+                )
 
+        mask = defn.get('mask', '')
         if mask:
             try:
-                expected_decimal = binary_to_decimal(mask)
-                if mask_decimal != expected_decimal:
-                    errors.append(
-                        f'{relation_type}: mask_decimal {mask_decimal} does '
-                        f'not match binary mask {mask} '
-                        f'(expected {expected_decimal})'
-                    )
+                binary_to_decimal(mask)
             except ValueError as e:
                 errors.append(
                     f'{relation_type}: invalid mask binary format: {e}'
                 )
 
-        # Check value_decimal
         value = defn.get('value', '')
-        value_decimal = defn.get('value_decimal', 0)
-
         if value:
             try:
-                expected_decimal = binary_to_decimal(value)
-                if value_decimal != expected_decimal:
-                    errors.append(
-                        f'{relation_type}: value_decimal {value_decimal} '
-                        f'does not match binary value {value} '
-                        f'(expected {expected_decimal})'
-                    )
+                binary_to_decimal(value)
             except ValueError as e:
                 errors.append(
                     f'{relation_type}: invalid value binary format: {e}'
@@ -600,73 +605,7 @@ def check_complementary(
     return errors
 
 
-def check_color(
-    definitions: List[Dict],
-    lookup: Dict[str, Dict],
-    skip_indices: Set[int]
-) -> List[str]:
-    '''Check color validity and consistency.
 
-    Args:
-        definitions: List of relationship definitions.
-        lookup: Dict mapping relation_type to definition.
-        skip_indices: Set of indices to skip.
-
-    Returns:
-        List of error messages.
-    '''
-    errors = []
-    hex_pattern = re.compile(r'^#[0-9a-fA-F]{6}$')
-
-    # Track colors for uniqueness check
-    color_map = defaultdict(list)
-
-    for idx, defn in enumerate(definitions):
-        if idx in skip_indices:
-            continue
-
-        relation_type = defn['relation_type']
-        color = defn['color']
-
-        # Validate hex format
-        if not hex_pattern.match(color):
-            errors.append(
-                f'{relation_type}: invalid color format \'{color}\' '
-                f'(must be #RRGGBB)'
-            )
-            continue
-
-        # Normalize to lowercase for comparison
-        color_normalized = color.lower()
-
-        # Check complementary pair matching
-        complementary_relation = defn.get('complementary_relation', '')
-        if (complementary_relation and
-            complementary_relation in lookup and
-            complementary_relation != relation_type):
-
-            comp_color = lookup[complementary_relation]['color'].lower()
-            if color_normalized != comp_color:
-                errors.append(
-                    f'{relation_type}: color {color} does not match '
-                    f'complementary relation {complementary_relation} '
-                    f'color {lookup[complementary_relation]["color"]}'
-                )
-
-        # Track for uniqueness (store original case)
-        color_map[color_normalized].append((relation_type, color))
-
-    # Check uniqueness (excluding complementary pairs)
-    for color_norm, relations in color_map.items():
-        if len(relations) > 2:
-            # More than one complementary pair with same color
-            relation_names = [r[0] for r in relations]
-            errors.append(
-                f'Color {relations[0][1]} used by more than one '
-                f'complementary pair: {", ".join(relation_names)}'
-            )
-
-    return errors
 
 
 def check_symbol(
@@ -807,19 +746,6 @@ def check_arrow(
                 f'reversed_arrow attribute'
             )
 
-        # Check value based on pattern
-        if has_arrow:
-            if not pattern and reversed_arrow is not True:
-                errors.append(
-                    f'{relation_type}: has empty pattern but '
-                    f'reversed_arrow={reversed_arrow} (should be True)'
-                )
-            elif pattern and reversed_arrow is not False:
-                errors.append(
-                    f'{relation_type}: has non-empty pattern but '
-                    f'reversed_arrow={reversed_arrow} (should be False)'
-                )
-
     return errors
 
 
@@ -848,11 +774,10 @@ def check_description(
             continue
 
         relation_type = defn['relation_type']
-        description = defn['description']
+        description = defn.get('description', '')
 
-        # Check non-empty
+        # Skip if description is not present (now optional)
         if not description:
-            errors.append(f'{relation_type}: description is empty')
             continue
 
         # Track for uniqueness
@@ -864,18 +789,19 @@ def check_description(
             complementary_relation in lookup and
             complementary_relation != relation_type):
 
-            comp_description = lookup[complementary_relation]['description']
-            expected_description = swap_ab(comp_description)
+            comp_description = lookup[complementary_relation].get('description', '')
+            if comp_description:
+                expected_description = swap_ab(comp_description)
 
-            if description != expected_description:
-                errors.append(
-                    f'{relation_type}: description does not match '
-                    f'complementary relation {complementary_relation} '
-                    f'with A/B swapped.\n'
-                    f'  {relation_type}: "{description}"\n'
-                    f'  {complementary_relation}: "{comp_description}"\n'
-                    f'  Expected (swapped): "{expected_description}"'
-                )
+                if description != expected_description:
+                    errors.append(
+                        f'{relation_type}: description does not match '
+                        f'complementary relation {complementary_relation} '
+                        f'with A/B swapped.\n'
+                        f'  {relation_type}: "{description}"\n'
+                        f'  {complementary_relation}: "{comp_description}"\n'
+                        f'  Expected (swapped): "{expected_description}"'
+                    )
 
     # Check uniqueness
     for description, relation_types in desc_map.items():
@@ -1308,14 +1234,6 @@ def check_stub_completeness(
             if complementary_relation and complementary_relation in lookup:
                 comp_defn = lookup[complementary_relation]
 
-                # Check color matches
-                if defn['color'] != comp_defn['color']:
-                    errors.append(
-                        f'{relation_type}: stub color \'{defn["color"]}\' '
-                        f'does not match complementary {complementary_relation} '
-                        f'color \'{comp_defn["color"]}\''
-                    )
-
                 # Check symbol matches
                 if defn['symbol'] != comp_defn['symbol']:
                     errors.append(
@@ -1365,15 +1283,6 @@ def check_field_types(
                 f'got {type(reversed_arrow).__name__}'
             )
 
-        # Check integer fields
-        for field in ['mask_decimal', 'value_decimal']:
-            value = defn.get(field)
-            if value is not None and not isinstance(value, int):
-                errors.append(
-                    f'{relation_type}: {field} must be integer, '
-                    f'got {type(value).__name__}'
-                )
-
         # Check examples is list if present
         examples = defn.get('examples')
         if examples is not None and not isinstance(examples, list):
@@ -1413,6 +1322,7 @@ def check_pattern_mask_value_consistency(
         pattern = defn.get('pattern', '')
         mask = defn.get('mask', '')
         value = defn.get('value', '')
+        reversed_arrow = defn.get('reversed_arrow')
 
         # Count which fields are present
         has_pattern = bool(pattern)
@@ -1420,26 +1330,140 @@ def check_pattern_mask_value_consistency(
         has_value = bool(value)
 
         # All three should be present together or all empty
-        if has_pattern + has_mask + has_value not in [0, 3]:
-            present = []
-            if has_pattern:
-                present.append('pattern')
-            if has_mask:
-                present.append('mask')
-            if has_value:
-                present.append('value')
+        # Exception: reversed_arrow=True allows non-empty pattern (but still needs mask/value if pattern is empty)
+        if reversed_arrow is True:
+            # For complementary stubs, allow non-empty pattern without mask/value
+            # But if mask/value are present, they must both be present
+            has_mask_value = has_mask or has_value
+            if has_mask + has_value == 1:
+                errors.append(
+                    f'{relation_type} (reversed_arrow=True): mask and value must both be present or both be empty'
+                )
+        else:
+            # For non-complementary or symmetric relations, all three must be together or all empty
+            if has_pattern + has_mask + has_value not in [0, 3]:
+                present = []
+                if has_pattern:
+                    present.append('pattern')
+                if has_mask:
+                    present.append('mask')
+                if has_value:
+                    present.append('value')
 
-            missing = []
-            if not has_pattern:
-                missing.append('pattern')
-            if not has_mask:
-                missing.append('mask')
-            if not has_value:
-                missing.append('value')
+                missing = []
+                if not has_pattern:
+                    missing.append('pattern')
+                if not has_mask:
+                    missing.append('mask')
+                if not has_value:
+                    missing.append('value')
 
+                errors.append(
+                    f'{relation_type}: inconsistent pattern/mask/value definition. '
+                    f'Present: {", ".join(present)}; Missing: {", ".join(missing)}'
+                )
+
+    return errors
+
+
+def check_transpose_consistency(
+    definitions: List[Dict],
+    lookup: Dict[str, Dict],
+    skip_indices: Set[int]
+) -> List[str]:
+    '''Check that complementary relation tests transpose correctly.
+
+    For relations with reversed_arrow=True (complementary stubs), verify that
+    the transpose of their mask and value match the complementary relation's
+    test (mask and value). This ensures the relationship is properly defined
+    both ways.
+
+    Args:
+        definitions: List of relationship definitions.
+        lookup: Dict mapping relation_type to definition.
+        skip_indices: Set of indices to skip.
+
+    Returns:
+        List of error messages.
+    '''
+    errors = []
+
+    for idx, defn in enumerate(definitions):
+        if idx in skip_indices:
+            continue
+
+        relation_type = defn['relation_type']
+        reversed_arrow = defn.get('reversed_arrow')
+
+        # Only check complementary stubs (reversed_arrow=True)
+        if reversed_arrow is not True:
+            continue
+
+        # Get the mask and value for this stub
+        mask_str = defn.get('mask', '')
+        value_str = defn.get('value', '')
+
+        # If this stub has no test defined, skip it
+        if not mask_str or not value_str:
+            continue
+
+        # Get the complementary relation
+        complementary_relation = defn.get('complementary_relation', '')
+        if not complementary_relation or complementary_relation not in lookup:
+            continue
+
+        comp_defn = lookup[complementary_relation]
+        comp_mask_str = comp_defn.get('mask', '')
+        comp_value_str = comp_defn.get('value', '')
+
+        # If complementary has no test, skip
+        if not comp_mask_str or not comp_value_str:
+            continue
+
+        # Convert to integers
+        try:
+            mask_int = int(mask_str, 2)
+            value_int = int(value_str, 2)
+            comp_mask_int = int(comp_mask_str, 2)
+            comp_value_int = int(comp_value_str, 2)
+        except ValueError as e:
             errors.append(
-                f'{relation_type}: inconsistent pattern/mask/value definition. '
-                f'Present: {", ".join(present)}; Missing: {", ".join(missing)}'
+                f'{relation_type}: invalid binary format in mask/value: {e}'
+            )
+            continue
+
+        # Transpose the stub's mask and value using RelationshipTest transpose
+        if RelationshipTest is None:
+            errors.append(
+                f'{relation_type}: Cannot verify transpose consistency '
+                '(RelationshipTest not available)'
+            )
+            continue
+
+        try:
+            transposed_mask = RelationshipTest._transpose_27bit(mask_int)
+            transposed_value = RelationshipTest._transpose_27bit(value_int)
+        except Exception as e:
+            errors.append(
+                f'{relation_type}: error transposing test: {e}'
+            )
+            continue
+
+        # Check if transposed test matches complementary's test
+        if transposed_mask != comp_mask_int:
+            errors.append(
+                f'{relation_type}: transposed mask does not match '
+                f'complementary relation {complementary_relation}\n'
+                f'  {relation_type} mask: {mask_str} → {bin(transposed_mask)}\n'
+                f'  {complementary_relation} mask: {comp_mask_str}'
+            )
+
+        if transposed_value != comp_value_int:
+            errors.append(
+                f'{relation_type}: transposed value does not match '
+                f'complementary relation {complementary_relation}\n'
+                f'  {relation_type} value: {value_str} → {bin(transposed_value)}\n'
+                f'  {complementary_relation} value: {comp_value_str}'
             )
 
     return errors
@@ -1608,10 +1632,6 @@ def main():
     all_checks.append(('Complementary Check', check_complementary(definitions, lookup, skip_indices)))
 
     if args.verbose:
-        print('Running Color Check...')
-    all_checks.append(('Color Check', check_color(definitions, lookup, skip_indices)))
-
-    if args.verbose:
         print('Running Symbol Check...')
     all_checks.append(('Symbol Check', check_symbol(definitions, lookup, skip_indices)))
 
@@ -1658,6 +1678,10 @@ def main():
     if args.verbose:
         print('Running Examples Check...')
     all_checks.append(('Examples Check', check_examples(definitions, skip_indices)))
+
+    if args.verbose:
+        print('Running Transpose Consistency Check...')
+    all_checks.append(('Transpose Consistency Check', check_transpose_consistency(definitions, lookup, skip_indices)))
 
     # Stub sync check at the end
     if args.verbose:

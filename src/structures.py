@@ -1,11 +1,14 @@
 '''Contains the structure class.
 '''
-from typing import List
+from typing import Callable, List, Optional
 from itertools import combinations
+from dataclasses import dataclass
 import logging
+import math
 
 import pandas as pd
 import networkx as nx
+from shapely.errors import GEOSException
 
 from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex
@@ -19,6 +22,15 @@ from relations import DE27IM
 # %% Configure logging if not already configured
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class VolumeMetrics:
+    '''Container for structure volume metrics in cm^3.'''
+
+    physical: float = 0.0
+    exterior: float = 0.0
+    hull: float = 0.0
 
 # %% StructureShape class
 class StructureShape():
@@ -41,9 +53,8 @@ class StructureShape():
                 - Label.
         region_table (SliceIndexType): A table of StructureSlice.
 
-        physical_volume (float): The physical volume of the structure in cm^3.
-        exterior_volume (float): The exterior volume of the structure in cm^3.
-        hull_volume (float): The volume of the convex hull of the structure in cm^3.
+        volume_metrics (VolumeMetrics): Physical, exterior, and hull volumes
+            in cm^3.
     '''
 
     def __init__(self, roi: ROI_Type, name: str = None):
@@ -55,9 +66,7 @@ class StructureShape():
         self.contour_graph = nx.DiGraph()
         self.contour_lookup = pd.DataFrame()
         self.region_table = pd.DataFrame()
-        self.physical_volume = 0.0
-        self.exterior_volume = 0.0
-        self.hull_volume = 0.0
+        self.volume_metrics = VolumeMetrics()
 
     def add_contour_graph(self, contour_table: pd.DataFrame,
                           slice_sequence: SliceSequence) -> SliceSequence:
@@ -137,13 +146,42 @@ class StructureShape():
 
                 # Skip only true duplicates. Multiple contours on the same
                 # slice can legitimately share region/role metadata.
+                def _is_same_geometry(existing_polygon, new_polygon) -> bool:
+                    # equals_exact avoids topology operations that can fail on
+                    # near-degenerate interpolated polygons.
+                    try:
+                        if existing_polygon.equals_exact(
+                            new_polygon,
+                            tolerance=1e-3,
+                        ):
+                            return True
+                    except GEOSException:
+                        pass
+
+                    # Fallback: coarse invariants prevent duplicate inserts
+                    # without triggering topology predicates.
+                    area_close = math.isclose(
+                        existing_polygon.area,
+                        new_polygon.area,
+                        rel_tol=1e-6,
+                        abs_tol=1e-4,
+                    )
+                    bounds_close = all(
+                        math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-3)
+                        for a, b in zip(
+                            existing_polygon.bounds,
+                            new_polygon.bounds,
+                        )
+                    )
+                    return area_close and bounds_close
+
                 duplicate_exists = any(
                     existing.slice_index == slice_index
                     and existing.region_index == contour_source.region_index
                     and existing.is_boundary == contour_source.is_boundary
                     and existing.is_hole == contour_source.is_hole
                     and existing.hole_type == contour_source.hole_type
-                    and existing.polygon.equals(interpolated_polygon)
+                    and _is_same_geometry(existing.polygon, interpolated_polygon)
                     for existing in (
                         self.contour_graph.nodes[node]['contour']
                         for node in self.contour_graph.nodes
@@ -230,7 +268,7 @@ class StructureShape():
                 total_volume -= volume
             else:
                 total_volume += volume
-        self.physical_volume = total_volume
+        self.volume_metrics.physical = total_volume
 
     def calculate_exterior_volume(self):
         '''Calculate the exterior volume of a ContourGraph.
@@ -256,7 +294,7 @@ class StructureShape():
                     total_volume -= volume
             else:
                 total_volume += volume
-        self.exterior_volume = total_volume
+        self.volume_metrics.exterior = total_volume
 
     def calculate_hull_volume(self):
         '''Calculate the hull volume of an EnclosedRegionTable.
@@ -278,7 +316,7 @@ class StructureShape():
             if contour1.is_hole:
                 volume = 0.0
             total_volume += volume
-        self.hull_volume = total_volume
+        self.volume_metrics.hull = total_volume
 
     def build_region_table(self):
         '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
@@ -358,7 +396,12 @@ class StructureShape():
             return None
         return self.region_table.loc[idx, 'RegionSlice'].values[0]
 
-    def relate(self, other: 'StructureShape', tolerance=0.0) -> 'DE27IM':
+    def relate_to(
+        self,
+        other: 'StructureShape',
+        tolerance=0.0,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> 'DE27IM':
         '''Relate this structure to another structure.
 
         This method identifies common slices between the two structures and
@@ -369,6 +412,8 @@ class StructureShape():
             other (StructureShape): The other structure to relate to.
             tolerance (float): The tolerance value to use for the boundaries of
                 the relation.
+            progress_callback (Optional[Callable[[int, int], None]]): Optional
+                callback receiving (current_slice_index, total_slices).
 
         Returns:
             DE27IM: A DE27IM relationship object containing the relationship
@@ -396,7 +441,11 @@ class StructureShape():
                                     lsuffix='_self', rsuffix='_other')
 
         # 4. For each common slice, get and merge the DE27IM relationship.
-        for slice_index, row in regions.iterrows():
+        total_slices = len(regions.index)
+        for current_slice_index, (slice_index, row) in enumerate(
+            regions.iterrows(),
+            start=1,
+        ):
             region_self = row['RegionSlice_self']
             region_other = row['RegionSlice_other']
             relation = DE27IM(region_self, region_other, tolerance=tolerance)
@@ -406,7 +455,13 @@ class StructureShape():
                          slice_index, relation.identify_relation(), relation)
 
             composite_relation.merge(relation)
+            if progress_callback is not None:
+                progress_callback(current_slice_index, total_slices)
         return composite_relation
+
+    def relate(self, other: 'StructureShape', tolerance=0.0) -> 'DE27IM':
+        '''Backward-compatible wrapper for relate_to.'''
+        return self.relate_to(other=other, tolerance=tolerance)
 
     def get_region_indexes(self, include_boundaries=True,
                            include_holes=True,

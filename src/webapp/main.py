@@ -11,14 +11,14 @@ import asyncio
 import tempfile
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 import io
 
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dicom import DicomStructureFile
 from structure_set import StructureSet
 from contour_plotting import plot_roi_slice
+from relations import RELATION_SCHEMA_VERSION
 from webapp.session_manager import SessionManager, SessionData
 from webapp.websocket_manager import ConnectionManager
 
@@ -59,6 +60,8 @@ async def log_requests(request, call_next):
 # Initialize managers
 session_manager = SessionManager()
 connection_manager = ConnectionManager()
+processing_tasks: Dict[str, asyncio.Task] = {}
+cancel_events: Dict[str, asyncio.Event] = {}
 
 # Mount static files
 static_dir = Path(__file__).parent / 'static'
@@ -136,6 +139,45 @@ class DiagramResponse(BaseModel):
 class ProcessRequest(BaseModel):
     session_id: str
     selected_rois: Optional[List[int]] = None
+
+
+class RelationshipContractMixin(BaseModel):
+    relation_type: Optional[str] = None
+    label: Optional[str] = None
+    symbol: Optional[str] = None
+    schema_version: int = RELATION_SCHEMA_VERSION
+    tolerance: float = 0.0
+    computed_at: Optional[datetime] = None
+    provenance: dict = Field(default_factory=dict)
+
+
+class JobSubmitResponse(RelationshipContractMixin):
+    job_id: str
+    session_id: str
+    status: str
+    message: str
+
+
+class JobStatusResponse(RelationshipContractMixin):
+    job_id: str
+    session_id: str
+    status: str
+    progress: float
+    message: str
+    error: Optional[str] = None
+
+
+class StructurePairResult(RelationshipContractMixin):
+    roi_a: int
+    roi_b: int
+    is_logical: bool = False
+
+
+class RelationshipResultResponse(RelationshipContractMixin):
+    job_id: str
+    session_id: str
+    status: str
+    pairs: List[StructurePairResult]
 
 
 # Startup event
@@ -390,7 +432,7 @@ async def preview_structures(request: SessionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post('/api/process')
+@app.post('/api/process', response_model=JobSubmitResponse)
 async def process_structures(request: ProcessRequest):
     '''Process selected structures and calculate relationships.
 
@@ -406,19 +448,205 @@ async def process_structures(request: ProcessRequest):
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
-    # Start processing task asynchronously
-    asyncio.create_task(
+    if request.session_id in processing_tasks:
+        task = processing_tasks[request.session_id]
+        if not task.done():
+            return JobSubmitResponse(
+                job_id=request.session_id,
+                session_id=request.session_id,
+                status='running',
+                message='Processing already running',
+                tolerance=session_data.structure_set.tolerance if session_data.structure_set else 0.0,
+                computed_at=session_data.job_computed_at,
+                provenance={
+                    'api': '/api/process',
+                    'event': 'already_running',
+                },
+            )
+
+    cancel_event = asyncio.Event()
+    cancel_events[request.session_id] = cancel_event
+    session_manager.update_session_job_state(
+        request.session_id,
+        job_status='running',
+        job_progress=0.0,
+        job_message='Processing started',
+        job_error=None,
+        job_provenance={
+            'api': '/api/process',
+            'selected_rois': request.selected_rois or [],
+            'started_at': datetime.now().isoformat(),
+        },
+    )
+
+    processing_tasks[request.session_id] = asyncio.create_task(
         process_structure_set(
             request.session_id,
             session_data.dicom_file_path,
-            request.selected_rois
+            request.selected_rois,
+            cancel_event=cancel_event,
         )
     )
 
-    return {'message': 'Processing started', 'session_id': request.session_id}
+    return JobSubmitResponse(
+        job_id=request.session_id,
+        session_id=request.session_id,
+        status='running',
+        message='Processing started',
+        tolerance=session_data.structure_set.tolerance if session_data.structure_set else 0.0,
+        computed_at=None,
+        provenance={
+            'api': '/api/process',
+            'selected_rois': request.selected_rois or [],
+        },
+    )
 
 
-async def process_structure_set(session_id: str, dicom_file_path: str, selected_rois: Optional[List[int]]):
+@app.get('/api/jobs/{session_id}/status', response_model=JobStatusResponse)
+async def get_job_status(session_id: str):
+    '''Get status for a relationship processing job.'''
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    return JobStatusResponse(
+        job_id=session_id,
+        session_id=session_id,
+        status=session_data.job_status,
+        progress=session_data.job_progress,
+        message=session_data.job_message,
+        error=session_data.job_error,
+        tolerance=session_data.structure_set.tolerance if session_data.structure_set else 0.0,
+        computed_at=session_data.job_computed_at,
+        provenance={
+            **session_data.job_provenance,
+            'api': f'/api/jobs/{session_id}/status',
+        },
+    )
+
+
+@app.get('/api/jobs/{session_id}/result', response_model=RelationshipResultResponse)
+async def get_job_result(session_id: str):
+    '''Return relationship pair results for a completed session job.'''
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+    if session_data.structure_set is None:
+        raise HTTPException(status_code=400, detail='Structures not yet processed')
+    if session_data.job_status not in {'completed', 'cancelled'}:
+        raise HTTPException(status_code=409, detail='Processing not complete')
+
+    pairs: List[StructurePairResult] = []
+    structure_set = session_data.structure_set
+    for roi_a, roi_b, edge_data in structure_set.relationship_graph.edges(data=True):
+        relationship = edge_data.get('relationship')
+        rel_type = relationship.relationship_type if relationship else None
+        pairs.append(
+            StructurePairResult(
+                roi_a=int(roi_a),
+                roi_b=int(roi_b),
+                relation_type=rel_type.relation_type if rel_type else 'UNKNOWN',
+                label=rel_type.label if rel_type else 'Unknown',
+                symbol=rel_type.symbol if rel_type else '?',
+                schema_version=RELATION_SCHEMA_VERSION,
+                tolerance=structure_set.tolerance,
+                computed_at=session_data.job_computed_at,
+                provenance={
+                    'api': f'/api/jobs/{session_id}/result',
+                    'logical': bool(getattr(relationship, 'is_logical', False)),
+                },
+                is_logical=bool(getattr(relationship, 'is_logical', False)),
+            )
+        )
+
+    pairs.sort(key=lambda pair: (pair.roi_a, pair.roi_b))
+    return RelationshipResultResponse(
+        job_id=session_id,
+        session_id=session_id,
+        status=session_data.job_status,
+        relation_type='BATCH',
+        label='Relationship Result Set',
+        symbol='*',
+        schema_version=RELATION_SCHEMA_VERSION,
+        tolerance=structure_set.tolerance,
+        computed_at=session_data.job_computed_at,
+        provenance={
+            **session_data.job_provenance,
+            'api': f'/api/jobs/{session_id}/result',
+            'pair_count': len(pairs),
+        },
+        pairs=pairs,
+    )
+
+
+@app.post('/api/jobs/{session_id}/cancel', response_model=JobStatusResponse)
+async def cancel_job(session_id: str):
+    '''Request cancellation for an in-flight processing job.'''
+    session_data = session_manager.load_session(session_id)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+
+    cancel_event = cancel_events.get(session_id)
+    task = processing_tasks.get(session_id)
+    if cancel_event is None or task is None or task.done():
+        if session_data.job_status == 'running':
+            session_manager.update_session_job_state(
+                session_id,
+                job_status='cancelled',
+                job_message='Cancellation requested',
+                job_provenance={
+                    **session_data.job_provenance,
+                    'cancel_requested_at': datetime.now().isoformat(),
+                },
+            )
+            session_data = session_manager.load_session(session_id)
+        return JobStatusResponse(
+            job_id=session_id,
+            session_id=session_id,
+            status=session_data.job_status,
+            progress=session_data.job_progress,
+            message='No active job to cancel',
+            error=session_data.job_error,
+            tolerance=session_data.structure_set.tolerance if session_data.structure_set else 0.0,
+            computed_at=session_data.job_computed_at,
+            provenance={
+                **session_data.job_provenance,
+                'api': f'/api/jobs/{session_id}/cancel',
+            },
+        )
+
+    cancel_event.set()
+    session_manager.update_session_job_state(
+        session_id,
+        job_status='cancelled',
+        job_message='Cancellation requested',
+        job_provenance={
+            **session_data.job_provenance,
+            'cancel_requested_at': datetime.now().isoformat(),
+        },
+    )
+    return JobStatusResponse(
+        job_id=session_id,
+        session_id=session_id,
+        status='cancelled',
+        progress=session_data.job_progress,
+        message='Cancellation requested',
+        error=None,
+        tolerance=session_data.structure_set.tolerance if session_data.structure_set else 0.0,
+        computed_at=session_data.job_computed_at,
+        provenance={
+            **session_data.job_provenance,
+            'api': f'/api/jobs/{session_id}/cancel',
+        },
+    )
+
+
+async def process_structure_set(
+    session_id: str,
+    dicom_file_path: str,
+    selected_rois: Optional[List[int]],
+    cancel_event: Optional[asyncio.Event] = None,
+):
     '''Background task to process DICOM file and calculate relationships.
 
     Args:
@@ -427,11 +655,23 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         selected_rois (List[int], optional): List of ROI numbers to process.
     '''
     try:
+        def _was_cancelled() -> bool:
+            return bool(cancel_event is not None and cancel_event.is_set())
+
         # Send initial progress
         disk_info = session_manager.get_disk_usage_info()
+        session_manager.update_session_job_state(
+            session_id,
+            job_status='running',
+            job_progress=0.0,
+            job_message='Loading DICOM file',
+        )
         await connection_manager.send_progress(
             session_id, 'parsing_dicom', 0, '', 'Loading DICOM file...', disk_info['usage_mb']
         )
+
+        if _was_cancelled():
+            raise asyncio.CancelledError('Processing cancelled before parsing')
 
         # Load DICOM file with error handling
         try:
@@ -455,6 +695,11 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         await connection_manager.send_progress(
             session_id, 'parsing_dicom', 20, '', 'Parsing structures...', disk_info['usage_mb']
         )
+        session_manager.update_session_job_state(
+            session_id,
+            job_progress=20.0,
+            job_message='Parsing structures',
+        )
 
         # Filter contour points to only include selected ROIs
         if selected_rois:
@@ -471,10 +716,21 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         except Exception as e:
             logger.error('Structure set creation error in session %s: %s', session_id, e, exc_info=True)
             await connection_manager.send_error(session_id, f'Failed to create structure set: {str(e)}')
+            session_manager.update_session_job_state(
+                session_id,
+                job_status='failed',
+                job_message='Failed to create structure set',
+                job_error=str(e),
+            )
             return
 
         await connection_manager.send_progress(
             session_id, 'building_graphs', 40, '', 'Building contour graphs...', disk_info['usage_mb']
+        )
+        session_manager.update_session_job_state(
+            session_id,
+            job_progress=40.0,
+            job_message='Building contour graphs',
         )
 
         # Process each structure
@@ -488,21 +744,64 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
                 session_id, 'building_graphs', progress,
                 structure.name, f'Processing {structure.name}...', disk_info['usage_mb']
             )
+            session_manager.update_session_job_state(
+                session_id,
+                job_progress=float(progress),
+                job_message=f'Processing {structure.name}',
+            )
+
+            if _was_cancelled():
+                raise asyncio.CancelledError('Processing cancelled during graph build')
 
         await connection_manager.send_progress(
             session_id, 'calculating_relationships', 70, '', 'Calculating relationships...', disk_info['usage_mb']
         )
+        session_manager.update_session_job_state(
+            session_id,
+            job_progress=70.0,
+            job_message='Calculating relationships',
+        )
 
         # Calculate relationships with error handling
         try:
-            structure_set.finalize()
+            def pair_progress(completed_pairs: int, total_pairs: int) -> None:
+                if total_pairs <= 0:
+                    progress = 95.0
+                else:
+                    progress = 70.0 + (completed_pairs / total_pairs) * 25.0
+                session_manager.update_session_job_state(
+                    session_id,
+                    job_progress=progress,
+                    job_message=(
+                        f'Calculating relationships '
+                        f'({completed_pairs}/{total_pairs})'
+                    ),
+                )
+                if _was_cancelled():
+                    raise RuntimeError('Processing cancelled by user')
+
+            structure_set.calculate_relationships(force=True, progress_callback=pair_progress)
+            structure_set.calculate_logical_flags()
         except Exception as e:
+            if 'cancelled' in str(e).lower():
+                raise asyncio.CancelledError(str(e)) from e
             logger.error('Relationship calculation error in session %s: %s', session_id, e, exc_info=True)
             await connection_manager.send_error(session_id, f'Failed to calculate relationships: {str(e)}')
+            session_manager.update_session_job_state(
+                session_id,
+                job_status='failed',
+                job_message='Failed to calculate relationships',
+                job_error=str(e),
+            )
             return
 
         await connection_manager.send_progress(
             session_id, 'calculating_relationships', 100, '', 'Complete!', disk_info['usage_mb']
+        )
+        session_manager.update_session_job_state(
+            session_id,
+            job_progress=100.0,
+            job_message='Processing complete',
         )
 
         # Save completed session BEFORE sending complete message
@@ -510,7 +809,27 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
         if not session_manager.update_session_structure_set(session_id, structure_set):
             logger.error('Failed to save structure set to session %s', session_id)
             await connection_manager.send_error(session_id, 'Failed to save results')
+            session_manager.update_session_job_state(
+                session_id,
+                job_status='failed',
+                job_message='Failed to save results',
+                job_error='Failed to save structure set',
+            )
             return
+
+        session_manager.update_session_job_state(
+            session_id,
+            job_status='completed',
+            job_progress=100.0,
+            job_message='Processing complete',
+            job_error=None,
+            job_computed_at=datetime.now(),
+            job_provenance={
+                'api': '/api/process',
+                'selected_rois': selected_rois or [],
+                'result_schema_version': RELATION_SCHEMA_VERSION,
+            },
+        )
 
         # Small delay to ensure file system flushes the pickle file
         await asyncio.sleep(0.1)
@@ -520,9 +839,32 @@ async def process_structure_set(session_id: str, dicom_file_path: str, selected_
 
         logger.info('Completed processing for session %s', session_id)
 
+    except asyncio.CancelledError as e:
+        logger.info('Processing cancelled for session %s: %s', session_id, e)
+        session_manager.update_session_job_state(
+            session_id,
+            job_status='cancelled',
+            job_message='Processing cancelled',
+            job_error=None,
+            job_provenance={
+                'api': '/api/process',
+                'cancelled_at': datetime.now().isoformat(),
+            },
+        )
+        await connection_manager.send_error(session_id, 'Processing cancelled')
+
     except Exception as e:
         logger.error('Unexpected error processing session %s: %s', session_id, e, exc_info=True)
         await connection_manager.send_error(session_id, f'Unexpected processing error: {str(e)}')
+        session_manager.update_session_job_state(
+            session_id,
+            job_status='failed',
+            job_message='Unexpected processing error',
+            job_error=str(e),
+        )
+    finally:
+        processing_tasks.pop(session_id, None)
+        cancel_events.pop(session_id, None)
 
 
 @app.post('/api/matrix', response_model=MatrixResponse)
@@ -813,7 +1155,7 @@ async def get_diagram_data(request: MatrixRequest):
         edges = []
 
         # Define symmetric relationships (no direction)
-        symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUALS'}
+        symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
 
         # For symmetric relationships: check all visible pairs once
         all_visible_rois = sorted(visible_rois)
@@ -841,7 +1183,7 @@ async def get_diagram_data(request: MatrixRequest):
                     logger.debug(f'  Filtering out {rel_type} relationship ({roi1},{roi2})')
                     continue
 
-                if rel_type == 'EQUALS':
+                if rel_type == 'EQUAL':
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
@@ -897,7 +1239,7 @@ async def get_diagram_data(request: MatrixRequest):
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
 
-                if rel_type == 'EQUALS':
+                if rel_type == 'EQUAL':
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue

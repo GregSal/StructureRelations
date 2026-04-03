@@ -49,7 +49,7 @@ Relationships are identified by pattern-matching against DE-27IM bit patterns (s
 - **CONTAINS**: One structure fully inside another
 - **SURROUNDS**: Structure inside a hole of another
 - **SHELTERS**: Structure within convex hull but not touching (see `docs/Shelters Issues.md` for known complexities)
-- **OVERLAPS**, **PARTITIONED**, **CONFINES**, **BORDERS**, **DISJOINT**, **EQUALS**
+- **OVERLAPS**, **PARTITIONED**, **CONFINES**, **BORDERS**, **DISJOINT**, **EQUAL**
 
 **Important**: The convex hull definition affects SHELTERS detection. Current implementation uses per-region hulls, not a single hull encompassing all regions (documented issue in Shelters Issues.md).
 

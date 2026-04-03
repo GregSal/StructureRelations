@@ -27,7 +27,7 @@ def test_relationship_summary_returns_labels():
     # Check diagonal contains 'Equals'
     structure_names = list(structure_set.structures.values())
     for struct in structure_names:
-        assert summary.loc[struct.name, struct.name] == 'Equals'
+        assert summary.loc[struct.name, struct.name] == 'is Equal to'
 
     # Check that CONTAINS or related string appears
     assert 'Contains' in summary.values or 'Equals' in summary.values
@@ -49,7 +49,7 @@ def test_get_relationship_matrix_with_symbols():
 
     # Verify matrix contains string symbols, not objects
     assert not matrix.empty
-    # Check diagonal contains '=' symbol for EQUALS
+    # Check diagonal contains '=' symbol for EQUAL
     structure_names = list(structure_set.structures.values())
     for struct in structure_names:
         assert matrix.loc[struct.name, struct.name] == '='
@@ -79,7 +79,7 @@ def test_get_relationship_matrix_with_labels():
     # Check diagonal contains 'Equals' label
     structure_names = list(structure_set.structures.values())
     for struct in structure_names:
-        assert matrix.loc[struct.name, struct.name] == 'Equals'
+        assert matrix.loc[struct.name, struct.name] == 'is Equal to'
 
     # Check that labels (not objects) are in the matrix
     all_values = matrix.values.flatten()
@@ -179,7 +179,7 @@ def test_single_structure():
     # Should have 1x1 matrix with 'Equals'
     assert summary.shape == (1, 1)
     struct_name = list(structure_set.structures.values())[0].name
-    assert summary.loc[struct_name, struct_name] == 'Equals'
+    assert summary.loc[struct_name, struct_name] == 'is Equal to'
 
     # Get relationship matrix with symbols
     matrix = structure_set.get_relationship_matrix(use_symbols=True)

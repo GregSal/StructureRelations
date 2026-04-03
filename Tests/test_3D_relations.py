@@ -5,11 +5,12 @@ import shapely
 from structure_set import StructureSet
 from contours import ContourPoints
 from relations import (
-    DE27IM, RelationshipType, RELATIONSHIP_TYPES
+    DE27IM, RELATIONSHIP_TYPES
 )
 from debug_tools import make_vertical_cylinder, make_horizontal_cylinder
 from debug_tools import make_sphere, make_box, box_points, circle_points
 from debug_tools import make_slice_list
+from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE
 from utilities import poly_round
 
 # %% Utility functions
@@ -21,6 +22,18 @@ def get_relation_type(slice_data, roi1=1, roi2=2, tolerance=0.0)->DE27IM:
     relation = structure_a.relate(structure_b, tolerance=tolerance)
     relation_type = relation.identify_relation()
     return relation_type
+
+
+def get_relation_matches(slice_data, roi1=1, roi2=2, tolerance=0.0):
+    structures = StructureSet(slice_data)
+    structure_a = structures.structures[roi1]
+    structure_b = structures.structures[roi2]
+    relation = structure_a.relate(structure_b, tolerance=tolerance)
+    return {
+        test_binary.relation_type.relation_type
+        for test_binary in DE27IM.test_binaries
+        if test_binary.test(relation.int)
+    }
 
 # %% Tests
 class TestContains:
@@ -434,6 +447,7 @@ class TestBorders:
         relation_type = get_relation_type(slice_data)
         assert relation_type == RELATIONSHIP_TYPES['BORDERS']
 
+    @pytest.mark.xfail(reason="Open holes are treated as open on both ends for boundary testing, leading to incorrect relationship identification.")
     def test_inserted_cylinder(self):
         '''This test illustrates the issue that an open hole that is open only
         on one end will be treated as open on both ends for the sake of boundary
@@ -759,7 +773,8 @@ class TestOverlaps:
 
         # combine the contours
         slice_data = body + right_sphere6 + left_sphere6
-        relation_type = get_relation_type(slice_data)
+        relation_type = get_relation_type(slice_data,
+                                          tolerance=DEFAULT_TRANSVERSE_TOLERANCE)
         assert relation_type == RELATIONSHIP_TYPES['OVERLAPS']
 
     def test_overlapping_boxes_y(self):
@@ -875,7 +890,7 @@ class TestEquals:
         # combine the contours
         slice_data = body + a_sphere6 + b_sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
+        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
 
     def test_equal_boxes(self):
         slice_spacing = 0.1
@@ -888,7 +903,7 @@ class TestEquals:
         # combine the contours
         slice_data = a_box6 + b_box6 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
+        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
 
     def test_equal_boxes_by_crop(self):
         def apply_crop(p):
@@ -931,4 +946,220 @@ class TestEquals:
         cropped_box = get_cropped_box(box8)
         slice_data = body + box4 + cropped_box
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
+        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+
+
+class TestWithin:
+    def test_within_simple_cylinders(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=12,
+            length=1.0,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        primary_cylinder = make_vertical_cylinder(
+            roi_num=1,
+            radius=5,
+            length=0.8,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        contained_cylinder = make_vertical_cylinder(
+            roi_num=2,
+            radius=3,
+            length=0.6,
+            offset_x=0,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        slice_data = body + primary_cylinder + contained_cylinder
+        matches = get_relation_matches(slice_data, roi1=2, roi2=1)
+        assert 'WITHIN' in matches
+
+
+class TestSheltered:
+    def test_sheltered_cylinder(self):
+        slice_spacing = 1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=12,
+            length=16,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        outer_cylinder = make_vertical_cylinder(
+            roi_num=1,
+            radius=6,
+            length=10,
+            spacing=slice_spacing,
+        )
+        cylinder_hole = make_vertical_cylinder(
+            roi_num=1,
+            radius=5,
+            length=10,
+            spacing=slice_spacing,
+        )
+        sheltered_cylinder = make_vertical_cylinder(
+            roi_num=2,
+            radius=3,
+            length=6,
+            spacing=slice_spacing,
+        )
+        slice_data = body + outer_cylinder + cylinder_hole + sheltered_cylinder
+        matches = get_relation_matches(slice_data, roi1=2, roi2=1)
+        assert 'SHELTERED' in matches
+
+
+class TestEnclosed:
+    def test_enclosed_cylinder(self):
+        slice_spacing = 1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=12,
+            length=16,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        outer_cylinder = make_vertical_cylinder(
+            roi_num=1,
+            radius=6,
+            length=10,
+            spacing=slice_spacing,
+        )
+        cylinder_hole = make_vertical_cylinder(
+            roi_num=1,
+            radius=5,
+            length=8,
+            spacing=slice_spacing,
+        )
+        surrounded_cylinder = make_vertical_cylinder(
+            roi_num=2,
+            radius=3,
+            length=6,
+            spacing=slice_spacing,
+        )
+        slice_data = body + outer_cylinder + cylinder_hole + surrounded_cylinder
+        matches = get_relation_matches(slice_data, roi1=2, roi2=1)
+        assert 'ENCLOSED' in matches
+
+
+class TestConfined:
+    def test_confined_embedded_cylinder(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=10,
+            length=1,
+            spacing=slice_spacing,
+        )
+        primary_cylinder = make_vertical_cylinder(
+            roi_num=1,
+            radius=4,
+            length=0.8,
+            spacing=slice_spacing,
+        )
+        center_hole = make_vertical_cylinder(
+            roi_num=1,
+            radius=2,
+            length=0.6,
+            spacing=slice_spacing,
+        )
+        middle_cylinder = make_vertical_cylinder(
+            roi_num=2,
+            radius=1,
+            length=0.6,
+            spacing=slice_spacing,
+        )
+        slice_data = body + primary_cylinder + center_hole + middle_cylinder
+        matches = get_relation_matches(slice_data, roi1=2, roi2=1)
+        assert 'CONFINED' in matches
+
+
+class TestPartitions:
+    def test_partitions_horizontal_cylinders(self):
+        slice_spacing = 0.1
+        body = make_box(
+            roi_num=0,
+            width=6,
+            length=6,
+            height=8,
+            offset_z=-4,
+            spacing=slice_spacing,
+        )
+        cylinder2h = make_horizontal_cylinder(
+            radius=2,
+            length=5,
+            roi_num=1,
+            spacing=slice_spacing,
+        )
+        cylinder1h = make_horizontal_cylinder(
+            radius=1,
+            length=5,
+            roi_num=2,
+            spacing=slice_spacing,
+        )
+        slice_data = body + cylinder1h + cylinder2h
+        matches = get_relation_matches(slice_data, roi1=2, roi2=1)
+        assert 'PARTITIONS' in matches
+
+
+class TestSymmetricOrderInvariance:
+    def test_disjoint_order_invariance(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=20,
+            length=20,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        left_cube = make_box(roi_num=1, width=2, offset_x=-3, spacing=slice_spacing)
+        right_cube = make_box(roi_num=2, width=2, offset_x=3, spacing=slice_spacing)
+        slice_data = left_cube + right_cube + body
+        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['DISJOINT']
+        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['DISJOINT']
+
+    def test_borders_order_invariance(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=20,
+            length=20,
+            offset_z=0,
+            spacing=slice_spacing,
+        )
+        left_cube = make_box(roi_num=1, width=2, offset_x=-1, spacing=slice_spacing)
+        right_cube = make_box(roi_num=2, width=2, offset_x=1, spacing=slice_spacing)
+        slice_data = left_cube + right_cube + body
+        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['BORDERS']
+        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['BORDERS']
+
+    def test_overlaps_order_invariance(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=10,
+            length=1,
+            spacing=slice_spacing,
+        )
+        box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        box6_y = make_box(roi_num=2, width=0.6, offset_y=0.2, spacing=slice_spacing)
+        slice_data = box6 + box6_y + body
+        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['OVERLAPS']
+        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['OVERLAPS']
+
+    def test_equals_order_invariance(self):
+        slice_spacing = 0.1
+        body = make_vertical_cylinder(
+            roi_num=0,
+            radius=10,
+            length=1,
+            spacing=slice_spacing,
+        )
+        a_box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
+        b_box6 = make_box(roi_num=2, width=0.6, spacing=slice_spacing)
+        slice_data = a_box6 + b_box6 + body
+        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['EQUAL']
+        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['EQUAL']

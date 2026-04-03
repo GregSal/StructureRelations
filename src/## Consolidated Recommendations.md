@@ -61,8 +61,8 @@ Step 3 — Update relate_contours, non-RegionSlice path:
   hull_polygon_b = region_b.convex_hull.
 
 Step 4 — Update relationship_definitions.json:
-- Recompute and replace pattern, mask, value, mask_decimal, value_decimal
-  for all primary relationships (reversed_arrow: false or missing).
+- Recompute and replace pattern, mask, and value for all primary
+  relationships (reversed_arrow: false or missing).
 - Do NOT add patterns to reversed_arrow: true entries yet.
 - New logical hierarchy:
     DISJOINT:  all three bands disjoint
@@ -93,7 +93,7 @@ Step 6 — Run tests:
 - [ ] `AmbiguousRelationshipError` class exists and is raised by `identify_relation`
       when multiple tests match
 - [ ] All primary relationships in relationship_definitions.json have non-empty
-      mask, value, mask_decimal, value_decimal fields
+  mask and value fields
 - [ ] The reversed_arrow: true entries (WITHIN, SHELTERED, ENCLOSED, CONFINED,
       PARTITIONS) still have no mask/value fields
 - [ ] No changes to debug_tools.py, DE9IM, merge, to_str, or to_int
@@ -132,7 +132,7 @@ Step 2 — Auto-generate reversed-arrow tests in _initialize_relationships:
 
 Step 3 — Update relationship_definitions.json:
 - For each reversed_arrow: true entry, manually derive and add pattern, mask,
-  value, mask_decimal, value_decimal by applying the transpose logic to the
+  and value by applying the transpose logic to the
   complementary relation's fields. These fields are informational only;
   the runtime derives them via transpose in Step 2.
 
