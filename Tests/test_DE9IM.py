@@ -22,11 +22,11 @@ def test_box_6_in_box4_boundary_a():
     box4 = shapely.MultiPolygon([shapely.Polygon(box_points(4))])
     relation = DE9IM(box6, box4)
     boundary_relation = relation.boundary_adjustment('a')
-    relation_string = 'FFF212FF2'
+    relation_string = 'FFF2FFFFF'
     matrix = '\n'.join([
         '|000|',
-        '|111|',
-        '|001|'
+        '|100|',
+        '|000|'
         ])
     assert str(boundary_relation) == matrix
     assert boundary_relation.relation_str == relation_string
@@ -63,11 +63,25 @@ def test_box_4_contains_box6_boundary_b():
     box4 = shapely.MultiPolygon([shapely.Polygon(box_points(4))])
     relation = DE9IM(box4, box6)
     boundary_relation = relation.boundary_adjustment('b')
-    relation_string = 'F2FF1FF22'
+    relation_string = 'F2FFFFFFF'
     matrix = '\n'.join([
         '|010|',
+        '|000|',
+        '|000|'
+        ])
+    assert str(boundary_relation) == matrix
+    assert boundary_relation.relation_str == relation_string
+
+def test_box_4_contains_box6_boundary_both():
+    box6 = shapely.MultiPolygon([shapely.Polygon(box_points(6))])
+    box4 = shapely.MultiPolygon([shapely.Polygon(box_points(4))])
+    relation = DE9IM(box4, box6)
+    boundary_relation = relation.boundary_adjustment('both')
+    relation_string = 'FFFF2FFFF'
+    matrix = '\n'.join([
+        '|000|',
         '|010|',
-        '|011|'
+        '|000|'
         ])
     assert str(boundary_relation) == matrix
     assert boundary_relation.relation_str == relation_string

@@ -341,33 +341,35 @@ class DE9IM():
 
         The “*Interior*” bits of the DE-9IM relationship metric become the
         “*Boundary*” bits of the new relationship metric.
+
+        Only the first bit associated with the interior of the boundary slice
+        is used.  All others are set to zero (False) because the boundary slice
+        is a thin slice that does not have a well-defined interior, or exterior.
         '''
-        new_str_list = []
+        # Get the bit associated with the interior of the boundary slice,
+        # which is the first bit of the relationship string.
+        interior_bit = self.relation_str[0]
+        # Start with a blank string of 'F's, which will become '0's when
+        # converted to binary.
+        new_str  = 'F' * 9
         if boundary_type == 'a':
-            interiors = self.relation_str[0:3]
-            boundaries = self.relation_str[3:6]
-            exteriors = self.relation_str[6:9]
-            new_str_list.extend(['F', 'F', 'F'])
-            for i, b in zip(interiors, boundaries):
-                if i == 'F':
-                    new_str_list.append(b)
-                else:
-                    new_str_list.append(i)
-            new_str_list.extend(exteriors)
+            # if A is the boundary slice, then the interior of A becomes the
+            # boundary of A.  All other bits are set to 'F', which will become
+            # '0' when converted to binary.
+            new_str = 'F' * 3 + interior_bit + 'F' * 5
         elif boundary_type == 'b':
-            interiors = self.relation_str[0:9:3]
-            boundaries = self.relation_str[1:9:3]
-            exteriors = self.relation_str[2:9:3]
-            for i, b, e in zip(interiors, boundaries, exteriors):
-                new_str_list.append('F')
-                if i == 'F':
-                    new_str_list.append(b)
-                else:
-                    new_str_list.append(i)
-                new_str_list.append(e)
+            # if B is the boundary slice, then the interior of B becomes the
+            # boundary of B. All other bits are set to 'F', which will become
+            # '0' when converted to binary.
+            new_str = 'F' + interior_bit + 'F' * 7
+        elif boundary_type == 'both':
+            # if both A and B are boundary slices, then the interior of A becomes
+            # the boundary of A and the interior of B becomes the boundary of B.
+            # All other bits are set to 'F', which will become '0' when converted
+            # to binary.
+            new_str = 'F' * 4 + interior_bit + 'F' * 4
         else:
             raise ValueError(f'Invalid boundary type: {boundary_type}')
-        new_str = ''.join(new_str_list)
         return self.__class__(relation_str=new_str)
 
     def hole_adjustment(self, hole: str)->'DE9IM':
@@ -1048,8 +1050,8 @@ class DE27IM():
         matrix in the following order:
             1. Boundary Adjustments: Adjust the relationship matrix when one of
                the contours is a boundary. Because the contour is a boundary,
-               the “*Interior*” bits of the DE-9IM relationship metric become
-               the “*Boundary*” bits of the new relationship metric.
+               the “*Interior*” bit of the DE-9IM relationship metric becomes
+               the “*Boundary*” bit of the new relationship metric.
 
         2. Hole Adjustments: Adjust the relationship matrix when one of
                the contours is a hole.  Because the contour is a hole, the
@@ -1068,12 +1070,26 @@ class DE27IM():
         normalized = {AdjustmentType(item) if isinstance(item, str) else item
                       for item in adjustments}
         # Apply Boundary Adjustments
+        # Note: If both boundary adjustments are applied, they must be applied
+        # simultaneously or the boundary bit will be lost in the first
+        # adjustment and the second adjustment will not be applied correctly.
         if AdjustmentType.BOUNDARY_A in normalized:
-            relation_group = tuple(de9im.boundary_adjustment('a')
-                                   for de9im in relation_group)
-        if AdjustmentType.BOUNDARY_B in normalized:
-            relation_group = tuple(de9im.boundary_adjustment('b')
-                                   for de9im in relation_group)
+            if AdjustmentType.BOUNDARY_B in normalized:
+                # for boundaries only the first DE9IM relationship is relevant.
+                relation_group = tuple(
+                    [relation_group[0].boundary_adjustment('both'),
+                     self.padding, self.padding]
+                    )
+            else:
+                relation_group =  tuple(
+                    [relation_group[0].boundary_adjustment('a'),
+                     self.padding, self.padding]
+                    )
+        elif AdjustmentType.BOUNDARY_B in normalized:
+            relation_group =  tuple(
+                [relation_group[0].boundary_adjustment('b'),
+                 self.padding, self.padding]
+                )
         # Apply Hole Adjustments
         if AdjustmentType.HOLE_A in normalized:
             contour, external, convex_hull = relation_group

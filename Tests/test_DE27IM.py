@@ -98,39 +98,58 @@ def test_de27im_merge():
     assert de27im1.int == int(expected_relation, 2)
 
 def test_de27im_apply_adjustments_boundary_a():
-    initial_relation_group = (DE9IM(relation_str='FF2FF1212'),
+    ''''Test that applying the boundary_a adjustment correctly modifies the
+    DE27IM relations.
+
+    A boundary_a adjustment should move the first bit of the DE27IM relation to
+    The 4th position, and set the rest of the bits to 'F'.
+    '''
+    initial_relation_group = (DE9IM(relation_str='2F2FF1212'),
                               DE9IM(relation_str='212FF1FF2'),
                               DE9IM(relation_str='212FF1FF2'))
     de27im = DE27IM(relation_int=0)
     adjusted_de27im = de27im.apply_adjustments(initial_relation_group,
                                                ['boundary_a'])
-    expected_relation = (DE9IM(relation_str='FFFFF2212'),
-                         DE9IM(relation_str='FFF212FF2'),
-                         DE9IM(relation_str='FFF212FF2'))
+    expected_relation = (DE9IM(relation_str='FFF2FFFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'))
     assert adjusted_de27im == expected_relation
 
 def test_de27im_apply_adjustments_boundary_b():
-    initial_relation_group = (DE9IM(relation_str='FF2FF1212'),
+    '''Test that applying the boundary_b adjustment correctly modifies the
+    DE27IM relations.
+
+    A boundary_b adjustment should move the first bit of the DE27IM relation to
+    The 2nd position, and set the rest of the bits to 'F'.
+    '''
+    initial_relation_group = (DE9IM(relation_str='2F2FF1212'),
                               DE9IM(relation_str='212FF1FF2'),
                               DE9IM(relation_str='212FF1FF2'))
     de27im = DE27IM(relation_int=0)
     adjusted_de27im = de27im.apply_adjustments(initial_relation_group,
                                                ['boundary_b'])
-    expected_relation = (DE9IM(relation_str='FF2FF1F22'),
-                         DE9IM(relation_str='F22FF1FF2'),
-                         DE9IM(relation_str='F22FF1FF2'))
+    expected_relation = (DE9IM(relation_str='F2FFFFFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'))
     assert adjusted_de27im == expected_relation
 
 def test_de27im_apply_adjustments_both_boundaries():
-    initial_relation_group = (DE9IM(relation_str='FF2FF1212'),
+    '''Test that applying both boundary_a and boundary_b adjustments correctly
+    modifies the DE27IM relations.
+
+    A combined boundary_a and boundary_b adjustment should move the first bit
+    of the DE27IM relation to the 5th position, and set the rest of the bits to
+    'F'.
+'''
+    initial_relation_group = (DE9IM(relation_str='2F2FF1212'),
                               DE9IM(relation_str='212FF1FF2'),
                               DE9IM(relation_str='212FF1FF2'))
     de27im = DE27IM(relation_int=0)
     adjusted_de27im = de27im.apply_adjustments(initial_relation_group,
                                                ['boundary_a', 'boundary_b'])
-    expected_relation = (DE9IM(relation_str='FFFFF2F22'),
-                         DE9IM(relation_str='FFFF22FF2'),
-                         DE9IM(relation_str='FFFF22FF2'))
+    expected_relation = (DE9IM(relation_str='FFFF2FFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'),
+                         DE9IM(relation_str='FFFFFFFFF'))
     assert adjusted_de27im == expected_relation
 
 def test_de27im_apply_adjustments_hole_a():
