@@ -11,7 +11,7 @@ import networkx as nx
 from types_and_classes import ROI_Type
 from contours import build_contour_table
 from structures import StructureShape
-from relations import RELATIONSHIP_TYPES
+from relations import RELATIONSHIP_TYPES, RelationshipType
 from relationships import StructureRelationship
 from dicom import DicomStructureFile
 from utilities import round_value
@@ -378,9 +378,12 @@ class StructureSet:
         Args:
             target_relation (RelationshipType): The relationship to infer
                 from implied edges (e.g., CONTAINS implied by PARTITIONED).
+                Direct edges of the target relation are also included so
+                mixed paths can be evaluated.
 
         Returns:
-            nx.DiGraph: Subgraph with edges that imply the target relation.
+            nx.DiGraph: Subgraph with direct target edges and edges that
+                imply the target relation.
         '''
         implied_graph = nx.DiGraph()
         implied_graph.add_nodes_from(self.relationship_graph.nodes())
@@ -392,17 +395,62 @@ class StructureSet:
                 continue
 
             rel_type = relationship.relationship_type
-            if not rel_type or rel_type == target_relation:
+            if not rel_type:
                 continue
 
-            if target_relation in rel_type.implied:
+            is_direct_target_edge = rel_type == target_relation
+            is_implied_target_edge = target_relation in rel_type.implied
+            if is_direct_target_edge or is_implied_target_edge:
                 implied_graph.add_edge(roi_a, roi_b,
-                                       relationship=relationship)
+                                       relationship=relationship,
+                                       is_direct_target_edge=
+                                       is_direct_target_edge)
                 if rel_type.is_symmetric or target_relation.is_symmetric:
                     implied_graph.add_edge(roi_b, roi_a,
-                                           relationship=relationship)
+                                           relationship=relationship,
+                                           is_direct_target_edge=
+                                           is_direct_target_edge)
 
         return implied_graph
+
+    def _is_valid_implied_path(
+        self,
+        implied_graph: nx.DiGraph,
+        path: list[ROI_Type],
+        target_relation: 'RelationshipType'
+    ) -> bool:
+        '''Check whether an alternate implied path can justify a relation.
+
+        For CONTAINS/WITHIN-style inference, reject paths made entirely of
+        implied PARTITIONED/PARTITIONS edges because those paths remain
+        ambiguous. Mixed paths are valid, including when the final segment is
+        the only direct target edge.
+
+        Args:
+            implied_graph (nx.DiGraph): Graph containing direct and implied
+                edges for the target relation.
+            path (list[ROI_Type]): Candidate path from source to target.
+            target_relation (RelationshipType): Direct relation being tested.
+
+        Returns:
+            bool: True when the path is a valid alternate explanation for the
+                target relation.
+        '''
+        if len(path) < 3:
+            return False
+
+        path_edge_data = [
+            implied_graph[path[index]][path[index + 1]]
+            for index in range(len(path) - 1)
+        ]
+
+        if target_relation.relation_type in {'CONTAINS', 'WITHIN'}:
+            return any(
+                edge_data.get('is_direct_target_edge', False)
+                for edge_data in path_edge_data
+            )
+
+        return True
 
     def calculate_logical_flags(self) -> None:
         '''Calculate logical relationship flags based on graph topology.
@@ -476,7 +524,7 @@ class StructureSet:
                 # Node doesn't exist, skip
                 pass
 
-        # Find logical relationships via implied-only paths
+        # Find logical relationships via implied and mixed alternate paths
         implied_graph_cache = {}
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
@@ -498,13 +546,24 @@ class StructureSet:
             implied_graph = implied_graph_cache[rel_type.relation_type]
             if implied_graph.number_of_edges() == 0:
                 continue
+            if not any(
+                not edge_data.get('is_direct_target_edge', False)
+                for _, _, edge_data in implied_graph.edges(data=True)
+            ):
+                continue
 
             try:
                 implied_paths = list(nx.all_simple_paths(
                     implied_graph, roi_a, roi_b
                 ))
-                if implied_paths:
-                    longest_path = max(implied_paths, key=len)
+                valid_paths = [
+                    path for path in implied_paths
+                    if self._is_valid_implied_path(
+                        implied_graph, path, rel_type
+                    )
+                ]
+                if valid_paths:
+                    longest_path = max(valid_paths, key=len)
                     intermediate_rois = longest_path[1:-1]
                     intermediate_structures = [ROI_Type(roi)
                                               for roi in intermediate_rois]
