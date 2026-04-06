@@ -1,4 +1,4 @@
-## Data Processing Pipeline Summary
+# Data Processing Pipeline Summary
 
 ### **Phase 1: DICOM Parsing & Contour Table Creation**
 

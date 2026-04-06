@@ -5,8 +5,6 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Web App Updates
-    0. Fix relationship identification for 'RS.CNS_FSRT_2_GTV.BRAI.dcm'
-
         3. with 'RS.4Field_Logic.BRER.dcm':
              PTV Cavity->Partitioned by->eval PTV and
              eval PTV->Partitioned by->CTV Cavity.

@@ -63,30 +63,50 @@ class TestLogicalContains:
         assert rel_2_4.is_logical
         assert ROI_Type(3) in rel_2_4.intermediate_structures
 
-    def test_partitioned_box_logical_contains(self):
-        '''Test: A Partitioned_by B, B Contains C => A Contains C is logical.'''
+    def test_logical_contains_partitioned(self):
+        '''Test: A Contains B, B is Partitioned by C => A Contains C is logical.'''
         slice_spacing = 0.5
         cube10 = make_box(roi_num=1, width=10, spacing=slice_spacing)
-        half_cube10 = make_box(
-            roi_num=2, width=5, length=8, height=8,
-            offset_x=2.5, offset_y=0, offset_z=0,
-            spacing=slice_spacing
-        )
-        cube4 = make_box(
-            roi_num=3, width=4,
-            offset_x=2.5, offset_y=0, offset_z=0,
-            spacing=slice_spacing
-        )
+        half_cube10 = make_box(roi_num=2, width=5, length=8, height=8,
+                            offset_x=0, offset_y=0, offset_z=0,
+                            spacing=slice_spacing)
 
-        slice_data = cube10 + half_cube10 + cube4
+        half_cube6 = make_box(roi_num=3, width=3, length=6, height=6,
+                        offset_x=1, offset_y=0, offset_z=0,
+                        spacing=slice_spacing)
+
+        slice_data = cube10 + half_cube10 + half_cube6
         structures = StructureSet(slice_data)
 
         # Check (1,3) relationship contains is logical
         rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
         assert rel_1_3 is not None
+        # Relationship A->C should be CONTAINS
+        assert rel_1_3.relationship_type.relation_type == 'CONTAINS'
         # Due to implied relationship, this should be logical
-        assert rel_1_3.is_logical or \
-               rel_1_3.relationship_type.relation_type == 'CONTAINS'
+        assert rel_1_3.is_logical
+
+    def test_logical_partitions_contains(self):
+        '''Test: A is Partitioned by B, B Contains C => A Contains C is logical.'''
+        slice_spacing = 0.5
+        cube10 = make_box(roi_num=1, width=10, spacing=slice_spacing)
+        half_cube10 = make_box(roi_num=2, width=5, length=8, height=8,
+                            offset_x=2.5, offset_y=0, offset_z=0,
+                            spacing=slice_spacing)
+
+        half_cube6 = make_box(roi_num=3, width=3, length=6, height=6,
+                        offset_x=2.5, offset_y=0, offset_z=0,
+                        spacing=slice_spacing)
+
+        slice_data = cube10 + half_cube10 + half_cube6
+        structures = StructureSet(slice_data)
+        # Check (1,3) relationship contains is logical
+        rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
+        assert rel_1_3 is not None
+        # Relationship A->C should be CONTAINS
+        assert rel_1_3.relationship_type.relation_type == 'CONTAINS'
+        # Due to implied relationship, this should be logical
+        assert rel_1_3.is_logical
 
 
 class TestLogicalConfines:
@@ -280,29 +300,51 @@ class TestNotLogical:
         assert rel_1_3 is not None
         assert not rel_1_3.is_logical
 
-    def test_partitioned_double_not_logical(self):
-        '''Test: A Partitioned_by B, B Partitioned_by C => A Partitioned_by C
-        is NOT logical (Partitioned is not transitive).'''
+    def test_not_logical_partitioned_box(self):
+        '''Test: A is Partitioned by B, B is Partitioned by C =>
+        A is Partitioned by C is NOT logical (Contains is also possible).'''
         slice_spacing = 0.5
         cube10 = make_box(roi_num=1, width=10, spacing=slice_spacing)
-        half_cube10 = make_box(
-            roi_num=2, width=5, length=8, height=8,
-            offset_x=2.5, offset_y=0, offset_z=0,
-            spacing=slice_spacing
-        )
-        half_cube4 = make_box(
-            roi_num=3, width=4,
-            offset_x=3, offset_y=0, offset_z=0,
-            spacing=slice_spacing
-        )
+        half_cube10 = make_box(roi_num=2, width=5, length=8, height=8,
+                            offset_x=2.5, offset_y=0, offset_z=0,
+                            spacing=slice_spacing)
 
-        slice_data = cube10 + half_cube10 + half_cube4
+        half_cube6 = make_box(roi_num=3, width=3, length=6,
+                        offset_x=3.5, offset_y=0, offset_z=0,
+                        spacing=slice_spacing)
+        slice_data = cube10 + half_cube10 + half_cube6
         structures = StructureSet(slice_data)
 
         # (1,3) should NOT be logical (result is ambiguous)
         rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
         assert rel_1_3 is not None
+        # Relationship A->C should be PARTITIONED
+        assert rel_1_3.relationship_type.relation_type == 'PARTITIONED'
         # Not logical because no single transitive path can explain it
+        assert not rel_1_3.is_logical
+
+    def test_not_logical_partitioned_contains(self):
+        '''Test: A is Partitioned by B, B is Partitioned by C =>
+        A Contains C is NOT logical (Partitioned is also possible).
+        '''
+        slice_spacing = 0.5
+        cube10 = make_box(roi_num=1, width=10, spacing=slice_spacing)
+        half_cube10 = make_box(roi_num=2, width=5, length=8, height=8,
+                            offset_x=2.5, offset_y=0, offset_z=0,
+                            spacing=slice_spacing)
+        half_cube6 = make_box(roi_num=3, width=3, length=6,
+                        offset_x=1.5, offset_y=0, offset_z=0,
+                        spacing=slice_spacing)
+        # combine the contours
+        slice_data = cube10 + half_cube10 + half_cube6
+        structures = StructureSet(slice_data)
+
+        # (1,3) should NOT be logical (result is ambiguous)
+        rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
+        assert rel_1_3 is not None
+        # Relationship A->C should be CONTAINS
+        assert rel_1_3.relationship_type.relation_type == 'CONTAINS'
+        # Not logical because 1_3 can either be Contains or Partitioned
         assert not rel_1_3.is_logical
 
 
