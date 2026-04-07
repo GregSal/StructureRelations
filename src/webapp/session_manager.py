@@ -26,6 +26,7 @@ class SessionData:
         app_version (str): Application version for compatibility checking.
         job_status (str): Processing status
             (idle/running/completed/failed/cancelled).
+        job_stage (str): Current processing stage identifier.
         job_progress (float): Processing percentage from 0.0 to 100.0.
         job_message (str): Human-readable processing status.
         job_error (Optional[str]): Last processing error message, if any.
@@ -38,6 +39,7 @@ class SessionData:
     last_accessed: datetime = field(default_factory=datetime.now)
     app_version: str = '1.0.0'
     job_status: str = 'idle'
+    job_stage: str = 'idle'
     job_progress: float = 0.0
     job_message: str = ''
     job_error: Optional[str] = None

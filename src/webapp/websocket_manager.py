@@ -38,7 +38,7 @@ class ConnectionManager:
             del self.active_connections[session_id]
             logger.info(f'WebSocket disconnected for session {session_id}')
 
-    async def send_progress(self, session_id: str, stage: str, progress: int,
+    async def send_progress(self, session_id: str, stage: str, progress: float,
                           current_structure: str = '', message: str = '',
                           disk_usage_mb: float = 0.0):
         '''Send a progress update to a connected client.
@@ -47,7 +47,7 @@ class ConnectionManager:
             session_id (str): The session ID.
             stage (str): Current processing stage
                 (e.g., 'parsing_dicom', 'building_graphs', 'calculating_relationships').
-            progress (int): Progress percentage (0-100).
+            progress (float): Progress percentage (0-100).
             current_structure (str, optional): Name of structure currently being processed.
             message (str, optional): Human-readable status message.
             disk_usage_mb (float, optional): Current disk usage in MB.

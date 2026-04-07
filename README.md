@@ -5,15 +5,6 @@ Test and reports on relationships between DICOM RT Structures
 ## TO Do Next
 
 1. Web App Updates
-        3. with 'RS.4Field_Logic.BRER.dcm':
-             PTV Cavity->Partitioned by->eval PTV and
-             eval PTV->Partitioned by->CTV Cavity.
-
-             PTV Cavity->Contains->CTV Cavity
-            is being treated as Logical, but this is wrong because it could also be:
-             PTV Cavity->Partitioned by->CTV Cavity
-
-
     1. Cosmetic Changes
         - Need tooltips for edges
         - Add a legend for edge colors and styles

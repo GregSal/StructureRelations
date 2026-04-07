@@ -43,7 +43,9 @@ class StructureSet:
     def __init__(self,
                  slice_data: Optional[List] = None,
                  dicom_structure_file: Optional[DicomStructureFile] = None,
-                 tolerance=0.0):
+                 tolerance=0.0,
+                 auto_calculate_relationships: bool = True,
+                 auto_calculate_logical_flags: bool = True):
         '''Initialize the StructureSet.
 
         Args:
@@ -55,12 +57,20 @@ class StructureSet:
                 slice_data if both are provided.
             tolerance (float, optional): Tolerance value for structure
                 relationships. Defaults to 0.0.
+            auto_calculate_relationships (bool, optional): Whether to
+                automatically calculate relationships as part of finalize.
+                Defaults to True.
+            auto_calculate_logical_flags (bool, optional): Whether to
+                automatically calculate logical flags during finalize.
+                Defaults to True.
         '''
         self.structures = {}
         self.slice_sequence = None
         self.relationship_graph = nx.DiGraph()
         self.dicom_structure_file = dicom_structure_file
         self.tolerance = tolerance
+        self.auto_calculate_relationships = auto_calculate_relationships
+        self.auto_calculate_logical_flags = auto_calculate_logical_flags
         self.relationship_progress: Dict[str, float | int | str] = {
             'current_pair': 0,
             'total_pairs': 0,
@@ -69,6 +79,8 @@ class StructureSet:
             'status': 'idle',
             'percent_complete': 0.0,
         }
+        self._relationship_matrix_cache: Optional[pd.DataFrame] = None
+        self._summary_cache: Optional[pd.DataFrame] = None
 
         # Prioritize dicom_structure_file over slice_data
         if dicom_structure_file is not None:
@@ -138,9 +150,16 @@ class StructureSet:
         for structure in self.structures.values():
             logger.debug('Finalizing structure %s (%s)', structure.name, structure.roi)
             structure.finalize(self.slice_sequence)
-        self.finalize()
+        self.finalize(
+            calculate_relationships=self.auto_calculate_relationships,
+            calculate_logical_flags=self.auto_calculate_logical_flags,
+        )
 
-    def finalize(self) -> None:
+    def finalize(
+        self,
+        calculate_relationships: bool = True,
+        calculate_logical_flags: bool = True,
+    ) -> None:
         '''Complete the StructureSet process by calculating relationships.
 
         This method:
@@ -148,9 +167,21 @@ class StructureSet:
         4. Constructs a graph where the nodes are the StructureShape objects
            and the edges are the relationships between them.
         5. Calculates logical relationship flags based on graph topology.
+
+        Args:
+            calculate_relationships (bool): Whether to calculate geometric
+                relationships.
+            calculate_logical_flags (bool): Whether to calculate logical flags.
         '''
-        self.calculate_relationships()
-        self.calculate_logical_flags()
+        if calculate_relationships:
+            self.calculate_relationships()
+        if calculate_logical_flags:
+            self.calculate_logical_flags()
+
+    def _invalidate_caches(self) -> None:
+        '''Invalidate cached summary and matrix data.'''
+        self._relationship_matrix_cache = None
+        self._summary_cache = None
 
     def add_structure(self, structure: StructureShape) -> None:
         '''Add a structure to the set.
@@ -159,6 +190,7 @@ class StructureSet:
             structure (StructureShape): The structure to add.
         '''
         self.structures[structure.roi] = structure
+        self._invalidate_caches()
 
         # Add structure to relationship graph
         self.relationship_graph.add_node(structure.roi, structure=structure)
@@ -204,6 +236,7 @@ class StructureSet:
             logger.debug('Force recalculation enabled, recalculating relationships')
             # Clear existing edges but keep nodes for recalculation
             self.relationship_graph.clear_edges()
+        self._invalidate_caches()
 
         logger.info('Calculating relationships for %d structures',
                     len(structure_rois))
@@ -292,6 +325,7 @@ class StructureSet:
             'status': 'complete',
             'percent_complete': 100.0,
         })
+        self._invalidate_caches()
 
     def calculate_relationships_with_progress(self, force=False) -> None:
         '''Calculate relationships with optional tqdm terminal progress output.
@@ -452,6 +486,86 @@ class StructureSet:
 
         return True
 
+    def _iter_simple_paths(
+        self,
+        graph: nx.DiGraph,
+        source: ROI_Type,
+        target: ROI_Type,
+    ):
+        '''Yield simple paths from source to target using a generator.
+
+        Wraps nx.shortest_simple_paths and suppresses no-path exceptions.
+
+        Args:
+            graph (nx.DiGraph): Graph to search.
+            source (ROI_Type): Source node.
+            target (ROI_Type): Target node.
+
+        Yields:
+            list: Simple paths from source to target.
+        '''
+        try:
+            yield from nx.shortest_simple_paths(graph, source, target)
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return
+
+    def _find_longest_alternate_transitive_path(
+        self,
+        transitive_graph: nx.DiGraph,
+        source: ROI_Type,
+        target: ROI_Type,
+    ) -> Optional[list]:
+        '''Return the longest simple path when more than one path exists.
+
+        Returns None when only one path (the direct edge) exists, meaning
+        the relationship is not logically derived.
+
+        Args:
+            transitive_graph (nx.DiGraph): Graph of transitive relationships.
+            source (ROI_Type): Source structure ROI.
+            target (ROI_Type): Target structure ROI.
+
+        Returns:
+            Optional[list]: Longest path as node list, or None if fewer than
+                two paths exist.
+        '''
+        longest: Optional[list] = None
+        count = 0
+        for path in self._iter_simple_paths(transitive_graph, source, target):
+            count += 1
+            if longest is None or len(path) > len(longest):
+                longest = path
+        return longest if count > 1 else None
+
+    def _find_longest_valid_implied_path(
+        self,
+        implied_graph: nx.DiGraph,
+        source: ROI_Type,
+        target: ROI_Type,
+        target_relation: 'RelationshipType',
+    ) -> Optional[list]:
+        '''Return the longest valid implied path from source to target.
+
+        Streams paths on demand, validates each with _is_valid_implied_path,
+        and tracks the longest valid candidate without building a full list.
+
+        Args:
+            implied_graph (nx.DiGraph): Graph of direct and implied edges.
+            source (ROI_Type): Source structure ROI.
+            target (ROI_Type): Target structure ROI.
+            target_relation (RelationshipType): Relation type for validation.
+
+        Returns:
+            Optional[list]: Longest valid path as node list, or None.
+        '''
+        longest: Optional[list] = None
+        for path in self._iter_simple_paths(implied_graph, source, target):
+            if self._is_valid_implied_path(implied_graph, path,
+                                           target_relation):
+                if longest is None or len(path) > len(longest):
+                    longest = path
+        return longest
+
     def calculate_logical_flags(self) -> None:
         '''Calculate logical relationship flags based on graph topology.
 
@@ -492,37 +606,21 @@ class StructureSet:
                     roi_b not in transitive_graph):
                 continue
 
-            try:
-                # Find all simple paths between structures in transitive graph
-                all_paths = list(nx.all_simple_paths(
-                    transitive_graph, roi_a, roi_b
-                ))
-
-                # If multiple paths exist, the direct edge is logical
-                if len(all_paths) > 1:
-                    # Find the longest path for intermediate structures
-                    longest_path = max(all_paths, key=len)
-                    # Extract intermediate ROIs (exclude first and last)
-                    intermediate_rois = longest_path[1:-1]
-                    # Convert to ROI_Type list
-                    intermediate_structures = [ROI_Type(roi)
-                                              for roi in intermediate_rois]
-
-                    relationship.is_logical = True
-                    relationship.intermediate_structures = \
-                        intermediate_structures
-
-                    logger.debug(
-                        'Identified logical relationship: ROI %d -> ROI %d '
-                        '(intermediates: %s)',
-                        roi_a, roi_b, intermediate_structures
-                    )
-            except nx.NetworkXNoPath:
-                # No path exists in transitive subgraph, not logical
-                pass
-            except nx.NodeNotFound:
-                # Node doesn't exist, skip
-                pass
+            longest_path = self._find_longest_alternate_transitive_path(
+                transitive_graph, roi_a, roi_b
+            )
+            if longest_path is not None:
+                intermediate_rois = longest_path[1:-1]
+                intermediate_structures = [
+                    ROI_Type(roi) for roi in intermediate_rois
+                ]
+                relationship.is_logical = True
+                relationship.intermediate_structures = intermediate_structures
+                logger.debug(
+                    'Identified logical relationship: ROI %d -> ROI %d '
+                    '(intermediates: %s)',
+                    roi_a, roi_b, intermediate_structures
+                )
 
         # Find logical relationships via implied and mixed alternate paths
         implied_graph_cache = {}
@@ -552,36 +650,21 @@ class StructureSet:
             ):
                 continue
 
-            try:
-                implied_paths = list(nx.all_simple_paths(
-                    implied_graph, roi_a, roi_b
-                ))
-                valid_paths = [
-                    path for path in implied_paths
-                    if self._is_valid_implied_path(
-                        implied_graph, path, rel_type
-                    )
+            longest_path = self._find_longest_valid_implied_path(
+                implied_graph, roi_a, roi_b, rel_type
+            )
+            if longest_path is not None:
+                intermediate_rois = longest_path[1:-1]
+                intermediate_structures = [
+                    ROI_Type(roi) for roi in intermediate_rois
                 ]
-                if valid_paths:
-                    longest_path = max(valid_paths, key=len)
-                    intermediate_rois = longest_path[1:-1]
-                    intermediate_structures = [ROI_Type(roi)
-                                              for roi in intermediate_rois]
-
-                    relationship.is_logical = True
-                    relationship.intermediate_structures = (
-                        intermediate_structures
-                    )
-
-                    logger.debug(
-                        'Identified implied logical relationship: ROI %d -> '
-                        'ROI %d (intermediates: %s)',
-                        roi_a, roi_b, intermediate_structures
-                    )
-            except nx.NetworkXNoPath:
-                pass
-            except nx.NodeNotFound:
-                pass
+                relationship.is_logical = True
+                relationship.intermediate_structures = intermediate_structures
+                logger.debug(
+                    'Identified implied logical relationship: ROI %d -> '
+                    'ROI %d (intermediates: %s)',
+                    roi_a, roi_b, intermediate_structures
+                )
 
         # Handle EQUAL relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
@@ -691,6 +774,9 @@ class StructureSet:
         Returns:
             pd.DataFrame: Summary table with structure information.
         '''
+        if self._summary_cache is not None:
+            return self._summary_cache.copy()
+
         summary_data = []
         for roi, structure in self.structures.items():
             interpolated_regions = structure.region_table.Interpolated
@@ -715,7 +801,8 @@ class StructureSet:
             summary_df = summary_df.join(
                 self.dicom_structure_file.get_roi_labels(), on='ROI')
 
-        return summary_df
+        self._summary_cache = summary_df
+        return summary_df.copy()
 
     @property
     def relationship_matrix(self) -> pd.DataFrame:
@@ -726,6 +813,9 @@ class StructureSet:
                 and StructureRelationship objects as values. The matrix is symmetric for
                 symmetric relationships.
         '''
+        if self._relationship_matrix_cache is not None:
+            return self._relationship_matrix_cache.copy()
+
         # Return empty DataFrame if no structures
         if not self.structures:
             return pd.DataFrame()
@@ -784,7 +874,8 @@ class StructureSet:
         relationship_matrix.index.name = 'Structure_B'
         relationship_matrix.columns.name = 'Structure_A'
 
-        return relationship_matrix
+        self._relationship_matrix_cache = relationship_matrix
+        return relationship_matrix.copy()
 
     def filter_relationships_by_logical_mode(
             self,
@@ -1064,7 +1155,7 @@ class StructureSet:
                 visible_rois = list(self.structures.keys())
 
             # Filter relationships based on logical mode
-            filtered_matrix, fade_info = (
+            _, fade_info = (
                 self.filter_relationships_by_logical_mode(
                     mode=logical_relations_mode,
                     visible_rois=visible_rois

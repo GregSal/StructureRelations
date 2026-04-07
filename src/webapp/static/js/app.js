@@ -18,6 +18,7 @@ class WebAppClient {
         this.patientInfo = null;
         this.structureItems = [];
         this.structureItemsByRoi = new Map();
+        this.statusPollIntervalId = null;
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -312,10 +313,52 @@ class WebAppClient {
                     `Disk: ${data.disk_usage_mb.toFixed(1)} MB`;
             }
         } else if (data.type === 'complete') {
+            this.stopStatusPolling();
             this.onProcessingComplete();
         } else if (data.type === 'error') {
+            this.stopStatusPolling();
             alert(data.message);
             this.showStage('upload');
+        }
+    }
+
+    startStatusPolling() {
+        this.stopStatusPolling();
+        this.statusPollIntervalId = window.setInterval(async () => {
+            if (!this.sessionId) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/jobs/${this.sessionId}/status`);
+                if (!response.ok) {
+                    return;
+                }
+                const status = await response.json();
+                if (typeof status.progress === 'number') {
+                    this.updateProgress(
+                        status.stage || 'processing',
+                        status.progress,
+                        status.message || 'Processing...',
+                        ''
+                    );
+                }
+
+                if (status.status === 'completed') {
+                    this.stopStatusPolling();
+                }
+                if (status.status === 'failed' || status.status === 'cancelled') {
+                    this.stopStatusPolling();
+                }
+            } catch (error) {
+                console.debug('Status polling skipped:', error);
+            }
+        }, 1200);
+    }
+
+    stopStatusPolling() {
+        if (this.statusPollIntervalId) {
+            window.clearInterval(this.statusPollIntervalId);
+            this.statusPollIntervalId = null;
         }
     }
 
@@ -419,6 +462,8 @@ class WebAppClient {
         }
 
         this.showStage('processing');
+        this.updateProgress('initializing', 0, 'Starting processing...', '');
+        this.startStatusPolling();
 
         try {
             const response = await fetch('/api/process', {
@@ -439,9 +484,17 @@ class WebAppClient {
             // Progress updates will come via WebSocket
 
         } catch (error) {
+            this.stopStatusPolling();
             console.error('Processing error:', error);
             alert('Failed to start processing.');
         }
+    }
+
+    formatStageLabel(stage) {
+        if (!stage) {
+            return 'processing';
+        }
+        return stage.replaceAll('_', ' ');
     }
 
     updateProgress(stage, progress, message, currentStructure) {
@@ -449,8 +502,10 @@ class WebAppClient {
         const progressText = document.getElementById('progressText');
         const progressDetail = document.getElementById('progressDetail');
 
-        progressFill.style.width = `${progress}%`;
-        progressText.textContent = `${progress}% - ${stage.replace('_', ' ')}`;
+        const boundedProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+
+        progressFill.style.width = `${boundedProgress}%`;
+        progressText.textContent = `${boundedProgress.toFixed(1)}% - ${this.formatStageLabel(stage)}`;
 
         let detailText = message;
         if (currentStructure) {
@@ -460,6 +515,7 @@ class WebAppClient {
     }
 
     async onProcessingComplete() {
+        this.stopStatusPolling();
         // Load structure summary
         try {
             const response = await fetch('/api/matrix', {
@@ -1822,6 +1878,10 @@ class WebAppClient {
     }
 
     showStage(stageName) {
+        if (stageName !== 'processing') {
+            this.stopStatusPolling();
+        }
+
         // Hide all stages
         document.querySelectorAll('.stage').forEach(stage => {
             stage.style.display = 'none';
@@ -1832,6 +1892,7 @@ class WebAppClient {
     }
 
     resetApp() {
+        this.stopStatusPolling();
         // Reset application state for new analysis
         this.sessionId = null;
         this.selectedStructures.clear();

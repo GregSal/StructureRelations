@@ -10,6 +10,7 @@ import uuid
 import asyncio
 import tempfile
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -162,6 +163,7 @@ class JobStatusResponse(RelationshipContractMixin):
     job_id: str
     session_id: str
     status: str
+    stage: str = 'idle'
     progress: float
     message: str
     error: Optional[str] = None
@@ -469,6 +471,7 @@ async def process_structures(request: ProcessRequest):
     session_manager.update_session_job_state(
         request.session_id,
         job_status='running',
+        job_stage='queued',
         job_progress=0.0,
         job_message='Processing started',
         job_error=None,
@@ -513,6 +516,7 @@ async def get_job_status(session_id: str):
         job_id=session_id,
         session_id=session_id,
         status=session_data.job_status,
+        stage=session_data.job_stage,
         progress=session_data.job_progress,
         message=session_data.job_message,
         error=session_data.job_error,
@@ -593,6 +597,7 @@ async def cancel_job(session_id: str):
             session_manager.update_session_job_state(
                 session_id,
                 job_status='cancelled',
+                job_stage='cancelled',
                 job_message='Cancellation requested',
                 job_provenance={
                     **session_data.job_provenance,
@@ -604,6 +609,7 @@ async def cancel_job(session_id: str):
             job_id=session_id,
             session_id=session_id,
             status=session_data.job_status,
+            stage=session_data.job_stage,
             progress=session_data.job_progress,
             message='No active job to cancel',
             error=session_data.job_error,
@@ -619,6 +625,7 @@ async def cancel_job(session_id: str):
     session_manager.update_session_job_state(
         session_id,
         job_status='cancelled',
+        job_stage='cancelled',
         job_message='Cancellation requested',
         job_provenance={
             **session_data.job_provenance,
@@ -629,6 +636,7 @@ async def cancel_job(session_id: str):
         job_id=session_id,
         session_id=session_id,
         status='cancelled',
+        stage='cancelled',
         progress=session_data.job_progress,
         message='Cancellation requested',
         error=None,
@@ -658,16 +666,63 @@ async def process_structure_set(
         def _was_cancelled() -> bool:
             return bool(cancel_event is not None and cancel_event.is_set())
 
+        ws_loop = asyncio.get_running_loop()
+        ws_last_emit_time = 0.0
+        ws_last_emit_progress = -1.0
+
+        def _queue_progress_update(
+            stage: str,
+            progress: float,
+            current_structure: str,
+            message: str,
+            force_emit: bool = False,
+        ) -> None:
+            nonlocal ws_last_emit_time, ws_last_emit_progress
+            bounded_progress = max(0.0, min(100.0, float(progress)))
+            session_manager.update_session_job_state(
+                session_id,
+                job_stage=stage,
+                job_progress=bounded_progress,
+                job_message=message,
+            )
+            now = time.monotonic()
+            should_emit = (
+                force_emit
+                or bounded_progress in {0.0, 100.0}
+                or (bounded_progress - ws_last_emit_progress) >= 0.5
+                or (now - ws_last_emit_time) >= 0.4
+            )
+            if not should_emit:
+                return
+
+            ws_last_emit_time = now
+            ws_last_emit_progress = bounded_progress
+            disk_info = session_manager.get_disk_usage_info()
+            ws_loop.create_task(
+                connection_manager.send_progress(
+                    session_id,
+                    stage,
+                    bounded_progress,
+                    current_structure,
+                    message,
+                    disk_info['usage_mb'],
+                )
+            )
+
         # Send initial progress
-        disk_info = session_manager.get_disk_usage_info()
         session_manager.update_session_job_state(
             session_id,
             job_status='running',
+            job_stage='parsing_dicom',
             job_progress=0.0,
             job_message='Loading DICOM file',
         )
-        await connection_manager.send_progress(
-            session_id, 'parsing_dicom', 0, '', 'Loading DICOM file...', disk_info['usage_mb']
+        _queue_progress_update(
+            'parsing_dicom',
+            0.0,
+            '',
+            'Loading DICOM file...',
+            force_emit=True,
         )
 
         if _was_cancelled():
@@ -692,13 +747,12 @@ async def process_structure_set(
             await connection_manager.send_error(session_id, f'Failed to parse DICOM file: {str(e)}')
             return
 
-        await connection_manager.send_progress(
-            session_id, 'parsing_dicom', 20, '', 'Parsing structures...', disk_info['usage_mb']
-        )
-        session_manager.update_session_job_state(
-            session_id,
-            job_progress=20.0,
-            job_message='Parsing structures',
+        _queue_progress_update(
+            'parsing_dicom',
+            20.0,
+            '',
+            'Parsing structures...',
+            force_emit=True,
         )
 
         # Filter contour points to only include selected ROIs
@@ -712,25 +766,29 @@ async def process_structure_set(
 
         # Create structure set with filtered contours
         try:
-            structure_set = StructureSet(dicom_structure_file=dicom_file)
+            structure_set = StructureSet(
+                dicom_structure_file=dicom_file,
+                auto_calculate_relationships=False,
+                auto_calculate_logical_flags=False,
+            )
         except Exception as e:
             logger.error('Structure set creation error in session %s: %s', session_id, e, exc_info=True)
             await connection_manager.send_error(session_id, f'Failed to create structure set: {str(e)}')
             session_manager.update_session_job_state(
                 session_id,
                 job_status='failed',
+                job_stage='failed',
                 job_message='Failed to create structure set',
                 job_error=str(e),
             )
             return
 
-        await connection_manager.send_progress(
-            session_id, 'building_graphs', 40, '', 'Building contour graphs...', disk_info['usage_mb']
-        )
-        session_manager.update_session_job_state(
-            session_id,
-            job_progress=40.0,
-            job_message='Building contour graphs',
+        _queue_progress_update(
+            'building_graphs',
+            40.0,
+            '',
+            'Building contour graphs...',
+            force_emit=True,
         )
 
         # Process each structure
@@ -739,27 +797,23 @@ async def process_structure_set(
             if selected_rois and roi not in selected_rois:
                 continue
 
-            progress = 40 + int((idx / total_structures) * 30)
-            await connection_manager.send_progress(
-                session_id, 'building_graphs', progress,
-                structure.name, f'Processing {structure.name}...', disk_info['usage_mb']
-            )
-            session_manager.update_session_job_state(
-                session_id,
-                job_progress=float(progress),
-                job_message=f'Processing {structure.name}',
+            progress = 40.0 + ((idx / total_structures) * 30.0)
+            _queue_progress_update(
+                'building_graphs',
+                progress,
+                structure.name,
+                f'Preparing {structure.name}...',
             )
 
             if _was_cancelled():
                 raise asyncio.CancelledError('Processing cancelled during graph build')
 
-        await connection_manager.send_progress(
-            session_id, 'calculating_relationships', 70, '', 'Calculating relationships...', disk_info['usage_mb']
-        )
-        session_manager.update_session_job_state(
-            session_id,
-            job_progress=70.0,
-            job_message='Calculating relationships',
+        _queue_progress_update(
+            'calculating_relationships',
+            70.0,
+            '',
+            'Calculating relationships...',
+            force_emit=True,
         )
 
         # Calculate relationships with error handling
@@ -769,18 +823,37 @@ async def process_structure_set(
                     progress = 95.0
                 else:
                     progress = 70.0 + (completed_pairs / total_pairs) * 25.0
-                session_manager.update_session_job_state(
-                    session_id,
-                    job_progress=progress,
-                    job_message=(
-                        f'Calculating relationships '
-                        f'({completed_pairs}/{total_pairs})'
-                    ),
+                pair_status = structure_set.relationship_progress.get(
+                    'status',
+                    f'pair {completed_pairs}/{total_pairs}',
+                )
+                current_slice = structure_set.relationship_progress.get('current_slice', 0)
+                total_slices = structure_set.relationship_progress.get('total_slices', 0)
+                if isinstance(current_slice, int) and isinstance(total_slices, int):
+                    message = (
+                        f'Computing {pair_status} '
+                        f'(slice {current_slice}/{total_slices})'
+                    )
+                else:
+                    message = f'Computing {pair_status}'
+
+                _queue_progress_update(
+                    'calculating_relationships',
+                    progress,
+                    '',
+                    message,
                 )
                 if _was_cancelled():
                     raise RuntimeError('Processing cancelled by user')
 
             structure_set.calculate_relationships(force=True, progress_callback=pair_progress)
+            _queue_progress_update(
+                'calculating_relationships',
+                97.5,
+                '',
+                'Resolving logical relationships...',
+                force_emit=True,
+            )
             structure_set.calculate_logical_flags()
         except Exception as e:
             if 'cancelled' in str(e).lower():
@@ -790,18 +863,18 @@ async def process_structure_set(
             session_manager.update_session_job_state(
                 session_id,
                 job_status='failed',
+                job_stage='failed',
                 job_message='Failed to calculate relationships',
                 job_error=str(e),
             )
             return
 
-        await connection_manager.send_progress(
-            session_id, 'calculating_relationships', 100, '', 'Complete!', disk_info['usage_mb']
-        )
-        session_manager.update_session_job_state(
-            session_id,
-            job_progress=100.0,
-            job_message='Processing complete',
+        _queue_progress_update(
+            'calculating_relationships',
+            100.0,
+            '',
+            'Complete!',
+            force_emit=True,
         )
 
         # Save completed session BEFORE sending complete message
@@ -812,6 +885,7 @@ async def process_structure_set(
             session_manager.update_session_job_state(
                 session_id,
                 job_status='failed',
+                job_stage='failed',
                 job_message='Failed to save results',
                 job_error='Failed to save structure set',
             )
@@ -820,6 +894,7 @@ async def process_structure_set(
         session_manager.update_session_job_state(
             session_id,
             job_status='completed',
+            job_stage='completed',
             job_progress=100.0,
             job_message='Processing complete',
             job_error=None,
@@ -844,6 +919,7 @@ async def process_structure_set(
         session_manager.update_session_job_state(
             session_id,
             job_status='cancelled',
+            job_stage='cancelled',
             job_message='Processing cancelled',
             job_error=None,
             job_provenance={
@@ -859,6 +935,7 @@ async def process_structure_set(
         session_manager.update_session_job_state(
             session_id,
             job_status='failed',
+            job_stage='failed',
             job_message='Unexpected processing error',
             job_error=str(e),
         )
