@@ -94,6 +94,7 @@ class MatrixRequest(BaseModel):
     col_rois: Optional[List[int]] = None
     use_symbols: bool = True
     show_disjoint: bool = False
+    show_unknown: bool = False
     logical_relations_mode: str = 'limited'  # 'hide', 'limited', 'show', 'faded'
 
 
@@ -125,16 +126,58 @@ class DiagramNode(BaseModel):
 class DiagramEdge(BaseModel):
     from_node: int
     to_node: int
+    relation_type: str
+    symbol: Optional[str] = None
     label: str
+    title: str
     color: str
     width: int
     dashes: bool
     arrows: Optional[str] = None
+    is_logical: bool = False
 
 
 class DiagramResponse(BaseModel):
     nodes: List[DiagramNode]
     edges: List[DiagramEdge]
+
+
+def _load_diagram_settings() -> dict:
+    """Load diagram settings configuration from disk.
+
+    Returns:
+        dict: Diagram settings dictionary or an empty dictionary on failure.
+    """
+    diagram_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
+    if not diagram_file.exists():
+        logger.warning('Diagram settings file not found: %s', diagram_file)
+        return {}
+
+    try:
+        with open(diagram_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (IOError, json.JSONDecodeError) as exc:
+        logger.warning('Failed to load diagram settings: %s', exc)
+        return {}
+
+
+def _load_relationship_definitions() -> dict:
+    """Load relationship definitions from disk.
+
+    Returns:
+        dict: Relationship definitions dictionary or an empty dictionary on failure.
+    """
+    definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
+    if not definitions_file.exists():
+        logger.warning('Relationship definitions file not found: %s', definitions_file)
+        return {}
+
+    try:
+        with open(definitions_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (IOError, json.JSONDecodeError) as exc:
+        logger.warning('Failed to load relationship definitions: %s', exc)
+        return {}
 
 
 class ProcessRequest(BaseModel):
@@ -225,31 +268,33 @@ async def get_symbol_config():
     Raises:
         HTTPException: If relationship_definitions.json or diagram_settings.json not found.
     '''
-    definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
-    diagram_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
+    definitions = _load_relationship_definitions()
+    diagram_settings = _load_diagram_settings()
 
-    if not definitions_file.exists():
-        logger.error('Configuration file not found: %s', definitions_file)
+    if not definitions:
+        logger.error('Unable to load relationship_definitions.json')
         raise HTTPException(
             status_code=500,
             detail='Configuration file not found: relationship_definitions.json'
         )
-
-    if not diagram_file.exists():
-        logger.error('Diagram settings file not found: %s', diagram_file)
+    if not diagram_settings:
+        logger.error('Unable to load diagram_settings.json')
         raise HTTPException(
             status_code=500,
             detail='Configuration file not found: diagram_settings.json'
         )
 
     try:
-        with open(definitions_file, 'r', encoding='utf-8') as f:
-            definitions = json.load(f)
-
-        with open(diagram_file, 'r', encoding='utf-8') as f:
-            diagram_settings = json.load(f)
-
         relationship_styles = diagram_settings.get('relationship_styles', {})
+        node_shapes = diagram_settings.get('node_shapes', {})
+        relationship_defaults = diagram_settings.get(
+            'relationship_display_defaults',
+            diagram_settings.get('Relationship_Display_Defaults', {})
+        )
+        diagram_options = diagram_settings.get(
+            'diagram_options',
+            diagram_settings.get('DiagramOptions', {})
+        )
 
         # Transform relationship definitions to symbol config format
         relationships = {}
@@ -272,7 +317,12 @@ async def get_symbol_config():
                 'transparency': 20,
                 'description': 'Settings for logical relationship display'
             }),
-            'relationships': relationships
+            'relationships': relationships,
+            'node_shapes': node_shapes,
+            'relationship_styles': relationship_styles,
+            'relationship_display_defaults': relationship_defaults,
+            'diagram_options': diagram_options,
+            'tooltips': diagram_settings.get('tooltips', {}),
         }
         return config
     except json.JSONDecodeError as e:
@@ -410,13 +460,32 @@ async def preview_structures(request: SessionRequest):
         # Sort by ROI number
         structures.sort(key=lambda s: s['roi'])
 
-        # Get patient info from structure set info
+        # Get patient and structure-set metadata from existing DICOM info
         structure_set_info = dicom_file.get_structure_set_info()
+        file_path_value = structure_set_info.get('File')
+        file_name = ''
+        if file_path_value:
+            try:
+                file_name = Path(str(file_path_value)).name
+            except (TypeError, ValueError):
+                file_name = str(file_path_value)
+
+        resolution_value = dicom_file.resolution
+        resolution_cm_per_pixel = (
+            float(resolution_value) if resolution_value is not None else None
+        )
+
         patient_info = {
             'patient_id': structure_set_info.get('PatientID', ''),
             'patient_name': structure_set_info.get('PatientName', ''),
             'structure_set': structure_set_info.get('StructureSet', ''),
-            'study_id': structure_set_info.get('StudyID', '')
+            'study_id': structure_set_info.get('StudyID', ''),
+            'series_number': structure_set_info.get('SeriesNumber', ''),
+            'series_description': structure_set_info.get('SeriesDescription', ''),
+            'file_name': file_name,
+            'file_path': str(file_path_value) if file_path_value else '',
+            'resolution_cm_per_pixel': resolution_cm_per_pixel,
+            'structure_count': len(structures),
         }
 
         # Get disk usage
@@ -709,6 +778,13 @@ async def process_structure_set(
                 )
             )
 
+        def _queue_status_line(stage: str, message: str) -> None:
+            ws_loop.create_task(
+                connection_manager.send_status_line(
+                    session_id, stage, 'backend', message
+                )
+            )
+
         # Send initial progress
         session_manager.update_session_job_state(
             session_id,
@@ -724,6 +800,8 @@ async def process_structure_set(
             'Loading DICOM file...',
             force_emit=True,
         )
+        _queue_status_line('parsing_dicom', 'Loading DICOM file...')
+        await asyncio.sleep(0)
 
         if _was_cancelled():
             raise asyncio.CancelledError('Processing cancelled before parsing')
@@ -754,6 +832,11 @@ async def process_structure_set(
             'Parsing structures...',
             force_emit=True,
         )
+        _queue_status_line(
+            'parsing_dicom',
+            f'DICOM loaded \u2014 {len(dicom_file.contour_points)} contour slice(s) found.',
+        )
+        await asyncio.sleep(0)
 
         # Filter contour points to only include selected ROIs
         if selected_rois:
@@ -790,6 +873,12 @@ async def process_structure_set(
             'Building contour graphs...',
             force_emit=True,
         )
+        _queue_status_line(
+            'building_graphs',
+            f'Structure set created with {len(structure_set.structures)} structure(s).'
+            ' Building contour graphs...',
+        )
+        await asyncio.sleep(0)
 
         # Process each structure
         total_structures = len(structure_set.structures)
@@ -815,6 +904,13 @@ async def process_structure_set(
             'Calculating relationships...',
             force_emit=True,
         )
+        _n_structures = len(structure_set.structures)
+        _queue_status_line(
+            'calculating_relationships',
+            f'Contour graphs built. Computing relationships for '
+            f'{_n_structures * (_n_structures - 1) // 2} structure pair(s)...',
+        )
+        await asyncio.sleep(0)
 
         # Calculate relationships with error handling
         try:
@@ -854,7 +950,14 @@ async def process_structure_set(
                 'Resolving logical relationships...',
                 force_emit=True,
             )
+            _queue_status_line(
+                'calculating_relationships',
+                'Spatial relationships calculated. Resolving logical flags...',
+            )
+            await asyncio.sleep(0)
             structure_set.calculate_logical_flags()
+            _queue_status_line('calculating_relationships', 'Logical flags resolved.')
+            await asyncio.sleep(0)
         except Exception as e:
             if 'cancelled' in str(e).lower():
                 raise asyncio.CancelledError(str(e)) from e
@@ -1102,39 +1205,34 @@ async def get_diagram_data(request: MatrixRequest):
         structure_set = session_data.structure_set
 
         # Load node shape definitions and edge styles from diagram settings
-        diagram_settings_file = Path(__file__).parent / 'config' / 'diagram_settings.json'
         shape_map = {}
         default_shape = 'ellipse'
         edge_styles = {}
-
-        if diagram_settings_file.exists():
-            try:
-                with open(diagram_settings_file, 'r', encoding='utf-8') as f:
-                    diagram_settings = json.load(f)
-                    node_shapes = diagram_settings.get('node_shapes', {})
-                    shape_map = node_shapes.get('shape_map', {})
-                    default_shape = node_shapes.get('default_shape', 'ellipse')
-                    rel_styles = diagram_settings.get('relationship_styles', {})
-                    for rel_type, style in rel_styles.items():
-                        edge_styles[rel_type] = style
-            except (IOError, json.JSONDecodeError) as e:
-                logger.warning('Failed to load diagram settings: %s', e)
-        else:
-            logger.warning('Diagram settings file not found: %s, using defaults', diagram_settings_file)
+        diagram_settings = _load_diagram_settings()
+        node_shapes = diagram_settings.get('node_shapes', {})
+        shape_map = node_shapes.get('shape_map', {})
+        default_shape = node_shapes.get('default_shape', 'ellipse')
+        rel_styles = diagram_settings.get('relationship_styles', {})
+        for rel_type, style in rel_styles.items():
+            edge_styles[rel_type] = style
+        tooltips_cfg = diagram_settings.get('tooltips', {})
 
         # Load transparency settings from relationship definitions
         logical_opacity = 0.2  # Default 20% opacity
-        definitions_file = Path(__file__).parent.parent / 'relationship_definitions.json'
-        if definitions_file.exists():
-            try:
-                with open(definitions_file, 'r', encoding='utf-8') as f:
-                    definitions = json.load(f)
-                    transparency = definitions.get('logical_relationships', {}).get(
-                        'transparency', 20
-                    )
-                    logical_opacity = max(0.0, min(1.0, transparency / 100.0))
-            except (IOError, json.JSONDecodeError):
-                logger.warning('Failed to load logical relationship transparency settings')
+        definitions = _load_relationship_definitions()
+        transparency = definitions.get('logical_relationships', {}).get(
+            'transparency', 20
+        )
+        logical_opacity = max(0.0, min(1.0, transparency / 100.0))
+        relationship_metadata = {
+            rel.get('relation_type'): {
+                'symbol': rel.get('symbol', '?'),
+                'label': rel.get('label', rel.get('relation_type', 'Unknown')),
+                'description': rel.get('description', ''),
+            }
+            for rel in definitions.get('Relationships', [])
+            if rel.get('relation_type')
+        }
 
         def hex_to_rgba(color_hex: str, alpha: float) -> str:
             color_hex = color_hex.lstrip('#')
@@ -1144,6 +1242,53 @@ async def get_diagram_data(request: MatrixRequest):
             green = int(color_hex[2:4], 16)
             blue = int(color_hex[4:6], 16)
             return f'rgba({red}, {green}, {blue}, {alpha:.3f})'
+
+        def get_arrow_description(arrows: Optional[str]) -> str:
+            if arrows == 'to':
+                return 'Directed from source to target'
+            if arrows == 'to;from':
+                return 'Bidirectional'
+            if arrows == 'from':
+                return 'Directed from target to source'
+            return 'Undirected'
+
+        def build_edge_tooltip(
+            from_name: str,
+            to_name: str,
+            relation_type: str,
+            is_logical: bool,
+            style: dict,
+        ) -> tuple[str, Optional[str]]:
+            metadata = relationship_metadata.get(relation_type, {})
+            symbol = metadata.get('symbol')
+            label = metadata.get('label', relation_type)
+            description = metadata.get('description', '')
+
+            line_style = 'dashed' if style.get('dashes') else 'solid'
+            direction = get_arrow_description(style.get('arrows'))
+            logical_text = 'yes' if is_logical else 'no'
+
+            edge_cfg = tooltips_cfg.get('edges', {})
+            tooltip_lines = []
+            if edge_cfg.get('show_source', True):
+                tooltip_lines.append(f'Source: {from_name}')
+            if edge_cfg.get('show_target', True):
+                tooltip_lines.append(f'Target: {to_name}')
+            if edge_cfg.get('show_relationship', True):
+                tooltip_lines.append(f'Relationship: {label} ({relation_type})')
+            if edge_cfg.get('show_symbol', True):
+                tooltip_lines.append(f'Symbol: {symbol or "n/a"}')
+            if edge_cfg.get('show_direction', True):
+                tooltip_lines.append(f'Direction: {direction}')
+            if edge_cfg.get('show_style', False):
+                tooltip_lines.append(
+                    f'Edge style: {line_style}, width {style.get("width", 2)}'
+                )
+            if edge_cfg.get('show_logical', True):
+                tooltip_lines.append(f'Logical relation: {logical_text}')
+            if description and edge_cfg.get('show_description', True):
+                tooltip_lines.append(f'Description: {description}')
+            return '\n'.join(tooltip_lines), symbol
 
         # Get summary data
         summary_df = structure_set.summary()
@@ -1201,6 +1346,7 @@ async def get_diagram_data(request: MatrixRequest):
 
         # Build nodes only for visible structures
         nodes = []
+        roi_to_name = {}
         for _, row in summary_df.iterrows():
             roi = int(row['ROI'])
 
@@ -1218,7 +1364,20 @@ async def get_diagram_data(request: MatrixRequest):
             # Create tooltip with structure info
             volume = row.get('Physical_Volume', 0)
             num_regions = row.get('Num_Regions', 0)
-            tooltip = f"{name} (ROI {roi})\nType: {dicom_type}\nVolume: {volume:.2f} cm³\nRegions: {num_regions}"
+            node_cfg = tooltips_cfg.get('nodes', {})
+            name_label = (
+                f'{name} (ROI {roi})'
+                if node_cfg.get('show_roi_number', True)
+                else name
+            )
+            tooltip_lines = [name_label]
+            if node_cfg.get('show_type', True):
+                tooltip_lines.append(f'Type: {dicom_type}')
+            if node_cfg.get('show_volume', True):
+                tooltip_lines.append(f'Volume: {volume:.2f} cm³')
+            if node_cfg.get('show_regions', True):
+                tooltip_lines.append(f'Regions: {num_regions}')
+            tooltip = '\n'.join(tooltip_lines)
 
             nodes.append(DiagramNode(
                 id=roi,
@@ -1227,6 +1386,7 @@ async def get_diagram_data(request: MatrixRequest):
                 shape=shape_map.get(dicom_type, default_shape),
                 title=tooltip
             ))
+            roi_to_name[roi] = name
 
         # Build edges from relationship matrix
         edges = []
@@ -1264,6 +1424,8 @@ async def get_diagram_data(request: MatrixRequest):
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
+                if rel_type == 'UNKNOWN' and not request.show_unknown:
+                    continue
 
                 if rel_type in symmetric_relations:
                     # Symmetric relationships: show between any two visible structures
@@ -1273,14 +1435,25 @@ async def get_diagram_data(request: MatrixRequest):
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
                     # Add brackets around label for logical relationships
                     edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
+                    edge_title, edge_symbol = build_edge_tooltip(
+                        roi_to_name.get(roi1, f'ROI {roi1}'),
+                        roi_to_name.get(roi2, f'ROI {roi2}'),
+                        rel_type,
+                        rel.is_logical,
+                        style,
+                    )
                     edges.append(DiagramEdge(
                         from_node=roi1,
                         to_node=roi2,
+                        relation_type=rel_type,
+                        symbol=edge_symbol,
                         label=edge_label,
+                        title=edge_title,
                         color=edge_color,
                         width=style['width'],
                         dashes=style['dashes'],
-                        arrows=style['arrows']
+                        arrows=style['arrows'],
+                        is_logical=rel.is_logical,
                     ))
 
         # For directional relationships: check From->To combinations only
@@ -1320,6 +1493,8 @@ async def get_diagram_data(request: MatrixRequest):
                     continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
+                if rel_type == 'UNKNOWN' and not request.show_unknown:
+                    continue
 
                 if rel_type not in symmetric_relations:
                     # Directional relationship: from_roi [rel_type] to_roi
@@ -1329,15 +1504,26 @@ async def get_diagram_data(request: MatrixRequest):
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
                     # Add brackets around label for logical relationships
                     edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
+                    edge_title, edge_symbol = build_edge_tooltip(
+                        roi_to_name.get(from_roi, f'ROI {from_roi}'),
+                        roi_to_name.get(to_roi, f'ROI {to_roi}'),
+                        rel_type,
+                        rel.is_logical,
+                        style,
+                    )
                     edges.append(DiagramEdge(
                         from_node=from_roi,
                         to_node=to_roi,
+                        relation_type=rel_type,
+                        symbol=edge_symbol,
                         label=edge_label,
+                        title=edge_title,
                         color=edge_color,
-                            width=style['width'],
-                            dashes=style['dashes'],
-                            arrows=style['arrows']
-                        ))
+                        width=style['width'],
+                        dashes=style['dashes'],
+                        arrows=style['arrows'],
+                        is_logical=rel.is_logical,
+                    ))
 
         logger.info(f'Diagram response: {len(nodes)} nodes, {len(edges)} edges (mode={request.logical_relations_mode})')
         return DiagramResponse(nodes=nodes, edges=edges)

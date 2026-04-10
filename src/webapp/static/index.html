@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=33">
+    <link rel="stylesheet" href="static/css/styles.css?v=36">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -71,6 +71,14 @@
                         <p class="progress-text" id="progressText">Initializing...</p>
                         <p class="progress-detail" id="progressDetail"></p>
                     </div>
+                    <div class="status-log-box">
+                        <div class="status-log-header">
+                            <span class="status-log-title">Processing Log</span>
+                            <button class="status-log-clear" id="statusLogClearBtn"
+                                    type="button">Clear</button>
+                        </div>
+                        <div class="status-log-content" id="statusLogContent"></div>
+                    </div>
                 </div>
             </section>
 
@@ -90,33 +98,6 @@
                 <div class="tab-content-container">
                     <!-- Diagram Tab -->
                     <div class="tab-content active" id="tab-diagram">
-                        <div class="card collapsible-card" style="margin-bottom: 1rem;">
-                            <div class="card-header" id="diagramConfigHeader">
-                                <h3>Select Structures to Display</h3>
-                                <button class="collapse-toggle" id="diagramConfigToggle">►</button>
-                            </div>
-                            <div class="card-content" id="diagramConfigContent" style="display: none;">
-                                <div class="diagram-search">
-                                    <label for="diagramSearchInput">Search:</label>
-                                    <input type="text" id="diagramSearchInput" placeholder="Search ID or type...">
-                                </div>
-                                <div class="diagram-structure-list" id="diagramStructureList"></div>
-                                <div class="diagram-config-controls">
-                                    <div class="logical-relations-control">
-                                        <label for="diagramLogicalRelationsMode">Logical Relations:</label>
-                                        <select id="diagramLogicalRelationsMode" class="logical-mode-select">
-                                            <option value="hide">Hide</option>
-                                            <option value="limited" selected>Limited (Default)</option>
-                                            <option value="show">Show All</option>
-                                            <option value="faded">Faded</option>
-                                        </select>
-                                    </div>
-                                    <div class="button-group">
-                                        <button class="btn btn-secondary" id="copyFromMatrixBtn">Copy from matrix</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <div class="card">
                             <h2>Relationship Diagram</h2>
                             <div class="diagram-controls">
@@ -128,9 +109,72 @@
                                     <input type="checkbox" id="showLabelsToggle" checked>
                                     <span>Show Edge Labels</span>
                                 </label>
+                                <div class="logical-relations-control">
+                                    <label for="diagramLogicalRelationsMode">Logical Relations:</label>
+                                    <select id="diagramLogicalRelationsMode" class="logical-mode-select">
+                                        <option value="hide">Hide</option>
+                                        <option value="limited" selected>Limited (Default)</option>
+                                        <option value="show">Show All</option>
+                                        <option value="faded">Faded</option>
+                                    </select>
+                                </div>
+                                <div class="diagram-layout-slider" title="Lower values keep movement local. Higher values propagate movement globally.">
+                                    <label for="layoutInfluenceSlider">
+                                        Layout Coupling
+                                        <span id="layoutInfluenceLabel" class="layout-influence-label">Local 30%</span>
+                                    </label>
+                                    <input
+                                        type="range"
+                                        id="layoutInfluenceSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="30"
+                                    >
+                                    <div class="layout-influence-scale">
+                                        <span>Local</span>
+                                        <span>Global</span>
+                                    </div>
+                                </div>
                                 <button class="btn btn-primary" id="applyDiagramBtn" disabled>Apply</button>
                             </div>
-                            <div id="networkDiagram" class="network-diagram"></div>
+                            <div class="network-diagram-wrapper">
+                                <div id="networkDiagram" class="network-diagram"></div>
+                                <button
+                                    type="button"
+                                    id="structureSetBadge"
+                                    class="structure-set-badge"
+                                    title="Right-click to select structures"
+                                >
+                                    <span class="structure-set-badge-icon">SS</span>
+                                    <span class="structure-set-badge-name" id="structureSetBadgeName">Structure Set</span>
+                                </button>
+                                <div id="structureSetBadgeTooltip" class="structure-set-tooltip"></div>
+                            </div>
+                        </div>
+
+                        <div id="diagramStructureModal" class="diagram-structure-modal" style="display: none;">
+                            <div class="diagram-structure-modal-backdrop" id="diagramStructureModalBackdrop"></div>
+                            <div class="diagram-structure-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="diagramStructureModalTitle">
+                                <div class="diagram-structure-modal-header">
+                                    <h3 id="diagramStructureModalTitle">Select Structures to Display</h3>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="diagramStructureModalCloseBtn">Close</button>
+                                </div>
+                                <div class="diagram-search">
+                                    <label for="diagramSearchInput">Search:</label>
+                                    <input type="text" id="diagramSearchInput" placeholder="Search ID or type...">
+                                </div>
+                                <div class="diagram-structure-list" id="diagramStructureList"></div>
+                                <div class="diagram-config-controls">
+                                    <div class="button-group">
+                                        <button class="btn btn-secondary" id="copyFromMatrixBtn">Copy from matrix</button>
+                                    </div>
+                                    <div class="button-group">
+                                        <button class="btn btn-secondary" id="diagramStructureModalCancelBtn">Cancel</button>
+                                        <button class="btn btn-primary" id="diagramStructureModalApplyBtn">Apply Selection</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -244,62 +288,6 @@
                                 <button class="btn btn-secondary" id="exportJsonBtn">Export JSON</button>
                             </div>
                         </div>
-
-                        <div class="card collapsible-card" style="margin-top: 1rem;">
-                            <div class="card-header" id="legendHeader">
-                                <h3>Relationship Symbol Legend</h3>
-                                <button class="collapse-toggle" id="legendToggle">▼</button>
-                            </div>
-                            <div class="card-content" id="legendContent">
-                                <div class="legend-grid">
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-contains">⊂</span>
-                                        <span class="legend-label">Contains</span>
-                                        <span class="legend-description">Structure A fully encloses structure B</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-overlaps">∩</span>
-                                        <span class="legend-label">Overlaps</span>
-                                        <span class="legend-description">Structures share common volume</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-borders">|</span>
-                                        <span class="legend-label">Borders</span>
-                                        <span class="legend-description">Structures touch at boundaries</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-surrounds">○</span>
-                                        <span class="legend-label">Surrounds</span>
-                                        <span class="legend-description">Structure B is within a hole in A</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-shelters">△</span>
-                                        <span class="legend-label">Shelters</span>
-                                        <span class="legend-description">B within convex hull of A, not touching</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-partition">⊕</span>
-                                        <span class="legend-label">Partition</span>
-                                        <span class="legend-description">Structures partition space between them</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-confines">⊏</span>
-                                        <span class="legend-label">Confines</span>
-                                        <span class="legend-description">B contacts inner surface of A</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-disjoint">∅</span>
-                                        <span class="legend-label">Disjoint</span>
-                                        <span class="legend-description">Structures are completely separated</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="legend-symbol rel-equals">=</span>
-                                        <span class="legend-label">Equals</span>
-                                        <span class="legend-description">Same structure (diagonal)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Contour Plot Tab -->
@@ -364,7 +352,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=105"></script>
+    <script src="static/js/app.js?v=108"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

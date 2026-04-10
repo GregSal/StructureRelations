@@ -158,3 +158,29 @@ def test_error_recovery_allows_resubmission(monkeypatch, tmp_path):
     assert second_submit.status_code == 200
     completed_payload = _wait_for_status(client, session_id, 'completed')
     assert completed_payload['error'] is None
+
+
+def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
+    '''Verify symbol config endpoint returns node and edge style metadata.'''
+    client, _ = _prepare_client(monkeypatch, tmp_path)
+
+    response = client.get('/api/config/symbols')
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert 'relationships' in payload
+    assert 'node_shapes' in payload
+    assert 'relationship_styles' in payload
+    assert 'relationship_display_defaults' in payload
+    assert 'diagram_options' in payload
+
+    # Ensure key styles expected by diagram legend are present.
+    assert 'shape_map' in payload['node_shapes']
+    assert payload['node_shapes'].get('default_shape')
+    assert 'CONTAINS' in payload['relationship_styles']
+    assert payload['relationship_display_defaults'].get('show_edge_labels') is True
+    assert payload['diagram_options'].get('interaction', {}).get('tooltip_delay') == 100
+    diagram_layout = payload['diagram_options'].get('diagram_layout', {})
+    assert diagram_layout.get('layout', {}).get('local_global_default') == 30
+    assert 'local' in diagram_layout.get('physics', {})
+    assert 'global' in diagram_layout.get('physics', {})

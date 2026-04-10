@@ -6,21 +6,28 @@ Test and reports on relationships between DICOM RT Structures
 
 1. Web App Updates
     1. Cosmetic Changes
-        - Need tooltips for edges
-        - Add a legend for edge colors and styles
-        - Add a legend for node colors and shapes
-        - Add a legend for relationship symbols
-    2. Relation (Edge) Updates
+
+
+Add a tooltips section to the json file and then add subsections for nodes, edges, and "structure_set"
+    1. General Diagram Updates
+        - When Local is 100% in the Layout Coupling, then dragging a node should only change the location of that node and not move any other nodes at all.
+        -replace the current edge tooltip format with {from} {relationship label}{to} (e.g. "PTV overlaps with Bladder")
+        - Direction should become "Relationship is directional" or "Relationship is non-directional" Logical relations should become "Relationship is logical" or "Relationship is not logical"
+        Description text should be wrapped to 80 characters or maximum width of the tooltip box whichever is smaller
+        ![alt text](image.png)
+    2. Processing Updates
+        - Rendering time is much slower than before. Review the last stage of processing to see if there are any inefficiencies that can be improved.
+        - During relationship calculations update the progress bar after each relationship is calculated. This will give users a better sense of how long the processing will take and that the app is still working.
+        - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
+        - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
+
+    3. Relation (Edge) Updates
         - implement expanded options for line types
             - Different dash types
             - double lines
             - glow
-    3. General Diagram Updates
-        - More flexibility in diagram layout so that nodes can be dragged without pulling the entire diagram
-            - Move parameters for layout algorithm to json file.
-    4. Processing Updates
-        - Add a status bar to the webapp to show current status, messages, etc. put logging.info() messages there.
-        - Make the progress bar update during long operations (loading structures, calculating relationships, etc.)
+
+
     5. Plot Contours update
         - Add a toggle-able legend to Plot Contours
         - Allow Plot contours to select more than two structures in an orderable list

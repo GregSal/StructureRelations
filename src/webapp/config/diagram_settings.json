@@ -108,5 +108,86 @@
       "dashes": false,
       "arrows": null
     }
+  },
+  "relationship_display_defaults": {
+    "show_disjoint": false,
+    "show_edge_labels": true,
+    "logical_relations": "Limited",
+    "show_unknown": false
+  },
+  "diagram_options": {
+    "description": "Default options for network diagram visualization",
+    "font": {
+      "face": "Arial",
+      "node_size": 14,
+      "edge_size": 12,
+      "dark_color": "#000000",
+      "light_color": "#FFFFFF"
+    },
+    "background": {
+      "color": "#000000"
+    },
+    "interaction": {
+      "hover": true,
+      "tooltip_delay": 100,
+      "navigation_buttons": true,
+      "keyboard": true
+    },
+    "diagram_layout": {
+      "description": "Grouped layout and physics settings for interactive diagram positioning",
+      "layout": {
+        "improved_layout": true,
+        "hierarchical": false,
+        "local_global_default": 30,
+        "local_global_min": 0,
+        "local_global_max": 100
+      },
+      "physics": {
+        "enabled": true,
+        "stabilization_iterations": 200,
+        "local": {
+          "gravitational_constant": -700,
+          "spring_constant": 0.008,
+          "spring_length": 80,
+          "damping": 0.55,
+          "central_gravity": 0.02
+        },
+        "global": {
+          "gravitational_constant": -2000,
+          "spring_constant": 0.04,
+          "spring_length": 150,
+          "damping": 0.28,
+          "central_gravity": 0.15
+        }
+      }
+    }
+  },
+  "tooltips": {
+    "description": "Controls which fields are shown in diagram tooltips. Set a field to false to hide it.",
+    "nodes": {
+      "show_roi_number": true,
+      "show_type": true,
+      "show_volume": true,
+      "show_regions": false
+    },
+    "edges": {
+      "show_source": true,
+      "show_target": true,
+      "show_relationship": true,
+      "show_symbol": true,
+      "show_direction": true,
+      "show_style": false,
+      "show_logical": true,
+      "show_description": true
+    },
+    "structure_set": {
+      "show_structure_set": true,
+      "show_structure_count": true,
+      "show_file_name": true,
+      "show_series_label": true,
+      "show_patient_name": false,
+      "show_patient_id": true,
+      "show_resolution": true
+    }
   }
 }

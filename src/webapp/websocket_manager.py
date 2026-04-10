@@ -95,6 +95,33 @@ class ConnectionManager:
             logger.error(f'Failed to send error to session {session_id}: {e}')
             self.disconnect(session_id)
 
+    async def send_status_line(self, session_id: str, stage: str, source: str, message: str):
+        '''Send a single status-line update to a connected client.
+
+        Args:
+            session_id (str): The session ID.
+            stage (str): Current processing stage (mirrors send_progress stage values).
+            source (str): Origin of the message, e.g. 'backend' or 'frontend'.
+            message (str): Human-readable single-line status text.
+        '''
+        if session_id not in self.active_connections:
+            return
+
+        websocket = self.active_connections[session_id]
+
+        data = {
+            'type': 'status_line',
+            'stage': stage,
+            'source': source,
+            'message': message,
+        }
+
+        try:
+            await websocket.send_json(data)
+        except Exception as e:
+            logger.error('Failed to send status_line to session %s: %s', session_id, e)
+            self.disconnect(session_id)
+
     async def send_complete(self, session_id: str, message: str = 'Processing complete'):
         '''Send a completion message to a connected client.
 

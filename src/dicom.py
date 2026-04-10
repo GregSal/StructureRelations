@@ -145,6 +145,7 @@ class DicomStructureFile:
             'StructureSet': str(self.dataset.get('StructureSetLabel', '')),
             'StudyID': str(self.dataset.get('StudyID', '')),
             'SeriesNumber': str(self.dataset.get('SeriesNumber', '')),
+            'SeriesDescription': str(self.dataset.get('SeriesDescription', '')),
             'File': self.file_path
         }
 

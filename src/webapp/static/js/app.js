@@ -12,13 +12,60 @@ class WebAppClient {
         this.diagramLogicalRelationsModeApplied = 'limited';
         this.diagramShowDisjointApplied = false;
         this.diagramShowLabelsApplied = true;
+        this.diagramShowUnknownApplied = false;
         this.diagramSelection = new Set();
         this.diagramAppliedSelection = new Set();
         this.diagramSelectionPending = false;
+        this.diagramSelectionModalOpen = false;
         this.patientInfo = null;
         this.structureItems = [];
         this.structureItemsByRoi = new Map();
         this.statusPollIntervalId = null;
+        this.latestDiagramData = null;
+        this.diagramOptions = {
+            font: {
+                face: 'Arial',
+                node_size: 14,
+                edge_size: 12,
+                dark_color: '#000000',
+                light_color: '#FFFFFF'
+            },
+            Background: {
+                color: '#000000'
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100,
+                navigationButtons: true,
+                keyboard: true
+            },
+            layout: {
+                improvedLayout: true,
+                hierarchical: false,
+                local_global_default: 30,
+                local_global_min: 0,
+                local_global_max: 100
+            },
+            physics: {
+                enabled: true,
+                stabilization_iterations: 200,
+                local: {
+                    gravitationalConstant: -700,
+                    springConstant: 0.008,
+                    springLength: 80,
+                    damping: 0.55,
+                    centralGravity: 0.02
+                },
+                global: {
+                    gravitationalConstant: -2000,
+                    springConstant: 0.04,
+                    springLength: 150,
+                    damping: 0.28,
+                    centralGravity: 0.15
+                }
+            }
+        };
+        this.layoutInfluence = 30;
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -39,6 +86,10 @@ class WebAppClient {
                 this.symbolConfig = await response.json();
                 console.log('Loaded symbol configuration:', this.symbolConfig);
                 this.applySymbolColors();  // Apply custom colors
+                this.applyDiagramSettingsFromConfig();
+                if (this.latestDiagramData) {
+                    this.renderDiagramLegend(this.latestDiagramData);
+                }
             } else {
                 console.warn('Failed to load symbol config, using defaults');
             }
@@ -56,6 +107,194 @@ class WebAppClient {
             if (config.color) {
                 root.style.setProperty(`--rel-${relType.toLowerCase()}-color`, config.color);
             }
+        }
+    }
+
+    applyDiagramSettingsFromConfig() {
+        if (!this.symbolConfig) return;
+
+        const configOptions = this.symbolConfig.diagram_options || {};
+        const configFont = configOptions.font || {};
+        const configBackground = configOptions.background || configOptions.Background || {};
+        const configInteractionRaw = configOptions.interaction || {};
+        const configInteraction = {
+            ...configInteractionRaw,
+            tooltipDelay: configInteractionRaw.tooltip_delay ?? configInteractionRaw.tooltipDelay,
+            navigationButtons: configInteractionRaw.navigation_buttons ?? configInteractionRaw.navigationButtons,
+        };
+        const groupedDiagramLayout = configOptions.diagram_layout || configOptions['Diagram Layout'] || {};
+        const configLayoutRaw = groupedDiagramLayout.layout || configOptions.layout || {};
+        const configLayout = {
+            ...configLayoutRaw,
+            improvedLayout: configLayoutRaw.improved_layout ?? configLayoutRaw.improvedLayout,
+        };
+        const configPhysicsRaw = groupedDiagramLayout.physics || configOptions.physics || {};
+        const configPhysics = {
+            ...configPhysicsRaw,
+            local: {
+                ...(configPhysicsRaw.local || {}),
+                gravitationalConstant: configPhysicsRaw.local?.gravitational_constant ?? configPhysicsRaw.local?.gravitationalConstant,
+                springConstant: configPhysicsRaw.local?.spring_constant ?? configPhysicsRaw.local?.springConstant,
+                springLength: configPhysicsRaw.local?.spring_length ?? configPhysicsRaw.local?.springLength,
+                centralGravity: configPhysicsRaw.local?.central_gravity ?? configPhysicsRaw.local?.centralGravity,
+            },
+            global: {
+                ...(configPhysicsRaw.global || {}),
+                gravitationalConstant: configPhysicsRaw.global?.gravitational_constant ?? configPhysicsRaw.global?.gravitationalConstant,
+                springConstant: configPhysicsRaw.global?.spring_constant ?? configPhysicsRaw.global?.springConstant,
+                springLength: configPhysicsRaw.global?.spring_length ?? configPhysicsRaw.global?.springLength,
+                centralGravity: configPhysicsRaw.global?.central_gravity ?? configPhysicsRaw.global?.centralGravity,
+            }
+        };
+
+        this.diagramOptions = {
+            font: {
+                ...this.diagramOptions.font,
+                ...configFont,
+            },
+            Background: {
+                ...this.diagramOptions.Background,
+                ...configBackground,
+            },
+            interaction: {
+                ...this.diagramOptions.interaction,
+                ...configInteraction,
+            },
+            layout: {
+                ...this.diagramOptions.layout,
+                ...configLayout,
+            },
+            physics: {
+                ...this.diagramOptions.physics,
+                ...configPhysics,
+                local: {
+                    ...this.diagramOptions.physics.local,
+                    ...(configPhysics.local || {}),
+                },
+                global: {
+                    ...this.diagramOptions.physics.global,
+                    ...(configPhysics.global || {}),
+                }
+            }
+        };
+
+        const defaults = this.symbolConfig.relationship_display_defaults || {};
+        const showDisjoint = defaults.show_disjoint ?? defaults.Show_Disjoint;
+        const showEdgeLabels = defaults.show_edge_labels ?? defaults.Show_Edge_Labels;
+        const showUnknown = defaults.show_unknown ?? defaults.Show_Unknown;
+        const logicalModeRaw = defaults.logical_relations ?? defaults.Logical_Relations;
+
+        if (typeof showDisjoint === 'boolean') {
+            document.getElementById('showDisjointToggle').checked = showDisjoint;
+            this.diagramShowDisjointApplied = showDisjoint;
+        }
+        if (typeof showEdgeLabels === 'boolean') {
+            document.getElementById('showLabelsToggle').checked = showEdgeLabels;
+            this.diagramShowLabelsApplied = showEdgeLabels;
+        }
+        if (typeof showUnknown === 'boolean') {
+            this.diagramShowUnknownApplied = showUnknown;
+        }
+
+        if (typeof logicalModeRaw === 'string') {
+            const normalized = logicalModeRaw.toLowerCase();
+            const validModes = new Set(['hide', 'limited', 'show', 'faded']);
+            if (validModes.has(normalized)) {
+                this.diagramLogicalRelationsMode = normalized;
+                this.diagramLogicalRelationsModeApplied = normalized;
+                document.getElementById('diagramLogicalRelationsMode').value = normalized;
+            }
+        }
+
+        const defaultInfluence = Number(this.diagramOptions.layout.local_global_default);
+        this.setLayoutInfluence(
+            Number.isFinite(defaultInfluence) ? defaultInfluence : this.layoutInfluence,
+            false
+        );
+
+        this.tooltipsConfig = this.symbolConfig.tooltips || {};
+    }
+
+    clampNumber(value, minValue, maxValue) {
+        return Math.max(minValue, Math.min(maxValue, value));
+    }
+
+    interpolateNumber(localValue, globalValue, weight) {
+        return localValue + (globalValue - localValue) * weight;
+    }
+
+    getLayoutInfluenceWeight() {
+        const minValue = Number(this.diagramOptions.layout.local_global_min ?? 0);
+        const maxValue = Number(this.diagramOptions.layout.local_global_max ?? 100);
+        const clamped = this.clampNumber(this.layoutInfluence, minValue, maxValue);
+        if (maxValue <= minValue) {
+            return 0;
+        }
+        return (clamped - minValue) / (maxValue - minValue);
+    }
+
+    getPhysicsFromInfluence() {
+        const localPhysics = this.diagramOptions.physics.local || {};
+        const globalPhysics = this.diagramOptions.physics.global || {};
+        const weight = this.getLayoutInfluenceWeight();
+
+        return {
+            enabled: this.diagramOptions.physics.enabled !== false,
+            stabilization: {
+                iterations: Number(this.diagramOptions.physics.stabilization_iterations || 200)
+            },
+            barnesHut: {
+                gravitationalConstant: this.interpolateNumber(
+                    Number(localPhysics.gravitationalConstant ?? -700),
+                    Number(globalPhysics.gravitationalConstant ?? -2000),
+                    weight
+                ),
+                springConstant: this.interpolateNumber(
+                    Number(localPhysics.springConstant ?? 0.008),
+                    Number(globalPhysics.springConstant ?? 0.04),
+                    weight
+                ),
+                springLength: this.interpolateNumber(
+                    Number(localPhysics.springLength ?? 80),
+                    Number(globalPhysics.springLength ?? 150),
+                    weight
+                ),
+                damping: this.interpolateNumber(
+                    Number(localPhysics.damping ?? 0.55),
+                    Number(globalPhysics.damping ?? 0.28),
+                    weight
+                ),
+                centralGravity: this.interpolateNumber(
+                    Number(localPhysics.centralGravity ?? 0.02),
+                    Number(globalPhysics.centralGravity ?? 0.15),
+                    weight
+                )
+            }
+        };
+    }
+
+    setLayoutInfluence(value, shouldUpdateNetwork) {
+        const minValue = Number(this.diagramOptions.layout.local_global_min ?? 0);
+        const maxValue = Number(this.diagramOptions.layout.local_global_max ?? 100);
+        const safeValue = Number.isFinite(value) ? value : this.layoutInfluence;
+        this.layoutInfluence = this.clampNumber(safeValue, minValue, maxValue);
+
+        const slider = document.getElementById('layoutInfluenceSlider');
+        const label = document.getElementById('layoutInfluenceLabel');
+        if (slider) {
+            slider.min = String(minValue);
+            slider.max = String(maxValue);
+            slider.value = String(this.layoutInfluence);
+        }
+
+        if (label) {
+            const localWeight = 100 - this.getLayoutInfluenceWeight() * 100;
+            label.textContent = `Local ${Math.round(localWeight)}%`;
+        }
+
+        if (shouldUpdateNetwork && this.network) {
+            this.network.setOptions({ physics: this.getPhysicsFromInfluence() });
+            this.network.startSimulation();
         }
     }
 
@@ -129,19 +368,65 @@ class WebAppClient {
             this.exportMatrix('json');
         });
 
-        // Legend toggle
-        document.getElementById('legendToggle').addEventListener('click', () => {
-            this.toggleLegend();
-        });
-
         // Analysis config toggle
         document.getElementById('analysisConfigToggle').addEventListener('click', () => {
             this.toggleAnalysisConfig();
         });
 
-        // Diagram config toggle
-        document.getElementById('diagramConfigToggle').addEventListener('click', () => {
-            this.toggleDiagramConfig();
+        // Structure-set badge and selector modal
+        const structureSetBadge = document.getElementById('structureSetBadge');
+        const structureSetTooltip = document.getElementById('structureSetBadgeTooltip');
+        if (structureSetBadge) {
+            structureSetBadge.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.openDiagramStructureModal();
+            });
+            structureSetBadge.addEventListener('click', () => {
+                this.openDiagramStructureModal();
+            });
+            structureSetBadge.addEventListener('mouseenter', () => {
+                if (structureSetTooltip && structureSetTooltip.innerHTML.trim()) {
+                    structureSetTooltip.classList.add('visible');
+                }
+            });
+            structureSetBadge.addEventListener('mouseleave', () => {
+                structureSetTooltip?.classList.remove('visible');
+            });
+        }
+
+        const modalBackdrop = document.getElementById('diagramStructureModalBackdrop');
+        if (modalBackdrop) {
+            modalBackdrop.addEventListener('click', () => {
+                this.closeDiagramStructureModal(true);
+            });
+        }
+
+        const modalClose = document.getElementById('diagramStructureModalCloseBtn');
+        if (modalClose) {
+            modalClose.addEventListener('click', () => {
+                this.closeDiagramStructureModal(true);
+            });
+        }
+
+        const modalCancel = document.getElementById('diagramStructureModalCancelBtn');
+        if (modalCancel) {
+            modalCancel.addEventListener('click', () => {
+                this.closeDiagramStructureModal(true);
+            });
+        }
+
+        const modalApply = document.getElementById('diagramStructureModalApplyBtn');
+        if (modalApply) {
+            modalApply.addEventListener('click', () => {
+                this.applyDiagramSelection();
+                this.closeDiagramStructureModal(false);
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.diagramSelectionModalOpen) {
+                this.closeDiagramStructureModal(true);
+            }
         });
 
         // DICOM Type filters
@@ -163,6 +448,9 @@ class WebAppClient {
             console.log('Diagram logical relations mode changed to:', e.target.value);
             this.diagramLogicalRelationsMode = e.target.value;
             this.updateDiagramPendingState();
+        });
+        document.getElementById('layoutInfluenceSlider').addEventListener('input', (e) => {
+            this.setLayoutInfluence(Number(e.target.value), true);
         });
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
             this.applyDiagramSelection();
@@ -219,6 +507,11 @@ class WebAppClient {
             this.showStage('upload');
             this.resetApp();
         });
+        document.getElementById('statusLogClearBtn').addEventListener('click', () => {
+            this.clearStatusLog();
+        });
+
+        this.setLayoutInfluence(this.layoutInfluence, false);
     }
 
     async handleFileSelect(file) {
@@ -315,6 +608,8 @@ class WebAppClient {
         } else if (data.type === 'complete') {
             this.stopStatusPolling();
             this.onProcessingComplete();
+        } else if (data.type === 'status_line') {
+            this.appendStatusLogLine(data.source || 'backend', data.message || '');
         } else if (data.type === 'error') {
             this.stopStatusPolling();
             alert(data.message);
@@ -388,6 +683,7 @@ class WebAppClient {
                 <div><strong>Patient ID:</strong> ${pInfo.patient_id || 'N/A'}</div>
                 <div><strong>Patient Name:</strong> ${pInfo.patient_name || 'N/A'}</div>
                 <div><strong>Structure Set:</strong> ${pInfo.structure_set || 'N/A'}</div>
+                <div><strong>Resolution:</strong> ${this.formatResolution(pInfo.resolution_cm_per_pixel)}</div>
             `;
 
             // Populate structures list
@@ -423,6 +719,8 @@ class WebAppClient {
                 structuresList.appendChild(item);
                 this.selectedStructures.add(struct.roi);
             });
+
+            this.updateStructureSetBadge();
 
             // Add checkbox event listeners
             structuresList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -462,6 +760,8 @@ class WebAppClient {
         }
 
         this.showStage('processing');
+        this.clearStatusLog();
+        this.appendStatusLogLine('frontend', 'Processing started...');
         this.updateProgress('initializing', 0, 'Starting processing...', '');
         this.startStatusPolling();
 
@@ -514,8 +814,27 @@ class WebAppClient {
         progressDetail.textContent = detailText;
     }
 
+    clearStatusLog() {
+        const content = document.getElementById('statusLogContent');
+        if (content) {
+            content.innerHTML = '';
+        }
+    }
+
+    appendStatusLogLine(source, message) {
+        const content = document.getElementById('statusLogContent');
+        if (!content) return;
+        const line = document.createElement('div');
+        line.className = `status-log-line source-${source}`;
+        const timestamp = new Date().toLocaleTimeString();
+        line.textContent = `[${timestamp}] ${message}`;
+        content.appendChild(line);
+        content.scrollTop = content.scrollHeight;
+    }
+
     async onProcessingComplete() {
         this.stopStatusPolling();
+        this.appendStatusLogLine('frontend', 'Fetching results from server...');
         // Load structure summary
         try {
             const response = await fetch('/api/matrix', {
@@ -536,6 +855,10 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            this.appendStatusLogLine(
+                'frontend',
+                `Loaded ${data.rows?.length ?? 0} structure(s) — building views...`
+            );
 
             // Store data for sorting and checkbox management
             this.summaryData = data;
@@ -561,6 +884,7 @@ class WebAppClient {
             // Refresh diagram with initial data
             this.applyDiagramSelection();
 
+            this.appendStatusLogLine('frontend', 'All views ready.');
             // Show results stage
             this.showStage('results');
 
@@ -1049,6 +1373,113 @@ class WebAppClient {
         return labelMap[symbol] || null;
     }
 
+    escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    getArrowMeaning(arrows) {
+        if (arrows === 'to') return 'directed';
+        if (arrows === 'to;from') return 'bidirectional';
+        if (arrows === 'from') return 'reverse directed';
+        return 'undirected';
+    }
+
+    buildEdgeTooltip(edge, nodes = []) {
+        const nodeNameById = new Map(nodes.map(node => [node.id, node.label]));
+        const sourceLabel = nodeNameById.get(edge.from_node) || `ROI ${edge.from_node}`;
+        const targetLabel = nodeNameById.get(edge.to_node) || `ROI ${edge.to_node}`;
+        const relationType = edge.relation_type || String(edge.label || '').replace(/\[|\]/g, '');
+        const symbol = edge.symbol || this.symbolConfig?.relationships?.[relationType]?.symbol || 'n/a';
+        const isLogical = edge.is_logical ? 'yes' : 'no';
+        const styleText = edge.dashes ? 'dashed' : 'solid';
+        const directionText = this.getArrowMeaning(edge.arrows);
+
+        return [
+            `Source: ${sourceLabel}`,
+            `Target: ${targetLabel}`,
+            `Relationship: ${relationType}`,
+            `Symbol: ${symbol}`,
+            `Direction: ${directionText}`,
+            `Edge style: ${styleText}, width ${edge.width || 2}`,
+            `Logical relation: ${isLogical}`
+        ].join('\n');
+    }
+
+    renderDiagramLegend(data) {
+        // Remove any existing inset legend
+        const existing = document.getElementById('diagramInsetLegend');
+        if (existing) existing.remove();
+
+        // Only show inset legend when edge labels are hidden
+        if (this.diagramShowLabelsApplied) return;
+        if (!data || !data.edges || data.edges.length === 0) return;
+
+        // Collect unique edge types present in this diagram
+        const edgeTypes = new Map();
+        data.edges.forEach(edge => {
+            const relType = edge.relation_type || String(edge.label || '').replace(/\[|\]/g, '');
+            if (!edgeTypes.has(relType)) {
+                edgeTypes.set(relType, {
+                    color: edge.color,
+                    width: edge.width,
+                    dashes: edge.dashes,
+                    symbol: edge.symbol
+                        || this.symbolConfig?.relationships?.[relType]?.symbol
+                        || '',
+                });
+            }
+        });
+
+        if (edgeTypes.size === 0) return;
+
+        // Determine text/background colors based on diagram background
+        const background = this.diagramOptions.Background || {};
+        const bgColor = background.color || '#ffffff';
+        const lightColor = this.diagramOptions?.font?.light_color || '#FFFFFF';
+        const isDark = this.getTextColor(bgColor) === lightColor;
+        const textColor = isDark
+            ? lightColor
+            : (this.diagramOptions?.font?.dark_color || '#000000');
+        const legendBg = isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.80)';
+        const borderColor = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.15)';
+
+        // Build a row per unique edge type: swatch | symbol | label
+        const items = Array.from(edgeTypes.entries()).map(([relType, meta]) => {
+            const symbol = meta.symbol && meta.symbol !== '?'
+                ? this.escapeHtml(meta.symbol) : '';
+            const swatchClass = meta.dashes ? 'is-dashed' : 'is-solid';
+            const symbolHtml = symbol
+                ? `<span class="inset-legend-symbol" style="color:${this.escapeHtml(meta.color)}">${symbol}</span>`
+                : `<span class="inset-legend-symbol"></span>`;
+            return `
+                <div class="inset-legend-row">
+                    <span class="legend-edge-swatch ${swatchClass}"
+                          style="--edge-color:${this.escapeHtml(meta.color)};--edge-width:${Math.max(meta.width || 2, 1)}px;"></span>
+                    ${symbolHtml}
+                    <span class="inset-legend-label">${this.escapeHtml(relType)}</span>
+                </div>
+            `;
+        }).join('');
+
+        const legend = document.createElement('div');
+        legend.id = 'diagramInsetLegend';
+        legend.className = 'diagram-inset-legend';
+        legend.style.cssText =
+            `background:${legendBg};border-color:${borderColor};color:${textColor};`;
+        legend.innerHTML = items;
+
+        const container = document.getElementById('networkDiagram');
+        if (container) {
+            container.appendChild(legend);
+        }
+    }
+
     async exportMatrix(format) {
         try {
             const response = await fetch(`/api/export/${format}/${this.sessionId}`);
@@ -1076,19 +1507,6 @@ class WebAppClient {
         }
     }
 
-    toggleLegend() {
-        const content = document.getElementById('legendContent');
-        const toggle = document.getElementById('legendToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '►';
-        }
-    }
-
     toggleAnalysisConfig() {
         const content = document.getElementById('analysisConfigContent');
         const toggle = document.getElementById('analysisConfigToggle');
@@ -1102,17 +1520,77 @@ class WebAppClient {
         }
     }
 
-    toggleDiagramConfig() {
-        const content = document.getElementById('diagramConfigContent');
-        const toggle = document.getElementById('diagramConfigToggle');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '►';
+    formatResolution(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+            return 'N/A';
         }
+        return `${numeric.toFixed(3)} cm/pixel`;
+    }
+
+    updateStructureSetBadge() {
+        const badgeName = document.getElementById('structureSetBadgeName');
+        const tooltip = document.getElementById('structureSetBadgeTooltip');
+        if (!badgeName || !tooltip) return;
+
+        const pInfo = this.patientInfo || {};
+        const ssCfg = this.tooltipsConfig?.structure_set || {};
+        const structureSetName = pInfo.structure_set || 'Structure Set';
+        const structureCount = Number(pInfo.structure_count) || this.structureItems.length;
+        const tooltipLines = [];
+        if (ssCfg.show_structure_set !== false) {
+            tooltipLines.push(['Structure Set', structureSetName]);
+        }
+        if (ssCfg.show_structure_count !== false) {
+            tooltipLines.push(['Structures', structureCount ? String(structureCount) : 'N/A']);
+        }
+        if (ssCfg.show_file_name !== false) {
+            tooltipLines.push(['File Name', pInfo.file_name || 'N/A']);
+        }
+        if (ssCfg.show_series_label !== false) {
+            tooltipLines.push(['Series Label', pInfo.series_description || pInfo.series_number || 'N/A']);
+        }
+        if (ssCfg.show_patient_name !== false) {
+            tooltipLines.push(['Patient Name', pInfo.patient_name || 'N/A']);
+        }
+        if (ssCfg.show_patient_id !== false) {
+            tooltipLines.push(['Patient ID', pInfo.patient_id || 'N/A']);
+        }
+        if (ssCfg.show_resolution !== false) {
+            tooltipLines.push(['Resolution', this.formatResolution(pInfo.resolution_cm_per_pixel)]);
+        }
+
+        badgeName.textContent = structureSetName;
+        tooltip.innerHTML = tooltipLines.map(([label, value]) => (
+            `<div class="structure-set-tooltip-line"><span class="structure-set-tooltip-label">${this.escapeHtml(label)}:</span>${this.escapeHtml(value)}</div>`
+        )).join('');
+    }
+
+    openDiagramStructureModal() {
+        const modal = document.getElementById('diagramStructureModal');
+        if (!modal) return;
+
+        const searchInput = document.getElementById('diagramSearchInput');
+        if (searchInput) {
+            searchInput.value = '';
+            this.filterDiagramSelectionList('');
+        }
+
+        modal.style.display = 'block';
+        this.diagramSelectionModalOpen = true;
+        document.getElementById('structureSetBadgeTooltip')?.classList.remove('visible');
+    }
+
+    closeDiagramStructureModal(revertSelection = false) {
+        const modal = document.getElementById('diagramStructureModal');
+        if (!modal) return;
+
+        if (revertSelection) {
+            this.syncDiagramSelection(this.diagramAppliedSelection);
+        }
+
+        modal.style.display = 'none';
+        this.diagramSelectionModalOpen = false;
     }
 
     initializeDiagramSelection(data) {
@@ -1133,6 +1611,7 @@ class WebAppClient {
         this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
         this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
         this.updateDiagramPendingState();
+        this.updateStructureSetBadge();
 
         if (data && data.rows && data.rows.length > 0) {
             this.updateDiagramPendingState();
@@ -1216,6 +1695,11 @@ class WebAppClient {
         this.diagramSelectionPending = isPending;
         const applyButton = document.getElementById('applyDiagramBtn');
         applyButton.disabled = !isPending;
+
+        const badge = document.getElementById('structureSetBadge');
+        if (badge) {
+            badge.classList.toggle('pending', isPending);
+        }
     }
 
     updateDiagramPendingState() {
@@ -1280,10 +1764,12 @@ class WebAppClient {
                 row_rois: selectedRois,
                 col_rois: selectedRois,
                 show_disjoint: showDisjoint,
+                show_unknown: this.diagramShowUnknownApplied,
                 logical_relations_mode: this.diagramLogicalRelationsModeApplied
             };
             console.log('Sending diagram request:', diagramRequest);
 
+            this.appendStatusLogLine('frontend', 'Fetching relationship diagram...');
             const response = await fetch('/api/diagram', {
                 method: 'POST',
                 headers: {
@@ -1299,6 +1785,10 @@ class WebAppClient {
             const data = await response.json();
             console.log('Diagram response received:', { nodes: data.nodes.length, edges: data.edges.length });
             console.log('Diagram edges:', data.edges.map(e => `(${e.from_node}->${e.to_node}): ${e.label}`));
+            this.appendStatusLogLine(
+                'frontend',
+                `Diagram rendered: ${data.nodes.length} node(s), ${data.edges.length} edge(s).`
+            );
             this.renderDiagram(data);
 
         } catch (error) {
@@ -1310,6 +1800,22 @@ class WebAppClient {
     renderDiagram(data) {
         const container = document.getElementById('networkDiagram');
         const showLabels = this.diagramShowLabelsApplied;
+        const nodeFont = this.diagramOptions.font || {};
+        const interaction = this.diagramOptions.interaction || {};
+        const background = this.diagramOptions.Background || {};
+        const layoutSettings = this.diagramOptions.layout || {};
+        this.latestDiagramData = data;
+
+        if (background.color) {
+            container.style.backgroundColor = background.color;
+            const textColor = this.getTextColor(background.color);
+            const lightColor = this.diagramOptions?.font?.light_color || '#FFFFFF';
+            const isDark = textColor === lightColor;
+            container.style.setProperty(
+                '--vis-nav-filter',
+                isDark ? 'invert(1) brightness(1.8)' : 'none'
+            );
+        }
 
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => ({
@@ -1327,8 +1833,8 @@ class WebAppClient {
             title: node.title,
             font: {
                 color: this.getTextColor(node.color),
-                size: 14,
-                face: 'Arial'
+                size: Number(nodeFont.node_size || 14),
+                face: nodeFont.face || 'Arial'
             },
             borderWidth: 2
         }));
@@ -1338,12 +1844,14 @@ class WebAppClient {
             from: edge.from_node,
             to: edge.to_node,
             label: showLabels ? edge.label : '',
+            originalLabel: edge.label,
+            title: edge.title || this.buildEdgeTooltip(edge, data.nodes),
             color: edge.color,
             width: edge.width,
             dashes: edge.dashes,
             arrows: edge.arrows ? edge.arrows : undefined,
             font: {
-                size: 12,
+                size: Number(nodeFont.edge_size || 12),
                 color: edge.color,
                 strokeWidth: 0
             },
@@ -1365,25 +1873,17 @@ class WebAppClient {
                 }
             },
             physics: {
-                enabled: true,
-                stabilization: {
-                    iterations: 200
-                },
-                barnesHut: {
-                    gravitationalConstant: -2000,
-                    springConstant: 0.04,
-                    springLength: 150
-                }
+                ...this.getPhysicsFromInfluence()
             },
             interaction: {
-                hover: true,
-                tooltipDelay: 100,
-                navigationButtons: true,
-                keyboard: true
+                hover: interaction.hover !== false,
+                tooltipDelay: Number(interaction.tooltipDelay || 100),
+                navigationButtons: interaction.navigationButtons !== false,
+                keyboard: interaction.keyboard !== false
             },
             layout: {
-                improvedLayout: true,
-                hierarchical: false
+                improvedLayout: layoutSettings.improvedLayout !== false,
+                hierarchical: layoutSettings.hierarchical === true
             }
         };
 
@@ -1409,6 +1909,8 @@ class WebAppClient {
                 this.removeStructureFromDiagram(roi);
             }
         });
+
+        this.renderDiagramLegend(data);
     }
 
     removeStructureFromDiagram(roi) {
@@ -1540,7 +2042,9 @@ class WebAppClient {
         // Calculate brightness
         const brightness = (r * 299 + g * 587 + b * 114) / 1000;
 
-        return brightness > 128 ? '#000000' : '#FFFFFF';
+        const darkColor = this.diagramOptions?.font?.dark_color || '#000000';
+        const lightColor = this.diagramOptions?.font?.light_color || '#FFFFFF';
+        return brightness > 128 ? darkColor : lightColor;
     }
 
     populateContourPlotControls(data) {
@@ -1899,6 +2403,7 @@ class WebAppClient {
         this.patientInfo = null;
         this.diagramSelection.clear();
         this.diagramAppliedSelection.clear();
+        this.diagramSelectionModalOpen = false;
         if (this.websocket) {
             this.websocket.close();
             this.websocket = null;
@@ -1913,6 +2418,20 @@ class WebAppClient {
         if (structureSetInfo) {
             structureSetInfo.innerHTML = '';
             structureSetInfo.style.display = 'none';
+        }
+
+        const badgeName = document.getElementById('structureSetBadgeName');
+        if (badgeName) {
+            badgeName.textContent = 'Structure Set';
+        }
+        const tooltip = document.getElementById('structureSetBadgeTooltip');
+        if (tooltip) {
+            tooltip.innerHTML = '';
+            tooltip.classList.remove('visible');
+        }
+        const modal = document.getElementById('diagramStructureModal');
+        if (modal) {
+            modal.style.display = 'none';
         }
 
         // Clear file input
