@@ -1162,9 +1162,6 @@ class StructureSet:
                 )
             )
 
-            # Build matrix with filtered relationships
-            matrix = self.get_relationship_matrix(row_rois, col_rois, use_symbols)
-
             # Create fade info keyed by matrix position (row_index, col_index)
             if logical_relations_mode == 'faded':
                 faded_relationships = {}

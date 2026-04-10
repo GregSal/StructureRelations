@@ -10,11 +10,46 @@ Test and reports on relationships between DICOM RT Structures
 
 Add a tooltips section to the json file and then add subsections for nodes, edges, and "structure_set"
     1. General Diagram Updates
+      1. Diagram Layout:
         - When Local is 100% in the Layout Coupling, then dragging a node should only change the location of that node and not move any other nodes at all.
-        -replace the current edge tooltip format with {from} {relationship label}{to} (e.g. "PTV overlaps with Bladder")
-        - Direction should become "Relationship is directional" or "Relationship is non-directional" Logical relations should become "Relationship is logical" or "Relationship is not logical"
-        Description text should be wrapped to 80 characters or maximum width of the tooltip box whichever is smaller
-        ![alt text](image.png)
+        - When right-clicking on a node, bring up a menu with options to "Fix/Unfix Position", "Show/Hide Label", "Show/Hide Structure"
+      2. Edge tooltip format:
+        Make the following changes to the edge tooltip format:
+
+      `Source: {from}
+      Target: {to}
+      Relationship: {relationship_label} ({relationship_type})
+      Symbol: {relationship_symbol}`
+
+      becomes
+
+      `{from} {label|symbol|type} {to}` (e.g. "PTV overlaps with Bladder")
+
+      `Direction: {direction}`
+
+      becomes
+
+      `Relationship is {directional|non-directional}`
+
+      Logical relation: {is_logical}
+
+      becomes
+
+      `Relationship is {logical|not logical}
+
+      Description text should be wrapped to 80 characters or maximum width of the tooltip box whichever is smaller
+
+      Drop style information from tooltip
+
+      3. json settings becomes
+        `"edges": {
+            "show_structures": true,
+            "relationship": "label", # options: label, symbol, type
+            "show_direction": true,
+            "show_logical": true,
+            "show_description": true
+          },
+
     2. Processing Updates
         - Rendering time is much slower than before. Review the last stage of processing to see if there are any inefficiencies that can be improved.
         - During relationship calculations update the progress bar after each relationship is calculated. This will give users a better sense of how long the processing will take and that the app is still working.

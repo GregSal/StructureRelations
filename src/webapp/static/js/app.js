@@ -5,6 +5,8 @@ class WebAppClient {
         this.selectedStructures = new Set();
         this.sortableRows = null;
         this.sortableColumns = null;
+        this.sortableListsInitialized = false;
+        this.sortableInitScheduled = false;
         this.symbolConfig = null;  // Will store loaded config
         this.network = null;  // vis-network instance
         this.plotAbortController = null;  // Track current plot request
@@ -837,6 +839,7 @@ class WebAppClient {
         this.appendStatusLogLine('frontend', 'Fetching results from server...');
         // Load structure summary
         try {
+            const matrixFetchStart = performance.now();
             const response = await fetch('/api/matrix', {
                 method: 'POST',
                 headers: {
@@ -855,34 +858,49 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            const matrixFetchMs = Math.round(performance.now() - matrixFetchStart);
             this.appendStatusLogLine(
                 'frontend',
-                `Loaded ${data.rows?.length ?? 0} structure(s) — building views...`
+                `Loaded ${data.rows?.length ?? 0} structure(s) in ${matrixFetchMs} ms. Building views...`
             );
+
+            const runViewBuildStep = (label, callback) => {
+                this.appendStatusLogLine('frontend', `${label}...`);
+                const stepStart = performance.now();
+                callback();
+                const stepMs = Math.round(performance.now() - stepStart);
+                this.appendStatusLogLine('frontend', `${label} complete (${stepMs} ms).`);
+            };
 
             // Store data for sorting and checkbox management
             this.summaryData = data;
+            this.buildStructureItems(data);
 
-            // Populate structure summary
-            this.populateStructureSummary(data);
+            runViewBuildStep('Building structure summary', () => {
+                this.populateStructureSummary(data);
+            });
+            runViewBuildStep('Configuring diagram selection', () => {
+                this.initializeDiagramSelection(data);
+            });
 
-            // Initialize sortable lists
-            this.initializeSortableLists(data);
+            this.appendStatusLogLine('frontend', 'Requesting relationship diagram...');
+            const diagramPromise = this.applyDiagramSelection();
 
-            // Initialize diagram selection list
-            this.initializeDiagramSelection(data);
+            runViewBuildStep('Populating contour controls', () => {
+                this.populateContourPlotControls(data);
+            });
+            runViewBuildStep('Rendering relationship matrix', () => {
+                this.displayMatrix(data);
+            });
+            runViewBuildStep('Rendering structure set details', () => {
+                this.renderStructureSetInfo();
+            });
 
-            // Populate contour plot controls
-            this.populateContourPlotControls(data);
+            this.scheduleDeferredSortableInitialization();
 
-            // Display initial matrix
-            this.displayMatrix(data);
-
-            // Render structure set info above tabs
-            this.renderStructureSetInfo();
-
-            // Refresh diagram with initial data
-            this.applyDiagramSelection();
+            if (diagramPromise && typeof diagramPromise.then === 'function') {
+                await diagramPromise;
+            }
 
             this.appendStatusLogLine('frontend', 'All views ready.');
             // Show results stage
@@ -1041,11 +1059,26 @@ class WebAppClient {
     }
 
     initializeSortableLists(data) {
+        if (data) {
+            this.buildStructureItems(data);
+        }
+
         // Populate selected lists (start with all structures selected)
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
         const availableRowsList = document.getElementById('availableRowsList');
         const availableColsList = document.getElementById('availableColsList');
+
+        if (this.sortableRows) {
+            this.sortableRows.available.destroy();
+            this.sortableRows.selected.destroy();
+            this.sortableRows = null;
+        }
+        if (this.sortableColumns) {
+            this.sortableColumns.available.destroy();
+            this.sortableColumns.selected.destroy();
+            this.sortableColumns = null;
+        }
 
         // Clear all lists
         selectedRowsList.innerHTML = '';
@@ -1053,42 +1086,7 @@ class WebAppClient {
         availableRowsList.innerHTML = '';
         availableColsList.innerHTML = '';
 
-        // Collect unique DICOM types and create items
-        const dicomTypes = new Set();
-        const items = [];
-
-        data.rows.forEach((roi, idx) => {
-            // Colors object has string keys in JSON
-            const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
-            const name = data.row_names[idx];
-
-            // Get data from dictionaries using ROI as key
-            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
-            const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
-
-            if (dicomType) {
-                dicomTypes.add(dicomType);
-            }
-
-            items.push({ roi, name, color, dicomType, codeMeaning });
-        });
-
-        // Populate DICOM type filter dropdowns
-        this.populateDicomTypeFilters(Array.from(dicomTypes).sort());
-
-        // Sort items by DICOM Type, then by name
-        items.sort((a, b) => {
-            if (a.dicomType !== b.dicomType) {
-                return a.dicomType.localeCompare(b.dicomType);
-            }
-            return a.name.localeCompare(b.name);
-        });
-
-        this.structureItems = items;
-        this.structureItemsByRoi = new Map();
-        items.forEach(item => {
-            this.structureItemsByRoi.set(parseInt(item.roi), item);
-        });
+        const items = this.structureItems;
 
         // Add sorted items to selected lists
         items.forEach(item => {
@@ -1125,6 +1123,88 @@ class WebAppClient {
                 ghostClass: 'dragging'
             })
         };
+
+        this.sortableListsInitialized = true;
+        this.sortableInitScheduled = false;
+    }
+
+    buildStructureItems(data) {
+        if (!data || !data.rows || !data.row_names) {
+            return;
+        }
+
+        // Collect unique DICOM types and create items.
+        const dicomTypes = new Set();
+        const items = [];
+
+        data.rows.forEach((roi, idx) => {
+            const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
+            const name = data.row_names[idx];
+            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
+            const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
+
+            if (dicomType) {
+                dicomTypes.add(dicomType);
+            }
+
+            items.push({ roi, name, color, dicomType, codeMeaning });
+        });
+
+        items.sort((a, b) => {
+            if (a.dicomType !== b.dicomType) {
+                return a.dicomType.localeCompare(b.dicomType);
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+        this.populateDicomTypeFilters(Array.from(dicomTypes).sort());
+        this.structureItems = items;
+        this.structureItemsByRoi = new Map();
+        items.forEach(item => {
+            this.structureItemsByRoi.set(parseInt(item.roi), item);
+        });
+    }
+
+    ensureSortableListsInitialized() {
+        if (this.sortableListsInitialized) {
+            return true;
+        }
+        if (this.structureItems.length === 0 && this.summaryData) {
+            this.buildStructureItems(this.summaryData);
+        }
+        if (this.structureItems.length === 0) {
+            return false;
+        }
+        this.initializeSortableLists();
+        return true;
+    }
+
+    scheduleDeferredSortableInitialization() {
+        if (this.sortableListsInitialized || this.sortableInitScheduled) {
+            return;
+        }
+        this.sortableInitScheduled = true;
+        const initAction = () => {
+            if (this.sortableListsInitialized) {
+                this.sortableInitScheduled = false;
+                return;
+            }
+            this.appendStatusLogLine('frontend', 'Initializing matrix selectors...');
+            const stepStart = performance.now();
+            this.ensureSortableListsInitialized();
+            const stepMs = Math.round(performance.now() - stepStart);
+            this.appendStatusLogLine(
+                'frontend',
+                `Matrix selectors ready (${stepMs} ms).`
+            );
+        };
+
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(initAction, { timeout: 1200 });
+            return;
+        }
+
+        window.setTimeout(initAction, 0);
     }
 
     createSortableItem(roi, name, color, dicomType = '', codeMeaning = '') {
@@ -1218,6 +1298,11 @@ class WebAppClient {
     async updateMatrix() {
         console.log('updateMatrix called');
 
+        if (!this.ensureSortableListsInitialized()) {
+            alert('Matrix selectors are not ready yet. Please try again.');
+            return;
+        }
+
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
 
@@ -1269,18 +1354,34 @@ class WebAppClient {
 
         const thead = document.getElementById('matrixHead');
         const tbody = document.getElementById('matrixBody');
+        const configRelationships = this.symbolConfig?.relationships || {};
+
+        // Build quick lookup maps once per render to avoid per-cell scans.
+        const relationshipClassBySymbol = {};
+        const relationshipLabelBySymbol = {};
+        Object.entries(configRelationships).forEach(([relType, config]) => {
+            if (!config?.symbol) {
+                return;
+            }
+            relationshipClassBySymbol[config.symbol] = `rel-${relType.toLowerCase()}`;
+            relationshipLabelBySymbol[config.symbol] =
+                `${config.label} - ${config.description}`;
+        });
 
         // Build header row
         thead.innerHTML = '<tr><th>Structure</th></tr>';
         const headerRow = thead.querySelector('tr');
+        const headerFragment = document.createDocumentFragment();
         data.col_names.forEach(name => {
             const th = document.createElement('th');
             th.textContent = name;
-            headerRow.appendChild(th);
+            headerFragment.appendChild(th);
         });
+        headerRow.appendChild(headerFragment);
 
         // Build body rows
         tbody.innerHTML = '';
+        const bodyFragment = document.createDocumentFragment();
         data.data.forEach((row, rowIdx) => {
             const tr = document.createElement('tr');
 
@@ -1295,7 +1396,8 @@ class WebAppClient {
                 td.textContent = value;
 
                 // Add relationship-specific class for color coding
-                const relClass = this.getRelationshipClass(value);
+                const relClass = relationshipClassBySymbol[value]
+                    || this.getRelationshipClass(value);
                 if (relClass) {
                     td.classList.add(relClass);
                 }
@@ -1309,7 +1411,8 @@ class WebAppClient {
                 }
 
                 // Add tooltip with relationship name
-                const relLabel = this.getRelationshipLabel(value);
+                const relLabel = relationshipLabelBySymbol[value]
+                    || this.getRelationshipLabel(value);
                 if (relLabel) {
                     td.title = relLabel;
                 }
@@ -1317,8 +1420,9 @@ class WebAppClient {
                 tr.appendChild(td);
             });
 
-            tbody.appendChild(tr);
+            bodyFragment.appendChild(tr);
         });
+        tbody.appendChild(bodyFragment);
     }
 
     getRelationshipClass(symbol) {
@@ -1688,7 +1792,7 @@ class WebAppClient {
         this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
         this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
         this.updateDiagramPendingState();
-        this.refreshDiagram();
+        return this.refreshDiagram();
     }
 
     setDiagramPending(isPending) {
@@ -1770,6 +1874,7 @@ class WebAppClient {
             console.log('Sending diagram request:', diagramRequest);
 
             this.appendStatusLogLine('frontend', 'Fetching relationship diagram...');
+            const diagramFetchStart = performance.now();
             const response = await fetch('/api/diagram', {
                 method: 'POST',
                 headers: {
@@ -1783,13 +1888,21 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            const diagramFetchMs = Math.round(performance.now() - diagramFetchStart);
             console.log('Diagram response received:', { nodes: data.nodes.length, edges: data.edges.length });
             console.log('Diagram edges:', data.edges.map(e => `(${e.from_node}->${e.to_node}): ${e.label}`));
             this.appendStatusLogLine(
                 'frontend',
-                `Diagram rendered: ${data.nodes.length} node(s), ${data.edges.length} edge(s).`
+                `Diagram data received (${diagramFetchMs} ms): ${data.nodes.length} node(s), ${data.edges.length} edge(s). Rendering...`
             );
+
+            const diagramRenderStart = performance.now();
             this.renderDiagram(data);
+            const diagramRenderMs = Math.round(performance.now() - diagramRenderStart);
+            this.appendStatusLogLine(
+                'frontend',
+                `Diagram rendered in ${diagramRenderMs} ms.`
+            );
 
         } catch (error) {
             console.error('Error refreshing diagram:', error);
@@ -1939,6 +2052,9 @@ class WebAppClient {
     }
 
     selectAllAxisStructures(axis) {
+        if (!this.ensureSortableListsInitialized()) {
+            return;
+        }
         const availableList = document.getElementById(axis === 'rows' ? 'availableRowsList' : 'availableColsList');
         const selectedList = document.getElementById(axis === 'rows' ? 'selectedRowsList' : 'selectedColsList');
 
@@ -1949,6 +2065,9 @@ class WebAppClient {
     }
 
     selectNoneAxisStructures(axis) {
+        if (!this.ensureSortableListsInitialized()) {
+            return;
+        }
         const availableList = document.getElementById(axis === 'rows' ? 'availableRowsList' : 'availableColsList');
         const selectedList = document.getElementById(axis === 'rows' ? 'selectedRowsList' : 'selectedColsList');
 
@@ -1959,6 +2078,9 @@ class WebAppClient {
     }
 
     copyRowsToColumns() {
+        if (!this.ensureSortableListsInitialized()) {
+            return;
+        }
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
         const availableColsList = document.getElementById('availableColsList');
@@ -1975,6 +2097,9 @@ class WebAppClient {
     }
 
     copyFromMatrixToDiagram() {
+        if (!this.ensureSortableListsInitialized()) {
+            return;
+        }
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
 
@@ -1988,6 +2113,9 @@ class WebAppClient {
     }
 
     copyFromDiagramToMatrix() {
+        if (!this.ensureSortableListsInitialized()) {
+            return;
+        }
         const selectedRowsList = document.getElementById('selectedRowsList');
         const selectedColsList = document.getElementById('selectedColsList');
         const availableRowsList = document.getElementById('availableRowsList');
@@ -2400,13 +2528,28 @@ class WebAppClient {
         // Reset application state for new analysis
         this.sessionId = null;
         this.selectedStructures.clear();
+        this.summaryData = null;
         this.patientInfo = null;
+        this.structureItems = [];
+        this.structureItemsByRoi = new Map();
         this.diagramSelection.clear();
         this.diagramAppliedSelection.clear();
         this.diagramSelectionModalOpen = false;
+        this.sortableListsInitialized = false;
+        this.sortableInitScheduled = false;
         if (this.websocket) {
             this.websocket.close();
             this.websocket = null;
+        }
+        if (this.sortableRows) {
+            this.sortableRows.available.destroy();
+            this.sortableRows.selected.destroy();
+            this.sortableRows = null;
+        }
+        if (this.sortableColumns) {
+            this.sortableColumns.available.destroy();
+            this.sortableColumns.selected.destroy();
+            this.sortableColumns = null;
         }
         if (this.network) {
             this.network.destroy();
@@ -2462,6 +2605,9 @@ function initializeTabs() {
             if (targetContent) {
                 targetContent.classList.add('active');
                 console.log('Activated tab:', targetTab);
+                if (targetTab === 'matrix' && window.app) {
+                    window.app.ensureSortableListsInitialized();
+                }
             } else {
                 console.error('Tab content not found for:', targetTab);
             }

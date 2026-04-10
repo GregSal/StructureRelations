@@ -5,6 +5,7 @@ selecting structures, and analyzing spatial relationships with customizable
 matrix visualization.
 '''
 import sys
+import os
 import logging
 import uuid
 import asyncio
@@ -142,6 +143,16 @@ class DiagramResponse(BaseModel):
     edges: List[DiagramEdge]
 
 
+_diagram_settings_state = {'data': {}, 'mtime': None}
+_relationship_definitions_state = {'data': {}, 'mtime': None}
+
+# Micro-timing log control: log only when total_ms exceeds threshold,
+# or once every N requests (0 = threshold-only, no sampling).
+_TIMING_THRESHOLD_MS: int = int(os.getenv('SR_TIMING_THRESHOLD_MS', '1500'))
+_TIMING_SAMPLE_N: int = int(os.getenv('SR_TIMING_SAMPLE_N', '0'))
+_timing_request_counter: int = 0
+
+
 def _load_diagram_settings() -> dict:
     """Load diagram settings configuration from disk.
 
@@ -154,9 +165,17 @@ def _load_diagram_settings() -> dict:
         return {}
 
     try:
+        current_mtime = diagram_file.stat().st_mtime
+        cached_data = _diagram_settings_state['data']
+        if cached_data and _diagram_settings_state['mtime'] == current_mtime:
+            return cached_data
+
         with open(diagram_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (IOError, json.JSONDecodeError) as exc:
+            settings = json.load(f)
+            _diagram_settings_state['data'] = settings
+            _diagram_settings_state['mtime'] = current_mtime
+            return settings
+    except (IOError, OSError, json.JSONDecodeError) as exc:
         logger.warning('Failed to load diagram settings: %s', exc)
         return {}
 
@@ -173,9 +192,17 @@ def _load_relationship_definitions() -> dict:
         return {}
 
     try:
+        current_mtime = definitions_file.stat().st_mtime
+        cached_data = _relationship_definitions_state['data']
+        if cached_data and _relationship_definitions_state['mtime'] == current_mtime:
+            return cached_data
+
         with open(definitions_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (IOError, json.JSONDecodeError) as exc:
+            definitions = json.load(f)
+            _relationship_definitions_state['data'] = definitions
+            _relationship_definitions_state['mtime'] = current_mtime
+            return definitions
+    except (IOError, OSError, json.JSONDecodeError) as exc:
         logger.warning('Failed to load relationship definitions: %s', exc)
         return {}
 
@@ -755,11 +782,14 @@ async def process_structure_set(
                 job_message=message,
             )
             now = time.monotonic()
+            time_since_last = now - ws_last_emit_time
             should_emit = (
-                force_emit
-                or bounded_progress in {0.0, 100.0}
-                or (bounded_progress - ws_last_emit_progress) >= 0.5
-                or (now - ws_last_emit_time) >= 0.4
+                bounded_progress in {0.0, 100.0}
+                or (force_emit and time_since_last >= 0.1)
+                or (not force_emit and (
+                    (bounded_progress - ws_last_emit_progress) >= 0.5
+                    or time_since_last >= 0.4
+                ))
             )
             if not should_emit:
                 return
@@ -767,7 +797,9 @@ async def process_structure_set(
             ws_last_emit_time = now
             ws_last_emit_progress = bounded_progress
             disk_info = session_manager.get_disk_usage_info()
-            ws_loop.create_task(
+            # Use run_coroutine_threadsafe so this is safe to call from either
+            # the event-loop thread or a run_in_executor worker thread.
+            asyncio.run_coroutine_threadsafe(
                 connection_manager.send_progress(
                     session_id,
                     stage,
@@ -775,7 +807,8 @@ async def process_structure_set(
                     current_structure,
                     message,
                     disk_info['usage_mb'],
-                )
+                ),
+                ws_loop,
             )
 
         def _queue_status_line(stage: str, message: str) -> None:
@@ -938,11 +971,17 @@ async def process_structure_set(
                     progress,
                     '',
                     message,
+                    force_emit=True,
                 )
                 if _was_cancelled():
                     raise RuntimeError('Processing cancelled by user')
 
-            structure_set.calculate_relationships(force=True, progress_callback=pair_progress)
+            await ws_loop.run_in_executor(
+                None,
+                lambda: structure_set.calculate_relationships(
+                    force=True, progress_callback=pair_progress
+                ),
+            )
             _queue_progress_update(
                 'calculating_relationships',
                 97.5,
@@ -1063,7 +1102,16 @@ async def get_relationship_matrix(request: MatrixRequest):
                 f'use_symbols={request.use_symbols}, '
                 f'logical_relations_mode={request.logical_relations_mode}')
 
+    request_start = time.perf_counter()
+    await connection_manager.send_status_line(
+        request.session_id,
+        'loading_results',
+        'backend',
+        'Loading processed session data...',
+    )
+    session_load_start = time.perf_counter()
     session_data = session_manager.load_session(request.session_id)
+    session_load_ms = round((time.perf_counter() - session_load_start) * 1000.0)
     if session_data is None:
         logger.error(f'Session {request.session_id} not found or expired')
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
@@ -1073,7 +1121,15 @@ async def get_relationship_matrix(request: MatrixRequest):
         raise HTTPException(status_code=400, detail='Structures not yet processed')
 
     try:
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Preparing matrix filters...',
+        )
+
         # Build visible_rois list from row and col rois for limited mode
+        filter_start = time.perf_counter()
         visible_rois = None
         if request.logical_relations_mode == 'limited':
             visible_rois = []
@@ -1083,9 +1139,17 @@ async def get_relationship_matrix(request: MatrixRequest):
                 visible_rois.extend(request.col_rois)
             if visible_rois:
                 visible_rois = list(set(visible_rois))  # Remove duplicates
+        filter_ms = round((time.perf_counter() - filter_start) * 1000.0)
 
         # Get matrix as dictionary
         logger.info(f'Generating matrix for session {request.session_id}')
+        matrix_generation_start = time.perf_counter()
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Generating relationship matrix payload...',
+        )
         matrix_dict = session_data.structure_set.to_dict(
             row_rois=request.row_rois,
             col_rois=request.col_rois,
@@ -1093,13 +1157,59 @@ async def get_relationship_matrix(request: MatrixRequest):
             logical_relations_mode=request.logical_relations_mode,
             visible_rois=visible_rois
         )
+        matrix_generation_ms = round(
+            (time.perf_counter() - matrix_generation_start) * 1000.0
+        )
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            f'Matrix payload generated ({matrix_generation_ms} ms).',
+        )
 
         logger.info(f'Matrix dict keys: {matrix_dict.keys()}')
         logger.info(f'Matrix dict types: {[(k, type(v).__name__) for k, v in matrix_dict.items()]}')
 
         # Create response
         try:
+            validation_start = time.perf_counter()
+            await connection_manager.send_status_line(
+                request.session_id,
+                'loading_results',
+                'backend',
+                'Validating matrix response...',
+            )
             response = MatrixResponse(**matrix_dict)
+            validation_ms = round(
+                (time.perf_counter() - validation_start) * 1000.0
+            )
+            total_ms = round((time.perf_counter() - request_start) * 1000.0)
+            await connection_manager.send_status_line(
+                request.session_id,
+                'loading_results',
+                'backend',
+                f'Matrix ready ({total_ms} ms total).',
+            )
+            global _timing_request_counter
+            _timing_request_counter += 1
+            _should_log_timing = (
+                total_ms > _TIMING_THRESHOLD_MS
+                or (_TIMING_SAMPLE_N > 0
+                    and (_timing_request_counter % _TIMING_SAMPLE_N) == 0)
+            )
+            if _should_log_timing:
+                logger.info(
+                    'MATRIX_TIMING session=%s session_load_ms=%s filter_ms=%s '
+                    'payload_ms=%s validation_ms=%s total_ms=%s rows=%s cols=%s',
+                    request.session_id,
+                    session_load_ms,
+                    filter_ms,
+                    matrix_generation_ms,
+                    validation_ms,
+                    total_ms,
+                    len(matrix_dict.get('rows', [])),
+                    len(matrix_dict.get('columns', [])),
+                )
             logger.info(f'Matrix generated successfully for session {request.session_id}')
             return response
         except Exception as validation_error:
@@ -1195,7 +1305,16 @@ async def get_diagram_data(request: MatrixRequest):
     logger.info(f'    row_rois: {request.row_rois}')
     logger.info(f'    col_rois: {request.col_rois}')
     try:
+        request_start = time.perf_counter()
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Loading data for relationship diagram...',
+        )
+        session_load_start = time.perf_counter()
         session_data = session_manager.load_session(request.session_id)
+        session_load_ms = round((time.perf_counter() - session_load_start) * 1000.0)
         if session_data is None:
             raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -1208,6 +1327,13 @@ async def get_diagram_data(request: MatrixRequest):
         shape_map = {}
         default_shape = 'ellipse'
         edge_styles = {}
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Loading diagram configuration...',
+        )
+        config_start = time.perf_counter()
         diagram_settings = _load_diagram_settings()
         node_shapes = diagram_settings.get('node_shapes', {})
         shape_map = node_shapes.get('shape_map', {})
@@ -1233,6 +1359,13 @@ async def get_diagram_data(request: MatrixRequest):
             for rel in definitions.get('Relationships', [])
             if rel.get('relation_type')
         }
+        config_ms = round((time.perf_counter() - config_start) * 1000.0)
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Building diagram nodes...',
+        )
 
         def hex_to_rgba(color_hex: str, alpha: float) -> str:
             color_hex = color_hex.lstrip('#')
@@ -1291,9 +1424,12 @@ async def get_diagram_data(request: MatrixRequest):
             return '\n'.join(tooltip_lines), symbol
 
         # Get summary data
+        summary_start = time.perf_counter()
         summary_df = structure_set.summary()
+        summary_ms = round((time.perf_counter() - summary_start) * 1000.0)
 
         # Extract colors from DICOM file
+        color_start = time.perf_counter()
         colors = {}
         if structure_set.dicom_structure_file and hasattr(structure_set.dicom_structure_file, 'dataset'):
             try:
@@ -1303,6 +1439,7 @@ async def get_diagram_data(request: MatrixRequest):
                         colors[roi_num] = [int(c) for c in roi_contour.ROIDisplayColor]
             except AttributeError:
                 pass
+        color_extract_ms = round((time.perf_counter() - color_start) * 1000.0)
 
         # Build edges from relationship matrix
         edges = []
@@ -1346,6 +1483,7 @@ async def get_diagram_data(request: MatrixRequest):
 
         # Build nodes only for visible structures
         nodes = []
+        node_build_start = time.perf_counter()
         roi_to_name = {}
         for _, row in summary_df.iterrows():
             roi = int(row['ROI'])
@@ -1387,17 +1525,29 @@ async def get_diagram_data(request: MatrixRequest):
                 title=tooltip
             ))
             roi_to_name[roi] = name
+        node_build_ms = round((time.perf_counter() - node_build_start) * 1000.0)
 
         # Build edges from relationship matrix
         edges = []
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            'Building diagram edges...',
+        )
 
         # Define symmetric relationships (no direction)
         symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
 
         # For symmetric relationships: check all visible pairs once
+        edge_build_start = time.perf_counter()
+        symmetric_start = time.perf_counter()
+        symmetric_pairs_checked = 0
+        symmetric_edges_added = 0
         all_visible_rois = sorted(visible_rois)
         for i, roi1 in enumerate(all_visible_rois):
             for roi2 in all_visible_rois[i+1:]:
+                symmetric_pairs_checked += 1
                 # Check both directions since edges are only stored once
                 rel = structure_set.get_relationship(roi1, roi2)
                 if rel is None:
@@ -1455,10 +1605,16 @@ async def get_diagram_data(request: MatrixRequest):
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
                     ))
+                    symmetric_edges_added += 1
+        symmetric_ms = round((time.perf_counter() - symmetric_start) * 1000.0)
 
         # For directional relationships: check From->To combinations only
+        directional_start = time.perf_counter()
+        directional_pairs_checked = 0
+        directional_edges_added = 0
         for from_roi in col_rois:  # From = Source structures
             for to_roi in row_rois:  # To = Target structures
+                directional_pairs_checked += 1
                 if from_roi == to_roi:
                     continue  # Skip self-loops
 
@@ -1524,7 +1680,49 @@ async def get_diagram_data(request: MatrixRequest):
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
                     ))
+                    directional_edges_added += 1
+        directional_ms = round((time.perf_counter() - directional_start) * 1000.0)
+        edge_build_ms = round((time.perf_counter() - edge_build_start) * 1000.0)
 
+        total_ms = round((time.perf_counter() - request_start) * 1000.0)
+        await connection_manager.send_status_line(
+            request.session_id,
+            'loading_results',
+            'backend',
+            f'Diagram data ready ({len(nodes)} nodes, {len(edges)} edges, {total_ms} ms).',
+        )
+        global _timing_request_counter
+        _timing_request_counter += 1
+        _should_log_timing = (
+            total_ms > _TIMING_THRESHOLD_MS
+            or (_TIMING_SAMPLE_N > 0
+                and (_timing_request_counter % _TIMING_SAMPLE_N) == 0)
+        )
+        if _should_log_timing:
+            logger.info(
+                'DIAGRAM_TIMING session=%s session_load_ms=%s config_ms=%s '
+                'summary_ms=%s color_extract_ms=%s node_build_ms=%s '
+                'edge_build_ms=%s symmetric_ms=%s directional_ms=%s '
+                'symmetric_pairs=%s directional_pairs=%s '
+                'symmetric_edges=%s directional_edges=%s total_ms=%s '
+                'nodes=%s edges=%s',
+                request.session_id,
+                session_load_ms,
+                config_ms,
+                summary_ms,
+                color_extract_ms,
+                node_build_ms,
+                edge_build_ms,
+                symmetric_ms,
+                directional_ms,
+                symmetric_pairs_checked,
+                directional_pairs_checked,
+                symmetric_edges_added,
+                directional_edges_added,
+                total_ms,
+                len(nodes),
+                len(edges),
+            )
         logger.info(f'Diagram response: {len(nodes)} nodes, {len(edges)} edges (mode={request.logical_relations_mode})')
         return DiagramResponse(nodes=nodes, edges=edges)
 
