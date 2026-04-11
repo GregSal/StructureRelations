@@ -81,6 +81,7 @@ class StructureSet:
         }
         self._relationship_matrix_cache: Optional[pd.DataFrame] = None
         self._summary_cache: Optional[pd.DataFrame] = None
+        self.slice_relationship_records: Dict[str, List[dict]] = {}
 
         # Prioritize dicom_structure_file over slice_data
         if dicom_structure_file is not None:
@@ -237,6 +238,7 @@ class StructureSet:
             # Clear existing edges but keep nodes for recalculation
             self.relationship_graph.clear_edges()
         self._invalidate_caches()
+        self.slice_relationship_records = {}
 
         logger.info('Calculating relationships for %d structures',
                     len(structure_rois))
@@ -277,11 +279,50 @@ class StructureSet:
                         (completed_pairs + pair_fraction) * 100.0 / total_pairs
                     )
 
+                pair_key = f'{min(roi_a, roi_b)}|{max(roi_a, roi_b)}'
+                pair_slice_records: List[dict] = []
+
+                def capture_slice_relation(
+                    slice_index: float,
+                    relation: object,
+                    region_self: object,
+                    region_other: object,
+                    target_records: List[dict] = pair_slice_records,
+                ) -> None:
+                    relation_type = relation.identify_relation()
+
+                    def _slice_is_interpolated(region: object) -> bool:
+                        return bool(getattr(region, 'is_interpolated', False))
+
+                    def _slice_has_boundary(region: object) -> bool:
+                        if region is None or not hasattr(region, 'merged_boundary'):
+                            return False
+                        try:
+                            boundary = region.merged_boundary()
+                        except TypeError:
+                            return False
+                        return bool(boundary) and not boundary.is_empty
+
+                    target_records.append({
+                        'slice_index': float(slice_index),
+                        'relation_type': relation_type.label,
+                        'relation_symbol': relation_type.symbol,
+                        'is_interpolated': (
+                            _slice_is_interpolated(region_self)
+                            or _slice_is_interpolated(region_other)
+                        ),
+                        'has_boundary': (
+                            _slice_has_boundary(region_self)
+                            or _slice_has_boundary(region_other)
+                        ),
+                    })
+
                 # Calculate the DE27IM relationship
                 de27im_relationship = structure_a.relate_to(
                     structure_b,
                     tolerance=self.tolerance,
                     progress_callback=update_slice_progress,
+                    slice_relation_callback=capture_slice_relation,
                 )
                 relation_type = de27im_relationship.identify_relation()
                 logger.info('Calculated relationships between %s (ROI %s) and %s (ROI %s) as: %s',
@@ -298,6 +339,7 @@ class StructureSet:
                     roi_a, roi_b,
                     relationship=relationship
                 )
+                self.slice_relationship_records[pair_key] = pair_slice_records
 
                 completed_pairs += 1
                 self.relationship_progress.update({
@@ -1099,6 +1141,48 @@ class StructureSet:
         '''
         return {rel: rel.symbol for rel in RELATIONSHIP_TYPES.values()}
 
+    @staticmethod
+    def _make_pair_key(roi_a: ROI_Type, roi_b: ROI_Type) -> str:
+        '''Return a stable key for a pair of ROI values.'''
+        return f'{min(roi_a, roi_b)}|{max(roi_a, roi_b)}'
+
+    def _serialize_slice_relationships(self, all_rois: List[int]) -> dict:
+        '''Build slice-indexed relationship summaries for frontend use.'''
+        if not self.slice_relationship_records:
+            return {}
+
+        allowed_rois = set(all_rois)
+        slice_relationships: Dict[str, List[dict]] = {}
+
+        for pair_key, records in self.slice_relationship_records.items():
+            roi_a_str, roi_b_str = pair_key.split('|')
+            roi_a = int(roi_a_str)
+            roi_b = int(roi_b_str)
+            if roi_a not in allowed_rois or roi_b not in allowed_rois:
+                continue
+
+            structure_a = self.structures.get(roi_a)
+            structure_b = self.structures.get(roi_b)
+            if structure_a is None or structure_b is None:
+                continue
+
+            for record in records:
+                slice_key = str(round_value(record['slice_index'], 4))
+                slice_relationships.setdefault(slice_key, []).append({
+                    'rois': [roi_a, roi_b],
+                    'pair_key': pair_key,
+                    'label': (
+                        f'{structure_a.name} / {structure_b.name}: '
+                        f"{record['relation_type']}"
+                    ),
+                    'relation_type': record['relation_type'],
+                    'relation_symbol': record['relation_symbol'],
+                    'is_interpolated': record['is_interpolated'],
+                    'has_boundary': record['has_boundary'],
+                })
+
+        return slice_relationships
+
     def to_dict(self, row_rois=None, col_rois=None, use_symbols=True,
                 logical_relations_mode='limited', visible_rois=None) -> dict:
         '''Convert relationship matrix to dictionary for JSON serialization.
@@ -1204,6 +1288,9 @@ class StructureSet:
         num_regions_dict = {}
         slice_ranges_dict = {}
         structure_slices_dict = {}
+        structure_slices_original_dict = {}
+        structure_slices_interpolated_dict = {}
+        original_slice_pool = set()
 
         for roi in all_rois:
             # Get row from summary DataFrame for this ROI
@@ -1245,13 +1332,50 @@ class StructureSet:
                 if roi in self.structures:
                     structure = self.structures[roi]
                     if not structure.region_table.empty:
-                        slice_indexes = structure.region_table['SliceIndex']
-                        slice_index_list = slice_indexes.unique().tolist()
-                        structure_slices_dict[roi_key] = sorted(slice_index_list)
+                        region_table = structure.region_table
+                        non_empty_mask = ~region_table.Empty
+                        non_empty_rows = region_table.loc[non_empty_mask]
+
+                        if non_empty_rows.empty:
+                            structure_slices_dict[roi_key] = []
+                            structure_slices_original_dict[roi_key] = []
+                            structure_slices_interpolated_dict[roi_key] = []
+                        else:
+                            slice_index_list = sorted(
+                                non_empty_rows['SliceIndex'].unique().tolist()
+                            )
+                            structure_slices_dict[roi_key] = slice_index_list
+
+                            if 'Interpolated' in non_empty_rows.columns:
+                                original_rows = non_empty_rows.loc[
+                                    ~non_empty_rows.Interpolated
+                                ]
+                                interpolated_rows = non_empty_rows.loc[
+                                    non_empty_rows.Interpolated
+                                ]
+                                original_slices = sorted(
+                                    original_rows['SliceIndex'].unique().tolist()
+                                )
+                                interpolated_slices = sorted(
+                                    interpolated_rows['SliceIndex'].unique().tolist()
+                                )
+                            else:
+                                original_slices = slice_index_list
+                                interpolated_slices = []
+
+                            structure_slices_original_dict[roi_key] = original_slices
+                            structure_slices_interpolated_dict[
+                                roi_key
+                            ] = interpolated_slices
+                            original_slice_pool.update(original_slices)
                     else:
                         structure_slices_dict[roi_key] = []
+                        structure_slices_original_dict[roi_key] = []
+                        structure_slices_interpolated_dict[roi_key] = []
                 else:
                     structure_slices_dict[roi_key] = []
+                    structure_slices_original_dict[roi_key] = []
+                    structure_slices_interpolated_dict[roi_key] = []
             else:
                 roi_key = int(roi)
                 dicom_types_dict[roi_key] = ''
@@ -1260,6 +1384,8 @@ class StructureSet:
                 num_regions_dict[roi_key] = 0
                 slice_ranges_dict[roi_key] = ''
                 structure_slices_dict[roi_key] = []
+                structure_slices_original_dict[roi_key] = []
+                structure_slices_interpolated_dict[roi_key] = []
 
         return {
             'rows': row_rois_list,
@@ -1274,7 +1400,11 @@ class StructureSet:
             'num_regions': num_regions_dict,
             'slice_ranges': slice_ranges_dict,
             'slice_indices': self.slice_sequence.slices if self.slice_sequence else [],
+            'slice_indices_original': sorted(original_slice_pool),
             'structure_slices': structure_slices_dict,
+            'structure_slices_original': structure_slices_original_dict,
+            'structure_slices_interpolated': structure_slices_interpolated_dict,
+            'slice_relationships': self._serialize_slice_relationships(all_rois),
             'faded_relationships': faded_relationships if logical_relations_mode == 'faded' else None
         }
 

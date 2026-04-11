@@ -1096,9 +1096,45 @@ tbody tr:hover {
     gap: 0.5rem;
 }
 
+.contour-axis-header {
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.contour-structure-lists {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+#availableContourList,
+#selectedContourList {
+    min-height: 180px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
 .control-group label {
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.checkbox-inline input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.control-help {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
 }
 
 .structure-select {
@@ -1128,6 +1164,39 @@ tbody tr:hover {
     margin-bottom: 0.5rem;
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.slice-dropdown-group {
+    margin-bottom: 0.75rem;
+}
+
+.slice-dropdown {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.slice-dropdown:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.tolerance-input {
+    width: 100px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.tolerance-input:disabled {
+    opacity: 0.65;
 }
 
 .slider-container {

@@ -4,28 +4,32 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Web App Updates
+1. Fix relationship calculations:
+
+![alt text](image-1.png)
+
+![alt text](image.png)
+
+![alt text](image-3.png)
+
+2. Web App Updates
+
+    1. remove the box showing "true" thart appears just after uploading the DICOM data
+
+    2. When processing structures replace the messages like: "Computing running (slice 92/92)" with messages like: "Calculated relationships between OralCavity (ROI 107) and opt Larynx (ROI 27) as: is Disjoint from"
+
+    3. The progress bar is not scaled correctly. When it starts calculating relationships, it should be at about 30%, when it finishes calculating relationships it should be at 70% During the time that it is rendering the diagram it should be progressing from about 80% to 100%.
+
+    4. The tooltip for the structure sets should have the upload prefix dropped from the file name.  This should also apply internally to the file name attribute in the structure set.
+    ![alt text](image-2.png)
+
+    5. Try to improve the speed of rendering contour plots, especially when switching slices.
 
     3. Relation (Edge) Updates
         - implement expanded options for line types
             - Different dash types
             - double lines
             - glow
-
-
-    5. Plot Contours update
-        - Add a toggle-able legend to Plot Contours
-        - Allow Plot contours to select more than two structures in an orderable list
-        - Add option to use 3 contours for relationship mode to show the relationship between three structures (e.g. A, B, and A-B)
-        - Add option to enable or disable plotting margins (tolerance) around contours
-        - Allow Plot contours to toggle between contour mode and relationship mode
-            - In contour mode structures are displayed as outlines in their assigned colours (or from a default list if no colours assigned).
-            - In relationship mode contours are plotted filled with colours assigned based on the relationship between the structures.
-            - In relationship mode, only the first two or three structures are used
-        - provide a dropdown list to select slice
-            - this complements the slider bar
-            - The drop down includes what structures are present and the relationships between the structures on that slice. This allows users to quickly jump to slices of interest.
-            - Keep a record of the relationships calculated for every slice and for boundary slices
 
 5. Add a unit attribute to StructureSet
     - Populate it from DICOM data

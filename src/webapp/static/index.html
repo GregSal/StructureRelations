@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=36">
+    <link rel="stylesheet" href="static/css/styles.css?v=37">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -294,21 +294,98 @@
                     <div class="tab-content" id="tab-contour-plot">
                         <div class="card">
                             <h2>Contour Plotting</h2>
-                            <div class="plot-controls">
+                            <div class="card collapsible-card" style="margin-bottom: 1rem;">
+                                <div class="card-header" id="contourConfigHeader">
+                                    <h3>Contour Plot Controls</h3>
+                                    <button class="collapse-toggle" id="contourConfigToggle">▼</button>
+                                </div>
+                                <div class="card-content" id="contourConfigContent" style="display: block;">
+                            <div class="plot-controls" style="margin-bottom: 0;">
                                 <div class="control-group">
-                                    <label for="structure1Select">Structure 1:</label>
-                                    <select id="structure1Select" class="structure-select">
-                                        <option value="">Select structure...</option>
+                                    <div class="axis-header contour-axis-header">
+                                        <div>
+                                            <label>Contour structures:</label>
+                                            <p class="control-help">
+                                                Drag selected structures to control plot order.
+                                                Relationship mode uses the first two structures,
+                                                plus the third when the overlay source is set to
+                                                Selected Structure 3.
+                                            </p>
+                                        </div>
+                                        <div class="button-group">
+                                            <button class="btn btn-secondary btn-sm" id="selectAllContourBtn">Select All</button>
+                                            <button class="btn btn-secondary btn-sm" id="clearContourBtn">Clear</button>
+                                        </div>
+                                    </div>
+                                    <div class="structure-lists contour-structure-lists">
+                                        <div class="list-container">
+                                            <p class="list-label">Available</p>
+                                            <div class="sortable-list" id="availableContourList"></div>
+                                        </div>
+                                        <div class="list-container">
+                                            <p class="list-label">Selected</p>
+                                            <div class="sortable-list" id="selectedContourList"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <label for="plotModeSelect">Plot mode:</label>
+                                    <select id="plotModeSelect" class="structure-select">
+                                        <option value="contour">Contour (outlines)</option>
+                                        <option value="relationship" selected>Relationship (filled)</option>
                                     </select>
                                 </div>
                                 <div class="control-group">
-                                    <label for="structure2Select">Structure 2 (optional):</label>
-                                    <select id="structure2Select" class="structure-select">
-                                        <option value="">None</option>
+                                    <label for="relationshipOverlaySelect">Relationship overlay:</label>
+                                    <select id="relationshipOverlaySelect" class="structure-select">
+                                        <option value="none">A vs B</option>
+                                        <option value="third_structure">Selected Structure 3</option>
+                                        <option value="structure_1">Structure 1</option>
+                                        <option value="structure_2">Structure 2</option>
+                                        <option value="intersection_ab">A ∩ B</option>
+                                        <option value="a_minus_b">A - B</option>
+                                        <option value="a_xor_b">A XOR B</option>
                                     </select>
+                                    <p class="control-help" id="relationshipOverlayHelp">
+                                        Relationship mode requires at least two selected structures.
+                                    </p>
+                                </div>
+                                <div class="control-group checkbox-group">
+                                    <label class="checkbox-inline" for="showLegendToggle">
+                                        <input type="checkbox" id="showLegendToggle" checked>
+                                        Show legend
+                                    </label>
+                                </div>
+                                <div class="control-group checkbox-group">
+                                    <label class="checkbox-inline" for="showToleranceToggle">
+                                        <input type="checkbox" id="showToleranceToggle" checked>
+                                        Plot tolerance margins
+                                    </label>
+                                    <label for="toleranceInput">Tolerance (cm):</label>
+                                    <input
+                                        type="number"
+                                        id="toleranceInput"
+                                        min="0"
+                                        max="5"
+                                        step="0.01"
+                                        value="0.10"
+                                        class="tolerance-input"
+                                    >
+                                </div>
+                                <div class="control-group checkbox-group">
+                                    <label class="checkbox-inline" for="includeInterpolatedSlicesToggle">
+                                        <input type="checkbox" id="includeInterpolatedSlicesToggle">
+                                        Include boundary/interpolated slices
+                                    </label>
+                                    <p class="control-help">
+                                        By default, only original contour slices are available for
+                                        selection and plotting.
+                                    </p>
                                 </div>
                                 <div class="control-group">
                                     <button class="btn btn-primary" id="plotContoursBtn">Plot Contours</button>
+                                </div>
+                            </div>
                                 </div>
                             </div>
                             <div class="diagram-controls">
@@ -330,6 +407,12 @@
                                 </div>
                             </div>
                             <div class="slider-controls">
+                                <div class="slice-dropdown-group">
+                                    <label for="sliceDropdown">Slice selector:</label>
+                                    <select id="sliceDropdown" class="slice-dropdown">
+                                        <option value="">No slices available</option>
+                                    </select>
+                                </div>
                                 <label for="sliceSlider">Slice: <span id="sliceValue">0.0</span> cm</label>
                                 <div class="slider-container">
                                     <button class="slider-arrow" id="slicePrevBtn" title="Previous slice">◄</button>
@@ -352,7 +435,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=108"></script>
+    <script src="static/js/app.js?v=113"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

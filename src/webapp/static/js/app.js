@@ -81,6 +81,16 @@ class WebAppClient {
         this.isDragging = false;
         this.dragStartX = 0;
         this.dragStartY = 0;
+        this.contourSortables = null;
+        this.allSliceIndices = [];
+        this.allSliceIndicesOriginal = [];
+        this.sliceIndices = [];
+        this.structureSlices = {};
+        this.structureSlicesOriginal = {};
+        this.structureSlicesInterpolated = {};
+        this.sliceRelationships = {};
+        this.contourStructureLabels = {};
+        this.contourStructureColors = {};
 
         this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
@@ -379,6 +389,9 @@ class WebAppClient {
         document.getElementById('analysisConfigToggle').addEventListener('click', () => {
             this.toggleAnalysisConfig();
         });
+        document.getElementById('contourConfigToggle').addEventListener('click', () => {
+            this.toggleContourConfig();
+        });
 
         // Structure-set badge and selector modal
         const structureSetBadge = document.getElementById('structureSetBadge');
@@ -487,17 +500,40 @@ class WebAppClient {
         document.getElementById('plotContoursBtn').addEventListener('click', () => {
             this.plotContours();
         });
+        document.getElementById('plotModeSelect').addEventListener('change', () => {
+            this.updateRelationshipOverlayState();
+            this.updateSliceRangeForStructures();
+        });
+        document.getElementById('relationshipOverlaySelect').addEventListener('change', () => {
+            this.updateRelationshipOverlayState();
+        });
+        document.getElementById('selectAllContourBtn').addEventListener('click', () => {
+            this.selectAllContourStructures();
+        });
+        document.getElementById('clearContourBtn').addEventListener('click', () => {
+            this.clearContourStructures();
+        });
 
         // Zoom and pan controls
         this.initializePlotControls();
         document.getElementById('sliceSlider').addEventListener('input', (e) => {
             this.updateSliceValue(e.target.value);
             this.updateSliderArrows();
-            // Auto-update plot when slider moves
-            const structure1 = document.getElementById('structure1Select').value;
-            if (structure1) {
-                this.plotContours();
-            }
+            this.plotContours({ suppressAlerts: true });
+        });
+        document.getElementById('sliceDropdown').addEventListener('change', (e) => {
+            const slider = document.getElementById('sliceSlider');
+            slider.value = e.target.value;
+            this.updateSliceValue(e.target.value);
+            this.updateSliderArrows();
+            this.plotContours({ suppressAlerts: true });
+        });
+        document.getElementById('includeInterpolatedSlicesToggle').addEventListener('change', () => {
+            this.updateSliceRangeForStructures();
+        });
+        document.getElementById('showToleranceToggle').addEventListener('change', (e) => {
+            const toleranceInput = document.getElementById('toleranceInput');
+            toleranceInput.disabled = !e.target.checked;
         });
         document.getElementById('slicePrevBtn').addEventListener('click', () => {
             this.stepSlice(-1);
@@ -1717,6 +1753,19 @@ class WebAppClient {
         }
     }
 
+    toggleContourConfig() {
+        const content = document.getElementById('contourConfigContent');
+        const toggle = document.getElementById('contourConfigToggle');
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '►';
+        }
+    }
+
     formatResolution(value) {
         const numeric = Number(value);
         if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -2472,114 +2521,370 @@ class WebAppClient {
     }
 
     populateContourPlotControls(data) {
-        // Store all slice data
         this.allSliceIndices = data.slice_indices || [];
+        this.allSliceIndicesOriginal = data.slice_indices_original || this.allSliceIndices;
         this.structureSlices = data.structure_slices || {};
-        this.sliceIndices = this.allSliceIndices;  // Start with all slices
+        this.structureSlicesOriginal = data.structure_slices_original || this.structureSlices;
+        this.structureSlicesInterpolated =
+            data.structure_slices_interpolated || {};
+        this.sliceRelationships = this.normalizeSliceRelationships(
+            data.slice_relationships
+        );
 
-        // Configure slider with discrete steps
-        const slider = document.getElementById('sliceSlider');
-        if (this.sliceIndices.length > 0) {
-            slider.min = 0;
-            slider.max = this.sliceIndices.length - 1;
-            slider.value = Math.floor(this.sliceIndices.length / 2);
-            slider.step = 1;
+        const includeInterpolatedToggle = document.getElementById(
+            'includeInterpolatedSlicesToggle'
+        );
+        includeInterpolatedToggle.checked = false;
+        document.getElementById('plotModeSelect').value = 'relationship';
+        document.getElementById('relationshipOverlaySelect').value = 'none';
+        document.getElementById('showLegendToggle').checked = true;
+        document.getElementById('showToleranceToggle').checked = true;
+        document.getElementById('toleranceInput').value = '0.10';
+        document.getElementById('toleranceInput').disabled = false;
 
-            // Set initial slice value
-            const midIndex = Math.floor(this.sliceIndices.length / 2);
-            document.getElementById('sliceValue').textContent = this.sliceIndices[midIndex].toFixed(2);
-        } else {
-            slider.min = 0;
-            slider.max = 0;
-            slider.value = 0;
-            document.getElementById('sliceValue').textContent = '0.0';
-        }
-
-        // Update arrow button states
-        this.updateSliderArrows();
-
-        // Populate structure dropdowns
-        const select1 = document.getElementById('structure1Select');
-        const select2 = document.getElementById('structure2Select');
-
-        // Clear existing options except first
-        select1.innerHTML = '<option value="">Select structure...</option>';
-        select2.innerHTML = '<option value="">None</option>';
-
-        // Add structures
+        this.contourStructureLabels = {};
+        this.contourStructureColors = {};
         data.rows.forEach((roi, idx) => {
             const name = data.row_names[idx];
-            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
+            const dicomType = data.dicom_types
+                ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '')
+                : '';
             const label = dicomType ? `${name} (${dicomType})` : name;
-
-            const option1 = document.createElement('option');
-            option1.value = roi;
-            option1.textContent = label;
-            select1.appendChild(option1);
-
-            const option2 = document.createElement('option');
-            option2.value = roi;
-            option2.textContent = label;
-            select2.appendChild(option2);
+            this.contourStructureLabels[String(roi)] = label;
+            this.contourStructureColors[String(roi)] = this.rgbToColor(
+                data.colors[roi] || data.colors[String(roi)]
+            );
         });
 
-        // Add event listeners for structure selection changes
-        select1.addEventListener('change', () => this.updateSliceRangeForStructures());
-        select2.addEventListener('change', () => this.updateSliceRangeForStructures());
+        this.initializeContourSortableLists(data);
+        this.updateRelationshipOverlayState();
+
+        this.sliceIndices = this.getDefaultSliceIndices();
+        this.updateSliceRangeForStructures();
+    }
+
+    initializeContourSortableLists(data) {
+        if (data) {
+            this.buildStructureItems(data);
+        }
+
+        const availableList = document.getElementById('availableContourList');
+        const selectedList = document.getElementById('selectedContourList');
+
+        if (this.contourSortables) {
+            this.contourSortables.available.destroy();
+            this.contourSortables.selected.destroy();
+            this.contourSortables = null;
+        }
+
+        availableList.innerHTML = '';
+        selectedList.innerHTML = '';
+
+        this.structureItems.forEach((item) => {
+            const contourItem = this.createContourSortableItem(
+                item.roi,
+                item.name,
+                item.color,
+                item.dicomType,
+                item.codeMeaning
+            );
+            availableList.appendChild(contourItem);
+        });
+
+        const sortableConfig = {
+            group: 'contour-structures',
+            animation: 150,
+            ghostClass: 'dragging',
+            onSort: () => this.updateContourSelectionState(),
+            onAdd: () => this.updateContourSelectionState(),
+            onRemove: () => this.updateContourSelectionState(),
+            onEnd: () => this.updateContourSelectionState(),
+        };
+
+        this.contourSortables = {
+            available: new Sortable(availableList, sortableConfig),
+            selected: new Sortable(selectedList, sortableConfig),
+        };
+    }
+
+    createContourSortableItem(roi, name, color, dicomType = '', codeMeaning = '') {
+        const item = this.createSortableItem(roi, name, color, dicomType, codeMeaning);
+
+        item.addEventListener('dblclick', () => {
+            const parentList = item.parentElement;
+            if (parentList && parentList.id === 'selectedContourList') {
+                document.getElementById('availableContourList').appendChild(item);
+                this.updateContourSelectionState();
+            } else if (parentList && parentList.id === 'availableContourList') {
+                document.getElementById('selectedContourList').appendChild(item);
+                this.updateContourSelectionState();
+            }
+        });
+
+        return item;
+    }
+
+    updateContourSelectionState() {
+        this.updateRelationshipOverlayState();
+        this.updateSliceRangeForStructures();
+    }
+
+    getSelectedContourRois() {
+        const selectedList = document.getElementById('selectedContourList');
+        if (!selectedList) {
+            return [];
+        }
+        return Array.from(selectedList.children)
+            .map((item) => Number.parseInt(item.dataset.roi, 10))
+            .filter((roi) => Number.isInteger(roi));
+    }
+
+    selectAllContourStructures() {
+        const availableList = document.getElementById('availableContourList');
+        const selectedList = document.getElementById('selectedContourList');
+        Array.from(availableList.children).forEach((item) => {
+            selectedList.appendChild(item);
+        });
+        this.updateContourSelectionState();
+    }
+
+    clearContourStructures() {
+        const availableList = document.getElementById('availableContourList');
+        const selectedList = document.getElementById('selectedContourList');
+        Array.from(selectedList.children).forEach((item) => {
+            availableList.appendChild(item);
+        });
+        this.updateContourSelectionState();
+    }
+
+    updateRelationshipOverlayState() {
+        const mode = this.getContourPlotMode();
+        const overlaySelect = document.getElementById('relationshipOverlaySelect');
+        const overlayHelp = document.getElementById('relationshipOverlayHelp');
+        const selectedRois = this.getSelectedContourRois();
+        const isRelationshipMode = mode === 'relationship';
+
+        overlaySelect.disabled = !isRelationshipMode;
+        if (!isRelationshipMode) {
+            overlayHelp.textContent = 'Overlay options are only used in relationship mode.';
+            return;
+        }
+
+        if (selectedRois.length < 2) {
+            overlayHelp.textContent = 'Relationship mode requires at least two selected structures.';
+            return;
+        }
+
+        if (overlaySelect.value === 'third_structure' && selectedRois.length < 3) {
+            overlayHelp.textContent = 'Selected Structure 3 requires at least three selected structures.';
+            return;
+        }
+
+        const firstLabel = this.contourStructureLabels[String(selectedRois[0])] || 'Structure 1';
+        const secondLabel = this.contourStructureLabels[String(selectedRois[1])] || 'Structure 2';
+        overlayHelp.textContent = `A = ${firstLabel}; B = ${secondLabel}.`;
+    }
+
+    isInterpolatedSliceEnabled() {
+        const toggle = document.getElementById('includeInterpolatedSlicesToggle');
+        return !!(toggle && toggle.checked);
+    }
+
+    getSliceKey(sliceValue) {
+        return Number(sliceValue).toFixed(4);
+    }
+
+    getDefaultSliceIndices() {
+        if (this.isInterpolatedSliceEnabled()) {
+            return [...this.allSliceIndices];
+        }
+        return [...this.allSliceIndicesOriginal];
+    }
+
+    getSlicesForStructure(roi, includeInterpolated) {
+        if (!roi) {
+            return [];
+        }
+        const key = String(parseInt(roi));
+        const sourceMap = includeInterpolated
+            ? this.structureSlices
+            : this.structureSlicesOriginal;
+        return sourceMap[key] || sourceMap[parseInt(roi)] || [];
+    }
+
+    normalizeSliceRelationships(rawRelationships) {
+        const normalized = {};
+        if (!rawRelationships || typeof rawRelationships !== 'object') {
+            return normalized;
+        }
+
+        Object.entries(rawRelationships).forEach(([sliceKey, records]) => {
+            const parsedSlice = Number.parseFloat(sliceKey);
+            const canonicalKey = Number.isNaN(parsedSlice)
+                ? String(sliceKey)
+                : this.getSliceKey(parsedSlice);
+
+            if (!normalized[canonicalKey]) {
+                normalized[canonicalKey] = [];
+            }
+
+            if (Array.isArray(records)) {
+                normalized[canonicalKey].push(...records);
+            }
+        });
+
+        return normalized;
+    }
+
+    getSliceRelationshipSummaries(sliceValue, selectedRois) {
+        if (!selectedRois || selectedRois.length < 2) {
+            return [];
+        }
+
+        const roiA = Number.parseInt(selectedRois[0], 10);
+        const roiB = Number.parseInt(selectedRois[1], 10);
+        const targetPair = [roiA, roiB].sort((a, b) => a - b);
+        const sliceKey = this.getSliceKey(sliceValue);
+        const records = this.sliceRelationships[sliceKey] || [];
+
+        return records.filter((record) => (
+            Array.isArray(record.rois)
+            && record.rois.length === 2
+            && (() => {
+                const pair = record.rois
+                    .map((roi) => Number.parseInt(roi, 10))
+                    .sort((a, b) => a - b);
+                return pair[0] === targetPair[0] && pair[1] === targetPair[1];
+            })()
+        ));
+    }
+
+    getSliceRelationshipStatus(sliceValue, selectedRois, includeInterpolated) {
+        if (!selectedRois || selectedRois.length < 2) {
+            return '';
+        }
+
+        const roiA = Number.parseInt(selectedRois[0], 10);
+        const roiB = Number.parseInt(selectedRois[1], 10);
+        const sliceKey = this.getSliceKey(sliceValue);
+        const labelA = this.contourStructureLabels[String(roiA)] || `ROI ${roiA}`;
+        const labelB = this.contourStructureLabels[String(roiB)] || `ROI ${roiB}`;
+
+        const hasA = this.getSlicesForStructure(roiA, includeInterpolated)
+            .some((value) => this.getSliceKey(value) === sliceKey);
+        const hasB = this.getSlicesForStructure(roiB, includeInterpolated)
+            .some((value) => this.getSliceKey(value) === sliceKey);
+
+        if (hasA && !hasB) {
+            return `${labelA} only`;
+        }
+        if (!hasA && hasB) {
+            return `${labelB} only`;
+        }
+        if (!hasA && !hasB) {
+            return '';
+        }
+
+        const relationshipSummaries = this.getSliceRelationshipSummaries(
+            sliceValue,
+            [roiA, roiB]
+        );
+
+        const relationLabels = Array.from(new Set(
+            relationshipSummaries
+                .map((record) => String(record.relation_type || '').trim())
+                .filter((label) => label.length > 0)
+        ));
+
+        const preferredRelationship = relationLabels.find(
+            (label) => !label.toLowerCase().includes('unknown')
+        ) || relationLabels[0] || 'has an Unknown relationship with';
+
+        return `${labelA} ${preferredRelationship} ${labelB}`;
+    }
+
+    updateSliceDropdownOptions() {
+        const dropdown = document.getElementById('sliceDropdown');
+        const includeInterpolated = this.isInterpolatedSliceEnabled();
+        const selectedRois = this.getSelectedContourRois();
+        const originalSliceKeys = new Set(
+            (this.allSliceIndicesOriginal || []).map((slice) => this.getSliceKey(slice))
+        );
+
+        dropdown.innerHTML = '';
+        if (!this.sliceIndices || this.sliceIndices.length === 0) {
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '0';
+            emptyOption.textContent = 'No slices available';
+            dropdown.appendChild(emptyOption);
+            return;
+        }
+
+        this.sliceIndices.forEach((sliceValue, idx) => {
+            const option = document.createElement('option');
+            option.value = idx;
+
+            const sliceKey = this.getSliceKey(sliceValue);
+            const sliceLabel = `${sliceValue.toFixed(2)} cm`;
+            const interpolationLabel =
+                includeInterpolated && !originalSliceKeys.has(sliceKey)
+                    ? ' [Interpolated]'
+                    : '';
+            const relationshipStatus = this.getSliceRelationshipStatus(
+                sliceValue,
+                selectedRois,
+                includeInterpolated
+            );
+            const relationshipLabel = relationshipStatus
+                ? ` | ${relationshipStatus}`
+                : '';
+            option.textContent = `${sliceLabel}${interpolationLabel}${relationshipLabel}`;
+            dropdown.appendChild(option);
+        });
     }
 
     updateSliceRangeForStructures() {
-        const structure1 = document.getElementById('structure1Select').value;
-        const structure2 = document.getElementById('structure2Select').value;
+        const selectedRois = this.getSelectedContourRois();
+        const includeInterpolated = this.isInterpolatedSliceEnabled();
 
         let filteredSlices = [];
-
-        if (structure1 || structure2) {
-            // Get slices for selected structures
-            const slices1 = structure1 ? (this.structureSlices[parseInt(structure1)] || []) : [];
-            const slices2 = structure2 ? (this.structureSlices[parseInt(structure2)] || []) : [];
-
-            // Combine slices (union of both structures)
-            const slicesSet = new Set([...slices1, ...slices2]);
-            filteredSlices = Array.from(slicesSet).sort((a, b) => a - b);
+        if (selectedRois.length > 0) {
+            const slicePool = new Set();
+            selectedRois.forEach((roi) => {
+                this.getSlicesForStructure(roi, includeInterpolated).forEach((slice) => {
+                    slicePool.add(slice);
+                });
+            });
+            filteredSlices = Array.from(slicePool).sort((a, b) => a - b);
         } else {
-            // No structures selected, use all slices
-            filteredSlices = [...this.allSliceIndices];
+            filteredSlices = this.getDefaultSliceIndices();
         }
 
-        // Get current slice value BEFORE updating the indices
         const slider = document.getElementById('sliceSlider');
         const oldSliceIndices = this.sliceIndices || [];
-        let currentSliceValue;
         const currentIndex = parseInt(slider.value);
-        if (oldSliceIndices.length > currentIndex) {
-            currentSliceValue = oldSliceIndices[currentIndex];
-        } else {
-            currentSliceValue = filteredSlices[Math.floor(filteredSlices.length / 2)];
-        }
+        const currentSliceValue = oldSliceIndices[currentIndex];
 
-        // Update the active slice indices
         this.sliceIndices = filteredSlices;
 
-        // Reconfigure slider
         if (filteredSlices.length > 0) {
-            // Update slider range
             slider.min = 0;
             slider.max = filteredSlices.length - 1;
+            slider.step = 1;
 
-            // Find closest slice in new range
-            let closestIndex = 0;
-            let minDiff = Infinity;
-            filteredSlices.forEach((slice, idx) => {
-                const diff = Math.abs(slice - currentSliceValue);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestIndex = idx;
-                }
-            });
-
+            let closestIndex = Math.floor(filteredSlices.length / 2);
+            if (typeof currentSliceValue === 'number') {
+                let minDiff = Infinity;
+                filteredSlices.forEach((slice, idx) => {
+                    const diff = Math.abs(slice - currentSliceValue);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestIndex = idx;
+                    }
+                });
+            }
             slider.value = closestIndex;
-            document.getElementById('sliceValue').textContent = filteredSlices[closestIndex].toFixed(2);
+            this.updateSliceValue(closestIndex);
         } else {
             slider.min = 0;
             slider.max = 0;
@@ -2587,20 +2892,17 @@ class WebAppClient {
             document.getElementById('sliceValue').textContent = '0.0';
         }
 
+        this.updateSliceDropdownOptions();
+        document.getElementById('sliceDropdown').value = slider.value;
         this.updateSliderArrows();
-
-        // Auto-update plot if a structure is selected
-        if (structure1) {
-            this.plotContours();
-        }
     }
 
     updateSliceValue(sliderValue) {
-        // Use discrete slice index from stored array
         if (this.sliceIndices && this.sliceIndices.length > 0) {
             const index = parseInt(sliderValue);
             const sliceValue = this.sliceIndices[index];
             document.getElementById('sliceValue').textContent = sliceValue.toFixed(2);
+            document.getElementById('sliceDropdown').value = String(index);
         }
     }
 
@@ -2629,13 +2931,38 @@ class WebAppClient {
             slider.value = newValue;
             this.updateSliceValue(newValue);
             this.updateSliderArrows();
-
-            // Auto-update plot if structure is selected
-            const structure1 = document.getElementById('structure1Select').value;
-            if (structure1) {
-                this.plotContours();
-            }
+            this.plotContours({ suppressAlerts: true });
         }
+    }
+
+    getContourPlotMode() {
+        const modeSelect = document.getElementById('plotModeSelect');
+        return modeSelect ? modeSelect.value : 'contour';
+    }
+
+    getRelationshipOverlayMode() {
+        const overlaySelect = document.getElementById('relationshipOverlaySelect');
+        return overlaySelect ? overlaySelect.value : 'none';
+    }
+
+    shouldShowContourLegend() {
+        const legendToggle = document.getElementById('showLegendToggle');
+        return !!(legendToggle && legendToggle.checked);
+    }
+
+    getContourTolerance() {
+        const toleranceToggle = document.getElementById('showToleranceToggle');
+        const toleranceInput = document.getElementById('toleranceInput');
+
+        if (!toleranceToggle || !toleranceToggle.checked) {
+            return 0.0;
+        }
+
+        const parsed = Number.parseFloat(toleranceInput.value);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            return 0.0;
+        }
+        return parsed;
     }
 
     initializePlotControls() {
@@ -2732,15 +3059,37 @@ class WebAppClient {
         this.updatePlotTransform();
     }
 
-    async plotContours() {
-        const structure1 = document.getElementById('structure1Select').value;
-        const structure2 = document.getElementById('structure2Select').value;
+    async plotContours(options = {}) {
+        const { suppressAlerts = false } = options;
+        const selectedRois = this.getSelectedContourRois();
         const sliderValue = document.getElementById('sliceSlider').value;
+        const plotMode = this.getContourPlotMode();
+        const overlayMode = this.getRelationshipOverlayMode();
 
-        if (!structure1) {
-            alert('Please select at least one structure to plot');
+        if (selectedRois.length === 0) {
+            if (!suppressAlerts) {
+                alert('Please select at least one structure to plot');
+            }
             return;
         }
+
+        if (plotMode === 'relationship' && selectedRois.length < 2) {
+            if (!suppressAlerts) {
+                alert('Relationship mode requires at least two selected structures');
+            }
+            return;
+        }
+
+        if (plotMode === 'relationship' && overlayMode === 'third_structure' && selectedRois.length < 3) {
+            if (!suppressAlerts) {
+                alert('Selected Structure 3 overlay requires at least three selected structures');
+            }
+            return;
+        }
+
+        const roiList = plotMode === 'relationship'
+            ? selectedRois.slice(0, overlayMode === 'third_structure' ? 3 : 2)
+            : selectedRois;
 
         // Get actual slice value from discrete indices
         const sliceIndex = this.sliceIndices[parseInt(sliderValue)];
@@ -2766,8 +3115,13 @@ class WebAppClient {
                 },
                 body: JSON.stringify({
                     session_id: this.sessionId,
-                    roi_list: structure2 ? [parseInt(structure1), parseInt(structure2)] : [parseInt(structure1)],
-                    slice_index: sliceIndex
+                    roi_list: roiList,
+                    slice_index: sliceIndex,
+                    include_interpolated_slices: this.isInterpolatedSliceEnabled(),
+                    plot_mode: plotMode,
+                    relationship_overlay: overlayMode,
+                    show_legend: this.shouldShowContourLegend(),
+                    tolerance: this.getContourTolerance()
                 }),
                 signal: signal
             });

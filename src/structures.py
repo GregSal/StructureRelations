@@ -401,6 +401,9 @@ class StructureShape():
         other: 'StructureShape',
         tolerance=0.0,
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        slice_relation_callback: Optional[
+            Callable[[SliceIndexType, 'DE27IM', object, object], None]
+        ] = None,
     ) -> 'DE27IM':
         '''Relate this structure to another structure.
 
@@ -414,6 +417,10 @@ class StructureShape():
                 the relation.
             progress_callback (Optional[Callable[[int, int], None]]): Optional
                 callback receiving (current_slice_index, total_slices).
+            slice_relation_callback (Optional[Callable[[SliceIndexType, DE27IM,
+                object, object], None]]): Optional callback receiving the slice
+                index, slice relationship, and raw RegionSlice entries for self
+                and other.
 
         Returns:
             DE27IM: A DE27IM relationship object containing the relationship
@@ -455,6 +462,13 @@ class StructureShape():
                          slice_index, relation.identify_relation(), relation)
 
             composite_relation.merge(relation)
+            if slice_relation_callback is not None:
+                slice_relation_callback(
+                    slice_index,
+                    relation,
+                    region_self,
+                    region_other,
+                )
             if progress_callback is not None:
                 progress_callback(current_slice_index, total_slices)
         return composite_relation

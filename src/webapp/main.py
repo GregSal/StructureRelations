@@ -112,7 +112,11 @@ class MatrixResponse(BaseModel):
     num_regions: dict
     slice_ranges: dict
     slice_indices: List[float]
+    slice_indices_original: List[float] = Field(default_factory=list)
     structure_slices: dict
+    structure_slices_original: dict = Field(default_factory=dict)
+    structure_slices_interpolated: dict = Field(default_factory=dict)
+    slice_relationships: dict = Field(default_factory=dict)
     faded_relationships: Optional[dict] = None
 
 
@@ -1737,6 +1741,55 @@ class PlotRequest(BaseModel):
     session_id: str
     roi_list: List[int]
     slice_index: float
+    include_interpolated_slices: bool = False
+    plot_mode: str = 'contour'
+    relationship_overlay: str = 'none'
+    show_legend: bool = True
+    tolerance: float = 0.0
+
+
+def _get_plottable_slices_for_roi(
+    structure_set: StructureSet,
+    roi: int,
+    include_interpolated_slices: bool,
+) -> List[float]:
+    """Return valid plotting slices for one ROI.
+
+    Args:
+        structure_set (StructureSet): The loaded structure set.
+        roi (int): ROI number.
+        include_interpolated_slices (bool): Whether interpolated slices are allowed.
+
+    Returns:
+        List[float]: Sorted slice indices that can be plotted for the ROI.
+    """
+    structure = structure_set.structures[roi]
+    if structure.region_table.empty:
+        return []
+
+    region_table = structure.region_table
+    valid_rows = region_table.loc[~region_table.Empty]
+
+    if not include_interpolated_slices and 'Interpolated' in valid_rows.columns:
+        valid_rows = valid_rows.loc[~valid_rows.Interpolated]
+
+    if valid_rows.empty:
+        return []
+
+    return sorted(valid_rows['SliceIndex'].unique().tolist())
+
+
+def _slice_matches_any(candidate: float, available_slices: List[float]) -> bool:
+    """Check if candidate slice index matches an available value.
+
+    Args:
+        candidate (float): Requested slice index.
+        available_slices (List[float]): Valid slice indexes.
+
+    Returns:
+        bool: True when the candidate is found in available slices.
+    """
+    return any(abs(candidate - item) < 1e-6 for item in available_slices)
 
 
 @app.post('/api/plot-contours')
@@ -1744,7 +1797,8 @@ async def plot_contours(request: PlotRequest):
     '''Generate a contour plot for selected structures on a specific slice.
 
     Args:
-        request (PlotRequest): Contains session_id, roi_list (1-2 ROIs), and slice_index.
+        request (PlotRequest): Contains session_id, roi_list (1-2 ROIs),
+            slice_index, and interpolated-slice preference.
 
     Returns:
         StreamingResponse: PNG image of the contour plot.
@@ -1760,8 +1814,68 @@ async def plot_contours(request: PlotRequest):
         structure_set = session_data.structure_set
 
         # Validate inputs
-        if len(request.roi_list) == 0 or len(request.roi_list) > 2:
-            raise HTTPException(status_code=400, detail='Must provide 1 or 2 ROI numbers')
+        if request.plot_mode not in {'contour', 'relationship'}:
+            raise HTTPException(status_code=400, detail='plot_mode must be contour or relationship')
+
+        allowed_overlays = {
+            'none',
+            'third_structure',
+            'structure_1',
+            'structure_2',
+            'intersection_ab',
+            'a_minus_b',
+            'a_xor_b',
+        }
+        if request.relationship_overlay not in allowed_overlays:
+            raise HTTPException(status_code=400, detail='relationship_overlay is invalid')
+
+        if request.tolerance < 0:
+            raise HTTPException(status_code=400, detail='tolerance must be >= 0')
+
+        if request.plot_mode == 'contour':
+            if len(request.roi_list) == 0:
+                raise HTTPException(status_code=400, detail='Must provide at least 1 ROI number')
+        else:
+            if len(request.roi_list) < 2 or len(request.roi_list) > 3:
+                raise HTTPException(
+                    status_code=400,
+                    detail='Relationship mode requires 2 or 3 ROI numbers',
+                )
+            if request.relationship_overlay == 'third_structure' and len(request.roi_list) < 3:
+                raise HTTPException(
+                    status_code=400,
+                    detail='third_structure overlay requires a third ROI',
+                )
+
+        for roi in request.roi_list:
+            if roi not in structure_set.structures:
+                raise HTTPException(status_code=400, detail=f'Invalid ROI selected: {roi}')
+
+        # Default behavior excludes interpolated slices unless explicitly enabled.
+        slice_pool = set()
+        for roi in request.roi_list:
+            slice_pool.update(
+                _get_plottable_slices_for_roi(
+                    structure_set=structure_set,
+                    roi=roi,
+                    include_interpolated_slices=request.include_interpolated_slices,
+                )
+            )
+        available_slices = sorted(slice_pool)
+
+        if not available_slices:
+            detail = (
+                'No slices are available for the selected structures with the '
+                'current interpolated-slice setting.'
+            )
+            raise HTTPException(status_code=400, detail=detail)
+
+        if not _slice_matches_any(request.slice_index, available_slices):
+            detail = (
+                'Selected slice is not available for plotting with the current '
+                'interpolated-slice setting.'
+            )
+            raise HTTPException(status_code=400, detail=detail)
 
         # Create the plot
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -1771,7 +1885,10 @@ async def plot_contours(request: PlotRequest):
             roi_list=request.roi_list,
             axes=ax,
             add_axis=False,
-            tolerance=0.1
+            tolerance=request.tolerance,
+            plot_mode=request.plot_mode,
+            relationship_overlay=request.relationship_overlay,
+            show_legend=request.show_legend,
         )
 
         # Save plot to bytes buffer

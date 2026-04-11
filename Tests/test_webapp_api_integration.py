@@ -6,10 +6,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import networkx as nx
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from relations import RELATION_SCHEMA_VERSION, RELATIONSHIP_TYPES
 from relationships import StructureRelationship
+from structure_set import StructureSet
 from webapp.main import app
 import webapp.main as web_main
 from webapp.session_manager import SessionData, SessionManager
@@ -24,6 +26,18 @@ def _make_fake_structure_set(tolerance: float = 0.1):
     )
     graph.add_edge(1, 2, relationship=rel)
     return SimpleNamespace(relationship_graph=graph, tolerance=tolerance)
+
+
+def _make_fake_plot_structure_set():
+    region_table = pd.DataFrame(
+        {
+            'SliceIndex': [1.0, 2.0],
+            'Empty': [False, False],
+            'Interpolated': [False, True],
+        }
+    )
+    fake_structure = SimpleNamespace(region_table=region_table)
+    return SimpleNamespace(structures={1: fake_structure, 2: fake_structure, 3: fake_structure})
 
 
 def _prepare_client(monkeypatch, tmp_path):
@@ -184,3 +198,215 @@ def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
     assert diagram_layout.get('layout', {}).get('local_global_default') == 30
     assert 'local' in diagram_layout.get('physics', {})
     assert 'global' in diagram_layout.get('physics', {})
+
+
+def test_plot_contours_excludes_interpolated_by_default(monkeypatch, tmp_path):
+    '''Verify contour plotting blocks interpolated-only slices unless opted in.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-interp-default-off'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', lambda **kwargs: None)
+
+    blocked = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1],
+            'slice_index': 2.0,
+        },
+    )
+    assert blocked.status_code == 400
+    assert 'interpolated-slice setting' in blocked.json()['detail']
+
+    allowed = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1],
+            'slice_index': 2.0,
+            'include_interpolated_slices': True,
+        },
+    )
+    assert allowed.status_code == 200
+
+
+def test_plot_contours_forwards_render_options(monkeypatch, tmp_path):
+    '''Verify contour plot endpoint forwards mode/legend/tolerance options.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-render-options'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    captured = {}
+
+    def fake_plot_roi_slice(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    response = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1, 2],
+            'slice_index': 1.0,
+            'plot_mode': 'relationship',
+            'show_legend': False,
+            'tolerance': 0.25,
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured['plot_mode'] == 'relationship'
+    assert captured['show_legend'] is False
+    assert captured['tolerance'] == 0.25
+
+
+def test_plot_contours_supports_multi_roi_contour_mode(monkeypatch, tmp_path):
+    '''Verify contour mode can forward more than two ordered structures.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-multi-roi-contour'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    captured = {}
+
+    def fake_plot_roi_slice(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    response = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1, 2, 3],
+            'slice_index': 1.0,
+            'plot_mode': 'contour',
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured['roi_list'] == [1, 2, 3]
+    assert captured['plot_mode'] == 'contour'
+
+
+def test_plot_contours_supports_third_structure_overlay(monkeypatch, tmp_path):
+    '''Verify relationship mode can forward a selected third structure overlay.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-third-overlay'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    captured = {}
+
+    def fake_plot_roi_slice(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    response = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1, 2, 3],
+            'slice_index': 1.0,
+            'plot_mode': 'relationship',
+            'relationship_overlay': 'third_structure',
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured['roi_list'] == [1, 2, 3]
+    assert captured['relationship_overlay'] == 'third_structure'
+
+
+def test_plot_contours_rejects_invalid_render_options(monkeypatch, tmp_path):
+    '''Verify plot option validation for mode and tolerance inputs.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-invalid-options'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', lambda **kwargs: None)
+
+    bad_mode = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1],
+            'slice_index': 1.0,
+            'plot_mode': 'bad-mode',
+        },
+    )
+    assert bad_mode.status_code == 400
+    assert 'plot_mode' in bad_mode.json()['detail']
+
+    bad_tolerance = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1],
+            'slice_index': 1.0,
+            'tolerance': -0.1,
+        },
+    )
+    assert bad_tolerance.status_code == 400
+    assert 'tolerance' in bad_tolerance.json()['detail']
+
+    bad_overlay = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1, 2],
+            'slice_index': 1.0,
+            'plot_mode': 'relationship',
+            'relationship_overlay': 'third_structure',
+        },
+    )
+    assert bad_overlay.status_code == 400
+    assert 'third_structure' in bad_overlay.json()['detail']
+
+
+def test_structure_set_serializes_slice_relationships():
+    '''Verify slice relationship records are grouped by slice for the frontend.'''
+    structure_set = StructureSet(auto_calculate_relationships=False)
+    structure_set.structures = {
+        1: SimpleNamespace(name='Alpha'),
+        2: SimpleNamespace(name='Beta'),
+    }
+    structure_set.slice_relationship_records = {
+        '1|2': [
+            {
+                'slice_index': 1.0,
+                'relation_type': 'OVERLAPS',
+                'relation_symbol': 'o',
+                'is_interpolated': False,
+                'has_boundary': True,
+            }
+        ]
+    }
+
+    serialized = structure_set._serialize_slice_relationships([1, 2])
+
+    assert '1.0' in serialized
+    assert serialized['1.0'][0]['rois'] == [1, 2]
+    assert serialized['1.0'][0]['label'] == 'Alpha / Beta: OVERLAPS'
+    assert serialized['1.0'][0]['has_boundary'] is True
