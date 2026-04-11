@@ -1443,6 +1443,47 @@ tbody tr:hover {
     font-size: 0.78rem;
     text-transform: capitalize;
 }
+
+/* Node context menu */
+.node-context-menu {
+    position: fixed;
+    z-index: 9999;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: var(--shadow-lg);
+    padding: 0.25rem 0;
+    min-width: 180px;
+    font-size: 0.875rem;
+    user-select: none;
+}
+
+.node-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    cursor: pointer;
+    color: var(--text-primary);
+    white-space: nowrap;
+    transition: background 0.1s;
+}
+
+.node-context-menu-item:hover {
+    background: var(--bg-color);
+}
+
+.node-context-menu-item.is-active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.node-context-menu-separator {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.25rem 0;
+}
+
 footer {
     text-align: center;
     margin-top: 3rem;

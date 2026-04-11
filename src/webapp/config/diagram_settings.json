@@ -171,12 +171,9 @@
       "show_regions": false
     },
     "edges": {
-      "show_source": true,
-      "show_target": true,
-      "show_relationship": true,
-      "show_symbol": true,
+      "show_structures": true,
+      "relationship": "label",
       "show_direction": true,
-      "show_style": false,
       "show_logical": true,
       "show_description": true
     },

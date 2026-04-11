@@ -24,6 +24,11 @@ class WebAppClient {
         this.structureItemsByRoi = new Map();
         this.statusPollIntervalId = null;
         this.latestDiagramData = null;
+        this.hiddenNodes = new Set();    // ROI ids hidden via context menu
+        this.hiddenLabels = new Set();   // ROI ids with label hidden
+        this.fixedNodes = new Set();     // ROI ids pinned via context menu
+        this._contextMenu = null;        // active context menu DOM element
+        this._invalidTooltipRelationshipModesWarned = new Set();
         this.diagramOptions = {
             font: {
                 face: 'Arial',
@@ -1494,25 +1499,113 @@ class WebAppClient {
         return 'undirected';
     }
 
+    wrapTooltipText(text, maxChars = 80) {
+        const clean = String(text || '').trim().replace(/\s+/g, ' ');
+        if (!clean) return '';
+        const words = clean.split(' ');
+        const lines = [];
+        let current = '';
+        for (const word of words) {
+            if (!current) {
+                current = word;
+                continue;
+            }
+            if ((current.length + 1 + word.length) <= maxChars) {
+                current += ` ${word}`;
+            } else {
+                lines.push(current);
+                current = word;
+            }
+        }
+        if (current) {
+            lines.push(current);
+        }
+        return lines.join('\n');
+    }
+
+    getTooltipRelationshipMode() {
+        const edgeCfg = this.tooltipsConfig?.edges || {};
+        const rawConfigured = edgeCfg.relationship;
+        const configured = String(rawConfigured || '').trim().toLowerCase();
+        const validModes = new Set(['label', 'symbol', 'type']);
+
+        if (validModes.has(configured)) {
+            return configured;
+        }
+
+        if (rawConfigured !== undefined && rawConfigured !== null && configured !== '') {
+            const warningKey = String(rawConfigured);
+            if (!this._invalidTooltipRelationshipModesWarned.has(warningKey)) {
+                this._invalidTooltipRelationshipModesWarned.add(warningKey);
+                const warningMessage =
+                    `Invalid tooltips.edges.relationship value `
+                    + `'${warningKey}'. Falling back to 'label'. `
+                    + `Valid options: label, symbol, type.`;
+                console.warn(warningMessage);
+                this.appendStatusLogLine('frontend', warningMessage);
+            }
+            return 'label';
+        }
+
+        // Backward compatibility with legacy booleans.
+        const showSymbol = edgeCfg.show_symbol === true;
+        const showRelationship = edgeCfg.show_relationship !== false;
+        if (showSymbol && !showRelationship) {
+            return 'symbol';
+        }
+        return 'label';
+    }
+
+    isDirectionalEdge(arrows) {
+        return arrows === 'to' || arrows === 'from';
+    }
+
     buildEdgeTooltip(edge, nodes = []) {
+        const edgeCfg = this.tooltipsConfig?.edges || {};
         const nodeNameById = new Map(nodes.map(node => [node.id, node.label]));
         const sourceLabel = nodeNameById.get(edge.from_node) || `ROI ${edge.from_node}`;
         const targetLabel = nodeNameById.get(edge.to_node) || `ROI ${edge.to_node}`;
-        const relationType = edge.relation_type || String(edge.label || '').replace(/\[|\]/g, '');
-        const symbol = edge.symbol || this.symbolConfig?.relationships?.[relationType]?.symbol || 'n/a';
-        const isLogical = edge.is_logical ? 'yes' : 'no';
-        const styleText = edge.dashes ? 'dashed' : 'solid';
-        const directionText = this.getArrowMeaning(edge.arrows);
+        const relationType = String(
+            edge.relation_type || String(edge.label || '').replace(/\[|\]/g, '')
+        ).toUpperCase();
+        const relationConfig = this.symbolConfig?.relationships?.[relationType] || {};
+        const relationLabel = edge.label || relationConfig.label || relationType;
+        const relationSymbol = edge.symbol || relationConfig.symbol || '?';
+        const relationDescription = relationConfig.description || '';
+        const relationshipMode = this.getTooltipRelationshipMode();
 
-        return [
-            `Source: ${sourceLabel}`,
-            `Target: ${targetLabel}`,
-            `Relationship: ${relationType}`,
-            `Symbol: ${symbol}`,
-            `Direction: ${directionText}`,
-            `Edge style: ${styleText}, width ${edge.width || 2}`,
-            `Logical relation: ${isLogical}`
-        ].join('\n');
+        let relationToken = relationLabel;
+        if (relationshipMode === 'symbol') {
+            relationToken = relationSymbol;
+        } else if (relationshipMode === 'type') {
+            relationToken = relationType;
+        }
+
+        const showStructures = edgeCfg.show_structures !== false
+            && edgeCfg.show_source !== false
+            && edgeCfg.show_target !== false;
+        const firstLine = showStructures
+            ? `${sourceLabel} ${relationToken} ${targetLabel}`
+            : `${relationToken}`;
+
+        const lines = [firstLine];
+
+        if (edgeCfg.show_direction !== false) {
+            lines.push(
+                `Relationship is ${this.isDirectionalEdge(edge.arrows) ? 'directional' : 'non-directional'}`
+            );
+        }
+
+        if (edgeCfg.show_logical !== false) {
+            lines.push(`Relationship is ${edge.is_logical ? 'logical' : 'not logical'}`);
+        }
+
+        if (edgeCfg.show_description !== false && relationDescription) {
+            const wrappedDescription = this.wrapTooltipText(relationDescription, 80);
+            lines.push(`Description: ${wrappedDescription}`);
+        }
+
+        return lines.join('\n');
     }
 
     renderDiagramLegend(data) {
@@ -1788,6 +1881,11 @@ class WebAppClient {
 
     applyDiagramSelection() {
         this.diagramAppliedSelection = new Set(this.diagramSelection);
+        this.hiddenNodes = new Set(
+            this.structureItems
+                .map(item => parseInt(item.roi))
+                .filter(roi => !this.diagramAppliedSelection.has(roi))
+        );
         this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
         this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
         this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
@@ -1930,10 +2028,22 @@ class WebAppClient {
             );
         }
 
+        // Keep state sets aligned with currently rendered nodes.
+        const renderedNodeIds = new Set(data.nodes.map(node => Number(node.id)));
+        this.hiddenNodes = new Set(Array.from(this.hiddenNodes).filter(id => renderedNodeIds.has(Number(id))));
+        this.hiddenLabels = new Set(Array.from(this.hiddenLabels).filter(id => renderedNodeIds.has(Number(id))));
+        this.fixedNodes = new Set(Array.from(this.fixedNodes).filter(id => renderedNodeIds.has(Number(id))));
+
         // Prepare nodes for vis-network
-        const nodes = data.nodes.map(node => ({
-            id: node.id,
-            label: node.label,
+        const nodes = data.nodes.map(node => {
+            const roi = Number(node.id);
+            const originalLabel = node.label;
+            const labelHidden = this.hiddenLabels.has(roi);
+            const isPhysicsFixed = this.fixedNodes.has(roi);
+            return {
+                id: roi,
+                _originalLabel: originalLabel,
+                label: labelHidden ? '' : originalLabel,
             color: {
                 background: node.color,
                 border: this.darkenColor(node.color),
@@ -1949,8 +2059,10 @@ class WebAppClient {
                 size: Number(nodeFont.node_size || 14),
                 face: nodeFont.face || 'Arial'
             },
-            borderWidth: 2
-        }));
+                borderWidth: 2,
+                physics: !isPhysicsFixed
+            };
+        });
 
         // Prepare edges for vis-network
         const edges = data.edges.map(edge => ({
@@ -1958,7 +2070,7 @@ class WebAppClient {
             to: edge.to_node,
             label: showLabels ? edge.label : '',
             originalLabel: edge.label,
-            title: edge.title || this.buildEdgeTooltip(edge, data.nodes),
+            title: this.buildEdgeTooltip(edge, data.nodes),
             color: edge.color,
             width: edge.width,
             dashes: edge.dashes,
@@ -2009,18 +2121,60 @@ class WebAppClient {
         this.network = new vis.Network(container, { nodes, edges }, options);
 
         // Add event listeners
-        this.network.on('click', (params) => {
-            if (params.nodes.length > 0) {
-                console.log('Clicked node:', params.nodes[0]);
+        this.network.on('click', () => this._dismissContextMenu());
+
+        // Right-click: show node context menu
+        this.network.on('oncontext', (params) => {
+            params.event.preventDefault();
+            this._dismissContextMenu();
+            const domPoint = params.pointer?.DOM;
+            const hitNode = domPoint ? this.network.getNodeAt(domPoint) : null;
+            const targetNode = hitNode ?? (params.nodes.length > 0 ? params.nodes[0] : null);
+            if (targetNode !== null && targetNode !== undefined) {
+                this._showNodeContextMenu(Number(targetNode), params.event);
             }
         });
 
-        // Add double-click handler to remove structure from diagram and lists
+        // Double-click: remove structure from diagram
         this.network.on('doubleClick', (params) => {
             if (params.nodes.length > 0) {
                 const roi = params.nodes[0];
                 this.removeStructureFromDiagram(roi);
             }
+        });
+
+        // Drag-start: when Local is 100%, freeze all OTHER nodes so only the
+        // dragged node moves.  Fixed nodes stay fixed regardless.
+        this.network.on('dragStart', (params) => {
+            if (params.nodes.length === 0) return;
+            const min = Number(this.diagramOptions.layout.local_global_min ?? 0);
+            if (this.layoutInfluence !== min) return;   // only at pure-local
+            const draggedId = params.nodes[0];
+            const allIds = this.network.body.data.nodes.getIds();
+            const toFreeze = [];
+            for (const id of allIds) {
+                if (id === draggedId) continue;
+                if (this.fixedNodes.has(id)) continue;  // already fixed
+                const pos = this.network.getPositions([id])[id];
+                toFreeze.push({ id, x: pos.x, y: pos.y, physics: false });
+            }
+            this._dragFrozen = toFreeze.map(n => n.id);
+            this.network.body.data.nodes.update(toFreeze);
+        });
+
+        // Drag-end: unfreeze nodes that were only frozen for this drag
+        this.network.on('dragEnd', () => {
+            if (!this._dragFrozen || this._dragFrozen.length === 0) return;
+            const toThaw = this._dragFrozen
+                .filter(id => !this.fixedNodes.has(id))
+                .map(id => {
+                    const pos = this.network.getPositions([id])[id];
+                    return { id, x: pos.x, y: pos.y, physics: true };
+                });
+            if (toThaw.length > 0) {
+                this.network.body.data.nodes.update(toThaw);
+            }
+            this._dragFrozen = [];
         });
 
         this.renderDiagramLegend(data);
@@ -2035,6 +2189,148 @@ class WebAppClient {
             this.diagramSelection.delete(parseInt(roi));
             this.updateDiagramPendingState();
         }
+    }
+
+    _dismissContextMenu() {
+        if (this._contextMenu) {
+            this._contextMenu.remove();
+            this._contextMenu = null;
+        }
+    }
+
+    _showNodeContextMenu(roi, event) {
+        const normalizedRoi = Number(roi);
+        const node = this.network?.body?.data?.nodes?.get(normalizedRoi);
+        if (!node) return;
+
+        const isDisplayed = this.diagramAppliedSelection.has(normalizedRoi);
+        const isFixed = this.fixedNodes.has(roi);
+        const isLabelHidden = this.hiddenLabels.has(normalizedRoi);
+        const isHidden = !isDisplayed;
+
+        const menu = document.createElement('div');
+        menu.className = 'node-context-menu';
+        menu.style.left = `${event.clientX}px`;
+        menu.style.top = `${event.clientY}px`;
+
+        const items = [
+            {
+                label: isFixed ? 'Unfix Position' : 'Fix Position',
+                active: isFixed,
+                action: () => this._ctxToggleFixed(normalizedRoi),
+            },
+            { separator: true },
+            {
+                label: isLabelHidden ? 'Show Label' : 'Hide Label',
+                active: isLabelHidden,
+                action: () => this._ctxToggleLabel(normalizedRoi),
+            },
+            {
+                label: isHidden ? 'Show Structure' : 'Hide Structure',
+                active: isHidden,
+                action: () => this._ctxToggleVisibility(normalizedRoi),
+            },
+        ];
+
+        for (const item of items) {
+            if (item.separator) {
+                const sep = document.createElement('div');
+                sep.className = 'node-context-menu-separator';
+                menu.appendChild(sep);
+                continue;
+            }
+            const el = document.createElement('div');
+            el.className = 'node-context-menu-item' + (item.active ? ' is-active' : '');
+            el.textContent = item.label;
+            el.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                item.action();
+                this._dismissContextMenu();
+            });
+            menu.appendChild(el);
+        }
+
+        document.body.appendChild(menu);
+        this._contextMenu = menu;
+
+        // Flip menu if it would overflow the viewport
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = `${event.clientX - rect.width}px`;
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = `${event.clientY - rect.height}px`;
+        }
+
+        // Dismiss on next outside click
+        const dismiss = (e) => {
+            if (!menu.contains(e.target)) {
+                this._dismissContextMenu();
+                document.removeEventListener('mousedown', dismiss, true);
+            }
+        };
+        document.addEventListener('mousedown', dismiss, true);
+    }
+
+    _ctxToggleFixed(roi) {
+        if (!this.network) return;
+        if (this.fixedNodes.has(roi)) {
+            this.fixedNodes.delete(roi);
+            const pos = this.network.getPositions([roi])[roi];
+            this.network.body.data.nodes.update([
+                { id: roi, x: pos.x, y: pos.y, physics: true },
+            ]);
+        } else {
+            this.fixedNodes.add(roi);
+            const pos = this.network.getPositions([roi])[roi];
+            this.network.body.data.nodes.update([
+                { id: roi, x: pos.x, y: pos.y, physics: false },
+            ]);
+        }
+    }
+
+    _ctxToggleLabel(roi) {
+        if (!this.network) return;
+        const node = this.network.body.data.nodes.get(roi);
+        if (!node) return;
+        if (this.hiddenLabels.has(roi)) {
+            this.hiddenLabels.delete(roi);
+            this.network.body.data.nodes.update([
+                { id: roi, label: node._originalLabel || node.label || String(roi) },
+            ]);
+        } else {
+            this.hiddenLabels.add(roi);
+            const original = node._originalLabel || node.label || String(roi);
+            this.network.body.data.nodes.update([
+                { id: roi, _originalLabel: original, label: '' },
+            ]);
+        }
+    }
+
+    _ctxToggleVisibility(roi) {
+        if (!this.network) return;
+
+        const shouldShow = !this.diagramAppliedSelection.has(roi);
+
+        if (shouldShow) {
+            this.diagramSelection.add(roi);
+            this.diagramAppliedSelection.add(roi);
+            this.hiddenNodes.delete(roi);
+        } else {
+            this.diagramSelection.delete(roi);
+            this.diagramAppliedSelection.delete(roi);
+            this.hiddenNodes.add(roi);
+        }
+
+        const checkbox = document.querySelector(
+            `#diagramStructureList input[type="checkbox"][data-roi="${roi}"]`
+        );
+        if (checkbox) {
+            checkbox.checked = shouldShow;
+        }
+
+        this.updateDiagramPendingState();
+        this.refreshDiagram();
     }
 
     toggleEdgeLabels() {
@@ -2537,6 +2833,10 @@ class WebAppClient {
         this.diagramSelectionModalOpen = false;
         this.sortableListsInitialized = false;
         this.sortableInitScheduled = false;
+        this.hiddenNodes.clear();
+        this.hiddenLabels.clear();
+        this.fixedNodes.clear();
+        this._dismissContextMenu();
         if (this.websocket) {
             this.websocket.close();
             this.websocket = null;
