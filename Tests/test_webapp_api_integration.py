@@ -406,7 +406,7 @@ def test_structure_set_serializes_slice_relationships():
 
     serialized = structure_set._serialize_slice_relationships([1, 2])
 
-    assert '1.0' in serialized
-    assert serialized['1.0'][0]['rois'] == [1, 2]
-    assert serialized['1.0'][0]['label'] == 'Alpha / Beta: OVERLAPS'
-    assert serialized['1.0'][0]['has_boundary'] is True
+    assert '1.0000' in serialized
+    assert serialized['1.0000'][0]['rois'] == [1, 2]
+    assert serialized['1.0000'][0]['label'] == 'Alpha / Beta: OVERLAPS'
+    assert serialized['1.0000'][0]['has_boundary'] is True

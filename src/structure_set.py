@@ -287,7 +287,6 @@ class StructureSet:
                     relation: object,
                     region_self: object,
                     region_other: object,
-                    target_records: List[dict] = pair_slice_records,
                 ) -> None:
                     relation_type = relation.identify_relation()
 
@@ -303,7 +302,7 @@ class StructureSet:
                             return False
                         return bool(boundary) and not boundary.is_empty
 
-                    target_records.append({
+                    pair_slice_records.append({
                         'slice_index': float(slice_index),
                         'relation_type': relation_type.label,
                         'relation_symbol': relation_type.symbol,
@@ -1167,7 +1166,7 @@ class StructureSet:
                 continue
 
             for record in records:
-                slice_key = str(round_value(record['slice_index'], 4))
+                slice_key = f"{float(record['slice_index']):.4f}"
                 slice_relationships.setdefault(slice_key, []).append({
                     'rois': [roi_a, roi_b],
                     'pair_key': pair_key,

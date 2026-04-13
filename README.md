@@ -4,17 +4,9 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Fix relationship calculations:
+1. Web App Updates
 
-![alt text](image-1.png)
-
-![alt text](image.png)
-
-![alt text](image-3.png)
-
-2. Web App Updates
-
-    1. remove the box showing "true" thart appears just after uploading the DICOM data
+    1. remove the box showing "true" that appears just after uploading the DICOM data
 
     2. When processing structures replace the messages like: "Computing running (slice 92/92)" with messages like: "Calculated relationships between OralCavity (ROI 107) and opt Larynx (ROI 27) as: is Disjoint from"
 
