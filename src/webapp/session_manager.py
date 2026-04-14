@@ -278,13 +278,18 @@ class SessionManager:
             logger.error(f'Failed to save session {session_id}: {e}')
             raise OSError(f'Storage full, cannot save session. Contact administrator.') from e
 
-    def load_session(self, session_id: str) -> Optional[SessionData]:
+    def load_session(
+        self,
+        session_id: str,
+        touch: bool = True,
+    ) -> Optional[SessionData]:
         '''Load a session from disk.
 
-        Updates last_accessed timestamp and re-saves the session.
+        Updates last_accessed timestamp and optionally re-saves the session.
 
         Args:
             session_id (str): The session ID to load.
+            touch (bool): Whether to persist the last_accessed update.
 
         Returns:
             SessionData: The session data, or None if not found or expired.
@@ -303,6 +308,9 @@ class SessionManager:
 
         # Update last_accessed
         session_data.last_accessed = datetime.now()
+
+        if not touch:
+            return session_data
 
         # Re-save with updated timestamp
         try:

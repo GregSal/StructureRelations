@@ -12,6 +12,7 @@ import asyncio
 import tempfile
 import json
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -64,6 +65,8 @@ session_manager = SessionManager()
 connection_manager = ConnectionManager()
 processing_tasks: Dict[str, asyncio.Task] = {}
 cancel_events: Dict[str, asyncio.Event] = {}
+_plot_response_cache: OrderedDict = OrderedDict()
+PLOT_RESPONSE_CACHE_MAX_ENTRIES = 128
 
 # Mount static files
 static_dir = Path(__file__).parent / 'static'
@@ -1745,6 +1748,7 @@ class PlotRequest(BaseModel):
     plot_mode: str = 'contour'
     relationship_overlay: str = 'none'
     show_legend: bool = True
+    add_axis: bool = False
     tolerance: float = 0.0
 
 
@@ -1792,19 +1796,52 @@ def _slice_matches_any(candidate: float, available_slices: List[float]) -> bool:
     return any(abs(candidate - item) < 1e-6 for item in available_slices)
 
 
+def _make_plot_cache_key(request: PlotRequest, structure_set) -> tuple:
+    '''Build a stable cache key for identical contour plot requests.'''
+    return (
+        request.session_id,
+        id(structure_set),
+        tuple(int(roi) for roi in request.roi_list),
+        round(float(request.slice_index), 4),
+        bool(request.include_interpolated_slices),
+        request.plot_mode,
+        request.relationship_overlay,
+        bool(request.show_legend),
+        bool(request.add_axis),
+        round(float(request.tolerance), 4),
+    )
+
+
+def _get_cached_plot_bytes(cache_key: tuple) -> Optional[bytes]:
+    '''Return cached plot bytes when available.'''
+    cached_bytes = _plot_response_cache.get(cache_key)
+    if cached_bytes is None:
+        return None
+    _plot_response_cache.move_to_end(cache_key)
+    return cached_bytes
+
+
+def _store_cached_plot_bytes(cache_key: tuple, image_bytes: bytes) -> None:
+    '''Store plot bytes in a small bounded LRU cache.'''
+    _plot_response_cache[cache_key] = image_bytes
+    _plot_response_cache.move_to_end(cache_key)
+    while len(_plot_response_cache) > PLOT_RESPONSE_CACHE_MAX_ENTRIES:
+        _plot_response_cache.popitem(last=False)
+
+
 @app.post('/api/plot-contours')
 async def plot_contours(request: PlotRequest):
     '''Generate a contour plot for selected structures on a specific slice.
 
     Args:
-        request (PlotRequest): Contains session_id, roi_list (1-2 ROIs),
-            slice_index, and interpolated-slice preference.
+        request (PlotRequest): Contains session_id, roi_list (one or more
+            ROIs), slice_index, and interpolated-slice preference.
 
     Returns:
         StreamingResponse: PNG image of the contour plot.
     '''
     try:
-        session_data = session_manager.load_session(request.session_id)
+        session_data = session_manager.load_session(request.session_id, touch=False)
         if session_data is None:
             raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -1819,12 +1856,18 @@ async def plot_contours(request: PlotRequest):
 
         allowed_overlays = {
             'none',
+            'single_structure',
             'third_structure',
+            'all_outlines',
             'structure_1',
             'structure_2',
             'intersection_ab',
             'a_minus_b',
             'a_xor_b',
+            'intersection_vs_c',
+            'union_vs_c',
+            'xor_vs_c',
+            'difference_vs_c',
         }
         if request.relationship_overlay not in allowed_overlays:
             raise HTTPException(status_code=400, detail='relationship_overlay is invalid')
@@ -1836,15 +1879,45 @@ async def plot_contours(request: PlotRequest):
             if len(request.roi_list) == 0:
                 raise HTTPException(status_code=400, detail='Must provide at least 1 ROI number')
         else:
-            if len(request.roi_list) < 2 or len(request.roi_list) > 3:
+            if len(request.roi_list) == 0:
                 raise HTTPException(
                     status_code=400,
-                    detail='Relationship mode requires 2 or 3 ROI numbers',
+                    detail='Relationship mode requires at least 1 ROI number',
                 )
-            if request.relationship_overlay == 'third_structure' and len(request.roi_list) < 3:
+
+            if request.relationship_overlay == 'single_structure':
+                if len(request.roi_list) != 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail='single_structure overlay requires exactly 1 ROI number',
+                    )
+            else:
+                if len(request.roi_list) < 2:
+                    raise HTTPException(
+                        status_code=400,
+                        detail='Relationship mode requires at least 2 ROI numbers',
+                    )
+
+            if (
+                request.relationship_overlay != 'all_outlines'
+                and len(request.roi_list) > 3
+            ):
                 raise HTTPException(
                     status_code=400,
-                    detail='third_structure overlay requires a third ROI',
+                    detail='Relationship mode supports more than 3 ROIs only for all_outlines',
+                )
+
+            if request.relationship_overlay in {
+                'third_structure',
+                'all_outlines',
+                'intersection_vs_c',
+                'union_vs_c',
+                'xor_vs_c',
+                'difference_vs_c',
+            } and len(request.roi_list) < 3:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f'{request.relationship_overlay} overlay requires a third ROI',
                 )
 
         for roi in request.roi_list:
@@ -1877,6 +1950,11 @@ async def plot_contours(request: PlotRequest):
             )
             raise HTTPException(status_code=400, detail=detail)
 
+        cache_key = _make_plot_cache_key(request, structure_set)
+        cached_image = _get_cached_plot_bytes(cache_key)
+        if cached_image is not None:
+            return StreamingResponse(io.BytesIO(cached_image), media_type='image/png')
+
         # Create the plot
         fig, ax = plt.subplots(figsize=(10, 10))
         plot_roi_slice(
@@ -1884,7 +1962,7 @@ async def plot_contours(request: PlotRequest):
             slice_index=request.slice_index,
             roi_list=request.roi_list,
             axes=ax,
-            add_axis=False,
+            add_axis=request.add_axis,
             tolerance=request.tolerance,
             plot_mode=request.plot_mode,
             relationship_overlay=request.relationship_overlay,
@@ -1893,11 +1971,12 @@ async def plot_contours(request: PlotRequest):
 
         # Save plot to bytes buffer
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-        buf.seek(0)
+        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        image_bytes = buf.getvalue()
+        _store_cached_plot_bytes(cache_key, image_bytes)
         plt.close(fig)
 
-        return StreamingResponse(buf, media_type='image/png')
+        return StreamingResponse(io.BytesIO(image_bytes), media_type='image/png')
 
     except HTTPException:
         raise

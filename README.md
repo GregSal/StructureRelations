@@ -4,13 +4,34 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Web App Updates
+1. Processing Updates
 
     1. remove the box showing "true" that appears just after uploading the DICOM data
 
     2. When processing structures replace the messages like: "Computing running (slice 92/92)" with messages like: "Calculated relationships between OralCavity (ROI 107) and opt Larynx (ROI 27) as: is Disjoint from"
 
     3. The progress bar is not scaled correctly. When it starts calculating relationships, it should be at about 30%, when it finishes calculating relationships it should be at 70% During the time that it is rendering the diagram it should be progressing from about 80% to 100%.
+
+2. Contour Plot Updates
+
+    1. The y axis of the contour plot should be flipped.
+
+    2. The Relationship overlay options should change depending on how many
+        structures are selected.
+        1. If only one structure is selected, the only option should be: Structure A
+        2. If two structures are selected, the only options should be: A vs B
+        3. If three structures are selected, the options should be:
+            - A vs B, C outline
+            - (A AND B) vs C
+            - (A OR B) vs C
+            - (A XOR B) vs C
+            - (A - B) vs C
+        4. If more than three structures are selected, the only options should
+            be: A vs B , outlines of all other structures
+
+    with the "A vs B, C outline" and "A vs B , outlines" (Structure A and, B are displayed in as they are with only two structures selected and all other selected structures are drawn as outlines)
+
+    3. Add an option to plot an axis
 
     4. The tooltip for the structure sets should have the upload prefix dropped from the file name.  This should also apply internally to the file name attribute in the structure set.
     ![alt text](image-2.png)
@@ -27,6 +48,13 @@ Test and reports on relationships between DICOM RT Structures
     - Populate it from DICOM data
     - For manually entered contours accept a unit parameter
     - set a default value
+
+6. Add an optional origin/ isocentre attribute to StructureSet
+    - The structure Set DICOM data does not contain an origin or isocentre, but
+      it is included in the DICOM RT Plan. In teh future, when we add support
+      for DICOM RT Plan, we can populate this attribute from the DICOM data.
+      For now, it should be possible to set is manually for the sake of testing.
+
 
 6. Begin work on Metric Calculations
 

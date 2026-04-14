@@ -25,6 +25,13 @@ from region_slice import RegionSlice
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def _flip_y_axis_if_needed(ax) -> None:
+    '''Invert the y-axis once so plots match image-style coordinates.'''
+    if not ax.yaxis_inverted():
+        ax.invert_yaxis()
+
+
 # %% functions
 def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
     '''Plot the difference between two polygons.
@@ -80,6 +87,8 @@ def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
     if add_axis:
         ax.axhline(0, color='gray', linestyle='--')
         ax.axvline(0, color='gray', linestyle='--')
+
+    _flip_y_axis_if_needed(ax)
     if not axes:
         plt.show()
     return ax
@@ -165,12 +174,18 @@ def plot_roi_slice(structure_set: StructureSet,
 
     allowed_overlays = {
         'none',
+        'single_structure',
         'third_structure',
+        'all_outlines',
         'structure_1',
         'structure_2',
         'intersection_ab',
         'a_minus_b',
         'a_xor_b',
+        'intersection_vs_c',
+        'union_vs_c',
+        'xor_vs_c',
+        'difference_vs_c',
     }
     if relationship_overlay not in allowed_overlays:
         raise ValueError(
@@ -181,14 +196,30 @@ def plot_roi_slice(structure_set: StructureSet,
     if len(roi_list) == 0:
         raise ValueError('At least one ROI must be provided.')
 
-    if plot_mode == 'relationship' and len(roi_list) < 2:
-        raise ValueError('Relationship mode requires at least 2 ROIs.')
+    if plot_mode == 'relationship' and len(roi_list) < 1:
+        raise ValueError('Relationship mode requires at least 1 ROI.')
 
-    if plot_mode == 'relationship' and len(roi_list) > 3:
-        raise ValueError('Relationship mode supports at most 3 ROIs.')
+    if (
+        plot_mode == 'relationship'
+        and len(roi_list) > 3
+        and relationship_overlay != 'all_outlines'
+    ):
+        raise ValueError(
+            'Relationship mode supports at most 3 ROIs unless using '
+            'all_outlines.'
+        )
 
-    if relationship_overlay == 'third_structure' and len(roi_list) < 3:
-        raise ValueError('third_structure overlay requires a third ROI.')
+    if relationship_overlay in {
+        'third_structure',
+        'all_outlines',
+        'intersection_vs_c',
+        'union_vs_c',
+        'xor_vs_c',
+        'difference_vs_c',
+    } and len(roi_list) < 3:
+        raise ValueError(
+            f'{relationship_overlay} overlay requires a third ROI.'
+        )
 
     # Validate ROIs exist
     for roi in roi_list:
@@ -344,60 +375,190 @@ def plot_roi_slice(structure_set: StructureSet,
         if show_legend and legend_handles:
             ax.legend(handles=legend_handles, loc='upper right')
     else:
-        structure_a = structures[0]
-        structure_b = structures[1]
-        poly_a = geometries[0]
-        poly_b = geometries[1]
+        if len(structures) == 1 or relationship_overlay == 'single_structure':
+            structure_a = structures[0]
+            poly_a = geometries[0]
 
-        ax = plot_ab(poly_a, poly_b, add_axis=add_axis, axes=ax)
-        plot_tolerance_bands(ax, poly_a, poly_b)
+            plot_filled_geometry(ax, poly_a, 'blue', alpha=1.0)
+            plot_outline_geometry(ax, poly_a, 'blue')
+            plot_tolerance_outline(ax, poly_a, 'blue')
+            ax.set_title(f'{structure_a.name} at slice {slice_index}', color='gray')
 
-        overlay_geom = None
-        overlay_label = None
-        if relationship_overlay == 'third_structure':
-            overlay_geom = geometries[2]
-            overlay_label = structures[2].name
-        elif relationship_overlay == 'structure_1':
-            overlay_geom = poly_a
-            overlay_label = structure_a.name
-        elif relationship_overlay == 'structure_2':
-            overlay_geom = poly_b
-            overlay_label = structure_b.name
-        elif relationship_overlay == 'intersection_ab':
-            overlay_geom = shapely.intersection(poly_a, poly_b)
-            overlay_label = 'A ∩ B'
-        elif relationship_overlay == 'a_minus_b':
-            overlay_geom = shapely.difference(poly_a, poly_b)
-            overlay_label = 'A - B'
-        elif relationship_overlay == 'a_xor_b':
-            overlay_geom = shapely.symmetric_difference(poly_a, poly_b)
-            overlay_label = 'A XOR B'
+            if show_legend:
+                handles = [
+                    Patch(facecolor='blue', edgecolor='blue', label=structure_a.name),
+                ]
+                ax.legend(handles=handles, loc='upper right')
+        else:
+            structure_a = structures[0]
+            structure_b = structures[1]
+            poly_a = geometries[0]
+            poly_b = geometries[1]
 
-        if overlay_geom is not None and not overlay_geom.is_empty:
-            plot_filled_geometry(ax, overlay_geom, 'red', alpha=0.45)
-            plot_outline_geometry(ax, overlay_geom, 'red')
-            plot_tolerance_outline(ax, overlay_geom, 'red')
+            derived_overlay_map = {
+                'intersection_vs_c': (
+                    shapely.intersection(poly_a, poly_b),
+                    f'{structure_a.name} AND {structure_b.name}',
+                ),
+                'union_vs_c': (
+                    shapely.union(poly_a, poly_b),
+                    f'{structure_a.name} OR {structure_b.name}',
+                ),
+                'xor_vs_c': (
+                    shapely.symmetric_difference(poly_a, poly_b),
+                    f'{structure_a.name} XOR {structure_b.name}',
+                ),
+                'difference_vs_c': (
+                    shapely.difference(poly_a, poly_b),
+                    f'{structure_a.name} - {structure_b.name}',
+                ),
+            }
 
-        ax.set_title(
-            f'{structure_a.name} vs {structure_b.name} at slice {slice_index}',
-            color='gray',
-        )
+            if relationship_overlay in derived_overlay_map:
+                derived_geom, derived_label = derived_overlay_map[
+                    relationship_overlay
+                ]
+                structure_c = structures[2]
+                poly_c = geometries[2]
 
-        if show_legend:
-            handles = [
-                Patch(facecolor='blue', edgecolor='blue', label=f'{structure_a.name} only'),
-                Patch(facecolor='green', edgecolor='green', label=f'{structure_b.name} only'),
-                Patch(facecolor='orange', edgecolor='orange', label='Intersection'),
-            ]
-            if overlay_geom is not None and not overlay_geom.is_empty:
-                handles.append(
-                    Patch(facecolor='red', edgecolor='red', alpha=0.45, label=overlay_label)
+                ax = plot_ab(derived_geom, poly_c, add_axis=add_axis, axes=ax)
+                plot_tolerance_bands(ax, derived_geom, poly_c)
+                ax.set_title(
+                    f'{derived_label} vs {structure_c.name} at slice {slice_index}',
+                    color='gray',
                 )
-            ax.legend(handles=handles, loc='upper right')
+
+                if show_legend:
+                    handles = [
+                        Patch(
+                            facecolor='blue',
+                            edgecolor='blue',
+                            label=f'{derived_label} only',
+                        ),
+                        Patch(
+                            facecolor='green',
+                            edgecolor='green',
+                            label=f'{structure_c.name} only',
+                        ),
+                        Patch(
+                            facecolor='orange',
+                            edgecolor='orange',
+                            label='Intersection',
+                        ),
+                    ]
+                    ax.legend(handles=handles, loc='upper right')
+            else:
+                ax = plot_ab(poly_a, poly_b, add_axis=add_axis, axes=ax)
+                plot_tolerance_bands(ax, poly_a, poly_b)
+
+                overlay_geom = None
+                overlay_label = None
+                outline_handles = []
+                title = f'{structure_a.name} vs {structure_b.name} at slice {slice_index}'
+
+                if relationship_overlay == 'third_structure':
+                    title = (
+                        f'{structure_a.name} vs {structure_b.name}, '
+                        f'{structures[2].name} outline at slice {slice_index}'
+                    )
+                    outline_color = color_cycle[2 % len(color_cycle)]
+                    overlay_geom = geometries[2]
+                    if not overlay_geom.is_empty:
+                        plot_outline_geometry(ax, overlay_geom, outline_color)
+                        plot_tolerance_outline(ax, overlay_geom, outline_color)
+                        if show_legend:
+                            outline_handles.append(
+                                Line2D(
+                                    [0],
+                                    [0],
+                                    color=outline_color,
+                                    lw=2,
+                                    label=structures[2].name,
+                                )
+                            )
+                    overlay_geom = None
+                elif relationship_overlay == 'all_outlines':
+                    title = (
+                        f'{structure_a.name} vs {structure_b.name} '
+                        f'(+{len(structures) - 2} outlines) at slice {slice_index}'
+                    )
+                    for idx, (structure, outline_geom) in enumerate(
+                        zip(structures[2:], geometries[2:]),
+                        start=2,
+                    ):
+                        if outline_geom.is_empty:
+                            continue
+                        outline_color = color_cycle[idx % len(color_cycle)]
+                        plot_outline_geometry(ax, outline_geom, outline_color)
+                        plot_tolerance_outline(ax, outline_geom, outline_color)
+                        if show_legend:
+                            outline_handles.append(
+                                Line2D(
+                                    [0],
+                                    [0],
+                                    color=outline_color,
+                                    lw=2,
+                                    label=structure.name,
+                                )
+                            )
+                elif relationship_overlay == 'structure_1':
+                    overlay_geom = poly_a
+                    overlay_label = structure_a.name
+                elif relationship_overlay == 'structure_2':
+                    overlay_geom = poly_b
+                    overlay_label = structure_b.name
+                elif relationship_overlay == 'intersection_ab':
+                    overlay_geom = shapely.intersection(poly_a, poly_b)
+                    overlay_label = 'A ∩ B'
+                elif relationship_overlay == 'a_minus_b':
+                    overlay_geom = shapely.difference(poly_a, poly_b)
+                    overlay_label = 'A - B'
+                elif relationship_overlay == 'a_xor_b':
+                    overlay_geom = shapely.symmetric_difference(poly_a, poly_b)
+                    overlay_label = 'A XOR B'
+
+                if overlay_geom is not None and not overlay_geom.is_empty:
+                    plot_filled_geometry(ax, overlay_geom, 'red', alpha=0.45)
+                    plot_outline_geometry(ax, overlay_geom, 'red')
+                    plot_tolerance_outline(ax, overlay_geom, 'red')
+
+                ax.set_title(title, color='gray')
+
+                if show_legend:
+                    handles = [
+                        Patch(
+                            facecolor='blue',
+                            edgecolor='blue',
+                            label=f'{structure_a.name} only',
+                        ),
+                        Patch(
+                            facecolor='green',
+                            edgecolor='green',
+                            label=f'{structure_b.name} only',
+                        ),
+                        Patch(
+                            facecolor='orange',
+                            edgecolor='orange',
+                            label='Intersection',
+                        ),
+                    ]
+                    handles.extend(outline_handles)
+                    if overlay_geom is not None and not overlay_geom.is_empty:
+                        handles.append(
+                            Patch(
+                                facecolor='red',
+                                edgecolor='red',
+                                alpha=0.45,
+                                label=overlay_label,
+                            )
+                        )
+                    ax.legend(handles=handles, loc='upper right')
 
     if add_axis and plot_mode == 'contour':
         ax.axhline(0, color='gray', linestyle='--')
         ax.axvline(0, color='gray', linestyle='--')
+
+    _flip_y_axis_if_needed(ax)
 
     if show_plot:
         plt.show()

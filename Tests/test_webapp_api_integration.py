@@ -37,7 +37,14 @@ def _make_fake_plot_structure_set():
         }
     )
     fake_structure = SimpleNamespace(region_table=region_table)
-    return SimpleNamespace(structures={1: fake_structure, 2: fake_structure, 3: fake_structure})
+    return SimpleNamespace(
+        structures={
+            1: fake_structure,
+            2: fake_structure,
+            3: fake_structure,
+            4: fake_structure,
+        }
+    )
 
 
 def _prepare_client(monkeypatch, tmp_path):
@@ -260,6 +267,7 @@ def test_plot_contours_forwards_render_options(monkeypatch, tmp_path):
             'slice_index': 1.0,
             'plot_mode': 'relationship',
             'show_legend': False,
+            'add_axis': True,
             'tolerance': 0.25,
         },
     )
@@ -267,6 +275,7 @@ def test_plot_contours_forwards_render_options(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert captured['plot_mode'] == 'relationship'
     assert captured['show_legend'] is False
+    assert captured['add_axis'] is True
     assert captured['tolerance'] == 0.25
 
 
@@ -333,6 +342,112 @@ def test_plot_contours_supports_third_structure_overlay(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert captured['roi_list'] == [1, 2, 3]
     assert captured['relationship_overlay'] == 'third_structure'
+
+
+def test_plot_contours_supports_single_structure_relationship_mode(monkeypatch, tmp_path):
+    '''Verify relationship mode accepts the single-structure filled view.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-single-relationship'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    captured = {}
+
+    def fake_plot_roi_slice(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    response = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1],
+            'slice_index': 1.0,
+            'plot_mode': 'relationship',
+            'relationship_overlay': 'single_structure',
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured['roi_list'] == [1]
+    assert captured['relationship_overlay'] == 'single_structure'
+
+
+def test_plot_contours_supports_all_outlines_overlay(monkeypatch, tmp_path):
+    '''Verify relationship mode can forward all selected ROIs for outline overlays.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-all-outlines'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    captured = {}
+
+    def fake_plot_roi_slice(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    response = client.post(
+        '/api/plot-contours',
+        json={
+            'session_id': session_id,
+            'roi_list': [1, 2, 3, 4],
+            'slice_index': 1.0,
+            'plot_mode': 'relationship',
+            'relationship_overlay': 'all_outlines',
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured['roi_list'] == [1, 2, 3, 4]
+    assert captured['relationship_overlay'] == 'all_outlines'
+
+
+def test_plot_contours_reuses_cached_render_for_identical_requests(monkeypatch, tmp_path):
+    '''Verify identical contour plot requests do not rerender more than once.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'plot-cache-hit'
+    fake_set = _make_fake_plot_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    call_count = {'count': 0}
+
+    def fake_plot_roi_slice(**kwargs):
+        call_count['count'] += 1
+
+    monkeypatch.setattr(web_main, 'plot_roi_slice', fake_plot_roi_slice)
+
+    payload = {
+        'session_id': session_id,
+        'roi_list': [1, 2],
+        'slice_index': 1.0,
+        'plot_mode': 'relationship',
+        'relationship_overlay': 'none',
+        'show_legend': True,
+        'tolerance': 0.0,
+    }
+
+    response_a = client.post('/api/plot-contours', json=payload)
+    response_b = client.post('/api/plot-contours', json=payload)
+    response_c = client.post(
+        '/api/plot-contours',
+        json={**payload, 'slice_index': 2.0, 'include_interpolated_slices': True},
+    )
+
+    assert response_a.status_code == 200
+    assert response_b.status_code == 200
+    assert response_c.status_code == 200
+    assert call_count['count'] == 2
 
 
 def test_plot_contours_rejects_invalid_render_options(monkeypatch, tmp_path):

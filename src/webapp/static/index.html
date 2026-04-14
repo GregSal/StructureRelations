@@ -338,13 +338,7 @@
                                 <div class="control-group">
                                     <label for="relationshipOverlaySelect">Relationship overlay:</label>
                                     <select id="relationshipOverlaySelect" class="structure-select">
-                                        <option value="none">A vs B</option>
-                                        <option value="third_structure">Selected Structure 3</option>
-                                        <option value="structure_1">Structure 1</option>
-                                        <option value="structure_2">Structure 2</option>
-                                        <option value="intersection_ab">A ∩ B</option>
-                                        <option value="a_minus_b">A - B</option>
-                                        <option value="a_xor_b">A XOR B</option>
+                                        <option value="none">Select structures to choose overlay</option>
                                     </select>
                                     <p class="control-help" id="relationshipOverlayHelp">
                                         Relationship mode requires at least two selected structures.
@@ -354,6 +348,10 @@
                                     <label class="checkbox-inline" for="showLegendToggle">
                                         <input type="checkbox" id="showLegendToggle" checked>
                                         Show legend
+                                    </label>
+                                    <label class="checkbox-inline" for="showAxisToggle">
+                                        <input type="checkbox" id="showAxisToggle">
+                                        Plot axis
                                     </label>
                                 </div>
                                 <div class="control-group checkbox-group">
@@ -435,7 +433,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=113"></script>
+    <script src="static/js/app.js?v=116"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

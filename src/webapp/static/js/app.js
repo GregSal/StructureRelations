@@ -91,6 +91,11 @@ class WebAppClient {
         this.sliceRelationships = {};
         this.contourStructureLabels = {};
         this.contourStructureColors = {};
+        this.plotImageCache = new Map();
+        this.maxPlotCacheEntries = 48;
+        this.plotDebounceTimer = null;
+        this.plotDebounceMs = 120;
+        this.lastRenderedPlotKey = null;
 
         this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
@@ -519,17 +524,20 @@ class WebAppClient {
         document.getElementById('sliceSlider').addEventListener('input', (e) => {
             this.updateSliceValue(e.target.value);
             this.updateSliderArrows();
-            this.plotContours({ suppressAlerts: true });
+            this.schedulePlotContours({ suppressAlerts: true });
         });
         document.getElementById('sliceDropdown').addEventListener('change', (e) => {
             const slider = document.getElementById('sliceSlider');
             slider.value = e.target.value;
             this.updateSliceValue(e.target.value);
             this.updateSliderArrows();
-            this.plotContours({ suppressAlerts: true });
+            this.schedulePlotContours({ suppressAlerts: true, debounceMs: 0 });
         });
         document.getElementById('includeInterpolatedSlicesToggle').addEventListener('change', () => {
             this.updateSliceRangeForStructures();
+        });
+        document.getElementById('showAxisToggle').addEventListener('change', () => {
+            this.schedulePlotContours({ suppressAlerts: true, debounceMs: 0 });
         });
         document.getElementById('showToleranceToggle').addEventListener('change', (e) => {
             const toleranceInput = document.getElementById('toleranceInput');
@@ -2521,6 +2529,7 @@ class WebAppClient {
     }
 
     populateContourPlotControls(data) {
+        this.clearContourPlotCache();
         this.allSliceIndices = data.slice_indices || [];
         this.allSliceIndicesOriginal = data.slice_indices_original || this.allSliceIndices;
         this.structureSlices = data.structure_slices || {};
@@ -2538,6 +2547,7 @@ class WebAppClient {
         document.getElementById('plotModeSelect').value = 'relationship';
         document.getElementById('relationshipOverlaySelect').value = 'none';
         document.getElementById('showLegendToggle').checked = true;
+        document.getElementById('showAxisToggle').checked = false;
         document.getElementById('showToleranceToggle').checked = true;
         document.getElementById('toleranceInput').value = '0.10';
         document.getElementById('toleranceInput').disabled = false;
@@ -2657,32 +2667,136 @@ class WebAppClient {
         this.updateContourSelectionState();
     }
 
+    getRelationshipOverlayOptions(selectedCount) {
+        if (selectedCount <= 0) {
+            return [];
+        }
+        if (selectedCount === 1) {
+            return [{ value: 'single_structure', label: 'Structure A' }];
+        }
+        if (selectedCount === 2) {
+            return [{ value: 'none', label: 'A vs B' }];
+        }
+        if (selectedCount === 3) {
+            return [
+                { value: 'third_structure', label: 'A vs B, C outline' },
+                { value: 'intersection_vs_c', label: '(A AND B) vs C' },
+                { value: 'union_vs_c', label: '(A OR B) vs C' },
+                { value: 'xor_vs_c', label: '(A XOR B) vs C' },
+                { value: 'difference_vs_c', label: '(A - B) vs C' },
+            ];
+        }
+        return [
+            {
+                value: 'all_outlines',
+                label: 'A vs B, outlines of all other structures',
+            },
+        ];
+    }
+
+    setRelationshipOverlayOptions(selectedCount) {
+        const overlaySelect = document.getElementById('relationshipOverlaySelect');
+        const currentValue = overlaySelect ? overlaySelect.value : 'none';
+        const options = this.getRelationshipOverlayOptions(selectedCount);
+
+        overlaySelect.innerHTML = '';
+
+        if (options.length === 0) {
+            return currentValue;
+        }
+
+        options.forEach((option) => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            overlaySelect.appendChild(optionElement);
+        });
+
+        const hasCurrentValue = options.some(
+            (option) => option.value === currentValue
+        );
+        overlaySelect.value = hasCurrentValue ? currentValue : options[0].value;
+        return overlaySelect.value;
+    }
+
+    getRequiredRelationshipOverlayCount(overlayMode) {
+        if (overlayMode === 'single_structure') {
+            return 1;
+        }
+        if (
+            [
+                'third_structure',
+                'intersection_vs_c',
+                'union_vs_c',
+                'xor_vs_c',
+                'difference_vs_c',
+                'all_outlines',
+            ].includes(overlayMode)
+        ) {
+            return 3;
+        }
+        return 2;
+    }
+
+    getRelationshipPlotRois(selectedRois, overlayMode) {
+        if (overlayMode === 'single_structure') {
+            return selectedRois.slice(0, 1);
+        }
+        if (
+            [
+                'third_structure',
+                'intersection_vs_c',
+                'union_vs_c',
+                'xor_vs_c',
+                'difference_vs_c',
+            ].includes(overlayMode)
+        ) {
+            return selectedRois.slice(0, 3);
+        }
+        if (overlayMode === 'all_outlines') {
+            return [...selectedRois];
+        }
+        return selectedRois.slice(0, 2);
+    }
+
     updateRelationshipOverlayState() {
         const mode = this.getContourPlotMode();
         const overlaySelect = document.getElementById('relationshipOverlaySelect');
         const overlayHelp = document.getElementById('relationshipOverlayHelp');
         const selectedRois = this.getSelectedContourRois();
         const isRelationshipMode = mode === 'relationship';
+        const activeOverlay = this.setRelationshipOverlayOptions(selectedRois.length);
 
-        overlaySelect.disabled = !isRelationshipMode;
+        overlaySelect.disabled = !isRelationshipMode || selectedRois.length === 0;
         if (!isRelationshipMode) {
             overlayHelp.textContent = 'Overlay options are only used in relationship mode.';
             return;
         }
 
-        if (selectedRois.length < 2) {
-            overlayHelp.textContent = 'Relationship mode requires at least two selected structures.';
-            return;
-        }
-
-        if (overlaySelect.value === 'third_structure' && selectedRois.length < 3) {
-            overlayHelp.textContent = 'Selected Structure 3 requires at least three selected structures.';
+        if (selectedRois.length === 0) {
+            overlayHelp.textContent = 'Select at least one structure to plot.';
             return;
         }
 
         const firstLabel = this.contourStructureLabels[String(selectedRois[0])] || 'Structure 1';
+        if (selectedRois.length === 1) {
+            overlayHelp.textContent = `A = ${firstLabel}.`;
+            return;
+        }
+
         const secondLabel = this.contourStructureLabels[String(selectedRois[1])] || 'Structure 2';
-        overlayHelp.textContent = `A = ${firstLabel}; B = ${secondLabel}.`;
+        if (selectedRois.length === 2) {
+            overlayHelp.textContent = `A = ${firstLabel}; B = ${secondLabel}.`;
+            return;
+        }
+
+        if (activeOverlay === 'all_outlines' || selectedRois.length > 3) {
+            overlayHelp.textContent = `A = ${firstLabel}; B = ${secondLabel}; all additional selected structures are shown as outlines.`;
+            return;
+        }
+
+        const thirdLabel = this.contourStructureLabels[String(selectedRois[2])] || 'Structure 3';
+        overlayHelp.textContent = `A = ${firstLabel}; B = ${secondLabel}; C = ${thirdLabel}.`;
     }
 
     isInterpolatedSliceEnabled() {
@@ -2950,6 +3064,11 @@ class WebAppClient {
         return !!(legendToggle && legendToggle.checked);
     }
 
+    shouldShowContourAxis() {
+        const axisToggle = document.getElementById('showAxisToggle');
+        return !!(axisToggle && axisToggle.checked);
+    }
+
     getContourTolerance() {
         const toleranceToggle = document.getElementById('showToleranceToggle');
         const toleranceInput = document.getElementById('toleranceInput');
@@ -2963,6 +3082,113 @@ class WebAppClient {
             return 0.0;
         }
         return parsed;
+    }
+
+    getContourPlotPayload() {
+        const selectedRois = this.getSelectedContourRois();
+        const sliderValue = document.getElementById('sliceSlider').value;
+        const plotMode = this.getContourPlotMode();
+        const overlayMode = this.getRelationshipOverlayMode();
+        const roiList = plotMode === 'relationship'
+            ? this.getRelationshipPlotRois(selectedRois, overlayMode)
+            : selectedRois;
+        const sliceIndex = this.sliceIndices[parseInt(sliderValue)];
+
+        return {
+            selectedRois,
+            plotMode,
+            overlayMode,
+            roiList,
+            payload: {
+                session_id: this.sessionId,
+                roi_list: roiList,
+                slice_index: sliceIndex,
+                include_interpolated_slices: this.isInterpolatedSliceEnabled(),
+                plot_mode: plotMode,
+                relationship_overlay: overlayMode,
+                show_legend: this.shouldShowContourLegend(),
+                add_axis: this.shouldShowContourAxis(),
+                tolerance: this.getContourTolerance(),
+            },
+        };
+    }
+
+    getContourPlotCacheKey(payload) {
+        return [
+            payload.session_id || '',
+            (payload.roi_list || []).join(','),
+            Number(payload.slice_index).toFixed(4),
+            payload.include_interpolated_slices ? '1' : '0',
+            payload.plot_mode,
+            payload.relationship_overlay,
+            payload.show_legend ? '1' : '0',
+            payload.add_axis ? '1' : '0',
+            Number(payload.tolerance || 0).toFixed(4),
+        ].join('|');
+    }
+
+    cacheContourPlotImage(cacheKey, imageUrl) {
+        if (!cacheKey || !imageUrl) {
+            return;
+        }
+
+        if (this.plotImageCache.has(cacheKey)) {
+            this.plotImageCache.delete(cacheKey);
+        }
+        this.plotImageCache.set(cacheKey, imageUrl);
+
+        while (this.plotImageCache.size > this.maxPlotCacheEntries) {
+            const oldestEntry = this.plotImageCache.entries().next().value;
+            if (!oldestEntry) {
+                break;
+            }
+            const [oldestKey, oldestUrl] = oldestEntry;
+            if (oldestUrl && oldestUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(oldestUrl);
+            }
+            this.plotImageCache.delete(oldestKey);
+        }
+    }
+
+    showCachedContourPlot(cacheKey) {
+        if (!cacheKey || !this.plotImageCache.has(cacheKey)) {
+            return false;
+        }
+
+        const plotImg = document.getElementById('contourPlot');
+        plotImg.src = this.plotImageCache.get(cacheKey);
+        plotImg.style.display = 'block';
+        this.lastRenderedPlotKey = cacheKey;
+        return true;
+    }
+
+    clearContourPlotCache() {
+        this.plotImageCache.forEach((imageUrl) => {
+            if (imageUrl && imageUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(imageUrl);
+            }
+        });
+        this.plotImageCache.clear();
+        this.lastRenderedPlotKey = null;
+    }
+
+    schedulePlotContours(options = {}) {
+        const { debounceMs = this.plotDebounceMs, suppressAlerts = false } = options;
+
+        if (this.plotDebounceTimer) {
+            clearTimeout(this.plotDebounceTimer);
+            this.plotDebounceTimer = null;
+        }
+
+        if (debounceMs <= 0) {
+            this.plotContours({ suppressAlerts });
+            return;
+        }
+
+        this.plotDebounceTimer = setTimeout(() => {
+            this.plotDebounceTimer = null;
+            this.plotContours({ suppressAlerts });
+        }, debounceMs);
     }
 
     initializePlotControls() {
@@ -3061,10 +3287,12 @@ class WebAppClient {
 
     async plotContours(options = {}) {
         const { suppressAlerts = false } = options;
-        const selectedRois = this.getSelectedContourRois();
-        const sliderValue = document.getElementById('sliceSlider').value;
-        const plotMode = this.getContourPlotMode();
-        const overlayMode = this.getRelationshipOverlayMode();
+        const {
+            selectedRois,
+            plotMode,
+            overlayMode,
+            payload,
+        } = this.getContourPlotPayload();
 
         if (selectedRois.length === 0) {
             if (!suppressAlerts) {
@@ -3073,26 +3301,33 @@ class WebAppClient {
             return;
         }
 
-        if (plotMode === 'relationship' && selectedRois.length < 2) {
-            if (!suppressAlerts) {
-                alert('Relationship mode requires at least two selected structures');
+        if (plotMode === 'relationship') {
+            const requiredCount = this.getRequiredRelationshipOverlayCount(
+                overlayMode
+            );
+            if (selectedRois.length < requiredCount) {
+                if (!suppressAlerts) {
+                    const noun = requiredCount === 1 ? 'structure' : 'structures';
+                    alert(
+                        `This relationship view requires at least ${requiredCount} selected ${noun}`
+                    );
+                }
+                return;
             }
+        }
+
+        const cacheKey = this.getContourPlotCacheKey(payload);
+        const plotImg = document.getElementById('contourPlot');
+        const loadingOverlay = document.getElementById('plotLoading');
+
+        if (cacheKey === this.lastRenderedPlotKey && plotImg.src) {
             return;
         }
 
-        if (plotMode === 'relationship' && overlayMode === 'third_structure' && selectedRois.length < 3) {
-            if (!suppressAlerts) {
-                alert('Selected Structure 3 overlay requires at least three selected structures');
-            }
+        if (this.showCachedContourPlot(cacheKey)) {
+            loadingOverlay.classList.remove('active');
             return;
         }
-
-        const roiList = plotMode === 'relationship'
-            ? selectedRois.slice(0, overlayMode === 'third_structure' ? 3 : 2)
-            : selectedRois;
-
-        // Get actual slice value from discrete indices
-        const sliceIndex = this.sliceIndices[parseInt(sliderValue)];
 
         // Cancel any in-flight request
         if (this.plotAbortController) {
@@ -3104,7 +3339,6 @@ class WebAppClient {
         const signal = this.plotAbortController.signal;
 
         // Show loading indicator
-        const loadingOverlay = document.getElementById('plotLoading');
         loadingOverlay.classList.add('active');
 
         try {
@@ -3113,16 +3347,7 @@ class WebAppClient {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    session_id: this.sessionId,
-                    roi_list: roiList,
-                    slice_index: sliceIndex,
-                    include_interpolated_slices: this.isInterpolatedSliceEnabled(),
-                    plot_mode: plotMode,
-                    relationship_overlay: overlayMode,
-                    show_legend: this.shouldShowContourLegend(),
-                    tolerance: this.getContourTolerance()
-                }),
+                body: JSON.stringify(payload),
                 signal: signal
             });
 
@@ -3130,22 +3355,19 @@ class WebAppClient {
                 throw new Error('Failed to generate plot');
             }
 
-            // Get image blob and display it
             const blob = await response.blob();
             const imageUrl = URL.createObjectURL(blob);
 
-            const plotImg = document.getElementById('contourPlot');
+            this.cacheContourPlotImage(cacheKey, imageUrl);
             plotImg.src = imageUrl;
             plotImg.style.display = 'block';
+            this.lastRenderedPlotKey = cacheKey;
 
-            // Hide loading indicator
             loadingOverlay.classList.remove('active');
 
         } catch (error) {
-            // Hide loading indicator
             loadingOverlay.classList.remove('active');
 
-            // Don't show error if request was aborted (this is expected)
             if (error.name === 'AbortError') {
                 console.log('Plot request cancelled');
                 return;
@@ -3154,7 +3376,6 @@ class WebAppClient {
             console.error('Plot error:', error);
             alert('Failed to generate contour plot');
         } finally {
-            // Clear the abort controller
             this.plotAbortController = null;
         }
     }
@@ -3175,6 +3396,15 @@ class WebAppClient {
 
     resetApp() {
         this.stopStatusPolling();
+        this.clearContourPlotCache();
+        if (this.plotDebounceTimer) {
+            clearTimeout(this.plotDebounceTimer);
+            this.plotDebounceTimer = null;
+        }
+        if (this.plotAbortController) {
+            this.plotAbortController.abort();
+            this.plotAbortController = null;
+        }
         // Reset application state for new analysis
         this.sessionId = null;
         this.selectedStructures.clear();
