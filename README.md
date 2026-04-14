@@ -15,6 +15,9 @@ Test and reports on relationships between DICOM RT Structures
 2. Diagram fix
   - with the JSON setting "relationship": "label",  the label is not being displayed.
   - Add a descrition field under edges that gives and explains the "relationship" options.
+  - Add buttons to "Manual Layout" and "Reset". "Manual Layout" fixes all nodes
+  in their current location so that tyey can be manually dragged to the desired
+  location. "Reset" Unfixes all nodes and re-applies the auto layout calculations.
 
 3. Structure Summary upgrades
   - Allow structures to be manually sorted in teh summary table
