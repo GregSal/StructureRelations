@@ -4,6 +4,7 @@
 from typing import Optional, List
 from pathlib import Path
 import logging
+import re
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,24 @@ from types_and_classes import ROI_Type, SliceIndexType
 #logging.basicConfig(level=logging.INFO)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+_UPLOAD_PREFIX_PATTERN = re.compile(
+    r'^(?:'
+    r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+    r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    r'|upload'
+    r')_(.+)$'
+)
+
+
+def clean_uploaded_file_name(file_name: str | Path) -> str:
+    '''Return a user-facing DICOM file name without temporary upload prefixes.'''
+    cleaned_name = Path(str(file_name)).name
+    while True:
+        match = _UPLOAD_PREFIX_PATTERN.match(cleaned_name)
+        if match is None:
+            return cleaned_name
+        cleaned_name = match.group(1)
 
 
 class DicomStructureFile:
@@ -63,10 +82,12 @@ class DicomStructureFile:
         # Handle file path/name logic
         if file_path is not None:
             self.file_path = Path(file_path)
-            self.file_name = self.file_path.name
+            raw_file_name = self.file_path.name
+            self.file_name = clean_uploaded_file_name(raw_file_name)
         elif file_name is not None:
-            self.file_name = file_name
-            self.file_path = self.top_dir / file_name
+            raw_file_name = file_name
+            self.file_name = clean_uploaded_file_name(raw_file_name)
+            self.file_path = self.top_dir / raw_file_name
         else:
             raise ValueError("Either file_path or file_name must be provided")
 

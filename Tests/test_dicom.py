@@ -4,6 +4,7 @@ These tests verify that DicomStructureFile correctly loads DICOM RT Structure
 files and extracts structure information without using deprecated DICOM fields.
 '''
 from pathlib import Path
+import shutil
 
 import pytest
 import pandas as pd
@@ -121,8 +122,8 @@ class TestDicomStructureFile:
                 # (can be None, NaN, or string for individual rows)
                 for idx, row in roi_labels.iterrows():
                     value = row.get(field)
-                    assert (value is None or 
-                            isinstance(value, str) or 
+                    assert (value is None or
+                            isinstance(value, str) or
                             pd.isna(value))
 
     def test_contour_points_extraction(self, test_dicom_file):
@@ -141,6 +142,23 @@ class TestDicomStructureFile:
         assert 'PatientID' in info
         assert 'StructureSet' in info
         assert 'File' in info
+
+    def test_uploaded_session_prefix_is_removed_from_file_name(
+        self,
+        tmp_path,
+    ):
+        '''Uploaded temp prefixes should not leak into the internal file name.'''
+        source_path = Path(__file__).parent / 'RS.HN_Struct.OROP.dcm'
+        prefixed_name = '123e4567-e89b-12d3-a456-426614174000_RS.HN_Struct.OROP.dcm'
+        copied_path = tmp_path / prefixed_name
+        shutil.copy(source_path, copied_path)
+
+        dicom_file = DicomStructureFile(
+            top_dir=tmp_path,
+            file_path=copied_path,
+        )
+
+        assert dicom_file.file_name == 'RS.HN_Struct.OROP.dcm'
 
     def test_no_deprecated_field_access(self, test_dicom_file):
         '''Verify that the deprecated ROIObservationLabel field is not

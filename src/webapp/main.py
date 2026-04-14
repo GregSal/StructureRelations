@@ -31,7 +31,7 @@ matplotlib.use('Agg')  # Use non-interactive backend
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from dicom import DicomStructureFile
+from dicom import DicomStructureFile, clean_uploaded_file_name
 from structure_set import StructureSet
 from contour_plotting import plot_roi_slice
 from relations import RELATION_SCHEMA_VERSION
@@ -500,9 +500,9 @@ async def preview_structures(request: SessionRequest):
         file_name = ''
         if file_path_value:
             try:
-                file_name = Path(str(file_path_value)).name
+                file_name = clean_uploaded_file_name(file_path_value)
             except (TypeError, ValueError):
-                file_name = str(file_path_value)
+                file_name = clean_uploaded_file_name(str(file_path_value))
 
         resolution_value = dicom_file.resolution
         resolution_cm_per_pixel = (

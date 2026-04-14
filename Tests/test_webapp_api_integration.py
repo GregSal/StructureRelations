@@ -1,6 +1,7 @@
 '''Integration tests for web API job contracts and relationship result endpoints.'''
 
 import asyncio
+import shutil
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -205,6 +206,29 @@ def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
     assert diagram_layout.get('layout', {}).get('local_global_default') == 30
     assert 'local' in diagram_layout.get('physics', {})
     assert 'global' in diagram_layout.get('physics', {})
+
+
+def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_path):
+    '''Verify preview metadata strips the temporary upload prefix from file names.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'preview-clean-name'
+
+    source_path = Path(__file__).parent / 'RS.GJS_Struct_Tests.Relations.dcm'
+    prefixed_path = (
+        tmp_path
+        / '123e4567-e89b-12d3-a456-426614174000_RS.GJS_Struct_Tests.Relations.dcm'
+    )
+    shutil.copy(source_path, prefixed_path)
+
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path=str(prefixed_path), structure_set=None),
+    )
+
+    response = client.post('/api/preview', json={'session_id': session_id})
+
+    assert response.status_code == 200
+    assert response.json()['patient_info']['file_name'] == 'RS.GJS_Struct_Tests.Relations.dcm'
 
 
 def test_plot_contours_excludes_interpolated_by_default(monkeypatch, tmp_path):
