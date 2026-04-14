@@ -772,6 +772,7 @@ async def process_structure_set(
         ws_loop = asyncio.get_running_loop()
         ws_last_emit_time = 0.0
         ws_last_emit_progress = -1.0
+        ws_last_pair_message = ''
 
         def _queue_progress_update(
             stage: str,
@@ -867,7 +868,7 @@ async def process_structure_set(
 
         _queue_progress_update(
             'parsing_dicom',
-            20.0,
+            15.0,
             '',
             'Parsing structures...',
             force_emit=True,
@@ -908,7 +909,7 @@ async def process_structure_set(
 
         _queue_progress_update(
             'building_graphs',
-            40.0,
+            20.0,
             '',
             'Building contour graphs...',
             force_emit=True,
@@ -926,7 +927,7 @@ async def process_structure_set(
             if selected_rois and roi not in selected_rois:
                 continue
 
-            progress = 40.0 + ((idx / total_structures) * 30.0)
+            progress = 20.0 + ((idx / total_structures) * 10.0)
             _queue_progress_update(
                 'building_graphs',
                 progress,
@@ -939,7 +940,7 @@ async def process_structure_set(
 
         _queue_progress_update(
             'calculating_relationships',
-            70.0,
+            30.0,
             '',
             'Calculating relationships...',
             force_emit=True,
@@ -955,23 +956,20 @@ async def process_structure_set(
         # Calculate relationships with error handling
         try:
             def pair_progress(completed_pairs: int, total_pairs: int) -> None:
+                nonlocal ws_last_pair_message
                 if total_pairs <= 0:
-                    progress = 95.0
+                    progress = 70.0
                 else:
-                    progress = 70.0 + (completed_pairs / total_pairs) * 25.0
-                pair_status = structure_set.relationship_progress.get(
-                    'status',
-                    f'pair {completed_pairs}/{total_pairs}',
-                )
-                current_slice = structure_set.relationship_progress.get('current_slice', 0)
-                total_slices = structure_set.relationship_progress.get('total_slices', 0)
-                if isinstance(current_slice, int) and isinstance(total_slices, int):
-                    message = (
-                        f'Computing {pair_status} '
-                        f'(slice {current_slice}/{total_slices})'
+                    progress = 30.0 + (completed_pairs / total_pairs) * 40.0
+
+                message = str(
+                    structure_set.relationship_progress.get(
+                        'status',
+                        f'Calculated relationship pair {completed_pairs}/{total_pairs}',
                     )
-                else:
-                    message = f'Computing {pair_status}'
+                ).strip()
+                if not message:
+                    message = f'Calculated relationship pair {completed_pairs}/{total_pairs}'
 
                 _queue_progress_update(
                     'calculating_relationships',
@@ -980,6 +978,9 @@ async def process_structure_set(
                     message,
                     force_emit=True,
                 )
+                if message != ws_last_pair_message:
+                    ws_last_pair_message = message
+                    _queue_status_line('calculating_relationships', message)
                 if _was_cancelled():
                     raise RuntimeError('Processing cancelled by user')
 
@@ -991,7 +992,7 @@ async def process_structure_set(
             )
             _queue_progress_update(
                 'calculating_relationships',
-                97.5,
+                70.0,
                 '',
                 'Resolving logical relationships...',
                 force_emit=True,
@@ -1019,12 +1020,13 @@ async def process_structure_set(
             return
 
         _queue_progress_update(
-            'calculating_relationships',
-            100.0,
+            'rendering_results',
+            80.0,
             '',
-            'Complete!',
+            'Preparing results for display...',
             force_emit=True,
         )
+        _queue_status_line('rendering_results', 'Preparing results for display...')
 
         # Save completed session BEFORE sending complete message
         # Use dedicated method to avoid race conditions with last_accessed updates
@@ -1043,9 +1045,9 @@ async def process_structure_set(
         session_manager.update_session_job_state(
             session_id,
             job_status='completed',
-            job_stage='completed',
-            job_progress=100.0,
-            job_message='Processing complete',
+            job_stage='rendering_results',
+            job_progress=80.0,
+            job_message='Preparing results for display',
             job_error=None,
             job_computed_at=datetime.now(),
             job_provenance={

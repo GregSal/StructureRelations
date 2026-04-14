@@ -296,39 +296,46 @@ class StructureSet:
                 pair_key = f'{min(roi_a, roi_b)}|{max(roi_a, roi_b)}'
                 pair_slice_records: List[dict] = []
 
-                def capture_slice_relation(
-                    slice_index: float,
-                    relation: object,
-                    region_self: object,
-                    region_other: object,
-                ) -> None:
-                    relation_type = relation.identify_relation()
+                def make_capture_slice_relation(
+                    pair_records: List[dict],
+                ) -> Callable[[float, object, object, object], None]:
+                    def capture_slice_relation(
+                        slice_index: float,
+                        relation: object,
+                        region_self: object,
+                        region_other: object,
+                    ) -> None:
+                        relation_type = relation.identify_relation()
 
-                    def _slice_is_interpolated(region: object) -> bool:
-                        return bool(getattr(region, 'is_interpolated', False))
+                        def _slice_is_interpolated(region: object) -> bool:
+                            return bool(getattr(region, 'is_interpolated', False))
 
-                    def _slice_has_boundary(region: object) -> bool:
-                        if region is None or not hasattr(region, 'merged_boundary'):
-                            return False
-                        try:
-                            boundary = region.merged_boundary()
-                        except TypeError:
-                            return False
-                        return bool(boundary) and not boundary.is_empty
+                        def _slice_has_boundary(region: object) -> bool:
+                            if region is None or not hasattr(region, 'merged_boundary'):
+                                return False
+                            try:
+                                boundary = region.merged_boundary()
+                            except TypeError:
+                                return False
+                            return bool(boundary) and not boundary.is_empty
 
-                    pair_slice_records.append({
-                        'slice_index': float(slice_index),
-                        'relation_type': relation_type.label,
-                        'relation_symbol': relation_type.symbol,
-                        'is_interpolated': (
-                            _slice_is_interpolated(region_self)
-                            or _slice_is_interpolated(region_other)
-                        ),
-                        'has_boundary': (
-                            _slice_has_boundary(region_self)
-                            or _slice_has_boundary(region_other)
-                        ),
-                    })
+                        pair_records.append({
+                            'slice_index': float(slice_index),
+                            'relation_type': relation_type.label,
+                            'relation_symbol': relation_type.symbol,
+                            'is_interpolated': (
+                                _slice_is_interpolated(region_self)
+                                or _slice_is_interpolated(region_other)
+                            ),
+                            'has_boundary': (
+                                _slice_has_boundary(region_self)
+                                or _slice_has_boundary(region_other)
+                            ),
+                        })
+
+                    return capture_slice_relation
+
+                capture_slice_relation = make_capture_slice_relation(pair_slice_records)
 
                 # Calculate the DE27IM relationship
                 de27im_relationship = structure_a.relate_to(
@@ -338,9 +345,12 @@ class StructureSet:
                     slice_relation_callback=capture_slice_relation,
                 )
                 relation_type = de27im_relationship.identify_relation()
-                logger.info('Calculated relationships between %s (ROI %s) and %s (ROI %s) as: %s',
-                            structure_a.name, structure_a.roi,
-                            structure_b.name, structure_b.roi, relation_type.label)
+                status_message = (
+                    f'Calculated relationships between {structure_a.name} '
+                    f'(ROI {structure_a.roi}) and {structure_b.name} '
+                    f'(ROI {structure_b.roi}) as: {relation_type.label}'
+                )
+                logger.info(status_message)
                 # Create StructureRelationship object
                 relationship = StructureRelationship(
                     de27im=de27im_relationship,
@@ -358,7 +368,11 @@ class StructureSet:
                 self.relationship_progress.update({
                     'current_pair': completed_pairs,
                     'current_slice': self.relationship_progress.get('total_slices', 0),
-                    'status': 'running',
+                    'status': status_message,
+                    'current_structure': (
+                        f'{structure_a.name} (ROI {structure_a.roi}) vs '
+                        f'{structure_b.name} (ROI {structure_b.roi})'
+                    ),
                     'percent_complete': (
                         (completed_pairs * 100.0 / total_pairs)
                         if total_pairs > 0

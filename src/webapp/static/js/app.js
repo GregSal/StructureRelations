@@ -612,11 +612,22 @@ class WebAppClient {
 
             // Update disk warning
             const diskWarning = document.getElementById('diskWarning');
+            const warningParagraph = diskWarning?.querySelector('p');
+            const defaultDiskWarning =
+                '⚠️ Session storage usage is high. Older sessions may be automatically deleted.';
             if (data.disk_warning) {
                 diskWarning.style.display = 'block';
-                diskWarning.querySelector('p').textContent = data.disk_warning;
+                if (warningParagraph) {
+                    warningParagraph.textContent =
+                        typeof data.disk_warning === 'string' && data.disk_warning.trim()
+                            ? data.disk_warning
+                            : defaultDiskWarning;
+                }
             } else {
                 diskWarning.style.display = 'none';
+                if (warningParagraph) {
+                    warningParagraph.textContent = defaultDiskWarning;
+                }
             }
 
             // Connect websocket
@@ -865,24 +876,40 @@ class WebAppClient {
     }
 
     formatStageLabel(stage) {
-        if (!stage) {
+        const normalized = String(stage || '').trim();
+        if (!normalized) {
             return 'processing';
         }
-        return stage.replaceAll('_', ' ');
+
+        const stageLabels = {
+            parsing_dicom: 'parsing DICOM',
+            building_graphs: 'building structures',
+            calculating_relationships: 'calculating relationships',
+            rendering_results: 'rendering results',
+            completed: 'completed',
+        };
+
+        return stageLabels[normalized] || normalized.replaceAll('_', ' ');
     }
 
     updateProgress(stage, progress, message, currentStructure) {
         const progressFill = document.querySelector('.progress-fill');
         const progressText = document.getElementById('progressText');
         const progressDetail = document.getElementById('progressDetail');
+        if (!progressFill || !progressText || !progressDetail) {
+            return;
+        }
 
         const boundedProgress = Math.max(0, Math.min(100, Number(progress) || 0));
 
         progressFill.style.width = `${boundedProgress}%`;
         progressText.textContent = `${boundedProgress.toFixed(1)}% - ${this.formatStageLabel(stage)}`;
 
-        let detailText = message;
-        if (currentStructure) {
+        let detailText = typeof message === 'string' ? message.trim() : '';
+        if (!detailText) {
+            detailText = 'Processing...';
+        }
+        if (currentStructure && !detailText.includes(currentStructure)) {
             detailText += ` (${currentStructure})`;
         }
         progressDetail.textContent = detailText;
@@ -908,8 +935,9 @@ class WebAppClient {
 
     async onProcessingComplete() {
         this.stopStatusPolling();
+        this.updateProgress('rendering_results', 80.0, 'Loading processed session data...', '');
         this.appendStatusLogLine('frontend', 'Fetching results from server...');
-        // Load structure summary
+
         try {
             const matrixFetchStart = performance.now();
             const response = await fetch('/api/matrix', {
@@ -929,6 +957,7 @@ class WebAppClient {
                 throw new Error('Failed to load matrix');
             }
 
+            this.updateProgress('rendering_results', 82.5, 'Loading processed session data...', '');
             const data = await response.json();
             const matrixFetchMs = Math.round(performance.now() - matrixFetchStart);
             this.appendStatusLogLine(
@@ -936,7 +965,8 @@ class WebAppClient {
                 `Loaded ${data.rows?.length ?? 0} structure(s) in ${matrixFetchMs} ms. Building views...`
             );
 
-            const runViewBuildStep = (label, callback) => {
+            const runViewBuildStep = (label, progressValue, callback) => {
+                this.updateProgress('rendering_results', progressValue, `${label}...`, '');
                 this.appendStatusLogLine('frontend', `${label}...`);
                 const stepStart = performance.now();
                 callback();
@@ -944,27 +974,27 @@ class WebAppClient {
                 this.appendStatusLogLine('frontend', `${label} complete (${stepMs} ms).`);
             };
 
-            // Store data for sorting and checkbox management
             this.summaryData = data;
             this.buildStructureItems(data);
 
-            runViewBuildStep('Building structure summary', () => {
+            runViewBuildStep('Building structure summary', 85.0, () => {
                 this.populateStructureSummary(data);
             });
-            runViewBuildStep('Configuring diagram selection', () => {
+            runViewBuildStep('Configuring diagram selection', 88.0, () => {
                 this.initializeDiagramSelection(data);
             });
 
+            this.updateProgress('rendering_results', 90.0, 'Requesting relationship diagram...', '');
             this.appendStatusLogLine('frontend', 'Requesting relationship diagram...');
             const diagramPromise = this.applyDiagramSelection();
 
-            runViewBuildStep('Populating contour controls', () => {
+            runViewBuildStep('Populating contour controls', 93.0, () => {
                 this.populateContourPlotControls(data);
             });
-            runViewBuildStep('Rendering relationship matrix', () => {
+            runViewBuildStep('Rendering relationship matrix', 96.0, () => {
                 this.displayMatrix(data);
             });
-            runViewBuildStep('Rendering structure set details', () => {
+            runViewBuildStep('Rendering structure set details', 98.0, () => {
                 this.renderStructureSetInfo();
             });
 
@@ -974,8 +1004,8 @@ class WebAppClient {
                 await diagramPromise;
             }
 
+            this.updateProgress('completed', 100.0, 'Processing complete', '');
             this.appendStatusLogLine('frontend', 'All views ready.');
-            // Show results stage
             this.showStage('results');
 
         } catch (error) {

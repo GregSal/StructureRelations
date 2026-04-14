@@ -4,41 +4,7 @@ Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
 
-1. Processing Updates
-
-    1. remove the box showing "true" that appears just after uploading the DICOM data
-
-    2. When processing structures replace the messages like: "Computing running (slice 92/92)" with messages like: "Calculated relationships between OralCavity (ROI 107) and opt Larynx (ROI 27) as: is Disjoint from"
-
-    3. The progress bar is not scaled correctly. When it starts calculating relationships, it should be at about 30%, when it finishes calculating relationships it should be at 70% During the time that it is rendering the diagram it should be progressing from about 80% to 100%.
-
-3. Structure Summary upgrades
-  - Allow structures to be manually sorted in the summary table
-    - right click on structure to reveal menu with options to move up, move down, hide
-    - add a reset button at the top to unhide all structures and reapply default sorting
-    - add a button on top to turn on/off click and drag sorting.  default off
-    - right click on column heading to reveal menu
-          - sort -> ascending, descending
-          - auto fit width
-          - hide
-          - Justify -> left, centre, right
-          - Decimal places (for volume and slice range)
-    - slice range should be formatted centres with the "to" portion of the text aligned
-
-    3. Relation (Edge) Updates
-        - implement expanded options for line types
-            - Different dash types
-            - double lines
-            - glow
-
-6. Add an optional origin/ isocentre attribute to StructureSet
-    - The structure Set DICOM data does not contain an origin or isocentre, but
-      it is included in the DICOM RT Plan. In teh future, when we add support
-      for DICOM RT Plan, we can populate this attribute from the DICOM data.
-      For now, it should be possible to set is manually for the sake of testing.
-
-
-6. Begin work on Metric Calculations
+Begin work on Metric Calculations
 
 
 ## Metrics
@@ -108,3 +74,19 @@ Test and reports on relationships between DICOM RT Structures
   - takes a unit and modifies value and unit accordingly.
   - Raises error if the unit and type are not compatible
 - default method \_\_str\_\_ returns a formatted string with `f'{name}: {value} {unit}'`
+
+
+
+## Future work
+
+1. Add an optional origin/ isocentre attribute to StructureSet
+    - The structure Set DICOM data does not contain an origin or isocentre, but
+      it is included in the DICOM RT Plan. In teh future, when we add support
+      for DICOM RT Plan, we can populate this attribute from the DICOM data.
+      For now, it should be possible to set is manually for the sake of testing.
+
+2. Relation (Edge) Styling
+    - Explore expanded options for line types
+        - Different dash types
+        - double lines
+        - glow
