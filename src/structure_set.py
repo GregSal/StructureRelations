@@ -38,12 +38,15 @@ class StructureSet:
         dicom_structure_file (DicomStructureFile): Optional reference to the
             source DICOM file.
         tolerance (float): Tolerance value for structure relationships.
+        unit (str): Unit of measurement for coordinates and distances.
+            Defaults to 'cm'.
     '''
 
     def __init__(self,
                  slice_data: Optional[List] = None,
                  dicom_structure_file: Optional[DicomStructureFile] = None,
                  tolerance=0.0,
+                 unit: str = 'cm',
                  auto_calculate_relationships: bool = True,
                  auto_calculate_logical_flags: bool = True):
         '''Initialize the StructureSet.
@@ -54,9 +57,14 @@ class StructureSet:
                 Deprecated - use dicom_structure_file instead.
             dicom_structure_file (DicomStructureFile, optional): DICOM structure
                 file object containing contour points. Takes precedence over
-                slice_data if both are provided.
+                slice_data if both are provided. When using DICOM data, the
+                unit is automatically set to 'cm' (DICOM coordinates are
+                converted from mm to cm).
             tolerance (float, optional): Tolerance value for structure
                 relationships. Defaults to 0.0.
+            unit (str, optional): Unit of measurement for coordinates and
+                distances. Defaults to 'cm'. When building from DICOM data,
+                this is automatically set to 'cm'.
             auto_calculate_relationships (bool, optional): Whether to
                 automatically calculate relationships as part of finalize.
                 Defaults to True.
@@ -69,6 +77,7 @@ class StructureSet:
         self.relationship_graph = nx.DiGraph()
         self.dicom_structure_file = dicom_structure_file
         self.tolerance = tolerance
+        self.unit = unit
         self.auto_calculate_relationships = auto_calculate_relationships
         self.auto_calculate_logical_flags = auto_calculate_logical_flags
         self.relationship_progress: Dict[str, float | int | str] = {
@@ -92,13 +101,18 @@ class StructureSet:
     def build_from_dicom_file(self) -> None:
         '''Build structures from DicomStructureFile following the StructureSet
         process.
+
+        When building from DICOM, the unit is set to 'cm' because DICOM
+        coordinates (in mm) are converted to cm during parsing.
         '''
         if not self.dicom_structure_file.contour_points:
             logger.warning("No contour points found in DicomStructureFile")
             return
         self.tolerance = self.dicom_structure_file.resolution
-        logger.info("Building StructureSet from %d contour points",
-                    len(self.dicom_structure_file.contour_points))
+        # DICOM coordinates are converted from mm to cm, so unit is always 'cm'
+        self.unit = 'cm'
+        logger.info("Building StructureSet from %d contour points (unit: %s)",
+                    len(self.dicom_structure_file.contour_points), self.unit)
         self.build_from_slice_data(self.dicom_structure_file.contour_points)
 
     def build_from_slice_data(self, slice_data: List) -> None:
@@ -1208,7 +1222,8 @@ class StructureSet:
                     'row_names': [structure_names],
                     'col_names': [structure_names],
                     'colors': {roi: [r, g, b]},
-                    'faded_relationships': {matrix_position: bool}
+                    'faded_relationships': {matrix_position: bool},
+                    'unit': str (unit of measurement, e.g., 'cm')
                 }
         '''
         # Extract ROI numbers from structure names early
@@ -1404,7 +1419,8 @@ class StructureSet:
             'structure_slices_original': structure_slices_original_dict,
             'structure_slices_interpolated': structure_slices_interpolated_dict,
             'slice_relationships': self._serialize_slice_relationships(all_rois),
-            'faded_relationships': faded_relationships if logical_relations_mode == 'faded' else None
+            'faded_relationships': faded_relationships if logical_relations_mode == 'faded' else None,
+            'unit': self.unit
         }
 
 

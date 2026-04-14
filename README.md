@@ -38,11 +38,6 @@ Test and reports on relationships between DICOM RT Structures
             - double lines
             - glow
 
-5. Add a unit attribute to StructureSet
-    - Populate it from DICOM data
-    - For manually entered contours accept a unit parameter
-    - set a default value
-
 6. Add an optional origin/ isocentre attribute to StructureSet
     - The structure Set DICOM data does not contain an origin or isocentre, but
       it is included in the DICOM RT Plan. In teh future, when we add support
