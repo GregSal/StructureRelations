@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=37">
+    <link rel="stylesheet" href="static/css/styles.css?v=38">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -186,6 +186,11 @@
                     <div class="tab-content" id="tab-summary">
                         <div class="card">
                             <h2>Structure Summary</h2>
+                            <div class="summary-toolbar">
+                                <span class="summary-toolbar-note">Right-click rows or headers for more options, including column reordering.</span>
+                                <button class="btn btn-secondary" id="summaryDragToggleBtn" type="button">Enable Drag Sorting</button>
+                                <button class="btn btn-secondary" id="summaryResetBtn" type="button">Reset Summary</button>
+                            </div>
                             <div class="table-container">
                                 <table id="structuresSummaryTable" class="sortable-table">
                                     <thead>
@@ -437,7 +442,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=117"></script>
+    <script src="static/js/app.js?v=120"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

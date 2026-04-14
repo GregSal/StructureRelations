@@ -687,6 +687,37 @@ header h1 {
     padding-right: 0.35rem;
 }
 
+.summary-input-dialog {
+    width: min(420px, calc(100vw - 2rem));
+}
+
+.summary-input-help {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.summary-input-label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.summary-input-field {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+.summary-input-error {
+    display: none;
+    margin: 0;
+    color: #dc2626;
+    font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
     .structure-set-badge {
         max-width: 175px;
@@ -789,6 +820,20 @@ header h1 {
 }
 
 /* Tables */
+.summary-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.summary-toolbar-note {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-right: auto;
+}
+
 .table-container {
     overflow-x: auto;
 }
@@ -885,6 +930,12 @@ tbody tr:hover {
     min-width: 200px;
 }
 
+.summary-label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .number-cell {
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -894,6 +945,43 @@ tbody tr:hover {
     font-size: 0.8rem;
     color: var(--text-secondary);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.slice-range-display {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.4rem;
+    width: 100%;
+}
+
+.slice-range-start {
+    text-align: right;
+}
+
+.slice-range-separator {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 1.4rem;
+}
+
+.slice-range-end {
+    text-align: left;
+}
+
+.slice-range-unit {
+    color: var(--text-secondary);
+    min-width: 1.8rem;
+}
+
+#structuresSummaryBody.summary-drag-enabled tr {
+    cursor: grab;
+}
+
+#structuresSummaryBody.summary-drag-enabled tr:active {
+    cursor: grabbing;
 }
 
 /* Matrix Info */
@@ -1545,6 +1633,16 @@ tbody tr:hover {
 .node-context-menu-item.is-active {
     color: var(--primary-color);
     font-weight: 600;
+}
+
+.node-context-menu-item.is-disabled {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.node-context-menu-item.is-disabled:hover {
+    background: transparent;
 }
 
 .node-context-menu-separator {

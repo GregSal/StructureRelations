@@ -7,6 +7,15 @@ class WebAppClient {
         this.sortableColumns = null;
         this.sortableListsInitialized = false;
         this.sortableInitScheduled = false;
+        this.summarySortable = null;
+        this.summaryRowOrder = [];
+        this.summaryDefaultOrder = [];
+        this.summaryHiddenRows = new Set();
+        this.summaryDragSortEnabled = false;
+        this.summaryColumnOrder = this.getDefaultSummaryColumnOrder();
+        this.summaryColumnSettings = this.getDefaultSummaryColumnSettings();
+        this.currentSort = { column: 'roi', ascending: true };
+        this._activeInputModal = null;
         this.symbolConfig = null;  // Will store loaded config
         this.network = null;  // vis-network instance
         this.plotAbortController = null;  // Track current plot request
@@ -379,6 +388,12 @@ class WebAppClient {
         });
         document.getElementById('copyFromDiagramBtn').addEventListener('click', () => {
             this.copyFromDiagramToMatrix();
+        });
+        document.getElementById('summaryResetBtn').addEventListener('click', () => {
+            this.resetSummaryView();
+        });
+        document.getElementById('summaryDragToggleBtn').addEventListener('click', () => {
+            this.toggleSummaryDragSorting();
         });
 
         // Export - use correct IDs from HTML
@@ -969,58 +984,203 @@ class WebAppClient {
         }
     }
 
+    getDefaultSummaryColumnOrder() {
+        return ['name', 'roi', 'type', 'label', 'regions', 'volume', 'slices'];
+    }
+
+    getDefaultSummaryColumnSettings() {
+        return {
+            name: { hidden: false, align: 'left', width: '' },
+            roi: { hidden: false, align: 'right', width: '' },
+            type: { hidden: false, align: 'left', width: '' },
+            label: { hidden: false, align: 'left', width: '' },
+            regions: { hidden: false, align: 'right', width: '' },
+            volume: { hidden: false, align: 'right', decimals: 2, width: '' },
+            slices: { hidden: false, align: 'center', decimals: 2, width: '' },
+        };
+    }
+
+    initializeSummaryState(data) {
+        const allStructures = [...new Set([...(data.rows || []), ...(data.columns || [])])]
+            .map(roi => Number(roi))
+            .sort((a, b) => a - b);
+        const signature = allStructures.join(',');
+
+        if (this._summarySignature !== signature) {
+            this._summarySignature = signature;
+            this.summaryDefaultOrder = [...allStructures];
+            this.summaryRowOrder = [...allStructures];
+            this.summaryHiddenRows.clear();
+            this.summaryDragSortEnabled = false;
+            if (this.summarySortable) {
+                this.summarySortable.destroy();
+                this.summarySortable = null;
+            }
+            this.summaryColumnOrder = this.getDefaultSummaryColumnOrder();
+            this.summaryColumnSettings = this.getDefaultSummaryColumnSettings();
+            this.currentSort = { column: 'roi', ascending: true };
+            return;
+        }
+
+        const validRois = new Set(allStructures);
+        this.summaryDefaultOrder = [...allStructures];
+        this.summaryRowOrder = this.summaryRowOrder.filter(roi => validRois.has(Number(roi)));
+        allStructures.forEach(roi => {
+            if (!this.summaryRowOrder.includes(roi)) {
+                this.summaryRowOrder.push(roi);
+            }
+        });
+        this.summaryHiddenRows = new Set(
+            Array.from(this.summaryHiddenRows).filter(roi => validRois.has(Number(roi)))
+        );
+    }
+
+    getSummaryRowDetails(data, roi) {
+        const normalizedRoi = Number(roi);
+        const rowIndex = (data.rows || []).indexOf(normalizedRoi);
+        const colIndex = (data.columns || []).indexOf(normalizedRoi);
+        const name = rowIndex >= 0
+            ? data.row_names?.[rowIndex]
+            : data.col_names?.[colIndex] || '';
+        const dicomType = data.dicom_types?.[normalizedRoi]
+            || data.dicom_types?.[String(normalizedRoi)]
+            || '';
+        const codeMeaning = data.code_meanings?.[normalizedRoi]
+            || data.code_meanings?.[String(normalizedRoi)]
+            || '';
+        const volume = Number(
+            data.volumes?.[normalizedRoi]
+            || data.volumes?.[String(normalizedRoi)]
+            || 0
+        );
+        const numRegions = Number(
+            data.num_regions?.[normalizedRoi]
+            || data.num_regions?.[String(normalizedRoi)]
+            || 0
+        );
+        const sliceRange = data.slice_ranges?.[normalizedRoi]
+            || data.slice_ranges?.[String(normalizedRoi)]
+            || '';
+        const color = this.rgbToColor(
+            data.colors?.[normalizedRoi] || data.colors?.[String(normalizedRoi)]
+        );
+
+        return {
+            roi: normalizedRoi,
+            name: name || '',
+            dicomType,
+            label: codeMeaning || name || '',
+            volume,
+            numRegions,
+            sliceRange,
+            color,
+        };
+    }
+
+    formatSummarySliceRange(sliceRange) {
+        if (sliceRange === null || sliceRange === undefined || sliceRange === '') {
+            return '';
+        }
+
+        const decimals = Number(this.summaryColumnSettings?.slices?.decimals ?? 2);
+        let start;
+        let end;
+        let unit = '';
+        let rawText = '';
+
+        if (Array.isArray(sliceRange) && sliceRange.length >= 2) {
+            [start, end] = sliceRange;
+            rawText = `${start} to ${end}`;
+        } else if (typeof sliceRange === 'object') {
+            start = sliceRange.start ?? sliceRange.min ?? sliceRange.lower;
+            end = sliceRange.end ?? sliceRange.max ?? sliceRange.upper;
+            unit = sliceRange.unit || '';
+            rawText = `${start} to ${end}${unit ? ` ${unit}` : ''}`;
+        } else {
+            rawText = String(sliceRange).trim();
+            const match = rawText.match(
+                /(-?\d+(?:\.\d+)?)\s*(?:cm|mm)?\s*(?:to|-|–|—)\s*(-?\d+(?:\.\d+)?)(?:\s*(cm|mm))?/i
+            );
+            if (match) {
+                start = match[1];
+                end = match[2];
+                unit = match[3] || (/(cm|mm)/i.exec(rawText)?.[1] || '');
+            }
+        }
+
+        const startNumber = Number(start);
+        const endNumber = Number(end);
+        if (!Number.isFinite(startNumber) || !Number.isFinite(endNumber)) {
+            return `<span>${this.escapeHtml(rawText)}</span>`;
+        }
+
+        return `
+            <div class="slice-range-display">
+                <span class="slice-range-value slice-range-start">${startNumber.toFixed(decimals)}</span>
+                <span class="slice-range-separator">to</span>
+                <span class="slice-range-value slice-range-end">${endNumber.toFixed(decimals)}</span>
+                <span class="slice-range-unit">${this.escapeHtml(unit)}</span>
+            </div>
+        `;
+    }
+
+    getSummarySliceSortValue(sliceRange) {
+        if (Array.isArray(sliceRange) && sliceRange.length > 0) {
+            return Number(sliceRange[0]) || 0;
+        }
+        if (sliceRange && typeof sliceRange === 'object') {
+            return Number(sliceRange.start ?? sliceRange.min ?? sliceRange.lower) || 0;
+        }
+        const text = String(sliceRange || '');
+        const match = text.match(/-?\d+(?:\.\d+)?/);
+        return match ? Number(match[0]) : 0;
+    }
+
     populateStructureSummary(data) {
         const summaryBody = document.getElementById('structuresSummaryBody');
+        if (!summaryBody) return;
+
+        this.initializeSummaryState(data);
         summaryBody.innerHTML = '';
 
-        const allStructures = [...new Set([...data.rows, ...data.columns])];
-        allStructures.sort((a, b) => a - b);
+        this.summaryRowOrder
+            .filter(roi => !this.summaryHiddenRows.has(Number(roi)))
+            .forEach(roi => {
+                const details = this.getSummaryRowDetails(data, roi);
+                const row = document.createElement('tr');
+                row.dataset.roi = String(details.roi);
+                row.dataset.name = details.name;
+                row.dataset.type = details.dicomType;
+                row.dataset.label = details.label;
+                row.dataset.volume = String(details.volume);
+                row.dataset.regions = String(details.numRegions);
+                row.dataset.slices = String(this.getSummarySliceSortValue(details.sliceRange));
 
-        allStructures.forEach(roi => {
-            const idx = data.rows.indexOf(roi);
-            const name = idx >= 0 ? data.row_names[idx] :
-                         data.col_names[data.columns.indexOf(roi)];
+                row.innerHTML = `
+                    <td class="name-cell" data-column="name">${this.escapeHtml(details.name)}</td>
+                    <td class="roi-cell number-cell" data-column="roi">${details.roi}</td>
+                    <td class="type-cell" data-column="type">${this.escapeHtml(details.dicomType)}</td>
+                    <td class="label-cell" data-column="label">
+                        <div class="summary-label-wrap">
+                            <div class="structure-color" style="background-color: ${details.color}"></div>
+                            <span>${this.escapeHtml(details.label)}</span>
+                        </div>
+                    </td>
+                    <td class="number-cell" data-column="regions">${details.numRegions}</td>
+                    <td class="number-cell" data-column="volume">${details.volume.toFixed(Number(this.summaryColumnSettings?.volume?.decimals ?? 2))}</td>
+                    <td class="slice-cell" data-column="slices">${this.formatSummarySliceRange(details.sliceRange)}</td>
+                `;
+                row.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    this.showSummaryRowContextMenu(details.roi, event);
+                });
+                summaryBody.appendChild(row);
+            });
 
-            // Get data from dictionaries using ROI as key
-            const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
-            const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
-            const volume = data.volumes ? (data.volumes[roi] || data.volumes[String(roi)] || 0) : 0;
-            const numRegions = data.num_regions ? (data.num_regions[roi] || data.num_regions[String(roi)] || 0) : 0;
-            const sliceRange = data.slice_ranges ? (data.slice_ranges[roi] || data.slice_ranges[String(roi)] || '') : '';
-
-            // Colors object has string keys in JSON
-            const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
-
-            // Build label with code meaning or name
-            let label = codeMeaning || name;
-
-            const row = document.createElement('tr');
-            row.dataset.roi = roi;
-            row.dataset.name = name;
-            row.dataset.type = dicomType;
-            row.dataset.label = label;
-            row.dataset.volume = volume;
-            row.dataset.regions = numRegions;
-
-            row.innerHTML = `
-                <td class="name-cell">${name}</td>
-                <td class="roi-cell">${roi}</td>
-                <td class="type-cell">${dicomType}</td>
-                <td class="label-cell">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div class="structure-color" style="background-color: ${color}"></div>
-                        ${label}
-                    </div>
-                </td>
-                <td class="number-cell">${numRegions}</td>
-                <td class="number-cell">${volume.toFixed(2)}</td>
-                <td class="slice-cell">${sliceRange}</td>
-            `;
-            summaryBody.appendChild(row);
-        });
-
-        // Add sort listeners
         this.initializeSorting();
+        this.applySummaryColumnSettings();
+        this.refreshSummarySortable();
+        this.updateSummaryToolbar();
     }
 
     renderStructureSetInfo() {
@@ -1053,66 +1213,541 @@ class WebAppClient {
     }
 
     initializeSorting() {
-        document.querySelectorAll('.sortable').forEach(th => {
-            th.addEventListener('click', () => {
-                const column = th.dataset.column;
-                this.sortTable(column);
+        document.querySelectorAll('#structuresSummaryTable .sortable').forEach(th => {
+            if (!th.dataset.summaryBound) {
+                th.dataset.summaryBound = 'true';
+                th.addEventListener('click', () => {
+                    const column = th.dataset.column;
+                    this.sortTable(column);
+                });
+                th.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    const column = th.dataset.column;
+                    this.showSummaryHeaderContextMenu(column, event);
+                });
+            }
+
+            th.classList.remove('sorted-asc', 'sorted-desc');
+            if (this.currentSort?.column === th.dataset.column) {
+                th.classList.add(this.currentSort.ascending ? 'sorted-asc' : 'sorted-desc');
+            }
+        });
+    }
+
+    sortTable(column, forcedAscending = null) {
+        if (!this.summaryData) return;
+
+        const currentSort = this.currentSort || {};
+        const ascending = typeof forcedAscending === 'boolean'
+            ? forcedAscending
+            : (currentSort.column === column ? !currentSort.ascending : true);
+        this.currentSort = { column, ascending };
+
+        const sortValueFor = (details) => {
+            switch (column) {
+                case 'name':
+                    return details.name.toLowerCase();
+                case 'roi':
+                    return Number(details.roi);
+                case 'type':
+                    return details.dicomType.toLowerCase();
+                case 'label':
+                    return details.label.toLowerCase();
+                case 'regions':
+                    return Number(details.numRegions);
+                case 'volume':
+                    return Number(details.volume);
+                case 'slices':
+                    return this.getSummarySliceSortValue(details.sliceRange);
+                default:
+                    return Number(details.roi);
+            }
+        };
+
+        this.summaryRowOrder.sort((aRoi, bRoi) => {
+            const aValue = sortValueFor(this.getSummaryRowDetails(this.summaryData, aRoi));
+            const bValue = sortValueFor(this.getSummaryRowDetails(this.summaryData, bRoi));
+
+            if (aValue < bValue) return ascending ? -1 : 1;
+            if (aValue > bValue) return ascending ? 1 : -1;
+            return Number(aRoi) - Number(bRoi);
+        });
+
+        this.populateStructureSummary(this.summaryData);
+    }
+
+    updateSummaryToolbar() {
+        const dragButton = document.getElementById('summaryDragToggleBtn');
+        const resetButton = document.getElementById('summaryResetBtn');
+        const hasSummary = !!this.summaryData && this.summaryDefaultOrder.length > 0;
+
+        if (dragButton) {
+            dragButton.disabled = !hasSummary;
+            dragButton.textContent = this.summaryDragSortEnabled
+                ? 'Disable Drag Sorting'
+                : 'Enable Drag Sorting';
+        }
+
+        if (resetButton) {
+            resetButton.disabled = !hasSummary;
+        }
+    }
+
+    toggleSummaryDragSorting() {
+        if (!this.summaryData) return;
+
+        this.summaryDragSortEnabled = !this.summaryDragSortEnabled;
+        this.refreshSummarySortable();
+        this.updateSummaryToolbar();
+        this.appendStatusLogLine(
+            'frontend',
+            this.summaryDragSortEnabled
+                ? 'Drag sorting enabled in the structure summary.'
+                : 'Drag sorting disabled in the structure summary.'
+        );
+    }
+
+    refreshSummarySortable() {
+        const tbody = document.getElementById('structuresSummaryBody');
+        if (!tbody) return;
+
+        if (this.summarySortable) {
+            this.summarySortable.destroy();
+            this.summarySortable = null;
+        }
+
+        tbody.classList.toggle('summary-drag-enabled', this.summaryDragSortEnabled);
+
+        if (this.summaryDragSortEnabled && typeof Sortable !== 'undefined') {
+            this.summarySortable = new Sortable(tbody, {
+                animation: 150,
+                ghostClass: 'dragging',
+                onEnd: () => {
+                    this.captureSummaryRowOrderFromDom();
+                    this.currentSort = { column: 'custom', ascending: true };
+                    this.initializeSorting();
+                },
+            });
+        }
+    }
+
+    captureSummaryRowOrderFromDom() {
+        const tbody = document.getElementById('structuresSummaryBody');
+        if (!tbody) return;
+
+        const visibleOrder = Array.from(tbody.querySelectorAll('tr')).map((row) => (
+            Number(row.dataset.roi)
+        ));
+        const hiddenOrder = this.summaryRowOrder.filter((roi) => (
+            this.summaryHiddenRows.has(Number(roi))
+        ));
+        this.summaryRowOrder = [...visibleOrder, ...hiddenOrder];
+    }
+
+    moveSummaryRow(roi, direction) {
+        const normalizedRoi = Number(roi);
+        const currentIndex = this.summaryRowOrder.indexOf(normalizedRoi);
+        if (currentIndex < 0) return;
+
+        let targetIndex = currentIndex + direction;
+        while (
+            targetIndex >= 0
+            && targetIndex < this.summaryRowOrder.length
+            && this.summaryHiddenRows.has(Number(this.summaryRowOrder[targetIndex]))
+        ) {
+            targetIndex += direction;
+        }
+
+        if (targetIndex < 0 || targetIndex >= this.summaryRowOrder.length) {
+            return;
+        }
+
+        const reordered = [...this.summaryRowOrder];
+        reordered.splice(currentIndex, 1);
+        reordered.splice(targetIndex, 0, normalizedRoi);
+        this.summaryRowOrder = reordered;
+        this.currentSort = { column: 'custom', ascending: true };
+        this.populateStructureSummary(this.summaryData);
+    }
+
+    hideSummaryRow(roi) {
+        this.summaryHiddenRows.add(Number(roi));
+        this.populateStructureSummary(this.summaryData);
+    }
+
+    resetSummaryView() {
+        if (!this.summaryData) return;
+
+        this.summaryHiddenRows.clear();
+        this.summaryRowOrder = [...this.summaryDefaultOrder];
+        this.summaryDragSortEnabled = false;
+        this.summaryColumnOrder = this.getDefaultSummaryColumnOrder();
+        this.summaryColumnSettings = this.getDefaultSummaryColumnSettings();
+        this.currentSort = { column: 'roi', ascending: true };
+        this.populateStructureSummary(this.summaryData);
+        this.appendStatusLogLine('frontend', 'Structure summary reset to the default view.');
+    }
+
+    applySummaryColumnOrder() {
+        const table = document.getElementById('structuresSummaryTable');
+        if (!table) return;
+
+        const headerRow = table.querySelector('thead tr');
+        if (!headerRow) return;
+
+        const availableColumns = Array.from(headerRow.querySelectorAll('th[data-column]'))
+            .map((header) => header.dataset.column);
+        const orderedColumns = (this.summaryColumnOrder || this.getDefaultSummaryColumnOrder())
+            .filter((column) => availableColumns.includes(column));
+
+        availableColumns.forEach((column) => {
+            if (!orderedColumns.includes(column)) {
+                orderedColumns.push(column);
+            }
+        });
+        this.summaryColumnOrder = orderedColumns;
+
+        orderedColumns.forEach((column) => {
+            const header = headerRow.querySelector(`th[data-column="${column}"]`);
+            if (header) {
+                headerRow.appendChild(header);
+            }
+        });
+
+        table.querySelectorAll('tbody tr').forEach((row) => {
+            orderedColumns.forEach((column) => {
+                const cell = row.querySelector(`td[data-column="${column}"]`);
+                if (cell) {
+                    row.appendChild(cell);
+                }
             });
         });
     }
 
-    sortTable(column) {
-        const tbody = document.getElementById('structuresSummaryBody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
+    moveSummaryColumn(column, direction) {
+        const currentOrder = [...(this.summaryColumnOrder || this.getDefaultSummaryColumnOrder())];
+        const currentIndex = currentOrder.indexOf(column);
+        if (currentIndex < 0) return;
 
-        // Determine sort direction
-        const currentSort = this.currentSort || {};
-        const ascending = currentSort.column === column ? !currentSort.ascending : true;
-        this.currentSort = { column, ascending };
+        const targetIndex = currentIndex + direction;
+        if (targetIndex < 0 || targetIndex >= currentOrder.length) {
+            return;
+        }
 
-        // Sort rows
-        rows.sort((a, b) => {
-            let aVal, bVal;
+        [currentOrder[currentIndex], currentOrder[targetIndex]] = [
+            currentOrder[targetIndex],
+            currentOrder[currentIndex],
+        ];
+        this.summaryColumnOrder = currentOrder;
+        this.applySummaryColumnOrder();
+        this.applySummaryColumnSettings();
+        this.appendStatusLogLine('frontend', `Moved ${column} column.`);
+    }
 
-            switch(column) {
-                case 'roi':
-                    aVal = parseInt(a.dataset.roi);
-                    bVal = parseInt(b.dataset.roi);
-                    break;
-                case 'type':
-                    aVal = a.dataset.type.toLowerCase();
-                    bVal = b.dataset.type.toLowerCase();
-                    break;
-                case 'label':
-                    aVal = a.dataset.label.toLowerCase();
-                    bVal = b.dataset.label.toLowerCase();
-                    break;
-                case 'volume':
-                    aVal = parseFloat(a.dataset.volume);
-                    bVal = parseFloat(b.dataset.volume);
-                    break;
-                case 'regions':
-                    aVal = parseInt(a.dataset.regions);
-                    bVal = parseInt(b.dataset.regions);
-                    break;
-                default:
-                    return 0;
+    applySummaryColumnSettings() {
+        const table = document.getElementById('structuresSummaryTable');
+        if (!table) return;
+
+        this.applySummaryColumnOrder();
+
+        Object.entries(this.summaryColumnSettings).forEach(([column, settings]) => {
+            const header = table.querySelector(`th[data-column="${column}"]`);
+            const cells = table.querySelectorAll(`td[data-column="${column}"]`);
+            const display = settings.hidden ? 'none' : '';
+            const alignment = settings.align || 'left';
+            const width = settings.width || '';
+
+            if (header) {
+                header.style.display = display;
+                header.style.textAlign = alignment;
+                header.style.width = width;
+                header.style.minWidth = width;
             }
 
-            if (aVal < bVal) return ascending ? -1 : 1;
-            if (aVal > bVal) return ascending ? 1 : -1;
-            return 0;
+            cells.forEach(cell => {
+                cell.style.display = display;
+                cell.style.textAlign = alignment;
+                if (width) {
+                    cell.style.width = width;
+                    cell.style.minWidth = width;
+                } else {
+                    cell.style.removeProperty('width');
+                    cell.style.removeProperty('min-width');
+                }
+            });
+        });
+    }
+
+    setSummaryColumnAlignment(column, alignment) {
+        if (!this.summaryColumnSettings[column]) return;
+        this.summaryColumnSettings[column].align = alignment;
+        this.applySummaryColumnSettings();
+    }
+
+    setSummaryColumnHidden(column, hidden = true) {
+        if (!this.summaryColumnSettings[column]) return;
+        this.summaryColumnSettings[column].hidden = hidden;
+        this.applySummaryColumnSettings();
+    }
+
+    autoFitSummaryColumn(column) {
+        const table = document.getElementById('structuresSummaryTable');
+        if (!table || !this.summaryColumnSettings[column]) return;
+
+        const header = table.querySelector(`th[data-column="${column}"]`);
+        const cells = table.querySelectorAll(`td[data-column="${column}"]`);
+        let maxWidth = header ? header.scrollWidth : 80;
+        cells.forEach(cell => {
+            maxWidth = Math.max(maxWidth, cell.scrollWidth);
         });
 
-        // Re-append rows in sorted order
-        rows.forEach(row => tbody.appendChild(row));
+        this.summaryColumnSettings[column].width = `${Math.min(Math.max(maxWidth + 24, 80), 420)}px`;
+        this.applySummaryColumnSettings();
+    }
 
-        // Update sort indicators
-        document.querySelectorAll('.sortable').forEach(th => {
-            th.classList.remove('sorted-asc', 'sorted-desc');
+    showNumericInputDialog(title, message, initialValue, minValue = 0, maxValue = 6) {
+        if (this._activeInputModal) {
+            this._activeInputModal.remove();
+            this._activeInputModal = null;
+        }
+
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'diagram-structure-modal';
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="diagram-structure-modal-backdrop"></div>
+                <div class="diagram-structure-modal-dialog summary-input-dialog" role="dialog" aria-modal="true" aria-labelledby="summaryInputDialogTitle">
+                    <div class="diagram-structure-modal-header">
+                        <h3 id="summaryInputDialogTitle">${this.escapeHtml(title)}</h3>
+                    </div>
+                    <p class="summary-input-help">${this.escapeHtml(message)}</p>
+                    <label for="summaryNumericInput" class="summary-input-label">Decimal places</label>
+                    <input
+                        id="summaryNumericInput"
+                        class="summary-input-field"
+                        type="number"
+                        min="${minValue}"
+                        max="${maxValue}"
+                        step="1"
+                        value="${Number(initialValue)}"
+                    >
+                    <p class="summary-input-error" id="summaryNumericInputError"></p>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" type="button" id="summaryNumericCancelBtn">Cancel</button>
+                        <button class="btn btn-primary" type="button" id="summaryNumericApplyBtn">Apply</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            this._activeInputModal = modal;
+
+            const input = modal.querySelector('#summaryNumericInput');
+            const error = modal.querySelector('#summaryNumericInputError');
+            const cancelButton = modal.querySelector('#summaryNumericCancelBtn');
+            const applyButton = modal.querySelector('#summaryNumericApplyBtn');
+            const backdrop = modal.querySelector('.diagram-structure-modal-backdrop');
+
+            const close = (result) => {
+                document.removeEventListener('keydown', handleKeyDown);
+                modal.remove();
+                if (this._activeInputModal === modal) {
+                    this._activeInputModal = null;
+                }
+                resolve(result);
+            };
+
+            const apply = () => {
+                const parsed = Number.parseInt(input.value, 10);
+                if (!Number.isFinite(parsed) || parsed < minValue || parsed > maxValue) {
+                    error.textContent = `Enter a whole number from ${minValue} to ${maxValue}.`;
+                    error.style.display = 'block';
+                    input.focus();
+                    input.select();
+                    return;
+                }
+                close(parsed);
+            };
+
+            const handleKeyDown = (event) => {
+                if (event.key === 'Escape') {
+                    close(null);
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    apply();
+                }
+            };
+
+            cancelButton.addEventListener('click', () => close(null));
+            applyButton.addEventListener('click', apply);
+            backdrop.addEventListener('click', () => close(null));
+            document.addEventListener('keydown', handleKeyDown);
+
+            error.style.display = 'none';
+            input.focus();
+            input.select();
         });
-        const sortedHeader = document.querySelector(`.sortable[data-column="${column}"]`);
-        sortedHeader.classList.add(ascending ? 'sorted-asc' : 'sorted-desc');
+    }
+
+    async setSummaryColumnDecimals(column) {
+        if (!this.summaryColumnSettings[column] || !this.summaryData) return;
+
+        const currentValue = Number(this.summaryColumnSettings[column].decimals ?? 2);
+        const parsed = await this.showNumericInputDialog(
+            `Set decimal places for ${column}`,
+            'Choose a value between 0 and 6.',
+            currentValue,
+            0,
+            6
+        );
+        if (parsed === null) return;
+
+        this.summaryColumnSettings[column].decimals = parsed;
+        this.populateStructureSummary(this.summaryData);
+        this.appendStatusLogLine(
+            'frontend',
+            `${column} decimal places updated to ${parsed}.`
+        );
+    }
+
+    _showSimpleContextMenu(items, event) {
+        this._dismissContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'node-context-menu';
+        menu.style.left = `${event.clientX}px`;
+        menu.style.top = `${event.clientY}px`;
+
+        for (const item of items) {
+            if (item.separator) {
+                const sep = document.createElement('div');
+                sep.className = 'node-context-menu-separator';
+                menu.appendChild(sep);
+                continue;
+            }
+
+            const el = document.createElement('div');
+            el.className = 'node-context-menu-item';
+            if (item.active) {
+                el.classList.add('is-active');
+            }
+            if (item.disabled) {
+                el.classList.add('is-disabled');
+            }
+            el.textContent = item.label;
+            if (!item.disabled) {
+                el.addEventListener('mousedown', (mouseEvent) => {
+                    mouseEvent.stopPropagation();
+                    item.action?.();
+                    this._dismissContextMenu();
+                });
+            }
+            menu.appendChild(el);
+        }
+
+        document.body.appendChild(menu);
+        this._contextMenu = menu;
+
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+            menu.style.left = `${Math.max(event.clientX - rect.width, 8)}px`;
+        }
+        if (rect.bottom > window.innerHeight) {
+            menu.style.top = `${Math.max(event.clientY - rect.height, 8)}px`;
+        }
+
+        const dismiss = (mouseEvent) => {
+            if (!menu.contains(mouseEvent.target)) {
+                this._dismissContextMenu();
+                document.removeEventListener('mousedown', dismiss, true);
+            }
+        };
+        document.addEventListener('mousedown', dismiss, true);
+    }
+
+    showSummaryRowContextMenu(roi, event) {
+        const rows = Array.from(document.querySelectorAll('#structuresSummaryBody tr'));
+        const visibleOrder = rows.map(row => Number(row.dataset.roi));
+        const index = visibleOrder.indexOf(Number(roi));
+
+        this._showSimpleContextMenu([
+            {
+                label: 'Move Up',
+                disabled: index <= 0,
+                action: () => this.moveSummaryRow(roi, -1),
+            },
+            {
+                label: 'Move Down',
+                disabled: index < 0 || index >= visibleOrder.length - 1,
+                action: () => this.moveSummaryRow(roi, 1),
+            },
+            { separator: true },
+            {
+                label: 'Hide Structure',
+                action: () => this.hideSummaryRow(roi),
+            },
+        ], event);
+    }
+
+    showSummaryHeaderContextMenu(column, event) {
+        const supportsDecimals = column === 'volume' || column === 'slices';
+        const alignment = this.summaryColumnSettings[column]?.align || 'left';
+        const columnOrder = this.summaryColumnOrder || this.getDefaultSummaryColumnOrder();
+        const columnIndex = columnOrder.indexOf(column);
+
+        this._showSimpleContextMenu([
+            {
+                label: 'Move Left',
+                disabled: columnIndex <= 0,
+                action: () => this.moveSummaryColumn(column, -1),
+            },
+            {
+                label: 'Move Right',
+                disabled: columnIndex < 0 || columnIndex >= columnOrder.length - 1,
+                action: () => this.moveSummaryColumn(column, 1),
+            },
+            { separator: true },
+            {
+                label: 'Sort Ascending',
+                action: () => this.sortTable(column, true),
+            },
+            {
+                label: 'Sort Descending',
+                action: () => this.sortTable(column, false),
+            },
+            { separator: true },
+            {
+                label: 'Auto Fit Width',
+                action: () => this.autoFitSummaryColumn(column),
+            },
+            {
+                label: 'Hide Column',
+                action: () => this.setSummaryColumnHidden(column, true),
+            },
+            { separator: true },
+            {
+                label: 'Justify Left',
+                active: alignment === 'left',
+                action: () => this.setSummaryColumnAlignment(column, 'left'),
+            },
+            {
+                label: 'Justify Centre',
+                active: alignment === 'center',
+                action: () => this.setSummaryColumnAlignment(column, 'center'),
+            },
+            {
+                label: 'Justify Right',
+                active: alignment === 'right',
+                action: () => this.setSummaryColumnAlignment(column, 'right'),
+            },
+            { separator: true },
+            {
+                label: 'Decimal Places...',
+                disabled: !supportsDecimals,
+                action: () => this.setSummaryColumnDecimals(column),
+            },
+        ], event);
     }
 
     initializeSortableLists(data) {
@@ -3509,6 +4144,13 @@ class WebAppClient {
         this.hiddenNodes.clear();
         this.hiddenLabels.clear();
         this.fixedNodes.clear();
+        this.summaryHiddenRows.clear();
+        this.summaryRowOrder = [];
+        this.summaryDefaultOrder = [];
+        this.summaryDragSortEnabled = false;
+        this.summaryColumnOrder = this.getDefaultSummaryColumnOrder();
+        this.summaryColumnSettings = this.getDefaultSummaryColumnSettings();
+        this.currentSort = { column: 'roi', ascending: true };
         this.manualLayoutActive = false;
         this._dragFrozen = [];
         this._dismissContextMenu();
@@ -3529,6 +4171,10 @@ class WebAppClient {
         if (this.network) {
             this.network.destroy();
             this.network = null;
+        }
+        if (this.summarySortable) {
+            this.summarySortable.destroy();
+            this.summarySortable = null;
         }
         this.updateConnectionStatus(false);
 
