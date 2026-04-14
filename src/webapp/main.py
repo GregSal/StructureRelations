@@ -1590,8 +1590,12 @@ async def get_diagram_data(request: MatrixRequest):
                     edge_color = style['color']
                     if request.logical_relations_mode == 'faded' and rel.is_logical:
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
-                    # Add brackets around label for logical relationships
-                    edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
+                    relation_label = relationship_metadata.get(rel_type, {}).get(
+                        'label', rel_type
+                    )
+                    edge_label = (
+                        f'[{relation_label}]' if rel.is_logical else relation_label
+                    )
                     edge_title, edge_symbol = build_edge_tooltip(
                         roi_to_name.get(roi1, f'ROI {roi1}'),
                         roi_to_name.get(roi2, f'ROI {roi2}'),
@@ -1665,8 +1669,12 @@ async def get_diagram_data(request: MatrixRequest):
                     edge_color = style['color']
                     if request.logical_relations_mode == 'faded' and rel.is_logical:
                         edge_color = hex_to_rgba(edge_color, logical_opacity)
-                    # Add brackets around label for logical relationships
-                    edge_label = f'[{rel_type}]' if rel.is_logical else rel_type
+                    relation_label = relationship_metadata.get(rel_type, {}).get(
+                        'label', rel_type
+                    )
+                    edge_label = (
+                        f'[{relation_label}]' if rel.is_logical else relation_label
+                    )
                     edge_title, edge_symbol = build_edge_tooltip(
                         roi_to_name.get(from_roi, f'ROI {from_roi}'),
                         roi_to_name.get(to_roi, f'ROI {to_roi}'),

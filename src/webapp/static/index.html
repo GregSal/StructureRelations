@@ -136,7 +136,11 @@
                                         <span>Global</span>
                                     </div>
                                 </div>
-                                <button class="btn btn-primary" id="applyDiagramBtn" disabled>Apply</button>
+                                <div class="button-group">
+                                    <button class="btn btn-primary" id="applyDiagramBtn" disabled>Apply</button>
+                                    <button class="btn btn-secondary" id="manualLayoutBtn" disabled>Manual Layout</button>
+                                    <button class="btn btn-secondary" id="resetLayoutBtn" disabled>Reset</button>
+                                </div>
                             </div>
                             <div class="network-diagram-wrapper">
                                 <div id="networkDiagram" class="network-diagram"></div>
@@ -433,7 +437,7 @@
         </footer>
     </div>
 
-    <script src="static/js/app.js?v=116"></script>
+    <script src="static/js/app.js?v=117"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

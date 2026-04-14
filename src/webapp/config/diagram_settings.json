@@ -171,6 +171,7 @@
       "show_regions": true
     },
     "edges": {
+      "description": "Controls which relationship details appear in edge tooltips. Set 'relationship' to 'label' for the human-readable name, 'symbol' for the relationship symbol/notation, or 'type' for the internal relationship ID.",
       "show_structures": true,
       "relationship": "label",
       "show_direction": true,

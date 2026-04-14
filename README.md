@@ -12,20 +12,13 @@ Test and reports on relationships between DICOM RT Structures
 
     3. The progress bar is not scaled correctly. When it starts calculating relationships, it should be at about 30%, when it finishes calculating relationships it should be at 70% During the time that it is rendering the diagram it should be progressing from about 80% to 100%.
 
-2. Diagram fix
-  - with the JSON setting "relationship": "label",  the label is not being displayed.
-  - Add a descrition field under edges that gives and explains the "relationship" options.
-  - Add buttons to "Manual Layout" and "Reset". "Manual Layout" fixes all nodes
-  in their current location so that tyey can be manually dragged to the desired
-  location. "Reset" Unfixes all nodes and re-applies the auto layout calculations.
-
 3. Structure Summary upgrades
-  - Allow structures to be manually sorted in teh summary table
+  - Allow structures to be manually sorted in the summary table
     - right click on structure to reveal menu with options to move up, move down, hide
     - add a reset button at the top to unhide all structures and reapply default sorting
     - add a button on top to turn on/off click and drag sorting.  default off
     - right click on column heading to reveal menu
-          - sort -> ascending, decending
+          - sort -> ascending, descending
           - auto fit width
           - hide
           - Justify -> left, centre, right

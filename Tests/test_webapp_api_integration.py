@@ -18,6 +18,43 @@ import webapp.main as web_main
 from webapp.session_manager import SessionData, SessionManager
 
 
+class FakeDiagramStructureSet:
+    '''Pickle-safe minimal structure set for diagram endpoint tests.'''
+
+    def __init__(self, relationship, tolerance: float = 0.1):
+        self.relationship_graph = nx.DiGraph()
+        self.relationship_graph.add_edge(1, 2, relationship=relationship)
+        self.tolerance = tolerance
+        self.dicom_structure_file = None
+        self._summary_df = pd.DataFrame(
+            [
+                {
+                    'ROI': 1,
+                    'Name': 'Alpha',
+                    'DICOM_Type': 'CTV',
+                    'Physical_Volume': 1.0,
+                    'Num_Regions': 1,
+                },
+                {
+                    'ROI': 2,
+                    'Name': 'Beta',
+                    'DICOM_Type': 'GTV',
+                    'Physical_Volume': 2.0,
+                    'Num_Regions': 1,
+                },
+            ]
+        )
+        self._relationship = relationship
+
+    def summary(self):
+        return self._summary_df
+
+    def get_relationship(self, from_roi, to_roi):
+        if from_roi == 1 and to_roi == 2:
+            return self._relationship
+        return None
+
+
 def _make_fake_structure_set(tolerance: float = 0.1):
     graph = nx.DiGraph()
     rel = StructureRelationship(
@@ -27,6 +64,15 @@ def _make_fake_structure_set(tolerance: float = 0.1):
     )
     graph.add_edge(1, 2, relationship=rel)
     return SimpleNamespace(relationship_graph=graph, tolerance=tolerance)
+
+
+def _make_fake_diagram_structure_set(tolerance: float = 0.1):
+    rel = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['CONTAINS'],
+    )
+    return FakeDiagramStructureSet(relationship=rel, tolerance=tolerance)
 
 
 def _make_fake_plot_structure_set():
@@ -206,6 +252,32 @@ def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
     assert diagram_layout.get('layout', {}).get('local_global_default') == 30
     assert 'local' in diagram_layout.get('physics', {})
     assert 'global' in diagram_layout.get('physics', {})
+
+
+def test_diagram_endpoint_uses_human_relationship_label(monkeypatch, tmp_path):
+    '''Verify diagram edge payload uses the human-readable relationship label.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-human-label'
+    fake_set = _make_fake_diagram_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['edges']
+    edge = payload['edges'][0]
+    assert edge['relation_type'] == 'CONTAINS'
+    assert edge['label'] == 'Contains'
 
 
 def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_path):

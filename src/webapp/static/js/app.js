@@ -27,6 +27,8 @@ class WebAppClient {
         this.hiddenNodes = new Set();    // ROI ids hidden via context menu
         this.hiddenLabels = new Set();   // ROI ids with label hidden
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
+        this.manualLayoutActive = false;
+        this._dragFrozen = [];
         this._contextMenu = null;        // active context menu DOM element
         this._invalidTooltipRelationshipModesWarned = new Set();
         this.diagramOptions = {
@@ -479,6 +481,12 @@ class WebAppClient {
         });
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
             this.applyDiagramSelection();
+        });
+        document.getElementById('manualLayoutBtn').addEventListener('click', () => {
+            this.enableManualLayout();
+        });
+        document.getElementById('resetLayoutBtn').addEventListener('click', () => {
+            this.resetDiagramLayout();
         });
         document.getElementById('copyFromMatrixBtn').addEventListener('click', () => {
             this.copyFromMatrixToDiagram();
@@ -1613,7 +1621,12 @@ class WebAppClient {
             edge.relation_type || String(edge.label || '').replace(/\[|\]/g, '')
         ).toUpperCase();
         const relationConfig = this.symbolConfig?.relationships?.[relationType] || {};
-        const relationLabel = edge.label || relationConfig.label || relationType;
+        const baseRelationLabel = relationConfig.label
+            || String(edge.label || '').replace(/\[|\]/g, '')
+            || relationType;
+        const relationLabel = edge.is_logical
+            ? `[${baseRelationLabel}]`
+            : baseRelationLabel;
         const relationSymbol = edge.symbol || relationConfig.symbol || '?';
         const relationDescription = relationConfig.description || '';
         const relationshipMode = this.getTooltipRelationshipMode();
@@ -1650,6 +1663,66 @@ class WebAppClient {
         }
 
         return lines.join('\n');
+    }
+
+    updateDiagramLayoutButtons() {
+        const manualButton = document.getElementById('manualLayoutBtn');
+        const resetButton = document.getElementById('resetLayoutBtn');
+        const nodeIds = this.network?.body?.data?.nodes?.getIds?.() || [];
+        const hasDiagram = nodeIds.length > 0;
+
+        if (manualButton) {
+            manualButton.disabled = !hasDiagram;
+            manualButton.textContent = this.manualLayoutActive
+                ? 'Manual Layout On'
+                : 'Manual Layout';
+        }
+
+        if (resetButton) {
+            resetButton.disabled = !hasDiagram;
+        }
+    }
+
+    enableManualLayout() {
+        if (!this.network) return;
+
+        const nodeIds = this.network.body.data.nodes.getIds();
+        if (!nodeIds.length) return;
+
+        const positions = this.network.getPositions(nodeIds);
+        const pinnedNodes = nodeIds.map((id) => {
+            const pos = positions[id] || { x: 0, y: 0 };
+            this.fixedNodes.add(Number(id));
+            return {
+                id,
+                x: pos.x,
+                y: pos.y,
+                physics: false,
+            };
+        });
+
+        this.manualLayoutActive = true;
+        this.network.body.data.nodes.update(pinnedNodes);
+        this.network.stopSimulation();
+        this.updateDiagramLayoutButtons();
+        this.appendStatusLogLine('frontend', 'Manual layout enabled for the diagram.');
+    }
+
+    resetDiagramLayout() {
+        if (!this.latestDiagramData) return;
+
+        this.fixedNodes.clear();
+        this.manualLayoutActive = false;
+        this._dragFrozen = [];
+        this.renderDiagram(this.latestDiagramData);
+
+        if (this.network) {
+            this.network.setOptions({ physics: this.getPhysicsFromInfluence() });
+            this.network.fit();
+            this.network.startSimulation();
+        }
+
+        this.appendStatusLogLine('frontend', 'Diagram layout reset to automatic positioning.');
     }
 
     renderDiagramLegend(data) {
@@ -2090,6 +2163,8 @@ class WebAppClient {
         this.hiddenNodes = new Set(Array.from(this.hiddenNodes).filter(id => renderedNodeIds.has(Number(id))));
         this.hiddenLabels = new Set(Array.from(this.hiddenLabels).filter(id => renderedNodeIds.has(Number(id))));
         this.fixedNodes = new Set(Array.from(this.fixedNodes).filter(id => renderedNodeIds.has(Number(id))));
+        this.manualLayoutActive = renderedNodeIds.size > 0
+            && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => {
@@ -2122,11 +2197,18 @@ class WebAppClient {
         });
 
         // Prepare edges for vis-network
-        const edges = data.edges.map(edge => ({
+        const edges = data.edges.map(edge => {
+            const relationType = String(edge.relation_type || '').toUpperCase();
+            const relationConfig = this.symbolConfig?.relationships?.[relationType] || {};
+            const baseLabel = relationConfig.label || edge.label || relationType;
+            const displayLabel = edge.is_logical && baseLabel && !String(baseLabel).startsWith('[')
+                ? `[${baseLabel}]`
+                : baseLabel;
+            return ({
             from: edge.from_node,
             to: edge.to_node,
-            label: showLabels ? edge.label : '',
-            originalLabel: edge.label,
+            label: showLabels ? displayLabel : '',
+            originalLabel: displayLabel,
             title: this.buildEdgeTooltip(edge, data.nodes),
             color: edge.color,
             width: edge.width,
@@ -2141,7 +2223,8 @@ class WebAppClient {
                 type: 'continuous',
                 roundness: 0.5
             }
-        }));
+        });
+        });
 
         // Network options
         const options = {
@@ -2235,6 +2318,7 @@ class WebAppClient {
         });
 
         this.renderDiagramLegend(data);
+        this.updateDiagramLayoutButtons();
     }
 
     removeStructureFromDiagram(roi) {
@@ -2344,6 +2428,11 @@ class WebAppClient {
                 { id: roi, x: pos.x, y: pos.y, physics: false },
             ]);
         }
+
+        const nodeIds = this.network.body.data.nodes.getIds();
+        this.manualLayoutActive = nodeIds.length > 0
+            && nodeIds.every(id => this.fixedNodes.has(Number(id)));
+        this.updateDiagramLayoutButtons();
     }
 
     _ctxToggleLabel(roi) {
@@ -3420,6 +3509,8 @@ class WebAppClient {
         this.hiddenNodes.clear();
         this.hiddenLabels.clear();
         this.fixedNodes.clear();
+        this.manualLayoutActive = false;
+        this._dragFrozen = [];
         this._dismissContextMenu();
         if (this.websocket) {
             this.websocket.close();
@@ -3456,6 +3547,7 @@ class WebAppClient {
             tooltip.innerHTML = '';
             tooltip.classList.remove('visible');
         }
+        this.updateDiagramLayoutButtons();
         const modal = document.getElementById('diagramStructureModal');
         if (modal) {
             modal.style.display = 'none';
