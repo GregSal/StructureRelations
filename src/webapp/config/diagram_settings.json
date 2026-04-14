@@ -165,10 +165,10 @@
   "tooltips": {
     "description": "Controls which fields are shown in diagram tooltips. Set a field to false to hide it.",
     "nodes": {
-      "show_roi_number": true,
+      "show_roi_number": false,
       "show_type": true,
       "show_volume": true,
-      "show_regions": false
+      "show_regions": true
     },
     "edges": {
       "show_structures": true,

@@ -12,31 +12,22 @@ Test and reports on relationships between DICOM RT Structures
 
     3. The progress bar is not scaled correctly. When it starts calculating relationships, it should be at about 30%, when it finishes calculating relationships it should be at 70% During the time that it is rendering the diagram it should be progressing from about 80% to 100%.
 
-2. Contour Plot Updates
+2. Diagram fix
+  - with the JSON setting "relationship": "label",  the label is not being displayed.
+  - Add a descrition field under edges that gives and explains the "relationship" options.
 
-    1. The y axis of the contour plot should be flipped.
-
-    2. The Relationship overlay options should change depending on how many
-        structures are selected.
-        1. If only one structure is selected, the only option should be: Structure A
-        2. If two structures are selected, the only options should be: A vs B
-        3. If three structures are selected, the options should be:
-            - A vs B, C outline
-            - (A AND B) vs C
-            - (A OR B) vs C
-            - (A XOR B) vs C
-            - (A - B) vs C
-        4. If more than three structures are selected, the only options should
-            be: A vs B , outlines of all other structures
-
-    with the "A vs B, C outline" and "A vs B , outlines" (Structure A and, B are displayed in as they are with only two structures selected and all other selected structures are drawn as outlines)
-
-    3. Add an option to plot an axis
-
-    4. The tooltip for the structure sets should have the upload prefix dropped from the file name.  This should also apply internally to the file name attribute in the structure set.
-    ![alt text](image-2.png)
-
-    5. Try to improve the speed of rendering contour plots, especially when switching slices.
+3. Structure Summary upgrades
+  - Allow structures to be manually sorted in teh summary table
+    - right click on structure to reveal menu with options to move up, move down, hide
+    - add a reset button at the top to unhide all structures and reapply default sorting
+    - add a button on top to turn on/off click and drag sorting.  default off
+    - right click on column heading to reveal menu
+          - sort -> ascending, decending
+          - auto fit width
+          - hide
+          - Justify -> left, centre, right
+          - Decimal places (for volume and slice range)
+    - slice range should be formatted centres with the "to" portion of the text aligned
 
     3. Relation (Edge) Updates
         - implement expanded options for line types
