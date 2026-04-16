@@ -1,28 +1,40 @@
 # Structure Metrics
 
+## Distance
+- $Distance = distance(a,b)$
+
+**Z direction metrics**
+
+- The larger of $\Delta Z$ or $d_{2D}$
+
+**Used By:**
+- DISJOINT
+- SURROUNDS
+- SHELTERS
+
 ## Ratio of Volumes
 
 Ratio of the overlapping volume to the average or larger volume.
 $R_V =\frac{V( a \cap b )}{\overline{V_{a,b}}}$
 
 Since the structures are compared slice by slice, the Volume function can be written as:<br>
-$V(x) = t \times \operatorname{area} ( x )$,<br>
+$V(x) = t \times \mathsf{area} ( x )$,<br>
 where $t$ is the slice thickness.
 
 When calculating the ratio, slice thickness is a constant, so the Volume ratio is equal to the ratio sums of the areas over all slices:
 
-$R_V =\frac{\sum_s \operatorname{area}( a \cap b )}{\sum_s \overline{\operatorname{area}_{a,b}}}$
+$R_V =\frac{\sum_s \mathsf{area}( a \cap b )}{\sum_s \overline{\mathsf{area}_{a,b}}}$
 
 *Used By:*
 
 - **Overlaps**
 > - Ratio of the volume of overlap to the average volume of $a$ and $b$:
-> - $R_v =\frac{\sum_s \left[ 2 \times \operatorname{area}( a \cap b ) \right] }{\sum_s \left[ \operatorname{area}( a ) + \operatorname{area}( b ) \right] }$
+> - $R_v =\frac{\sum_s \left[ 2 \times \mathsf{area}( a \cap b ) \right] }{\sum_s \left[ \mathsf{area}( a ) + \mathsf{area}( b ) \right] }$
 
 
 - **Partition**
 > - Ratio of the volume of the overlap to the volume of the larger structure ($a$):
-> - $R_V =\frac{\sum_s \operatorname{area}( a \cap b )}{\sum_s \operatorname{area}( a )}$
+> - $R_V =\frac{\sum_s \mathsf{area}( a \cap b )}{\sum_s \mathsf{area}( a )}$
 
 
 ## Ratio of Surface Area
@@ -56,17 +68,6 @@ Where:
 - $b_{px}$ is the exterior perimeter of polygon $b$
 - $a_{ph}$ is the perimeter of the relevant hole within polygon $a$
 - $\ell_s⁡(p_i)$ is the length of perimeter $i$ on slice $s$
-
-
-## Distance
-- $Distance = distance(a,b)$
-
-**Z direction metrics**
-
-- The larger of $\Delta Z$ or $d_{2D}$
-
-**Used By:**
-- Disjoint
 
 
 ## Margins
