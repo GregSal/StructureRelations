@@ -3,6 +3,7 @@
 # %% Imports
 from typing import Callable, Dict, List, Optional
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -48,7 +49,9 @@ class StructureSet:
                  tolerance=0.0,
                  unit: str = 'cm',
                  auto_calculate_relationships: bool = True,
-                 auto_calculate_logical_flags: bool = True):
+                 auto_calculate_logical_flags: bool = True,
+                 include_structures: Optional[List[str]] = None,
+                 exclude_structures: Optional[List[str]] = None):
         '''Initialize the StructureSet.
 
         Args:
@@ -71,6 +74,14 @@ class StructureSet:
             auto_calculate_logical_flags (bool, optional): Whether to
                 automatically calculate logical flags during finalize.
                 Defaults to True.
+            include_structures (List[str], optional): List of structure name
+                patterns to include. A structure is included if its name
+                exactly matches or matches via regex any pattern in this list.
+                If None, all structures are included (subject to exclusion).
+            exclude_structures (List[str], optional): List of structure name
+                patterns to exclude. A structure is excluded if its name
+                exactly matches or matches via regex any pattern in this list.
+                Exclusion takes precedence over inclusion.
         '''
         self.structures = {}
         self.slice_sequence = None
@@ -80,6 +91,8 @@ class StructureSet:
         self.unit = unit
         self.auto_calculate_relationships = auto_calculate_relationships
         self.auto_calculate_logical_flags = auto_calculate_logical_flags
+        self.include_structures = include_structures
+        self.exclude_structures = exclude_structures
         self.relationship_progress: Dict[str, float | int | str] = {
             'current_pair': 0,
             'total_pairs': 0,
@@ -97,6 +110,66 @@ class StructureSet:
             self.build_from_dicom_file()
         elif slice_data is not None:
             self.build_from_slice_data(slice_data)
+
+    def _should_include_structure(self, structure_name: str) -> bool:
+        '''Check if a structure should be included based on filter patterns.
+
+        Args:
+            structure_name (str): Name of the structure to check.
+
+        Returns:
+            bool: True if structure should be included, False otherwise.
+
+        Notes:
+            - Exclusion patterns take precedence over inclusion patterns.
+            - Patterns are matched using both exact string matching and regex.
+            - Invalid regex patterns are silently skipped.
+        '''
+        # Check exclusion patterns first (takes precedence)
+        if self.exclude_structures:
+            for pattern in self.exclude_structures:
+                # Try exact match first
+                if structure_name == pattern:
+                    logger.debug('Structure %s excluded by exact match: %s',
+                                 structure_name, pattern)
+                    return False
+                # Try regex match
+                try:
+                    if re.search(pattern, structure_name):
+                        logger.debug('Structure %s excluded by regex match: %s',
+                                     structure_name, pattern)
+                        return False
+                except re.error:
+                    # Invalid regex, skip
+                    logger.debug('Invalid regex pattern in exclude_structures: %s',
+                                 pattern)
+
+        # Check inclusion patterns
+        if self.include_structures:
+            for pattern in self.include_structures:
+                # Try exact match first
+                if structure_name == pattern:
+                    logger.debug('Structure %s included by exact match: %s',
+                                 structure_name, pattern)
+                    return True
+                # Try regex match
+                try:
+                    if re.search(pattern, structure_name):
+                        logger.debug('Structure %s included by regex match: %s',
+                                     structure_name, pattern)
+                        return True
+                except re.error:
+                    # Invalid regex, skip
+                    logger.debug('Invalid regex pattern in include_structures: %s',
+                                 pattern)
+            # No match found in include list, exclude
+            logger.debug('Structure %s not matched by any include pattern',
+                         structure_name)
+            return False
+
+        # No include_structures filter specified, include by default
+        # (structure already passed exclusion checks if we got here)
+        return True
 
     def build_from_dicom_file(self) -> None:
         '''Build structures from DicomStructureFile following the StructureSet
@@ -145,6 +218,11 @@ class StructureSet:
             else:
                 structure_name = f'Structure_{roi}'
                 logger.debug('Using generic name for ROI %s: %s', roi, structure_name)
+
+            # Check if structure should be included based on filters
+            if not self._should_include_structure(structure_name):
+                logger.info('Skipping structure %s (%s) due to filters', structure_name, roi)
+                continue
 
             logger.info('Adding structure %s (%s)', structure_name, roi)
             structure = StructureShape(roi=roi, name=structure_name)

@@ -113,6 +113,8 @@ class RegionSlice():
         is_empty (bool): True if the slice is empty, False otherwise.
         is_interpolated (bool): True if all contours in the slice are
             interpolated, False otherwise.
+        is_boundary (bool): True if any contour in the slice is a boundary
+            contour, False otherwise.
     '''
 
     def __init__(self, contour_graph: nx.Graph, slice_index: SliceIndexType) -> None:
@@ -141,6 +143,7 @@ class RegionSlice():
         # These dictionaries are treated as immutable after __init__ and are
         # safe to use with cached_property-derived geometry caches.
         interpolated_contours = []
+        boundary_contours = []
 
         # Extract the a subset of the contour_lookup table limited to contours
         # on the specified slice.
@@ -152,6 +155,7 @@ class RegionSlice():
         # If there are no contours on the slice, return an empty RegionSlice.
         if slice_contours.empty:
             self.is_interpolated = False
+            self.is_boundary = False
             return
 
         # select the primary contours on the slice, which are those
@@ -245,6 +249,7 @@ class RegionSlice():
                 contour_labels.append(contour.index)
                 # record whether the contour is interpolated
                 interpolated_contours.append(contour.is_interpolated)
+                boundary_contours.append(contour.is_boundary)
                 if contour.is_hole:
                     # add the hole to the list of hole contours
                     region_holes.append(contour)
@@ -297,6 +302,9 @@ class RegionSlice():
         # Label the RegionSlice as Interpolated if all contours on the slice are
         # interpolated.
         self.is_interpolated = all(interpolated_contours)
+        # Label the RegionSlice as Boundary if any contour on the slice is a
+        # boundary contour (face slice created by boundary extension).
+        self.is_boundary = any(boundary_contours)
 
     @functools.cached_property
     def exterior(self)-> Dict[RegionIndex, shapely.MultiPolygon]:

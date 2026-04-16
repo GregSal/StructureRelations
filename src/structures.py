@@ -346,7 +346,8 @@ class StructureShape():
                 'SliceIndex': slice_index,
                 'RegionSlice': region_slice,
                 'Empty': region_slice.is_empty,
-                'Interpolated': region_slice.is_interpolated
+                'Interpolated': region_slice.is_interpolated,
+                'IsBoundary': region_slice.is_boundary,
             })
 
         # Create the enclosed_region DataFrame
@@ -428,18 +429,45 @@ class StructureShape():
         '''
         # 1. Create an initial blank DE27IM relationship object.
         composite_relation = DE27IM()
-        # 2. Identify slices where either structures have non-empty RegionSlice objects.
-        slices_self = set(self.region_table['SliceIndex'])
-        slices_other = set(other.region_table['SliceIndex'])
-        used_slices = slices_self | slices_other
-        # 3. Find the common slices for the two structures.
-        this_slice_mask = self.region_table.SliceIndex.isin(used_slices)
+        # 2-3. Find comparison slice positions: only positions where at least
+        # one structure has a non-interpolated (original) or boundary-face
+        # slice. This excludes interior fill-in interpolated slices that may
+        # have incorrect geometry. When one structure has a valid slice at a
+        # position and the other only has a fill-in, the fill-in is still
+        # included as geometric context so that the relationship is computed
+        # correctly (e.g. an inner structure's boundary face at a position
+        # where the outer only has a fill-in should still be compared against
+        # the outer's fill-in geometry, not against an empty outer).
+        # Only use positions where at least one structure has a non-interpolated
+        # (original) or boundary-face slice. This excludes interior fill-in
+        # interpolated slices that may have incorrect geometry. When one
+        # structure has a valid slice at a position and the other only has a
+        # fill-in, the fill-in is still included as geometric context so that
+        # the relationship is computed correctly (e.g. an inner structure's
+        # boundary face at a position where the outer only has a fill-in should
+        # still be compared against the outer's fill-in geometry, not against
+        # an empty outer).
+        this_valid_mask = (
+            ~self.region_table.Interpolated | self.region_table.IsBoundary
+        )
+        valid_slices_self = set(
+            self.region_table.loc[this_valid_mask, 'SliceIndex']
+        )
+        other_valid_mask = (
+            ~other.region_table.Interpolated | other.region_table.IsBoundary
+        )
+        valid_slices_other = set(
+            other.region_table.loc[other_valid_mask, 'SliceIndex']
+        )
+        valid_positions = valid_slices_self | valid_slices_other
+
+        this_slice_mask = self.region_table.SliceIndex.isin(valid_positions)
         this_mask = this_slice_mask & ~self.region_table.Empty
         regions_self = self.region_table.loc[this_mask,
                                              ['SliceIndex', 'RegionSlice']]
         regions_self.set_index('SliceIndex', inplace=True)
 
-        other_slice_mask = other.region_table.SliceIndex.isin(used_slices)
+        other_slice_mask = other.region_table.SliceIndex.isin(valid_positions)
         other_mask = other_slice_mask & ~other.region_table.Empty
         regions_other = other.region_table.loc[other_mask,
                                              ['SliceIndex', 'RegionSlice']]
