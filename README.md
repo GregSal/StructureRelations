@@ -14,14 +14,14 @@ where the bit order is specified, and check that it is correct and consistent
 with the implementation in the code.
 
 2. Begin work on Metric Calculations
-
+    1. Design tests for each metric type for each relevant relationship type.
 
 ## Metrics
 
 ### Metrics Types
 
 - 4 kinds of Metrics
-  - Distance
+  - Length
     - Units of cm or mm
     - Distance between contours of two structures
     - Direction any of 3D (perpendicular to contour), or orthogonal directions (L, R, Ant, Post, Sup, Inf)
@@ -30,7 +30,7 @@ with the implementation in the code.
   - Volume
     - Units of $cm^3$, cc, ml
     - Volume of overlap ($A \cap B$), or difference ($A - B$) between two structures
-    - For a single structure this is teh volume of that structure
+    - For a single structure this is the volume of that structure
   - Surface Area
     - Units of $cm^2$, $mm^2$
     - Overlapping surfaces ($A_{boundary} \cap B_{boundary}$) Surface of B within A ($[A - B]_{boundary}$)
