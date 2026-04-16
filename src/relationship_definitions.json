@@ -71,7 +71,7 @@
         {
             "relation_type": "PARTITIONS",
             "label": "Partitions",
-            "symbol": "⊕",
+            "symbol": "⊗",
             "pattern": "T*F*T*T**\t*********\t*********",
             "mask": "0b101010100000000000000000000",
             "value": "0b100010100000000000000000000",

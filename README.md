@@ -3,8 +3,17 @@
 Test and reports on relationships between DICOM RT Structures
 
 ## TO Do Next
+1. The bit order of the DE27IM is not consistant in the documentation.
+The bit order should be Region (contour), External, Hull.  In some cased the
+documentation has it reversed as Hull, External, Region.  This is a critical
+detail for the implementation of the relationship calculations, so I need to
+verify that the bit order is correct and consistent in the documentation and in
+the code.
+I need to search through the notebooks and markdown files to identify instances
+where the bit order is specified, and check that it is correct and consistent
+with the implementation in the code.
 
-Begin work on Metric Calculations
+2. Begin work on Metric Calculations
 
 
 ## Metrics

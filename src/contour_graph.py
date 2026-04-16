@@ -256,7 +256,9 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
     # Create a contour for each polygon
     for poly in polygons_to_process:
         # Get the interpolated slice index from this polygon
-        interpolated_slice_index = poly.boundary.coords[0][2]
+        # Use exterior instead of boundary to handle polygons with holes
+        # (boundary is MultiLineString for polygons with holes)
+        interpolated_slice_index = poly.exterior.coords[0][2]
 
         # Set the contour parameters for this polygon
         params = contour_parameters.copy()
@@ -296,7 +298,8 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
 
     # Update the slice sequence with the interpolated slice (only once)
     # Use the first polygon's slice index (they should all be the same)
-    interpolated_slice_index = polygons_to_process[0].boundary.coords[0][2]
+    # Use exterior instead of boundary to handle polygons with holes
+    interpolated_slice_index = polygons_to_process[0].exterior.coords[0][2]
     neighbors = slice_sequence.get_neighbors(original_slice)
     slice_ref = {'PreviousSlice': neighbors.previous_slice,
                   'NextSlice': neighbors.next_slice,

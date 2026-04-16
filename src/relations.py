@@ -867,19 +867,26 @@ class DE27IM():
                     exterior = region_a.merged_exterior
                     hull = region_a.merged_hull
                     if region_b.has_regions():
-                        poly_b = region_b.merged_region
-                        exterior_b = region_b.merged_exterior
-                        hull_b = region_b.merged_hull
-                        self.relate_poly(
-                            poly_a,
-                            poly_b,
-                            external_polygon_a=exterior,
-                            hull_polygon_a=hull,
-                            external_polygon_b=exterior_b,
-                            hull_polygon_b=hull_b,
-                            adjustments=adjustments,
-                            tolerance=tolerance,
-                        )
+                        # Non-boundary regions must never be compared with each
+                        # other on a boundary slice. On a boundary slice, the
+                        # non-boundary (interior) regions cannot set the
+                        # interior-interior bit, only boundary-adjusted
+                        # comparisons are valid. Skip this comparison entirely
+                        # if either slice is marked as a boundary slice.
+                        if not region_a.is_boundary and not region_b.is_boundary:
+                            poly_b = region_b.merged_region
+                            exterior_b = region_b.merged_exterior
+                            hull_b = region_b.merged_hull
+                            self.relate_poly(
+                                poly_a,
+                                poly_b,
+                                external_polygon_a=exterior,
+                                hull_polygon_a=hull,
+                                external_polygon_b=exterior_b,
+                                hull_polygon_b=hull_b,
+                                adjustments=adjustments,
+                                tolerance=tolerance,
+                            )
                     if region_b.has_boundaries():
                         adjustments.append(AdjustmentType.BOUNDARY_B)
                         boundary_b = region_b.merged_boundary
