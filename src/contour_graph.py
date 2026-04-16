@@ -366,8 +366,10 @@ def add_graph_edges(contour_graph: ContourGraph,
 
     Edges are added between contours that are neighbours in the slice sequence
     and have the same hole type. Edges are directed from lower to higher slice
-    indices. Matching contours are identified by the intersection of the
-    contours' convex hulls.
+    indices. Matching contours are identified by requiring that the intersection
+    of the contours' polygons (with holes, poly_h) has a positive area. This
+    excludes boundary-only contact which can cause spurious cross-links between
+    separate regions that merely touch on adjacent slices.
 
     Args:
         contour_graph (ContourGraph): The directed graph representation of the contours.
@@ -395,10 +397,15 @@ def add_graph_edges(contour_graph: ContourGraph,
         # match this contour to the contours on the next slice
         for neighbour in contour_lookup.loc[neighbour_idx, 'Label']:
             neighbour_contour = contour_graph.nodes(data=True)[neighbour]['contour']
-            # If the convex hulls intersect, create a directed edge
-            if this_contour.poly_h.intersects(neighbour_contour.poly_h):
-                contour_match = ContourMatch(this_contour, neighbour_contour)
-                contour_graph.add_edge(this_label, neighbour, match=contour_match)
+            # Require genuine area overlap (not just boundary/point contact).
+            # A fast intersects() pre-check avoids the more expensive
+            # intersection().area computation for clearly disjoint pairs.
+            if not this_contour.poly_h.intersects(neighbour_contour.poly_h):
+                continue
+            if this_contour.poly_h.intersection(neighbour_contour.poly_h).area <= 0:
+                continue
+            contour_match = ContourMatch(this_contour, neighbour_contour)
+            contour_graph.add_edge(this_label, neighbour, match=contour_match)
     return contour_graph
 
 
