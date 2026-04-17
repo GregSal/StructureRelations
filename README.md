@@ -88,6 +88,10 @@ with the implementation in the code.
 
 ## Future work
 
+1. Exports do not respect selection, order, or symbol option in matrix display
+2. Include a legend in the spreadsheet / Json file if using symbols
+3. Include a description section in the spreadsheet / Json file with descriptions of relationships.  This should be expanded on as Metrics are added
+
 1. Add an optional origin/ isocentre attribute to StructureSet
     - The structure Set DICOM data does not contain an origin or isocentre, but
       it is included in the DICOM RT Plan. In teh future, when we add support
@@ -99,3 +103,4 @@ with the implementation in the code.
         - Different dash types
         - double lines
         - glow
+
