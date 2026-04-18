@@ -33,7 +33,7 @@ def _flip_y_axis_if_needed(ax) -> None:
 
 
 # %% functions
-def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
+def plot_ab(poly_a, poly_b, add_axis=True, axes=None, dicom_orientation=True):
     '''Plot the difference between two polygons.
 
     This function plots the difference between two polygons, showing the
@@ -49,6 +49,12 @@ def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
     Args:
         poly_a (shapely.Polygon | RegionSlice): The first polygon.
         poly_b (shapely.Polygon | RegionSlice): The second polygon.
+        add_axis (bool, optional): Whether to add axis lines at 0.
+            Defaults to True.
+        axes (matplotlib.axes, optional): Existing axes to plot on. If None,
+            creates a new figure. Defaults to None.
+        dicom_orientation (bool, optional): Whether to flip the y-axis to match
+            DICOM image coordinates. Defaults to True.
 
     Returns:
         ax: The matplotlib axis with the plotted polygons.
@@ -88,7 +94,9 @@ def plot_ab(poly_a, poly_b, add_axis=True, axes=None):
         ax.axhline(0, color='gray', linestyle='--')
         ax.axvline(0, color='gray', linestyle='--')
 
-    _flip_y_axis_if_needed(ax)
+    if dicom_orientation:
+        _flip_y_axis_if_needed(ax)
+
     if not axes:
         plt.show()
     return ax
