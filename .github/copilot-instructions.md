@@ -11,6 +11,8 @@ This project analyzes spatial relationships between DICOM RT (Radiotherapy) stru
 - Don't add a newline at the beginning of a doc string
 - use type hints for function arguments and return values
 - Use f-string for string formatting except for logging statements where lazy formatting is preferred
+- Use % formatting for logging statements to allow for lazy evaluation of log messages
+- Use logging instead of print statements for debug output
 - Use str.join() for string concatenation instead of + operator
 - Follow PEP 8
 - Use type hints
