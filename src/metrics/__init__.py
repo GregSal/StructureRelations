@@ -67,7 +67,7 @@ try:
 except ImportError as e:
     # Some calculators may not be implemented yet
     import logging
-    logging.getLogger(__name__).debug(f'Could not import all calculator modules: {e}')
+    logging.getLogger(__name__).debug('Could not import all calculator modules: %s', e)
 
 # Orchestrator (will be implemented in Phase 6)
 try:

@@ -57,11 +57,11 @@ class MetricCalculator(ABC):
         pass
 
     @abstractmethod
-    def is_applicable(self, relationship_type: RelationshipType) -> bool:
-        """Check if this metric applies to the given relationship type.
+    def is_applicable(self, relationship: StructureRelationship) -> bool:
+        """Check if this metric applies to the given relationship.
 
         Args:
-            relationship_type: The spatial relationship to check
+            relationship: The spatial relationship to check
 
         Returns:
             True if this metric is applicable, False otherwise
@@ -143,16 +143,18 @@ class MetricCalculator(ABC):
 
         return regions
 
-    def _warn_non_applicable(self, relationship_type: RelationshipType):
+    def _warn_non_applicable(self, relationship_type):
         """Log warning when calculator is used on non-applicable relationship.
 
         Args:
-            relationship_type: The relationship type
+            relationship_type: The RelationshipType instance
         """
         if self.config.warn_on_non_applicable:
             self.logger.warning(
-                f'{self.get_name()} metric is not applicable to {relationship_type.name} '
-                f'relationship. Returning {self.get_non_applicable_value()}'
+                '%s metric is not applicable to %s relationship. Returning %s',
+                self.get_name(),
+                relationship_type.relation_type,
+                self.get_non_applicable_value()
             )
 
 

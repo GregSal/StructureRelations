@@ -1,644 +1,686 @@
-
-# %% Margin Functions
-def broadcast_coords(center: np.array, limits: np.array) -> List[np.array]:
-    '''Create points at each of the 4 limits, aligned with center_coords.
-
-    Each limit value in limits is placed into an xy pair along with the
-    appropriate x or y values from center_coords.
-
-    Args:
-        center (np.array): length 2 array of float with center
-            coordinates.
-
-    limits (np.array): length 4 array of float with x and y limits.
-
-Returns:
-    list[np.array]: A list of xy coordinate pairs at the specified limits,
-        which can form orthogonal lines crossing through the center point.
-    '''
-    xy_pairs = [None] * 4
-    for i in range(2):
-        # Start with center coordinates as the xy pairs.
-        xy_pairs[i * 2] = center.copy()
-        xy_pairs[i * 2 + 1] = center.copy()
-        for j in range(2):
-            # The index of the xy pair to modify.
-            idx = i * 2 + j
-            # replace the appropriate x or y value with one of the limits.
-            xy_pairs[idx][j] = limits[i][j]
-    return xy_pairs
-
-
-def length_between(line: shapely.LineString,
-                   poly_a: ContourType, poly_b: ContourType)->float:
-    '''Calculate the length of the line between poly_a and poly_b.
-
-    The length of the line segment that lies exterior to poly_b and interior to
-    poly_a.
-
-    Args:
-        line (shapely.LineString): A line passing through both poly_a and
-            poly_b.
-        poly_a (ContourType): The outer polygon.
-        poly_b (ContourType): A polygon contained within poly_a
-
-    Returns:
-        float: The length of the line segment that lies between the outside
-            of poly_b and the outside of poly_a
-    '''
-    # disregard any holes in this calculation.
-    exterior_a = shapely.Polygon(poly_a.exterior)
-    exterior_b = shapely.Polygon(poly_b.exterior)
-    # Remove the part of the line inside of poly_b
-    line_outside_b = shapely.difference(line, exterior_b)
-    # Remove the part of the line outside of poly_a
-    line_between_ab = shapely.intersection(line_outside_b, exterior_a)
-    return shapely.length(line_between_ab)
-
-
-def orthogonal_margins(poly_a: ContourType, poly_b: ContourType,
-                       precision: int = PRECISION)->Dict[str, float]:
-    '''Calculate the orthogonal margins between poly_a and poly_b.
-
-    The orthogonal margins are the distances between the exterior of poly_b and
-    the boundary of poly_a along lines that are parallel to the x and y axes and
-    cross the centre point of poly_b.
-
-    Args:
-        poly_a (ContourType): The outer polygon.
-        poly_b (ContourType): A polygon contained within poly_a
-        precision (int, optional): The number of decimal points to round to.
-            Defaults to global PRECISION constant.
-
-    Returns:
-        Dict[str, float]: A dictionary containing the orthogonal margins in
-            each direction. The keys of the dictionary are:
-                ['x_min', 'y_min', 'x_max', 'y_max']
-    '''
-    # The maximum extent of polygon a in orthogonal directions.
-    a_limits = np.array(poly_a.bounds).reshape((2,-1))
-    # Coordinates of the centre of polygon b.
-    b_center = (shapely.centroid(poly_b))
-    center_coords = shapely.get_coordinates(b_center)[0]
-    # Points at the maximum extent of a in line with the centre of b.
-    end_points = broadcast_coords(center_coords, a_limits)
-    orthogonal_lengths = {}
-    labels = ['x_neg', 'y_neg', 'x_pos', 'y_pos']
-    for label, limit_point in zip(labels, end_points):
-        # Make a line between the center of b and the limit of a.
-        line = shapely.LineString([limit_point, center_coords])
-        # Get the length of that line between the edges of b and a.
-        length = length_between(line, poly_a, poly_b)
-        orthogonal_lengths[label] = round(length, precision)
-    return orthogonal_lengths
-
-
-def get_z_margins(slice_table: pd.DataFrame,
-                  structures: StructurePairType)->Dict[str, float]:
-    '''Calculate the orthogonal z margins between two structures.
-
-    The z margins are the distances between the edge of the second structure and
-    the edge of the first structure in the z direction.
-    **** NOTE if the structures contain two or more contours on a slice, the
-    centre will not align with either contour and the margins will be incorrect.
-    StructureSlice needs to calculate a centre point for each region in the
-    StructureSlice.
-
-    Args:
-        slice_structures (pd.DataFrame): A DataFrame with the structure names as
-            columns and the slice number as the index. The values are
-            StructureSlice objects.
-
-        structures (StructurePairType): The reference numbers for two different
-            structures to be compared.
-
-    Returns:
-        Dict[str, float]: A dictionary containing the z margins in each
-            direction. The keys of the dictionary are:
-                ['z_neg', 'z_pos']
-    '''
-    structure_slices = select_slices(slice_table, structures)
-    roi_a, roi_b = structures
-    # Select only the slices containing the second structure.
-    contour_b_edges = identify_boundary_slices(structure_slices[roi_b])
-    # Get the centre point of the edge contours of the second structure.
-    centre_points = contour_b_edges.apply(get_region_centres)
-    # Identify the slices of the primary structure that do not contain
-    # the second structure.
-    roi_a_index = set(structure_slices[roi_a].index)
-    roi_b_index = set(structure_slices[roi_b].index)
-    non_overlap = roi_a_index - roi_b_index
-    contour_a_slices = structure_slices[roi_a].loc[non_overlap]
-    distances = []
-    for index, centre in centre_points.iteritems():
-        # Identify the slices where the first structure contours contain the
-        # centre point of the second structure.
-        aligned = contour_a_slices.apply(contains_point, point=centre)
-        dist = contour_a_slices.index[aligned] - index
-        distances.append(dist)
-    if not distances:
-        return {}
-    # The minimum and maximum distances between the two structures.
-    z_pos = min(d for d in distances if d >= 0)
-    z_neg = max(d for d in distances if d <= 0)
-    margin = {'z_neg': -z_neg, 'z_pos': z_pos}
-    return margin
-
-
-def min_margin(poly_a: ContourType, poly_b: ContourType,
-               precision: int = PRECISION)->Dict[str, float]:
-    boundary_a = poly_a.exterior
-    boundary_b = poly_b.exterior
-    dist = boundary_a.distance(boundary_b)
-    rounded_distance = round(dist, precision)
-    return rounded_distance
-
-
-def max_margin(poly_a: ContourType, poly_b: ContourType,
-               precision: int = PRECISION)->Dict[str, float]:
-    boundary_a = poly_a.exterior
-    boundary_b = poly_b.exterior
-    dist = boundary_a.hausdorff_distance(boundary_b)
-    rounded_distance = round(dist, precision)
-    return rounded_distance
-
-
-def agg_margins(margin_table: pd.DataFrame):
-    if margin_table.empty:
-        return pd.Series()
-    margin_agg = margin_table.agg('min')
-    margin_agg['max'] = margin_table['max'].max()
-    return margin_agg
-
-# TODO It ould be best if metric functions did not depend on relation.
-def margins(poly_a: StructureSlice, poly_b: StructureSlice,
-            relation: RelationshipType,
-            precision: int = PRECISION)->pd.Series:
-    def calculate_margins(polygon_a: ContourType, polygon_b: ContourType,
-                          precision: int = PRECISION)->Dict[str, float]:
-        # Only calculate margins when the a polygon contains the b polygon.
-        # FIXME get_z_margins now needs slice_table and structures
-        if polygon_a.contains(polygon_b):
-            margin_dict = orthogonal_margins(polygon_a, polygon_b, precision)
-            margin_dict.update(
-                get_z_margins(slice_table, structures, precision))
-
-            margin_dict['max'] = max_margin(polygon_a, polygon_b, precision)
-            margin_dict['min'] = min_margin(polygon_a, polygon_b, precision)
-            return margin_dict
-        return {}
-
-    margin_list = []
-    # Compare all polygons on the same slice
-    for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                        poly_b.contour.geoms):
-        if ((relation == RelationshipType.CONTAINS) |
-            (relation == RelationshipType.PARTITION)):
-            margin_dict = calculate_margins(polygon_a, polygon_b, precision)
-        elif ((relation == RelationshipType.SURROUNDS) |
-              (relation == RelationshipType.BORDERS_INTERIOR)):
-            # Compare all holes in each a polygon with each b polygon.
-            for hole_ring in polygon_a.interiors:
-                hole = shapely.Polygon(hole_ring)
-                margin_dict = calculate_margins(hole, polygon_b, precision)
-                if margin_dict:
-                    margin_list.append(margin_dict)
-                margin_dict = {}  # Clear margin_dict so it is not added twice.
-        elif relation == RelationshipType.SHELTERS:
-            # The outer region to use for the margin is the "hole" formed by
-            # closing the contour using the convex hull.  This can be obtained
-            # by subtracting the contour polygon from its  convex hull polygon.
-            hull = shapely.convex_hull(polygon_a)
-            semi_hole = shapely.difference(hull, polygon_a)
-            margin_dict = calculate_margins(semi_hole, polygon_b, precision)
-        else:
-            msg = ''.join([
-                'Margins can only be calculated for the relations: ',
-                '"Contains", "Partition", "Surrounds", "Borders_interior", ',
-                'or "Shelters".\n',
-                f'Supplied structures have relation of type: {str(relation)}.'
-                ])
-            raise InvalidContourRelation(msg)
-        if margin_dict:
-            margin_list.append(margin_dict)
-    if margin_list:
-        margin_table = pd.DataFrame(margin_list)
-        return agg_margins(margin_table)
-    return pd.Series()
-
-
-def get_margins(structures, slice_table: pd.DataFrame,
-                relation: RelationshipType,
-                precision=PRECISION):
-    def get_contour_margins(slice_structures: pd.Series,
-                            relation: RelationshipType,
-                            precision=PRECISION):
-        margin_table = margins(slice_structures.iloc[0],
-                               slice_structures.iloc[1],
-                               relation, precision)
-        return margin_table
-
-    slice_structures = slice_table.loc[:, [structures[0], structures[1]]]
-    # Remove Slices that have neither structure.
-    slice_structures.dropna(how='all', inplace=True)
-    # For slices that have only one of the two structures, replace the nan
-    # values with empty polygons for duck typing.
-    slice_structures.fillna(StructureSlice([]), inplace=True)
-    # Get the relationships between the two structures for all slices.
-    metric_seq = slice_structures.apply(get_contour_margins, axis='columns',
-                                        result_type='expand', relation=relation,
-                                        precision=precision)
-    contour_margins = agg_margins(metric_seq)
-    # Add the z margin components
-    z_margins = get_z_margins(structures, slice_table, precision)
-    max_magin = max([contour_margins['max'], max(z_margins['struct'])])
-    contour_margins['max'] = max_magin
-    min_magin = min([contour_margins['min'], min(z_margins['struct'])])
-    contour_margins['min'] = min_magin
-    contour_margins = pd.concat([contour_margins, z_margins['aligned']])
-    return contour_margins
-
-
-#%% Distance function
-def distance(related_contours: pd.Series,
-              precision: int = PRECISION)->float:
-    '''Calculate the closest 3D distance between 2 contours.
-
-    The shortest 2D distance between the exteriors of two polynomials is
-    calculated and then converted into a 3D distance using the hight between
-    the two contour slices. If the contours are on the same slice then the
-    height is 0 and the 3D distance is the same as the 2D distance.
-
-    This function is intended to be used with the pd.DataFrame.apply method.
-
-    Args:
-        related_contours (pd.Series): A series containing 3 items:
-            ['a', 'b', 'height'], usually generated with the pandas apply
-            method on a DataFrame with columns of those names.  The 'a' and 'b'
-            columns have StructureSlice data type and the 'height' column
-            contains float values of the distance in cm between the two slices.
-        precision (int, optional): The number of decimal points to round to.
-            Defaults to global PRECISION constant.
-
-    Returns:
-        float: The closest 3D distance between 2 contours.
-    '''
-    distance_list = []
-    poly_a = related_contours['a']
-    poly_b = related_contours['b']
-    height = related_contours['height']
-    # Compare all polygons on the same slice
-    for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                        poly_b.contour.geoms):
-        boundary_a = polygon_a.exterior
-        boundary_b = polygon_b.exterior
-        distance_2d = boundary_a.distance(boundary_b)
-        distance_list.append(distance_2d)
-    if distance_list:
-        distance_2d = min(distance_list)
-        distance_3d = sqrt(height**2 + distance_2d**2)
-    else:
-        distance_3d = height
-    rounded_distance = round(distance_3d, precision)
-    return rounded_distance
-
-
-# %% Relative volume related functions
-def calculate_volume_ratio(related_contours: pd.Series,
-                           relation: RelationshipType,
-                           precision: int = PRECISION)->float:
-
-    def get_area(contour: StructureSlice):
-        if isinstance(contour, StructureSlice):
-            return contour.area
-        return np.nan
-
-    def get_overlap_area(related_contours: pd.Series)->Dict:
-        poly_a = related_contours['a']
-        if not isinstance(poly_a, StructureSlice):
-            return 0.0
-        poly_b = related_contours['b']
-        if not isinstance(poly_b, StructureSlice):
-            return 0.0
-        overlap_area_list = []
-        for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                            poly_b.contour.geoms):
-            overlap_region = shapely.intersection(polygon_a, polygon_b)
-            overlap_area_list.append(overlap_region.area)
-        overlap_area = sum(overlap_area_list)
-        return overlap_area
-
-    areas = related_contours.map(get_area)
-    overlap_area = related_contours.apply(get_overlap_area, axis='columns')
-    overlap_area.name = 'Overlap'
-    areas = pd.concat([areas, overlap_area], axis='columns')
-    total_areas = areas.sum()
-    if relation == RelationshipType.OVERLAPS:
-        average_volume = (total_areas['a'] + total_areas['b']) / 2.0
-        ratio = total_areas['Overlap'] / average_volume
-    elif relation == RelationshipType.PARTITION:
-        ratio = total_areas['Overlap'] / total_areas['a']
-    else:
-        ratio = np.nan
-    rounded_ratio = round(ratio, precision)
-    return rounded_ratio
-
-# %% Relative surface area related functions
-def related_lengths(poly_a: StructureSlice, poly_b: StructureSlice,
-                    relation: RelationshipType)->List[shapely.LineString]:
-    def get_perimeters(poly_a: StructureSlice, poly_b: StructureSlice):
-        # FIXME I think the polygon `poly_a.exterior()` should not be used here.
-        # Instead the line object `poly_a.boundary`
-
-        overlap_region = shapely.shared_paths(boundary_a, boundary_b)
-        perimeter_dict = {'overlapping_perimeter': overlap_region,
-                          'perimeter_a': boundary_a,
-                          'perimeter_b': boundary_b}
-        return perimeter_dict
-
-    perimeter_list = []
-    # get relevant perimeters for all polygons on the same slice
-    for polygon_a, polygon_b in product(poly_a.contour.geoms,
-                                        poly_b.contour.geoms):
-        if relation == RelationshipType.BORDERS:
-            boundary_a = poly_a.contour.boundary.normalize()
-            boundary_b = poly_b.contour.boundary.normalize()
-
-            perimeter_dict = get_perimeters(polygon_a, polygon_b)
-            perimeter_list.append(perimeter_dict)
-        elif relation == RelationshipType.BORDERS_INTERIOR:
-            # TODO Need to be able to identify which hole in a contains b even for
-            # slices where b is not present. For now we use the perimeter of all
-            # holes in a as a reasonable approximation.
-            for hole_ring in polygon_a.interiors:
-                hole = shapely.Polygon(hole_ring)
-                perimeter_dict = get_perimeters(hole, polygon_b)
-                perimeter_list.append(perimeter_dict)
-    return perimeter_list
-
-
-def length_ratio(poly_a: StructureSlice, poly_b: StructureSlice,
-                 relation: RelationshipType,
-                 precision: int = PRECISION)->pd.DataFrame:
-
-    def get_length(perimeter: shapely.LineString)->float:
-        return shapely.length(perimeter)
-
-    perimeter_list = related_lengths(poly_a, poly_b, relation)
-    if not perimeter_list:
-        return np.nan
-    perimeters = pd.DataFrame(perimeter_list)
-    lengths = perimeters.apply(get_length)
-    lengths_sum = lengths.apply(sum)
-    if relation == RelationshipType.BORDERS:
-        total_length = (lengths_sum.perimeter_a + lengths_sum.perimeter_b)
-        reference_length = total_length / 2
-    elif relation == RelationshipType.BORDERS_INTERIOR:
-        reference_length = lengths_sum.perimeter_a
-    ratio = lengths_sum.overlapping_perimeter / reference_length
-    rounded_ratio = round(ratio, precision)
-    return rounded_ratio
-
-#        def get_contour_margins(slice_structures: pd.Series,
-#                                relation: RelationshipType,
-#                                precision=PRECISION):
-#            margin_table = margins(slice_structures.iloc[0],
-#                                slice_structures.iloc[1],
-#                                relation, precision)
-#            return margin_table
-# %% Helper classes
-class ValueFormat(defaultdict):
-    '''String formatting templates for individual name, value pairs.
-    The default value gives a string like:
-        MetricName: 2.36%
-    '''
-    def __missing__(self, key: str) -> str:
-        format_part = ''.join([key, ':\t{', key, ':2.0%}'])
-        return format_part
-
-
-
-
-# %% Metric Classes
-class Metric(ABC):
-    # Overwrite these class variables for all subclasses.
-    metric_type: MetricType
-    default_format_template: str
-
-    def __init__(self, structures: StructurePairType, **kwargs):
-        self.structures = structures
-        self.metric = {}
-        self.calculate_metric(**kwargs)
-        self.format_template = self.default_format_template
-
-    def reset_formats(self):
-        self.format_template = self.default_format_template
-
-    def format_metric(self)-> str:
-        # Overwritten in some subclasses
-        # Returns str: Formatted metrics for report and display
-        # Default is for single '%' formatted metric value:
-        params = self.metric.copy()
-        display_metric = self.format_template.format(**params)
-        return display_metric
-
-    @abstractmethod
-    def calculate_metric(self, **kwargs):
-        pass
-
-
-class NoMetric(Metric):
-    '''A relevant metric does not exist'''
-    metric_type = MetricType.UNKNOWN
-    default_format_template = 'No Metric'
-
-    def calculate_metric(self, **kwargs):
-        self.metric = {}
-
-
-class DistanceMetric(Metric):
-    r'''Distance between two structures.
-
-    The shortest distance between any point in a and any point in b.
-
-    **Used By:**
-      - Disjoint
-    '''
-    metric_type = MetricType.DISTANCE
-    default_format_template = 'Distance:\t{Distance:5.2f}'
-
-    def calculate_metric(self, slice_table=pd.DataFrame(),
-                         precision=PRECISION, **kwargs):
-        roi_a, roi_b = self.structures
-        slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
-        shift_up = structure_neighbours(slice_structures, shift_direction=-1)
-        shift_down = structure_neighbours(slice_structures, shift_direction=1)
-        no_shift = structure_neighbours(slice_structures, shift_direction=0)
-        all_shifts = pd.concat([shift_up, shift_down, no_shift]).dropna()
-        all_distances = all_shifts.apply(distance, axis='columns',
-                                         precision=precision)
-        min_distance = min(all_distances)
-        self.metric = {'Distance': min_distance}
-
-
-class OverlapVolumeMetric(Metric):
-    '''The percentage of the volume overlapping for 2 structures.'''
-    metric_type = MetricType.OVERLAP_VOLUME
-    default_format_template = 'Percentage Overlap:\t{OverlapVolumeRatio:2.0%}'
-    def calculate_metric(self, slice_table=pd.DataFrame(),
-                         relation=RelationshipType.UNKNOWN,
-                         precision=PRECISION, **kwargs):
-        roi_a, roi_b = self.structures
-        slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
-        slice_structures.columns = ['a', 'b']
-        volume_ratio = calculate_volume_ratio(slice_structures,
-                                              relation=relation,
-                                              precision=precision)
-        self.metric = {'OverlapVolumeRatio': volume_ratio}
-
-
-class OverlapSurfaceMetric(Metric):
-    '''OverlapSurface metric for testing.'''
-    metric_type = MetricType.OVERLAP_SURFACE_AREA
-    default_format_template = 'Percentage Overlap:\t{OverlapSurfaceRatio:2.0%}'
-
-    def calculate_metric(self, **kwargs):
-        # FIXME replace this stub with the OverlapSurface metric function.
-        self.metric = {'OverlapSurfaceRatio': 0.23}
-
-
-class MarginMetric(Metric):
-    r'''Margins Between Structures.
-
-        - $Margin_\perp = bounds(a) − bounds(b)$
-        - $Margin_{min} = distance(a,b)$
-        - $Margin_{max} = distance_{housdorff}(a,b)$
-
-    **Z direction metrics**
-    - Orthogonal:
-      - The distance between the last slice containing $a$ and the last slice
-            of $b$ where the last contour of $a$ overlaps with the contour of $b$
-    - Max:
-      - The larger of $\Delta Z$ or $d_{2D}$
-    - Min:
-      - The Smaller of $d_{min}^{2D}$ and $\Delta Z$,<br>
-
-    **Used By:**
-        - Contains
-        - Surrounds
-        - Shelters
-    '''
-    metric_type = MetricType.MARGIN
-    orthogonal_format_template = '\n'.join([
-        '        {ANT}   {SUP}  ',
-        '        ANT  SUP       ',
-        '         | /           ',
-        '         |/            ',
-        '{RT} RT--- ---LT {LT}  ',
-        '        /|             ',
-        '       / |             ',
-        '   INF  POST           ',
-        '  {INF}   {POST}       ',
-        ])
-    range_format_template = '{MIN}   {MAX}'
-    default_format_template = '\n'.join([orthogonal_format_template,
-                                         range_format_template])
-    default_format_dict = {
-        'SUP':  '{z_neg:3.1f}',
-        'INF':  '{z_pos:3.1f}',
-        'RT':   '{x_neg:3.1f}',
-        'LT':   '{x_pos:3.1f}',
-        'ANT':  '{y_pos:3.1f}',
-        'POST': '{y_neg:3.1f}',
-        'MIN':  'Min: {min:3.1f}',
-        'MAX':  'Max: {max:3.1f}'
+"""Margin metric calculators for containment relationships.
+
+Margins measure clearance distances inside containing structures. Applicable to:
+- CONTAINS: Structure fully inside another
+- SURROUNDS: Structure inside a hole of another
+- SHELTERS: Structure within convex hull but not touching
+- EQUAL: Special case, all margins are 0
+
+This module implements three margin calculators:
+- OrthogonalMarginsCalculator: Clearance in 6 orthogonal directions (±X, ±Y, ±Z)
+- MinimumMarginCalculator: Single worst-case clearance value
+- MaximumMarginCalculator: Largest clearance (Hausdorff-based)
+"""
+
+import logging
+from typing import Dict, Tuple, Set
+
+from shapely import Polygon, LineString
+from shapely import centroid as shapely_centroid
+from shapely import distance as shapely_distance
+from shapely import hausdorff_distance as shapely_hausdorff
+
+from structures import StructureShape
+from relationships import StructureRelationship
+from types_and_classes import SliceIndexType, ContourIndex
+from metrics.base import MetricCalculator, register_calculator
+from metrics.data_structures import MarginMetrics
+
+logger = logging.getLogger(__name__)
+
+
+@register_calculator
+class OrthogonalMarginsCalculator(MetricCalculator):
+    """Calculate clearance in 6 orthogonal directions (±X, ±Y, ±Z).
+
+    For each region pair on each slice:
+    1. Get boundary polygons using RegionSlice.select('contour')
+    2. Find centroid of secondary (contained) region
+    3. Generate orthogonal lines through centroid to container boundaries
+    4. Calculate clearance distances in ±X and ±Y directions
+    5. Store per-slice, per-region-pair results
+
+    Z-direction margins are calculated from slice indices.
+    Final aggregated margins represent worst-case across all region pairs.
+    """
+
+    def get_name(self) -> str:
+        """Get calculator name."""
+        return 'orthogonal_margins'
+
+    def get_version(self) -> str:
+        """Get calculator version."""
+        return '1.0.0'
+
+    def is_applicable(self, relationship: StructureRelationship) -> bool:
+        """Check if orthogonal margins apply to this relationship.
+
+        Args:
+            relationship: The spatial relationship
+
+        Returns:
+            True for CONTAINS, SURROUNDS, SHELTERS, EQUAL
+        """
+        rel_type = relationship.relationship_type.relation_type
+        return rel_type in ['CONTAINS', 'SURROUNDS', 'SHELTERS', 'EQUAL']
+
+    def calculate(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        relationship: StructureRelationship
+    ) -> MarginMetrics:
+        """Calculate orthogonal margins for structure pair.
+
+        Args:
+            structure_a: Container/larger structure
+            structure_b: Contained/smaller structure
+            relationship: Relationship with type information
+
+        Returns:
+            MarginMetrics with per-region, per-slice, and aggregated data
+        """
+        if not self.is_applicable(relationship):
+            self._warn_non_applicable(relationship.relationship_type)
+            return self._create_non_applicable_result()
+
+        # Special case: EQUAL relationship has all margins = 0
+        if relationship.relationship_type.relation_type == 'EQUAL':
+            return self._create_equal_result()
+
+        # Identify regions in both structures
+        regions_a = self._identify_regions(structure_a)
+        regions_b = self._identify_regions(structure_b)
+
+        self.logger.debug(
+            'Calculating orthogonal margins: %d regions in A, %d regions in B',
+            len(regions_a), len(regions_b)
+        )
+
+        # Calculate per-region-pair, per-slice margins
+        per_region_slice_margins = {}
+        for region_a_id, contours_a in regions_a.items():
+            for region_b_id, contours_b in regions_b.items():
+                region_pair = (region_a_id, region_b_id)
+                per_region_slice_margins[region_pair] = (
+                    self._calculate_region_pair_margins(
+                        structure_a, structure_b,
+                        contours_a, contours_b
+                    )
+                )
+
+        # Calculate Z-direction margins
+        z_margins = self._calculate_z_margins(
+            structure_a, structure_b, regions_a, regions_b
+        )
+
+        # Aggregate to per-region-pair summaries
+        per_region_orthogonal = self._aggregate_to_per_region(
+            per_region_slice_margins, z_margins
+        )
+
+        # Aggregate to overall 3D summary (worst-case)
+        aggregated_margins, worst_case_info = self._aggregate_to_3d(
+            per_region_orthogonal
+        )
+
+        return MarginMetrics(
+            orthogonal_margins=aggregated_margins,
+            per_region_orthogonal_margins=per_region_orthogonal,
+            slice_orthogonal_margins=per_region_slice_margins,
+            worst_case_region_pair=worst_case_info['region_pair'],
+            worst_case_direction=worst_case_info['direction'],
+            worst_case_slice=worst_case_info.get('slice'),
+        )
+
+    def _calculate_region_pair_margins(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        contours_a: Set[ContourIndex],
+        contours_b: Set[ContourIndex]
+    ) -> Dict[SliceIndexType, Dict[str, float]]:
+        """Calculate per-slice margins for one region pair.
+
+        Args:
+            structure_a: Container structure
+            structure_b: Contained structure
+            contours_a: ContourIndex nodes for region A
+            contours_b: ContourIndex nodes for region B
+
+        Returns:
+            Dict mapping slice_index -> {'x_neg', 'x_pos', 'y_neg', 'y_pos'}
+        """
+        # Find common slices where both regions exist
+        slices_a = {contour[1] for contour in contours_a}  # contour[1] is slice_index
+        slices_b = {contour[1] for contour in contours_b}
+        common_slices = slices_a & slices_b
+
+        per_slice_margins = {}
+
+        for slice_idx in common_slices:
+            # Get RegionSlice objects
+            region_slice_a = structure_a.get_region_slice(slice_idx)
+            region_slice_b = structure_b.get_region_slice(slice_idx)
+
+            if region_slice_a is None or region_slice_b is None:
+                continue
+
+            # Get boundary polygons (actual contours, not exterior/hull)
+            poly_a = region_slice_a.select('contour')
+            poly_b = region_slice_b.select('contour')
+
+            if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
+                continue
+
+            # Calculate orthogonal margins for this slice
+            margins = self._calculate_slice_margins(poly_a, poly_b)
+            per_slice_margins[slice_idx] = margins
+
+        return per_slice_margins
+
+    def _calculate_slice_margins(
+        self,
+        poly_a: Polygon,
+        poly_b: Polygon
+    ) -> Dict[str, float]:
+        """Calculate orthogonal margins on a single slice.
+
+        Args:
+            poly_a: Container polygon
+            poly_b: Contained polygon
+
+        Returns:
+            Dict with keys: 'x_neg', 'x_pos', 'y_neg', 'y_pos'
+        """
+        # Get centroid of contained structure
+        centroid_b = shapely_centroid(poly_b)
+        center_x, center_y = centroid_b.x, centroid_b.y
+
+        # Get bounds of container
+        minx, miny, maxx, maxy = poly_a.bounds
+
+        # Create orthogonal lines through centroid to container boundaries
+        # Lines extend well beyond container to ensure intersection
+        margin = max(maxx - minx, maxy - miny) * 2
+
+        lines = {
+            'x_neg': LineString([(center_x - margin, center_y), (center_x, center_y)]),
+            'x_pos': LineString([(center_x, center_y), (center_x + margin, center_y)]),
+            'y_neg': LineString([(center_x, center_y - margin), (center_x, center_y)]),
+            'y_pos': LineString([(center_x, center_y), (center_x, center_y + margin)]),
         }
-    def __init__(self, structures: StructurePairType, **kwargs):
-        super().__init__(structures, **kwargs)
-        self.format_dict = self.default_format_dict.copy()
-        self.display_orthogonal_margins = True
-        self.display_margin_range = True
-        self.update_formats()
 
-    def reset_formats(self):
-        '''Return the metric display back to its default.
-        Default formatting looks like this:
+        margins = {}
+        for direction, line in lines.items():
+            margins[direction] = self._calculate_directional_margin(
+                line, poly_a, poly_b
+            )
 
-                1.2   0.8
-                ANT  SUP
-                 | /
-                 |/
-        1.1 RT--- ---LT 2.1
-                /|
-               / |
-           INF  POST
-          0.6   1.2
+        return margins
 
-        MIN: 2.1   MAX: 1.2
-        '''
-        self.format_dict = self.default_format_dict.copy()
-        self.display_orthogonal_margins = True
-        self.display_margin_range = True
+    def _calculate_directional_margin(
+        self,
+        line: LineString,
+        poly_a: Polygon,
+        poly_b: Polygon
+    ) -> float:
+        """Calculate margin in one direction.
 
-    def update_formats(self):
-        '''Updates the a Formatted metrics string for display.
+        The margin is the length of the line segment that lies:
+        - Outside poly_b (exterior to contained structure)
+        - Inside poly_a (interior to container)
 
-        This is called to update the complete display template when
-        changes ar made to parts of the template.
+        Args:
+            line: Orthogonal line from centroid in one direction
+            poly_a: Container polygon
+            poly_b: Contained polygon
 
-        Individual margins can be removed by replacing the appropriate value in
-        format_dict with an empty string.  Adding the margin back into the
-        display is done by copying the appropriate value from
-        default_format_dict into format_dict.
+        Returns:
+            Margin distance in this direction
+        """
+        # Get exterior-only polygons (no holes) for simpler calculation
+        from utilities import make_solid
+        exterior_a = make_solid(poly_a)
+        exterior_b = make_solid(poly_b)
 
-        The entire orthogonal display can be removed by setting
-        display_orthogonal_margins to False.  Likewise, removing the entire
-        margin range text and be done by setting display_margin_range to False.
-        '''
-        display_parts = []
-        if self.display_orthogonal_margins:
-            display_parts.append(self.orthogonal_format_template)
-        if self.display_margin_range:
-            display_parts.append(self.range_format_template)
-        self.format_template = '\n\n'.join(display_parts)
+        # Find part of line outside poly_b
+        try:
+            line_outside_b = line.difference(exterior_b)
 
-    def format_metric(self)-> str:
-        # Returns str: Formatted metrics for report and display
-        format_params = {}
-        for label, fmt_str in self.format_dict.items():
-            format_params[label] = fmt_str.format(**self.metric)
-        display_text = self.format_template.format(**format_params)
-        return display_text
+            # Find part of that which is inside poly_a
+            line_between = line_outside_b.intersection(exterior_a)
 
-    def calculate_metric(self, slice_table=pd.DataFrame(),
-                         relation=RelationshipType.UNKNOWN,
-                         precision=PRECISION, **kwargs):
-        def get_contour_margins(slice_structures: pd.Series,
-                                relation: RelationshipType,
-                                precision=PRECISION):
-            margin_table = margins(slice_structures.iloc[0],
-                                slice_structures.iloc[1],
-                                relation, precision)
-            return margin_table
+            # Return length
+            if line_between.is_empty:
+                return 0.0
 
-        roi_a, roi_b = self.structures
-        slice_structures = slice_table.loc[:, [roi_a, roi_b]].copy()
-        # Remove Slices that have neither structure.
-        slice_structures.dropna(how='all', inplace=True)
-        # For slices that have only one of the two structures, replace the nan
-        # values with empty polygons for duck typing.
-        slice_structures.fillna(StructureSlice([]), inplace=True)
-        # Get the relationships between the two structures for all slices.
-        metric_seq = slice_structures.apply(get_contour_margins, axis='columns',
-                                            result_type='expand',
-                                            relation=relation,
-                                            precision=precision)
-        contour_margins = agg_margins(metric_seq)
-        # Add the z margin components
-        z_margins = get_z_margins(self.structures, slice_table, precision)
-        max_margin = max([contour_margins['max'], max(z_margins['struct'])])
-        contour_margins['max'] = max_margin
-        min_margin = min([contour_margins['min'], min(z_margins['struct'])])
-        contour_margins['min'] = min_margin
-        contour_margins = pd.concat([contour_margins, z_margins['aligned']])
-        self.metric = contour_margins.to_dict()
+            return round(line_between.length, self.config.distance_precision)
+
+        except (ValueError, AttributeError, TypeError) as e:
+            self.logger.warning(
+                'Error calculating directional margin: %s. Returning 0.', e
+            )
+            return 0.0
+
+    def _calculate_z_margins(
+        self,
+        _structure_a: StructureShape,
+        _structure_b: StructureShape,
+        regions_a: Dict[int, Set],
+        regions_b: Dict[int, Set]
+    ) -> Dict[Tuple[int, int], Dict[str, float]]:
+        """Calculate Z-direction (through-plane) margins for each region pair.
+
+        Args:
+            _structure_a: Container structure (unused, signature for consistency)
+            _structure_b: Contained structure (unused, signature for consistency)
+            regions_a: Regions in structure A
+            regions_b: Regions in structure B
+
+        Returns:
+            Dict mapping (region_a_id, region_b_id) -> {'z_neg', 'z_pos'}
+        """
+        z_margins = {}
+
+        for region_a_id, contours_a in regions_a.items():
+            for region_b_id, contours_b in regions_b.items():
+                # Get slice indices for each region
+                slices_a = sorted([c[1] for c in contours_a])  # c[1] is slice_index
+                slices_b = sorted([c[1] for c in contours_b])
+
+                if not slices_a or not slices_b:
+                    z_margins[(region_a_id, region_b_id)] = {'z_neg': 0.0, 'z_pos': 0.0}
+                    continue
+
+                # Z margins: distance from extremes of B to extremes of A
+                # z_neg (inferior): distance from bottom of B to bottom of A
+                # z_pos (superior): distance from top of B to top of A
+                z_neg_margin = slices_b[0] - slices_a[0]  # Both in cm
+                z_pos_margin = slices_a[-1] - slices_b[-1]
+
+                z_margins[(region_a_id, region_b_id)] = {
+                    'z_neg': round(abs(z_neg_margin), self.config.distance_precision),
+                    'z_pos': round(abs(z_pos_margin), self.config.distance_precision),
+                }
+
+        return z_margins
+
+    def _aggregate_to_per_region(
+        self,
+        per_region_slice_margins: Dict[Tuple[int, int], Dict[SliceIndexType, Dict[str, float]]],
+        z_margins: Dict[Tuple[int, int], Dict[str, float]]
+    ) -> Dict[Tuple[int, int], Dict[str, float]]:
+        """Aggregate per-slice data to per-region-pair summaries.
+
+        For each region pair, take minimum margin in each direction across all slices.
+
+        Args:
+            per_region_slice_margins: Per-slice margins for each region pair
+            z_margins: Z-direction margins for each region pair
+
+        Returns:
+            Dict mapping (region_a_id, region_b_id) -> 6-direction margins dict
+        """
+        per_region = {}
+
+        for region_pair, slice_margins in per_region_slice_margins.items():
+            if not slice_margins:
+                continue
+
+            # Find minimum in each direction across all slices
+            directions = ['x_neg', 'x_pos', 'y_neg', 'y_pos']
+            aggregated = {}
+
+            for direction in directions:
+                values = [
+                    margins[direction]
+                    for margins in slice_margins.values()
+                    if direction in margins
+                ]
+                if values:
+                    aggregated[direction] = min(values)
+                else:
+                    aggregated[direction] = 0.0
+
+            # Add Z-direction margins
+            if region_pair in z_margins:
+                aggregated.update(z_margins[region_pair])
+            else:
+                aggregated['z_neg'] = 0.0
+                aggregated['z_pos'] = 0.0
+
+            per_region[region_pair] = aggregated
+
+        return per_region
+
+    def _aggregate_to_3d(
+        self,
+        per_region_orthogonal: Dict[Tuple[int, int], Dict[str, float]]
+    ) -> Tuple[Dict[str, float], Dict]:
+        """Aggregate per-region data to overall 3D summary.
+
+        Take worst-case (minimum) margin in each direction across all region pairs.
+
+        Args:
+            per_region_orthogonal: Per-region-pair margins
+
+        Returns:
+            Tuple of (aggregated_margins_dict, worst_case_info_dict)
+        """
+        if not per_region_orthogonal:
+            return {}, {'region_pair': None, 'direction': None}
+
+        directions = ['x_neg', 'x_pos', 'y_neg', 'y_pos', 'z_neg', 'z_pos']
+        aggregated = {}
+        worst_case_region = None
+        worst_case_direction = None
+        worst_case_value = float('inf')
+
+        for direction in directions:
+            values = [
+                (region_pair, margins[direction])
+                for region_pair, margins in per_region_orthogonal.items()
+                if direction in margins
+            ]
+
+            if values:
+                # Find minimum (worst-case) for this direction
+                min_pair = min(values, key=lambda x: x[1])
+                aggregated[direction] = min_pair[1]
+
+                # Track overall worst case
+                if min_pair[1] < worst_case_value:
+                    worst_case_value = min_pair[1]
+                    worst_case_region = min_pair[0]
+                    worst_case_direction = direction
+            else:
+                aggregated[direction] = 0.0
+
+        worst_case_info = {
+            'region_pair': worst_case_region,
+            'direction': worst_case_direction,
+        }
+
+        return aggregated, worst_case_info
+
+    def _create_non_applicable_result(self) -> MarginMetrics:
+        """Create result for non-applicable relationship."""
+        na_value = self.get_non_applicable_value()
+        return MarginMetrics(
+            orthogonal_margins={
+                'x_neg': na_value, 'x_pos': na_value,
+                'y_neg': na_value, 'y_pos': na_value,
+                'z_neg': na_value, 'z_pos': na_value,
+            },
+            minimum_margin=na_value,
+            maximum_margin=na_value,
+        )
+
+    def _create_equal_result(self) -> MarginMetrics:
+        """Create result for EQUAL relationship (all margins are 0)."""
+        return MarginMetrics(
+            orthogonal_margins={
+                'x_neg': 0.0, 'x_pos': 0.0,
+                'y_neg': 0.0, 'y_pos': 0.0,
+                'z_neg': 0.0, 'z_pos': 0.0,
+            },
+            minimum_margin=0.0,
+            maximum_margin=0.0,
+        )
+
+
+@register_calculator
+class MinimumMarginCalculator(MetricCalculator):
+    """Calculate single worst-case clearance distance.
+
+    Finds the minimum distance from any point on the contained structure
+    to the boundary of the container. This is the smallest margin in any direction.
+    """
+
+    def get_name(self) -> str:
+        """Get calculator name."""
+        return 'minimum_margin'
+
+    def get_version(self) -> str:
+        """Get calculator version."""
+        return '1.0.0'
+
+    def is_applicable(self, relationship: StructureRelationship) -> bool:
+        """Check if minimum margin applies to this relationship."""
+        rel_type = relationship.relationship_type.relation_type
+        return rel_type in ['CONTAINS', 'SURROUNDS', 'SHELTERS', 'EQUAL']
+
+    def calculate(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        relationship: StructureRelationship
+    ) -> MarginMetrics:
+        """Calculate minimum margin for structure pair.
+
+        Args:
+            structure_a: Container structure
+            structure_b: Contained structure
+            relationship: Relationship with type information
+
+        Returns:
+            MarginMetrics with minimum_margin and per-region data
+        """
+        if not self.is_applicable(relationship):
+            self._warn_non_applicable(relationship.relationship_type)
+            na_value = self.get_non_applicable_value()
+            return MarginMetrics(minimum_margin=na_value)
+
+        # Special case: EQUAL relationship
+        if relationship.relationship_type.relation_type == 'EQUAL':
+            return MarginMetrics(minimum_margin=0.0)
+
+        # Identify regions
+        regions_a = self._identify_regions(structure_a)
+        regions_b = self._identify_regions(structure_b)
+
+        # Calculate per-region-pair minimum margins
+        per_region_minimum = {}
+
+        for region_a_id, contours_a in regions_a.items():
+            for region_b_id, contours_b in regions_b.items():
+                region_pair = (region_a_id, region_b_id)
+
+                # Calculate minimum margin for this region pair
+                min_margin = self._calculate_region_pair_minimum(
+                    structure_a, structure_b, contours_a, contours_b
+                )
+                per_region_minimum[region_pair] = min_margin
+
+        # Aggregate to overall minimum (worst-case across all region pairs)
+        if per_region_minimum:
+            overall_minimum = min(per_region_minimum.values())
+            closest_pair = min(per_region_minimum.items(), key=lambda x: x[1])[0]
+        else:
+            overall_minimum = 0.0
+            closest_pair = None
+
+        return MarginMetrics(
+            minimum_margin=overall_minimum,
+            per_region_minimum_margin=per_region_minimum,
+            worst_case_region_pair=closest_pair,
+        )
+
+    def _calculate_region_pair_minimum(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        contours_a: Set[ContourIndex],
+        contours_b: Set[ContourIndex]
+    ) -> float:
+        """Calculate minimum margin for one region pair.
+
+        Args:
+            structure_a: Container structure
+            structure_b: Contained structure
+            contours_a: ContourIndex nodes for region A
+            contours_b: ContourIndex nodes for region B
+
+        Returns:
+            Minimum margin distance
+        """
+        # Find common slices
+        slices_a = {contour[1] for contour in contours_a}
+        slices_b = {contour[1] for contour in contours_b}
+        common_slices = slices_a & slices_b
+
+        min_distances = []
+
+        for slice_idx in common_slices:
+            region_slice_a = structure_a.get_region_slice(slice_idx)
+            region_slice_b = structure_b.get_region_slice(slice_idx)
+
+            if region_slice_a is None or region_slice_b is None:
+                continue
+
+            poly_a = region_slice_a.select('contour')
+            poly_b = region_slice_b.select('contour')
+
+            if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
+                continue
+
+            # Distance from contained boundary to container boundary
+            # Get exterior of contained structure and boundary of container
+            from shapely import boundary
+            boundary_b = boundary(poly_b)
+            boundary_a = boundary(poly_a)
+
+            # Minimum distance between boundaries
+            dist = shapely_distance(boundary_b, boundary_a)
+            min_distances.append(dist)
+
+        if min_distances:
+            return round(min(min_distances), self.config.distance_precision)
+        else:
+            return 0.0
+
+
+@register_calculator
+class MaximumMarginCalculator(MetricCalculator):
+    """Calculate largest clearance distance using Hausdorff distance.
+
+    The maximum margin is the largest distance from any point on the contained
+    structure to the nearest point on the container boundary.
+    """
+
+    def get_name(self) -> str:
+        """Get calculator name."""
+        return 'maximum_margin'
+
+    def get_version(self) -> str:
+        """Get calculator version."""
+        return '1.0.0'
+
+    def is_applicable(self, relationship: StructureRelationship) -> bool:
+        """Check if maximum margin applies to this relationship."""
+        rel_type = relationship.relationship_type.relation_type
+        return rel_type in ['CONTAINS', 'SURROUNDS', 'EQUAL']
+
+    def calculate(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        relationship: StructureRelationship
+    ) -> MarginMetrics:
+        """Calculate maximum margin for structure pair.
+
+        Args:
+            structure_a: Container structure
+            structure_b: Contained structure
+            relationship: Relationship with type information
+
+        Returns:
+            MarginMetrics with maximum_margin and per-region data
+        """
+        if not self.is_applicable(relationship):
+            self._warn_non_applicable(relationship.relationship_type)
+            na_value = self.get_non_applicable_value()
+            return MarginMetrics(maximum_margin=na_value)
+
+        # Special case: EQUAL relationship
+        if relationship.relationship_type.relation_type == 'EQUAL':
+            return MarginMetrics(maximum_margin=0.0)
+
+        # Identify regions
+        regions_a = self._identify_regions(structure_a)
+        regions_b = self._identify_regions(structure_b)
+
+        # Calculate per-region-pair maximum margins
+        per_region_maximum = {}
+
+        for region_a_id, contours_a in regions_a.items():
+            for region_b_id, contours_b in regions_b.items():
+                region_pair = (region_a_id, region_b_id)
+
+                max_margin = self._calculate_region_pair_maximum(
+                    structure_a, structure_b, contours_a, contours_b
+                )
+                per_region_maximum[region_pair] = max_margin
+
+        # Aggregate to overall maximum
+        if per_region_maximum:
+            overall_maximum = max(per_region_maximum.values())
+        else:
+            overall_maximum = 0.0
+
+        return MarginMetrics(
+            maximum_margin=overall_maximum,
+            per_region_maximum_margin=per_region_maximum,
+        )
+
+    def _calculate_region_pair_maximum(
+        self,
+        structure_a: StructureShape,
+        structure_b: StructureShape,
+        contours_a: Set[ContourIndex],
+        contours_b: Set[ContourIndex]
+    ) -> float:
+        """Calculate maximum margin for one region pair using Hausdorff distance.
+
+        Args:
+            structure_a: Container structure
+            structure_b: Contained structure
+            contours_a: ContourIndex nodes for region A
+            contours_b: ContourIndex nodes for region B
+
+        Returns:
+            Maximum margin distance
+        """
+        # Find common slices
+        slices_a = {contour[1] for contour in contours_a}
+        slices_b = {contour[1] for contour in contours_b}
+        common_slices = slices_a & slices_b
+
+        max_distances = []
+
+        for slice_idx in common_slices:
+            region_slice_a = structure_a.get_region_slice(slice_idx)
+            region_slice_b = structure_b.get_region_slice(slice_idx)
+
+            if region_slice_a is None or region_slice_b is None:
+                continue
+
+            poly_a = region_slice_a.select('contour')
+            poly_b = region_slice_b.select('contour')
+
+            if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
+                continue
+
+            # Hausdorff distance between boundaries
+            from shapely import boundary
+            boundary_b = boundary(poly_b)
+            boundary_a = boundary(poly_a)
+
+            hausdorff_dist = shapely_hausdorff(boundary_b, boundary_a)
+            max_distances.append(hausdorff_dist)
+
+        if max_distances:
+            return round(max(max_distances), self.config.distance_precision)
+        else:
+            return 0.0
