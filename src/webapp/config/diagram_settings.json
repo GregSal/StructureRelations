@@ -1,6 +1,6 @@
 {
   "description": "Configuration for network diagram visualization in StructureRelations webapp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "node_shapes": {
     "description": "Node shapes mapped to DICOM structure types for network diagram visualization. Valid shapes: star, hexagon, diamond, box, ellipse, triangle, triangleDown, dot, square",
     "shape_map": {
@@ -176,7 +176,112 @@
       "relationship": "label",
       "show_direction": true,
       "show_logical": true,
-      "show_description": true
+      "show_description": true,
+      "metrics": {
+        "description": "Controls display of quantitative metrics for spatial relationships. Metrics must be calculated first using calculate_relationships(calculate_metrics=True). Only applicable metrics for each relationship type will be shown.",
+        "enabled": true,
+        "display_mode": "auto",
+        "display_mode_options": {
+          "auto": "Show most relevant metrics based on relationship type (1-3 metrics)",
+          "compact": "Show only the single most critical metric (e.g., minimum margin)",
+          "summary": "Show all aggregated 3D metrics (no per-slice data)",
+          "detailed": "Show aggregated metrics plus key per-region breakdowns",
+          "full": "Show all available metrics including per-slice and per-region data"
+        },
+        "show_units": true,
+        "show_region_count": true,
+        "show_worst_case_region": false,
+        "margins": {
+          "description": "Clearance distances inside containing structure. Applicable to CONTAINS, SURROUNDS, SHELTERS relationships.",
+          "enabled": true,
+          "show_orthogonal": true,
+          "orthogonal_directions": {
+            "description": "Which orthogonal margin directions to display. Options: 'all', 'worst', 'transverse', 'longitudinal', or list of specific directions.",
+            "mode": "worst",
+            "mode_options": {
+              "worst": "Show only minimum margin (worst-case clearance)",
+              "all": "Show all 6 directions (±X, ±Y, ±Z / ±LR, ±AP, ±SI)",
+              "transverse": "Show in-plane directions only (±X, ±Y / ±LR, ±AP)",
+              "longitudinal": "Show through-plane direction only (±Z / ±SI)",
+              "custom": "Show specific directions listed in 'custom_directions'"
+            },
+            "custom_directions": ["x_neg", "x_pos", "y_neg", "y_pos", "z_neg", "z_pos"],
+            "direction_labels": {
+              "description": "How to label directions: 'anatomical' (R/L/A/P/S/I), 'geometric' (±X/±Y/±Z), or 'abbreviated' (+X/-X)",
+              "mode": "anatomical",
+              "anatomical_map": {
+                "x_neg": "R",
+                "x_pos": "L",
+                "y_neg": "A",
+                "y_pos": "P",
+                "z_neg": "I",
+                "z_pos": "S"
+              }
+            }
+          },
+          "show_minimum_margin": true,
+          "show_maximum_margin": false,
+          "highlight_below_threshold": false,
+          "threshold_value": 0.5
+        },
+        "distance": {
+          "description": "Gap between disjoint structures. Applicable to DISJOINT and SHELTERS relationships. N/A for BORDERS, CONFINES, EQUAL.",
+          "enabled": true,
+          "show_minimum_distance": true,
+          "show_3d_components": false
+        },
+        "volume": {
+          "description": "Volume overlap metrics. Applicable to OVERLAPS, PARTITION, CONTAINS, EQUAL relationships.",
+          "enabled": true,
+          "show_overlap_ratio": true,
+          "show_dice_coefficient": false,
+          "show_absolute_volumes": false,
+          "ratio_basis": "auto",
+          "ratio_basis_options": {
+            "auto": "Use relationship-appropriate denominator (larger for PARTITION, average for OVERLAPS)",
+            "larger": "Ratio relative to larger structure",
+            "smaller": "Ratio relative to smaller structure",
+            "average": "Ratio relative to average of both structures",
+            "both": "Show both ratios (A/B and B/A)"
+          }
+        },
+        "surface": {
+          "description": "Surface boundary overlap metrics. Applicable to BORDERS and CONFINES relationships.",
+          "enabled": true,
+          "show_overlap_ratio": true,
+          "show_absolute_areas": false,
+          "show_overlap_length": false
+        },
+        "geometry": {
+          "description": "Geometric properties of structures and their relationships.",
+          "enabled": false,
+          "show_centroid_distance": false,
+          "show_centroid_coordinates": false
+        },
+        "formatting": {
+          "decimal_places": 2,
+          "scientific_notation_threshold": 1000,
+          "show_na_as": "N/A",
+          "show_zero_as": "0",
+          "group_separator": ",",
+          "compact_large_numbers": true
+        },
+        "per_region_display": {
+          "description": "Controls display of per-region metric breakdowns for multi-region structures.",
+          "enabled": false,
+          "show_region_ids": true,
+          "show_worst_case_only": true,
+          "max_regions_shown": 3,
+          "collapse_identical_values": true
+        },
+        "per_slice_display": {
+          "description": "Controls display of per-slice metric data. Typically shown in detailed investigation view, not edge tooltips.",
+          "enabled": false,
+          "show_slice_range": true,
+          "show_worst_slice": true,
+          "max_slices_shown": 5
+        }
+      }
     },
     "structure_set": {
       "show_structure_set": true,

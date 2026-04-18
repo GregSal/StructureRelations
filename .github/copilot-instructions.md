@@ -3,7 +3,7 @@
 ## Project Overview
 This project analyzes spatial relationships between DICOM RT (Radiotherapy) structures using computational geometry. The core algorithm builds 3D structure representations from 2D contour slices and classifies relationships using DE-9IM (Dimensionally Extended 9-Intersection Model) extended to 27 dimensions for 3D structures.
 
-## Formatting conventions
+## Formatting Conventions and Style Guide
 - Use 4 spaces for indentation
 - Prefer limiting lines to 80 characters, accept lines up to 100 characters
 - use single quotes for strings unless double quotes are needed for interpolation or nested quotes
@@ -12,6 +12,10 @@ This project analyzes spatial relationships between DICOM RT (Radiotherapy) stru
 - use type hints for function arguments and return values
 - Use f-string for string formatting except for logging statements where lazy formatting is preferred
 - Use str.join() for string concatenation instead of + operator
+- Follow PEP 8
+- Use type hints
+- Use dataclasses for data containers
+- Prefer composition over inheritance
 
 ## Architecture
 
@@ -118,6 +122,13 @@ structure_set.calculate_relationships()
 - `utilities.poly_round()`: Rounds polygon coordinates to specified tolerance.
 - `utilities.points_to_polygon()`: Converts point list to shapely.Polygon with validation
 
+### Common Shapely Patterns
+- Always use shapely.operation functions (not methods) for robustness
+- Round coordinates to DEFAULT_TRANSVERSE_TOLERANCE
+- Handle MultiPolygon results from operations
+- Check .is_empty before using geometry results
+
+
 ## Files to Reference
 - **`types_and_classes.py`**: Type definitions, global constants, custom exceptions
 - **`utilities.py`**: Shared geometry utilities and helpers
@@ -133,7 +144,11 @@ structure_set.calculate_relationships()
 - **`StructureRelations.code-workspace`**: VS Code configuration (Python paths, test settings)
 
 ## Testing Strategy
+- Use pytest fixtures for test geometries
 - **2D tests**: Verify relationship detection on single slice pairs
 - **3D tests**: Multi-slice scenarios (cylinders, spheres, nested structures)
 - **Test data**: DICOM files in `tests/` directory (e.g., `RS.GJS_Struct_Tests.Relations.dcm`)
 - **Assertion pattern**: `assert relation_type == RelationshipType.EXPECTED_TYPE`
+- Test edge cases: empty, single-slice, multi-region
+- Use `debug_tools` to create synthetic geometries for specific relationship scenarios (e.g., SHELTERS with complex hulls)
+- Mock external dependencies if needed
