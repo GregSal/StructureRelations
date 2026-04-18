@@ -1,0 +1,103 @@
+{
+  "description": "Configuration for spatial relationship metrics calculation in StructureRelations",
+  "version": "1.0.0",
+  "units": {
+    "description": "Measurement units for metrics",
+    "distance": "cm",
+    "volume": "cm³",
+    "area": "cm²"
+  },
+  "precision": {
+    "description": "Decimal places for metric values",
+    "distance": 2,
+    "volume": 2,
+    "area": 2,
+    "ratio": 3
+  },
+  "slice_thickness": {
+    "description": "Default slice thickness for volume/surface calculations if not available from DICOM",
+    "default_cm": 0.3,
+    "use_dicom_if_available": true
+  },
+  "enabled_metrics": {
+    "description": "Which metric categories to calculate by default. Individual calculators check applicability to relationship type.",
+    "margins": true,
+    "distance": true,
+    "volume": true,
+    "surface": true,
+    "geometry": false
+  },
+  "margin_settings": {
+    "description": "Settings for margin calculations (CONTAINS, SURROUNDS, SHELTERS)",
+    "calculate_orthogonal": true,
+    "calculate_minimum": true,
+    "calculate_maximum": false,
+    "orthogonal_directions": ["x_neg", "x_pos", "y_neg", "y_pos", "z_neg", "z_pos"],
+    "anatomical_labels": {
+      "use_anatomical": true,
+      "x_neg": "R",
+      "x_pos": "L",
+      "y_neg": "A",
+      "y_pos": "P",
+      "z_neg": "I",
+      "z_pos": "S"
+    }
+  },
+  "distance_settings": {
+    "description": "Settings for distance calculations (DISJOINT, SHELTERS)",
+    "calculate_minimum": true,
+    "calculate_3d_components": false
+  },
+  "volume_settings": {
+    "description": "Settings for volume overlap calculations (OVERLAPS, PARTITION, CONTAINS, EQUAL)",
+    "calculate_overlap_ratio": true,
+    "calculate_dice": true,
+    "ratio_basis": "auto",
+    "ratio_basis_options": {
+      "auto": "Use relationship-appropriate denominator (larger for PARTITION, average for OVERLAPS)",
+      "larger": "Ratio relative to larger structure",
+      "smaller": "Ratio relative to smaller structure",
+      "average": "Ratio relative to average of both structures"
+    }
+  },
+  "surface_settings": {
+    "description": "Settings for surface overlap calculations (BORDERS, CONFINES)",
+    "calculate_overlap_ratio": true,
+    "calculate_absolute_areas": false,
+    "ratio_basis": "larger"
+  },
+  "geometry_settings": {
+    "description": "Settings for geometric property calculations",
+    "calculate_centroids": true,
+    "calculate_centroid_distance": false
+  },
+  "multi_region_handling": {
+    "description": "How to handle structures with multiple disconnected regions",
+    "store_per_region_data": true,
+    "store_per_slice_data": true,
+    "aggregate_method": {
+      "margins": "minimum",
+      "distance": "minimum",
+      "volume": "sum",
+      "surface": "sum"
+    }
+  },
+  "non_applicable_handling": {
+    "description": "How to represent metrics that don't apply to a relationship type",
+    "use_nan": true,
+    "use_none": false,
+    "use_zero": false
+  },
+  "validation": {
+    "description": "Validation settings for metric calculations",
+    "check_negative_margins": true,
+    "check_ratio_bounds": true,
+    "warn_on_non_applicable": true
+  },
+  "performance": {
+    "description": "Performance optimization settings",
+    "cache_region_identification": true,
+    "parallel_slice_calculation": false,
+    "max_workers": 4
+  }
+}

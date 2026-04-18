@@ -1,28 +1,97 @@
-'''Metrics subpackage for calculating relationship metrics.
+"""Metrics subpackage for calculating spatial relationship metrics.
 
-This subpackage will contain modules and classes for calculating various
-geometric metrics that describe the quantitative aspects of relationships
-between structures.
+This subpackage provides quantitative metrics for analyzing spatial relationships
+between radiotherapy structures. It follows a slice-oriented, region-aware
+architecture that matches the existing relationship calculation approach.
 
-Potential metrics include:
-- Distance metrics: minimum distance, maximum distance, centroid distance
-- Volume metrics: overlap volume, volume ratios, containment percentages
-- Surface metrics: surface area, contact area, surface distance
-- Geometric metrics: eccentricity, aspect ratios, shape similarity
+Architecture:
+- Slice-oriented: Per-slice calculation is PRIMARY, 3D summaries are derived
+- Region-aware: Separate metrics for each region pair in multi-region structures
+- Clinical focus: Uses actual contour boundaries for clinical relevance
+- Configurable: JSON-based configuration for units, precision, enabled metrics
 
-The metrics system is designed to be extensible, potentially using abstract
-base classes to define a consistent interface for different metric types.
-Individual metrics may be calculated on-demand or pre-computed based on
-relationship type.
+Metric Categories:
+- Margins: Clearance distances inside containing structure (CONTAINS, SURROUNDS, SHELTERS)
+- Distance: Gap between disjoint structures (DISJOINT, SHELTERS)
+- Volume: Overlap ratios and Dice coefficients (OVERLAPS, PARTITION, CONTAINS, EQUAL)
+- Surface: Boundary overlap for touching structures (BORDERS, CONFINES)
+- Geometry: Centroids and geometric properties
 
-Future development may include:
-- Base Metric abstract class
-- Specific metric hierarchies (e.g., DistanceMetrics, VolumeMetrics)
-- Metric calculation functions and utilities
-- Caching and lazy evaluation strategies
-'''
+Usage:
+    from metrics import get_config, MetricCalculatorRegistry
+    from metrics.data_structures import RelationshipMetrics
 
-# Placeholder for future metric classes and functions
-# This module will be populated as the metrics system is developed
+    # Load configuration
+    config = get_config()
 
-__all__ = []
+    # Get applicable calculators for a relationship
+    calculators = MetricCalculatorRegistry.get_applicable_calculators(
+        relationship_type=RelationshipType.CONTAINS,
+        config=config
+    )
+
+    # Calculate metrics using orchestrator
+    from metrics.orchestrator import MetricOrchestrator
+    orchestrator = MetricOrchestrator(config)
+    metrics = orchestrator.calculate_metrics(structure_a, structure_b, relationship)
+"""
+
+# Configuration
+from metrics.config import MetricsConfig, get_config, reload_config
+
+# Data structures
+from metrics.data_structures import (
+    MarginMetrics,
+    DistanceMetrics,
+    VolumeMetrics,
+    SurfaceMetrics,
+    GeometryMetrics,
+    RelationshipMetrics,
+)
+
+# Base classes and registry
+from metrics.base import (
+    MetricCalculator,
+    MetricCalculatorRegistry,
+    register_calculator,
+)
+
+# Import calculator modules to trigger registration
+# These imports ensure calculators are registered when metrics package is imported
+try:
+    from metrics import margins
+    from metrics import distance
+    from metrics import volume
+    from metrics import surface
+    from metrics import geometry
+except ImportError as e:
+    # Some calculators may not be implemented yet
+    import logging
+    logging.getLogger(__name__).debug(f'Could not import all calculator modules: {e}')
+
+# Orchestrator (will be implemented in Phase 6)
+try:
+    from metrics.orchestrator import MetricOrchestrator
+except ImportError:
+    MetricOrchestrator = None
+
+
+__all__ = [
+    # Configuration
+    'MetricsConfig',
+    'get_config',
+    'reload_config',
+    # Data structures
+    'MarginMetrics',
+    'DistanceMetrics',
+    'VolumeMetrics',
+    'SurfaceMetrics',
+    'GeometryMetrics',
+    'RelationshipMetrics',
+    # Base classes
+    'MetricCalculator',
+    'MetricCalculatorRegistry',
+    'register_calculator',
+    # Orchestrator
+    'MetricOrchestrator',
+]

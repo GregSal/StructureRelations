@@ -417,12 +417,6 @@ class ValueFormat(defaultdict):
         return format_part
 
 
-class MetricType(Enum):
-    MARGIN = auto()
-    DISTANCE = auto()
-    OVERLAP_VOLUME = auto()
-    OVERLAP_SURFACE_AREA = auto()
-    UNKNOWN = 999  # Used for initialization
 
 
 # %% Metric Classes
@@ -648,17 +642,3 @@ class MarginMetric(Metric):
         contour_margins['min'] = min_margin
         contour_margins = pd.concat([contour_margins, z_margins['aligned']])
         self.metric = contour_margins.to_dict()
-
-
-metric_match = {
-    RelationshipType.DISJOINT: DistanceMetric,
-    RelationshipType.BORDERS: OverlapSurfaceMetric,
-    RelationshipType.BORDERS_INTERIOR: OverlapSurfaceMetric,
-    RelationshipType.OVERLAPS: OverlapVolumeMetric,
-    RelationshipType.PARTITION: OverlapVolumeMetric,
-    RelationshipType.SHELTERS: MarginMetric,
-    RelationshipType.SURROUNDS: MarginMetric,
-    RelationshipType.CONTAINS: MarginMetric,
-    RelationshipType.EQUAL: NoMetric,
-    RelationshipType.UNKNOWN: NoMetric,
-    }
