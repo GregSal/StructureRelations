@@ -1,16 +1,85 @@
 # Structure Metrics
 
-## Distance
-- $Distance = distance(a,b)$
+## Metrics Categories
 
-**Z direction metrics**
+There are 4 kinds of Metrics, based on the type of units.
 
-- The larger of $\Delta Z$ or $d_{2D}$
+- **Length** (one dimensional)
+- **Surface Area** (two dimensional)
+- **Volume** (three dimensional)
+- **Ratio** (ratio of two other metrics, no units)
 
-**Used By:**
+### Length
+    - Units of cm or mm
+
+    - For a single structure there can be different types of length metrics.
+      - The maximum distance between any two points on a contour.
+      - The orthogonal bounds of the structure.bounds(a) − bounds(b)
+      - The equivalent diameter of the structure (diameter of a circle with the
+          same area as the structure).
+
+    - For two structures it is some form of measurement of the distance between
+        the contours of two structures.
+      - The minimum distance between the contours of the two structures.
+          ($distance(a,b)$)
+      - The maximum distance between the contours of the two structures
+          (Hausdorff distance).
+      - The average distance between the contours of two structures.
+      - The distance between the contours of two structures in the
+          orthogonal directions (L, R, Ant, Post, Sup, Inf).
+
+### Surface Area
+    - Units of $cm^2$, $mm^2$
+
+    - For a single structure this is the surface area of that structure.
+
+    - For two structures there can be different types of surface area metrics.
+      - A measure of the area of the surfaces where the two structures touch.
+          ($A_{boundary} \cap B_{boundary}$)
+      - A measure of the area of the surface of one structure that extends
+          within (or without) the other structure. ($[A - B]_{boundary}$)
+
+
+### Volume
+    - Units of $cm^3$, cc, ml
+    - Volume of overlap ($A \cap B$), or difference ($A - B$) between two structures
+    - For a single structure this is the volume of that structure
+
+
+  - **Ratio**
+    - Ratio of two other metrics
+    - The two metrics must be of the same type and units
+    - The two metrics can be the same of from different structures
+    - Ratios have no units (None) or \%
+
+
+## Metric Definitions
+
+### Distance
+The Distance metric is the distance between two structures, which is the
+minimum distance between any point on the contour of one structure to any point
+on the contour of the other structure. On a given slice, this can be calculated
+using the Shapely `distance` function.
+> $Distance = distance(a,b)$
+
+In the Z direction it is the distance between the closest boundary slices of
+$a$ and $b$
+> $\Delta Z$
+
+#### Calculation
+For the entire structure, the distance is the minimum of the 2D distance and the Z distance:
+> $Distance = min( distance(a,b), \Delta Z )$
+
+#### Usage
+The Distance metric is well defined for two structures that do not overlap:
 - DISJOINT
 - SURROUNDS
 - SHELTERS
+
+For structures that touch each other (BORDERS), the distance is zero.
+
+For structures that overlap in any way (OVERLAPS, CONTAINS etc.), the distance
+is undefined (`NaN`).
 
 ## Ratio of Volumes
 
