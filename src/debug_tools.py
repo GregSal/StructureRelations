@@ -389,7 +389,7 @@ def cylinder_points(radius: float, length: float, spacing: float = 0.1,
     # Generate circle for each slices
     slice_data = {}
     for slice_idx, r in r_coord:
-        slice_points = box_points(length, r, offset_x, offset_y,
+        slice_points = box_points(length, r * 2, offset_x, offset_y,
                                   tolerance=slice_tolerance)
         slice_data[SliceIndexType(slice_idx)] = slice_points
     return slice_data
