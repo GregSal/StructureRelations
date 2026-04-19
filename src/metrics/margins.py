@@ -34,7 +34,7 @@ class OrthogonalMarginsCalculator(MetricCalculator):
     """Calculate clearance in 6 orthogonal directions (±X, ±Y, ±Z).
 
     For each region pair on each slice:
-    1. Get boundary polygons using RegionSlice.select('contour')
+    1. Get boundary polygons using RegionSlice.select('all')
     2. Find centroid of secondary (contained) region
     3. Generate orthogonal lines through centroid to container boundaries
     4. Calculate clearance distances in ±X and ±Y directions
@@ -160,15 +160,15 @@ class OrthogonalMarginsCalculator(MetricCalculator):
 
         for slice_idx in common_slices:
             # Get RegionSlice objects
-            region_slice_a = structure_a.get_region_slice(slice_idx)
-            region_slice_b = structure_b.get_region_slice(slice_idx)
+            region_slice_a = structure_a.get_slice(slice_idx)
+            region_slice_b = structure_b.get_slice(slice_idx)
 
             if region_slice_a is None or region_slice_b is None:
                 continue
 
-            # Get boundary polygons (actual contours, not exterior/hull)
-            poly_a = region_slice_a.select('contour')
-            poly_b = region_slice_b.select('contour')
+            # Get boundary polygons (including extrapolated boundaries)
+            poly_a = region_slice_a.select('all')
+            poly_b = region_slice_b.select('all')
 
             if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
                 continue
@@ -533,14 +533,14 @@ class MinimumMarginCalculator(MetricCalculator):
         min_distances = []
 
         for slice_idx in common_slices:
-            region_slice_a = structure_a.get_region_slice(slice_idx)
-            region_slice_b = structure_b.get_region_slice(slice_idx)
+            region_slice_a = structure_a.get_slice(slice_idx)
+            region_slice_b = structure_b.get_slice(slice_idx)
 
             if region_slice_a is None or region_slice_b is None:
                 continue
 
-            poly_a = region_slice_a.select('contour')
-            poly_b = region_slice_b.select('contour')
+            poly_a = region_slice_a.select('all')
+            poly_b = region_slice_b.select('all')
 
             if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
                 continue
@@ -660,14 +660,14 @@ class MaximumMarginCalculator(MetricCalculator):
         max_distances = []
 
         for slice_idx in common_slices:
-            region_slice_a = structure_a.get_region_slice(slice_idx)
-            region_slice_b = structure_b.get_region_slice(slice_idx)
+            region_slice_a = structure_a.get_slice(slice_idx)
+            region_slice_b = structure_b.get_slice(slice_idx)
 
             if region_slice_a is None or region_slice_b is None:
                 continue
 
-            poly_a = region_slice_a.select('contour')
-            poly_b = region_slice_b.select('contour')
+            poly_a = region_slice_a.select('all')
+            poly_b = region_slice_b.select('all')
 
             if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
                 continue

@@ -1,5 +1,7 @@
 '''Integration tests for web API job contracts and relationship result endpoints.'''
 
+import pytest
+import os
 import asyncio
 import shutil
 import time
@@ -17,6 +19,10 @@ from webapp.main import app
 import webapp.main as web_main
 from webapp.session_manager import SessionData, SessionManager
 
+pytestmark = pytest.mark.skipif(
+    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
+    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
+)
 
 class FakeDiagramStructureSet:
     '''Pickle-safe minimal structure set for diagram endpoint tests.'''

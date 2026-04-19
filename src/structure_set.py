@@ -16,6 +16,15 @@ from relations import RELATIONSHIP_TYPES, RelationshipType
 from relationships import StructureRelationship
 from dicom import DicomStructureFile
 from utilities import round_value
+from metrics import get_config as get_metrics_config, MetricCalculatorRegistry
+from metrics.data_structures import (
+    RelationshipMetrics,
+    MarginMetrics,
+    DistanceMetrics,
+    VolumeMetrics,
+    SurfaceMetrics,
+    GeometryMetrics,
+)
 
 
 # %% Configure logging if not already configured
@@ -863,6 +872,164 @@ class StructureSet:
             return self.relationship_graph[roi_a][roi_b]['relationship']
         else:
             return None
+
+    def calculate_metric(
+        self,
+        roi_a: ROI_Type,
+        roi_b: ROI_Type,
+        metric_name: str
+    ):
+        '''Calculate a specific metric between two structures.
+
+        This method provides a convenient interface for calculating metrics
+        between structure pairs. It retrieves the relationship, gets the
+        appropriate calculator, and computes the requested metric. The
+        calculated metric is stored in a RelationshipMetrics object and
+        persisted in the relationship graph.
+
+        Args:
+            roi_a (ROI_Type): First structure ROI.
+            roi_b (ROI_Type): Second structure ROI.
+            metric_name (str): Name of the metric calculator to use.
+                Available metrics:
+                - 'orthogonal_margins': Clearance in 6 directions (±X, ±Y, ±Z)
+                - 'minimum_margin': Worst-case clearance distance
+                - 'maximum_margin': Largest clearance (Hausdorff)
+                - 'minimum_distance': Gap between disjoint structures
+
+        Returns:
+            Metric result dataclass (MarginMetrics, DistanceMetrics, etc.)
+            The result is also stored in the relationship graph at:
+            relationship_graph[roi_a][roi_b]['relationship'].metrics.<category>
+            where <category> is 'margin', 'distance', 'volume', 'surface', or 'geometry'.
+
+        Raises:
+            ValueError: If metric_name is not recognized.
+            KeyError: If ROI numbers don't exist in the structure set.
+
+        Example:
+            >>> structure_set = StructureSet(slice_data)
+            >>> structure_set.finalize()
+            >>> distance = structure_set.calculate_metric(1, 2, 'minimum_distance')
+            >>> print(f"Distance: {distance.minimum_distance:.2f} cm")
+            >>>
+            >>> # Access via RelationshipMetrics object
+            >>> rel = structure_set.get_relationship(1, 2)
+            >>> print(f"Distance: {rel.metrics.distance.minimum_distance:.2f} cm")
+            >>> print(f"Structures: {rel.metrics.structure_a_name} vs {rel.metrics.structure_b_name}")
+        '''
+        # Validate ROI numbers exist
+        if roi_a not in self.structures:
+            raise KeyError(f'Structure with ROI {roi_a} not found in structure set')
+        if roi_b not in self.structures:
+            raise KeyError(f'Structure with ROI {roi_b} not found in structure set')
+
+        # Get structures
+        structure_a = self.structures[roi_a]
+        structure_b = self.structures[roi_b]
+
+        # Get or create relationship
+        relationship = self.get_relationship(roi_a, roi_b)
+        if relationship is None:
+            # Need to calculate relationship first
+            logger.debug(
+                'Relationship between %d and %d not found, calculating...',
+                roi_a, roi_b
+            )
+            # Calculate DE27IM relationship
+            de27im_relationship = structure_a.relate(structure_b, tolerance=self.tolerance)
+            # Wrap in StructureRelationship object
+            relationship = StructureRelationship(
+                de27im=de27im_relationship,
+                is_identical=False
+            )
+            # Add to graph
+            self.relationship_graph.add_edge(
+                roi_a, roi_b,
+                relationship=relationship
+            )
+            logger.debug(
+                'Created and stored new relationship between %d and %d in graph',
+                roi_a, roi_b
+            )
+
+        # Get metric calculator
+        registry = MetricCalculatorRegistry()
+        calculator = registry.get_calculator(metric_name, get_metrics_config())
+
+        if calculator is None:
+            available = list(registry.get_all_calculators().keys())
+            raise ValueError(
+                f'Metric calculator "{metric_name}" not found. '
+                f'Available calculators: {available}'
+            )
+
+        # Check if metric is applicable
+        if not calculator.is_applicable(relationship):
+            logger.warning(
+                '%s metric is not applicable to %s relationship between '
+                'structures %d and %d',
+                metric_name,
+                relationship.relationship_type.relation_type,
+                roi_a,
+                roi_b
+            )
+            # Still call calculate() to get N/A result
+            return calculator.calculate(structure_a, structure_b, relationship)
+
+        # Calculate metric
+        logger.debug(
+            'Calculating %s for structures %d (%s) and %d (%s)',
+            metric_name,
+            roi_a,
+            structure_a.name,
+            roi_b,
+            structure_b.name
+        )
+
+        result = calculator.calculate(structure_a, structure_b, relationship)
+
+        # Initialize RelationshipMetrics if it doesn't exist
+        if relationship.metrics is None:
+            relationship.metrics = RelationshipMetrics(
+                structure_a_name=structure_a.name,
+                structure_b_name=structure_b.name,
+                structure_a_roi=roi_a,
+                structure_b_roi=roi_b,
+                region_count_a=structure_a.region_count,
+                region_count_b=structure_b.region_count,
+                unit=self.unit,
+            )
+
+        # Store result in appropriate field based on type
+        if isinstance(result, MarginMetrics):
+            relationship.metrics.margin = result
+        elif isinstance(result, DistanceMetrics):
+            relationship.metrics.distance = result
+        elif isinstance(result, VolumeMetrics):
+            relationship.metrics.volume = result
+        elif isinstance(result, SurfaceMetrics):
+            relationship.metrics.surface = result
+        elif isinstance(result, GeometryMetrics):
+            relationship.metrics.geometry = result
+        else:
+            logger.warning(
+                'Unknown metric type %s for metric %s',
+                type(result).__name__,
+                metric_name
+            )
+
+        # Note: No need to update graph - relationship object is stored by reference
+        # Changes to relationship.metrics are automatically reflected in the graph
+        logger.debug(
+            'Stored %s (%s) in relationship for structures %d and %d',
+            metric_name,
+            type(result).__name__,
+            roi_a,
+            roi_b
+        )
+
+        return result
 
     def get_structures_by_volume(
             self,
