@@ -7,11 +7,12 @@ import logging
 import math
 
 import pandas as pd
+import numpy as np
 import networkx as nx
 from shapely.errors import GEOSException
 
 from types_and_classes import ROI_Type, SliceIndexType
-from types_and_classes import ContourIndex
+from types_and_classes import ContourIndex, SLICE_INDEX_PRECISION
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup
@@ -67,6 +68,48 @@ class StructureShape():
         self.contour_lookup = pd.DataFrame()
         self.region_table = pd.DataFrame()
         self.volume_metrics = VolumeMetrics()
+
+    @property
+    def region_count(self) -> int:
+        '''Get the number of disconnected regions in this structure.
+
+        Regions are identified as weakly connected components in the contour graph.
+        A structure can have multiple regions if contours are not connected across
+        slices (e.g., lymph nodes, multiple lesions with same ROI number).
+
+        Returns:
+            Number of disconnected 3D regions in the structure.
+        '''
+        if len(self.contour_graph) == 0:
+            return 0
+        components = nx.weakly_connected_components(self.contour_graph)
+        return len(list(components))
+
+    @property
+    def slice_spacing(self) -> float:
+        '''Get the median spacing between consecutive slices in this structure.
+
+        Calculated from the slice indices in the contour_lookup table.
+        Returns SLICE_INDEX_PRECISION if structure has fewer than 2 slices.
+
+        Returns:
+            Median spacing between consecutive slices in cm.
+        '''
+        if len(self.contour_lookup) == 0:
+            return SLICE_INDEX_PRECISION
+
+        # Get unique slice indices, sorted
+        slice_indices = sorted(self.contour_lookup['SliceIndex'].unique())
+
+        if len(slice_indices) < 2:
+            return SLICE_INDEX_PRECISION
+
+        # Calculate differences between consecutive slices
+        spacings = [slice_indices[i+1] - slice_indices[i]
+                   for i in range(len(slice_indices) - 1)]
+
+        # Return median spacing
+        return float(np.median(spacings))
 
     def add_contour_graph(self, contour_table: pd.DataFrame,
                           slice_sequence: SliceSequence) -> SliceSequence:

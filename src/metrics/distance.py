@@ -162,7 +162,7 @@ class MinimumDistanceCalculator(MetricCalculator):
             for slice_b in slices_b:
                 # Only calculate if slices are same or adjacent
                 slice_diff = abs(slice_a - slice_b)
-                if slice_diff > structure_a.structure_set.slice_thickness * 1.5:
+                if slice_diff > structure_a.slice_spacing * 1.5:
                     continue
 
                 # Calculate distance for this slice pair
@@ -200,25 +200,23 @@ class MinimumDistanceCalculator(MetricCalculator):
             3D distance, or None if calculation fails
         """
         # Get RegionSlice objects
-        region_slice_a = structure_a.get_region_slice(slice_a)
-        region_slice_b = structure_b.get_region_slice(slice_b)
+        region_slice_a = structure_a.get_slice(slice_a)
+        region_slice_b = structure_b.get_slice(slice_b)
 
         if region_slice_a is None or region_slice_b is None:
             return None
 
-        # Get boundary polygons
-        poly_a = region_slice_a.select('contour')
-        poly_b = region_slice_b.select('contour')
+        # Get boundary polygons (including extrapolated boundaries)
+        poly_a = region_slice_a.select('all')
+        poly_b = region_slice_b.select('all')
 
         if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
             return None
 
         # Calculate 2D distance on slice plane
-        from shapely import boundary
-        boundary_a = boundary(poly_a)
-        boundary_b = boundary(poly_b)
-
-        distance_2d = shapely_distance(boundary_a, boundary_b)
+        # For solid structures, use filled polygons (not boundaries)
+        # If polygons overlap in 2D projection, distance_2d = 0
+        distance_2d = shapely_distance(poly_a, poly_b)
 
         # Calculate height difference between slices (in cm)
         height = abs(slice_a - slice_b)

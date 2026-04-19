@@ -131,14 +131,17 @@ class MetricCalculator(ABC):
         import networkx as nx
 
         # Get connected components from contour graph
+        # Contour graphs are always directed (DiGraph), so use weakly_connected_components
         # Each component is a set of ContourIndex values representing one 3D region
-        components = nx.connected_components(structure.contour_graph)
+        components = nx.weakly_connected_components(structure.contour_graph)
 
         # Assign region IDs (starting from 0)
         regions = {i: component for i, component in enumerate(components)}
 
         self.logger.debug(
-            f'Identified {len(regions)} region(s) in structure {structure.roi_number}'
+            'Identified %d region(s) in structure %s',
+            len(regions),
+            structure.roi
         )
 
         return regions
@@ -188,7 +191,7 @@ class MetricCalculatorRegistry:
             )
 
         cls._calculators[name] = calculator_class
-        logger.info(f'Registered calculator: {name} ({calculator_class.__name__})')
+        logger.info('Registered calculator: %s (%s)', name, calculator_class.__name__)
 
     @classmethod
     def get_calculator(
@@ -263,8 +266,10 @@ class MetricCalculatorRegistry:
         }
 
         logger.debug(
-            f'Found {len(applicable)} applicable calculator(s) for {relationship_type.name}: '
-            f'{list(applicable.keys())}'
+            'Found %d applicable calculator(s) for %s: %s',
+            len(applicable),
+            relationship_type.name,
+            list(applicable.keys())
         )
 
         return applicable

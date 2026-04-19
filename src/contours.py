@@ -489,12 +489,19 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     if p1.is_empty & (p2 is None):
         raise ValueError('No second polygon given and first polygon is empty.')
 
-    # If only one polygon is given, scale the polygon to half its size.
+    # If only one polygon is given, use it as the boundary polygon.
     if p2 is None:
         # For boundary polygons do not interpolate.
-        # itp_poly = shapely.affinity.scale(p1, xfact=0.5, yfact=0.5)
-        itp_poly = p1
-        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
+        # Preserve holes when creating boundary polygon
+        if p1.interiors:
+            # Reconstruct polygon with exterior and all interior rings (holes)
+            itp_poly = Polygon(
+                shapely.get_coordinates(p1.exterior),
+                [shapely.get_coordinates(interior) for interior in p1.interiors]
+            )
+        else:
+            # No holes - just use exterior
+            itp_poly = Polygon(shapely.get_coordinates(p1.exterior))
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly
     elif p1.is_empty:

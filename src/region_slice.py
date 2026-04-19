@@ -14,6 +14,7 @@ import functools
 import pandas as pd
 import networkx as nx
 import shapely
+from shapely import union_all
 
 # Local packages
 from contour_graph import build_contour_lookup, get_region_contours
@@ -270,7 +271,8 @@ class RegionSlice():
                         region = region - contour.polygon
                         # Open holes should always be subtracted from boundaries
                         # regardless of whether the hole itself is marked as a boundary
-                        #boundary = boundary - contour.polygon
+                        if contour.hole_type == 'Open':
+                            boundary = boundary - contour.polygon
                     ## Check whether the contour is a boundary
                     #if contour.is_boundary:
                     #    # Add the hole to the boundary.
@@ -445,6 +447,44 @@ class RegionSlice():
             poly_b = shapely.MultiPolygon()
         merged = poly_r.union(poly_b)
         return merged
+
+    def select(self, geometry_type: str) -> shapely.MultiPolygon:
+        '''Select a specific geometry type from the region slice.
+
+        Args:
+            geometry_type: Type of geometry to select. Options:
+                - 'contour': Actual contour regions (merged regions only, excludes boundaries)
+                - 'exterior': Regions with holes filled (merged exteriors)
+                - 'hull': Convex hulls (merged hulls)
+                - 'boundary': Boundary contours only (merged boundaries)
+                - 'all': All contours including regions and boundaries (for metrics)
+
+        Returns:
+            MultiPolygon representing the selected geometry type
+
+        Raises:
+            ValueError: If geometry_type is not recognized
+        '''
+        # For 'all', combine both regions and boundaries
+        # Used by distance/margin metrics to include extrapolated boundary slices
+        if geometry_type == 'all':
+            combined = union_all([self.merged_region, self.merged_boundary])
+            return make_multi(combined)
+
+        geometry_map = {
+            'contour': self.merged_region,
+            'exterior': self.merged_exterior,
+            'hull': self.merged_hull,
+            'boundary': self.merged_boundary,
+        }
+
+        if geometry_type not in geometry_map:
+            raise ValueError(
+                f"Unknown geometry type '{geometry_type}'. "
+                f"Valid options: {list(geometry_map.keys())}, 'all'"
+            )
+
+        return geometry_map[geometry_type]
 
     def __bool__(self) -> bool:
         '''Check if the slice is empty.

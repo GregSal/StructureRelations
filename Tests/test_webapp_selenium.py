@@ -24,10 +24,10 @@ import requests
 from requests.exceptions import ConnectionError
 
 
-#pytestmark = pytest.mark.skipif(
-#    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
-#    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
-#)
+pytestmark = pytest.mark.skipif(
+    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
+    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
+)
 
 
 @pytest.fixture(scope='function')
