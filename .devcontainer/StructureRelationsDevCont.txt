@@ -9,7 +9,7 @@ conda install -y pylint pytest jupyterlab ipympl
 conda env export > /workspaces/StructureRelations/.devcontainer/StructureRelations_FULL.yml
 conda env export --from-history > /workspaces/StructureRelations/.devcontainer/StructureRelations.yml
 
-
+# Dev containers drops xlwings and pyodbc from local environment
 
 ########## Install command ############
 conda create --name StructureRelations --file "C:\TEMP\StructureRelations_specfile.txt"
