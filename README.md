@@ -104,3 +104,6 @@ with the implementation in the code.
         - double lines
         - glow
 
+3. Create a new relationship type for SHELTERED structures that
+    extend beyond the hull of the other structure.
+    e.g ![Cylinder extending beyond sheltering ring](./src/Images/FreeCAD%20Images/Extended%20Inner%20cylinder.png)
