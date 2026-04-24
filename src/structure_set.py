@@ -444,6 +444,12 @@ class StructureSet:
                     is_identical=False
                 )
 
+                # Compute per-region relationships and attach to the result.
+                per_region = structure_a.relate_regions(
+                    structure_b, tolerance=self.tolerance
+                )
+                relationship.per_region_relations = per_region if per_region else None
+
                 # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
                     roi_a, roi_b,
@@ -872,6 +878,82 @@ class StructureSet:
             return self.relationship_graph[roi_a][roi_b]['relationship']
         else:
             return None
+
+    def describe_relationship(
+        self,
+        roi_a: ROI_Type,
+        roi_b: ROI_Type,
+        show_multi: bool = True,
+        drop_disjoint: bool = False,
+        drop_overlaps: bool = False,
+    ) -> Optional[dict]:
+        '''Return a rich description of the relationship between two structures.
+
+        Args:
+            roi_a: First structure ROI (subject).
+            roi_b: Second structure ROI (object).
+            show_multi: When True, apply multi-region display-label rules.
+            drop_disjoint: Exclude DISJOINT region pairs from label / summary.
+            drop_overlaps: Exclude OVERLAPS region pairs from label / summary.
+
+        Returns:
+            Dict with keys:
+              - ``consolidated_label`` (str): display label from
+                StructureRelationship.display_label().
+              - ``consolidated_type`` (str): relation_type string for the
+                consolidated relationship (e.g. ``'CONTAINS'``).
+              - ``has_multiple_regions`` (bool): True when multiple region
+                pairs are present.
+              - ``per_region`` (list[dict]): One entry per region pair with
+                keys ``region_a``, ``region_b``, ``label``, ``type``.
+              - ``summary`` (list[dict]): Unique relationship types ranked by
+                priority, each with keys ``label``, ``type``, ``count``.
+            Returns None when no relationship edge exists.
+        '''
+        from relations import count_relations_by_rank
+        relationship = self.get_relationship(roi_a, roi_b)
+        if relationship is None:
+            return None
+
+        per_types = relationship.region_relationship_types
+        consolidated_type = relationship.relationship_type
+
+        per_region_list = []
+        for (idx_a, idx_b), rel_type in per_types.items():
+            if drop_disjoint and rel_type.relation_type == 'DISJOINT':
+                continue
+            if drop_overlaps and rel_type.relation_type == 'OVERLAPS':
+                continue
+            per_region_list.append({
+                'region_a': idx_a,
+                'region_b': idx_b,
+                'label': rel_type.label,
+                'type': rel_type.relation_type,
+            })
+
+        ranked = count_relations_by_rank(
+            per_types,
+            drop_disjoint=drop_disjoint,
+            drop_overlaps=drop_overlaps,
+        )
+        summary = [
+            {'label': rt.label, 'type': rt.relation_type, 'count': cnt}
+            for rt, cnt in ranked
+        ]
+
+        return {
+            'consolidated_label': relationship.display_label(
+                show_multi=show_multi,
+                drop_disjoint=drop_disjoint,
+                drop_overlaps=drop_overlaps,
+            ),
+            'consolidated_type': (
+                consolidated_type.relation_type if consolidated_type else 'UNKNOWN'
+            ),
+            'has_multiple_regions': relationship.has_multiple_regions(),
+            'per_region': per_region_list,
+            'summary': summary,
+        }
 
     def calculate_metric(
         self,

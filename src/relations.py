@@ -1224,3 +1224,154 @@ DE27IM._initialize_relationships()
 
 # Make RELATIONSHIP_TESTS available at module level
 RELATIONSHIP_TYPES = DE27IM.relationship_definitions
+
+
+# === Multi-Region Relationship Helpers ===
+
+# Display priority rank for relationship types (lower = higher priority).
+# Used to sort and display per-region relationships consistently.
+RELATION_RANK: Dict[str, int] = {
+    'EQUALS':      1,
+    'PARTITIONED': 2,
+    'PARTITIONS':  3,
+    'CONTAINS':    4,
+    'WITHIN':      5,
+    'CONFINES':    6,
+    'CONFINED':    7,
+    'SURROUNDS':   8,
+    'ENCLOSED':    9,
+    'BORDERS':     10,
+    'SHELTERS':    11,
+    'SHELTERED':   12,
+    'OVERLAPS':    13,
+    'DISJOINT':    14,
+    'UNKNOWN':     99,
+}
+
+
+def count_relations_by_rank(
+    per_region_types: Dict[tuple, 'RelationshipType'],
+    drop_disjoint: bool = False,
+    drop_overlaps: bool = False,
+) -> List[Tuple['RelationshipType', int]]:
+    '''Count and rank per-region relationship types.
+
+    Given a mapping from region-pair keys to RelationshipType objects, returns
+    a list of (RelationshipType, count) tuples sorted by RELATION_RANK
+    (ascending) then by count (descending).
+
+    Args:
+        per_region_types: Dict mapping RegionPairKey to RelationshipType.
+        drop_disjoint: If True, exclude DISJOINT relationships from results.
+        drop_overlaps: If True, exclude OVERLAPS relationships from results.
+
+    Returns:
+        List of (RelationshipType, count) sorted by rank then count descending.
+    '''
+    counts: Dict[str, int] = {}
+    type_objects: Dict[str, 'RelationshipType'] = {}
+    for rel_type in per_region_types.values():
+        if rel_type is None:
+            continue
+        key = rel_type.relation_type
+        if drop_disjoint and key == 'DISJOINT':
+            continue
+        if drop_overlaps and key == 'OVERLAPS':
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        type_objects[key] = rel_type
+
+    return sorted(
+        [(type_objects[k], counts[k]) for k in counts],
+        key=lambda pair: (
+            RELATION_RANK.get(pair[0].relation_type, 99),
+            -pair[1],
+        ),
+    )
+
+
+def compute_region_pair_de27im(
+    region_slice_a: 'RegionSlice',
+    region_idx_a: str,
+    region_slice_b: 'RegionSlice',
+    region_idx_b: str,
+    tolerance: float = 0.0,
+) -> 'DE27IM':
+    '''Compute a DE27IM relationship for a specific pair of regions on one slice.
+
+    Extracts per-region geometry from two RegionSlice objects and computes the
+    27-bit relationship between them.  Boundary adjustments are applied when a
+    region is represented by boundary-face polygons on this slice.
+
+    Args:
+        region_slice_a: RegionSlice for structure A on this slice.
+        region_idx_a: RegionIndex key selecting the region within region_slice_a.
+        region_slice_b: RegionSlice for structure B on this slice.
+        region_idx_b: RegionIndex key selecting the region within region_slice_b.
+        tolerance: Geometric tolerance passed to DE27IM.relate_poly().
+
+    Returns:
+        DE27IM: The 27-bit relationship for this region pair on this slice.
+    '''
+    from utilities import make_multi as _make_multi
+
+    # --- Extract geometry for region A ---
+    poly_a = region_slice_a.regions.get(region_idx_a)
+    exterior_a = region_slice_a.exterior.get(region_idx_a)
+    hull_a = region_slice_a.hull.get(region_idx_a)
+    boundary_a = region_slice_a.boundaries.get(region_idx_a)
+
+    # --- Extract geometry for region B ---
+    poly_b = region_slice_b.regions.get(region_idx_b)
+    boundary_b = region_slice_b.boundaries.get(region_idx_b)
+
+    # Determine which geometry component to use and what adjustments to apply.
+    # If the region is only represented by a boundary face on this slice,
+    # use the boundary polygon and apply the boundary adjustment.
+    adjustments: List[str] = []
+
+    has_region_a = poly_a is not None and not poly_a.is_empty
+    has_boundary_a = boundary_a is not None and not boundary_a.is_empty
+    has_region_b = poly_b is not None and not poly_b.is_empty
+    has_boundary_b = boundary_b is not None and not boundary_b.is_empty
+
+    result = DE27IM()
+
+    if has_region_a and has_region_b:
+        # Normal region vs region comparison
+        result.relate_poly(
+            _make_multi(poly_a),
+            _make_multi(poly_b),
+            external_polygon_a=_make_multi(exterior_a) if exterior_a else None,
+            hull_polygon_a=_make_multi(hull_a) if hull_a else None,
+            adjustments=adjustments,
+            tolerance=tolerance,
+        )
+
+    if has_region_a and has_boundary_b:
+        result.relate_poly(
+            _make_multi(poly_a),
+            _make_multi(boundary_b),
+            external_polygon_a=_make_multi(exterior_a) if exterior_a else None,
+            hull_polygon_a=_make_multi(hull_a) if hull_a else None,
+            adjustments=[AdjustmentType.BOUNDARY_B],
+            tolerance=tolerance,
+        )
+
+    if has_boundary_a and has_region_b:
+        result.relate_poly(
+            _make_multi(boundary_a),
+            _make_multi(poly_b),
+            adjustments=[AdjustmentType.BOUNDARY_A],
+            tolerance=tolerance,
+        )
+
+    if has_boundary_a and has_boundary_b:
+        result.relate_poly(
+            _make_multi(boundary_a),
+            _make_multi(boundary_b),
+            adjustments=[AdjustmentType.BOUNDARY_A, AdjustmentType.BOUNDARY_B],
+            tolerance=tolerance,
+        )
+
+    return result

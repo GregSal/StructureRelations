@@ -61,6 +61,10 @@ ContourLink = NewType('ContourLink', Tuple[ContourIndex, ContourIndex])
 # The index of a a unique contiguous 3D region.
 RegionIndex = NewType('RegionIndex', str)
 
+# A pair of RegionIndexes identifying a unique (region_a, region_b) combination
+# for per-region relationship storage.
+RegionPairKey = Tuple[RegionIndex, RegionIndex]
+
 # A Networkx DiGraph object containing contour information.
 # Each node in the graph represents a contour and has a 'contour' attribute
 # that is an instance of the contours.Contour class.  The node labels are

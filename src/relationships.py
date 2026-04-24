@@ -6,11 +6,14 @@ including the DE27IM relationship, identity flag, logical flag, and
 metrics placeholder.
 '''
 # %% Imports
-from typing import Optional, Any, List
+from typing import Optional, Any, Dict, List, Tuple
 from dataclasses import dataclass, field
 
-from relations import DE27IM, RelationshipType, RELATIONSHIP_TYPES
-from types_and_classes import ROI_Type
+from relations import (
+    DE27IM, RelationshipType, RELATIONSHIP_TYPES,
+    RELATION_RANK, count_relations_by_rank,
+)
+from types_and_classes import ROI_Type, RegionIndex, RegionPairKey
 
 
 # %% Class Definition
@@ -68,6 +71,10 @@ class StructureRelationship:
     intermediate_structures: List[ROI_Type] = field(default_factory=list)
     metrics: Optional[Any] = None
     _override_type: Optional[RelationshipType] = None
+    # Per-region relationships: maps (region_idx_a, region_idx_b) → DE27IM.
+    # Populated by StructureSet.calculate_relationships() via
+    # StructureShape.relate_regions().  None when not yet computed.
+    per_region_relations: Optional[Dict[RegionPairKey, DE27IM]] = None
 
     @property
     def relationship_type(self) -> RelationshipType:
@@ -106,3 +113,88 @@ class StructureRelationship:
 
         # Otherwise, identify the relationship from DE27IM
         return self.de27im.identify_relation()
+
+    @property
+    def region_relationship_types(
+        self,
+    ) -> Dict[RegionPairKey, RelationshipType]:
+        '''Get the RelationshipType for each region pair.
+
+        Returns:
+            Dict mapping RegionPairKey to RelationshipType.  Empty dict when
+            per_region_relations is None.
+        '''
+        if not self.per_region_relations:
+            return {}
+        return {
+            key: de27im.identify_relation()
+            for key, de27im in self.per_region_relations.items()
+        }
+
+    def has_multiple_regions(self) -> bool:
+        '''Return True when there is more than one distinct region-pair key.
+
+        This indicates that one or both structures have multiple 3D regions
+        and the overall relationship may not capture all region-to-region
+        distinctions.
+        '''
+        if not self.per_region_relations:
+            return False
+        return len(self.per_region_relations) > 1
+
+    def display_label(
+        self,
+        show_multi: bool = False,
+        drop_disjoint: bool = False,
+        drop_overlaps: bool = False,
+    ) -> str:
+        '''Return a display label for this relationship.
+
+        When show_multi is False (default) the consolidated relationship label
+        is returned unchanged, matching pre-existing behaviour.
+
+        When show_multi is True and multiple region pairs exist the label is
+        enhanced according to the rules below:
+
+        - All region pairs have the same relationship type → bare label
+          (no brackets; identical to the single-region case).
+        - Multiple types, consolidated type is not UNKNOWN → ``{label}``
+          (curly brackets signal multiple underlying relationships).
+        - Consolidated type is UNKNOWN → ``{label_1 & label_2 & ...}`` where
+          the labels are sorted by RELATION_RANK priority.
+
+        Args:
+            show_multi: When True, apply multi-region labelling rules.
+            drop_disjoint: Exclude DISJOINT pairs from label computation.
+            drop_overlaps: Exclude OVERLAPS pairs from label computation.
+
+        Returns:
+            str: The display label for this relationship.
+        '''
+        base_type = self.relationship_type
+        base_label = base_type.label if base_type else ''
+
+        if not show_multi or not self.has_multiple_regions():
+            return base_label
+
+        per_types = self.region_relationship_types
+        ranked = count_relations_by_rank(
+            per_types,
+            drop_disjoint=drop_disjoint,
+            drop_overlaps=drop_overlaps,
+        )
+
+        if not ranked:
+            return base_label
+
+        # All pairs share the same type — no brackets needed.
+        if len(ranked) == 1:
+            return ranked[0][0].label
+
+        # Multiple types present.
+        if base_type and base_type.relation_type != 'UNKNOWN':
+            return '{' + base_label + '}'
+
+        # Consolidated result is UNKNOWN — enumerate the individual types.
+        combined = ' & '.join(rel_type.label for rel_type, _ in ranked)
+        return '{' + combined + '}'
