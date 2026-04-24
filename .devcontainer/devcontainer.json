@@ -28,7 +28,7 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/conda:1": {
+    "ghcr.io/devcontainers/features/conda:2": {
       "addCondaForge": true,
       "installMiniconda": true,
       "condaVersion": "latest"
