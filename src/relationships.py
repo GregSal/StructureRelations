@@ -198,3 +198,69 @@ class StructureRelationship:
         # Consolidated result is UNKNOWN — enumerate the individual types.
         combined = ' & '.join(rel_type.label for rel_type, _ in ranked)
         return '{' + combined + '}'
+
+    def describe_relationship(
+        self,
+        show_multi: bool = True,
+        drop_disjoint: bool = False,
+        drop_overlaps: bool = False,
+    ) -> dict:
+        '''Return a rich description of this relationship.
+
+        Args:
+            show_multi: When True, apply multi-region display-label rules.
+            drop_disjoint: Exclude DISJOINT region pairs from label / summary.
+            drop_overlaps: Exclude OVERLAPS region pairs from label / summary.
+
+        Returns:
+            Dict with keys:
+              - ``consolidated_label`` (str): display label from
+                display_label().
+              - ``consolidated_type`` (str): relation_type string for the
+                consolidated relationship (e.g. ``'CONTAINS'``).
+              - ``has_multiple_regions`` (bool): True when multiple region
+                pairs are present.
+              - ``per_region`` (list[dict]): One entry per region pair with
+                keys ``region_a``, ``region_b``, ``label``, ``type``.
+              - ``summary`` (list[dict]): Unique relationship types ranked by
+                priority, each with keys ``label``, ``type``, ``count``.
+        '''
+        per_types = self.region_relationship_types
+        consolidated_type = self.relationship_type
+
+        per_region_list = []
+        for (idx_a, idx_b), rel_type in per_types.items():
+            if drop_disjoint and rel_type.relation_type == 'DISJOINT':
+                continue
+            if drop_overlaps and rel_type.relation_type == 'OVERLAPS':
+                continue
+            per_region_list.append({
+                'region_a': idx_a,
+                'region_b': idx_b,
+                'label': rel_type.label,
+                'type': rel_type.relation_type,
+            })
+
+        ranked = count_relations_by_rank(
+            per_types,
+            drop_disjoint=drop_disjoint,
+            drop_overlaps=drop_overlaps,
+        )
+        summary = [
+            {'label': rt.label, 'type': rt.relation_type, 'count': cnt}
+            for rt, cnt in ranked
+        ]
+
+        return {
+            'consolidated_label': self.display_label(
+                show_multi=show_multi,
+                drop_disjoint=drop_disjoint,
+                drop_overlaps=drop_overlaps,
+            ),
+            'consolidated_type': (
+                consolidated_type.relation_type if consolidated_type else 'UNKNOWN'
+            ),
+            'has_multiple_regions': self.has_multiple_regions(),
+            'per_region': per_region_list,
+            'summary': summary,
+        }

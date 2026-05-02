@@ -280,7 +280,7 @@ class TestPerRegionInStructureSet:
             assert v is not None
 
     def test_describe_relationship_structure(self, two_in_box):
-        desc = two_in_box.describe_relationship(2, 1)
+        desc = two_in_box.get_relationship(2, 1).describe_relationship()
         assert desc is not None
         assert 'consolidated_label' in desc
         assert 'has_multiple_regions' in desc
@@ -290,7 +290,7 @@ class TestPerRegionInStructureSet:
         assert isinstance(desc['summary'], list)
 
     def test_describe_relationship_missing_pair_returns_none(self, two_in_box):
-        assert two_in_box.describe_relationship(99, 100) is None
+        assert two_in_box.get_relationship(99, 100) is None
 
 
 class TestSingleRegionNoMulti:
