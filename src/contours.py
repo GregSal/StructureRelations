@@ -658,7 +658,7 @@ class ContourPoints(dict):
                                          'coordinate (slice index).')
             # If points are 2D, add slice as the z-coordinate.
             if this_point_dim == 2:
-                point = point + (slice_index,)
+                point = tuple(list(point) + [np.float64(slice_index)])
             clean_points.append(point)
         return clean_points
 
