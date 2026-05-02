@@ -453,8 +453,10 @@ def add_boundary_contours(contour_graph: ContourGraph,
                 # There's a previous slice, interpolate halfway
                 boundary_slice = (this_slice + neighbors.previous_slice) / 2
             else:
-                # No previous slice, create boundary at this_slice - 0.5
-                boundary_slice = this_slice - 0.5
+                # No previous slice, create boundary at this_slice - half the
+                # distance to the next slice
+                slice_spacing = neighbors.next_slice - this_slice
+                boundary_slice = this_slice - slice_spacing / 2
             boundary_nodes.add(node)
             contour_parameters['starting_contour'] = node
             contour_parameters['interpolated_slice'] = boundary_slice
@@ -472,9 +474,10 @@ def add_boundary_contours(contour_graph: ContourGraph,
                 # There's a next slice, interpolate halfway
                 boundary_slice = (this_slice + neighbors.next_slice) / 2
             else:
-                # No next slice, create boundary at this_slice + 0.5
-                # FIXME - hardcoded 0.5, should be based on slice spacing
-                boundary_slice = this_slice + 0.5
+                # No next slice, create boundary at this_slice + half the
+                # distance to the previous slice
+                slice_spacing = this_slice - neighbors.previous_slice
+                boundary_slice = this_slice + slice_spacing / 2
             boundary_nodes.add(node)
             contour_parameters['starting_contour'] = node
             contour_parameters['interpolated_slice'] = boundary_slice
