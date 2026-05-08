@@ -12,6 +12,7 @@ NOT applicable to:
 
 import math
 import logging
+from bisect import bisect_left
 from typing import Dict, Tuple, Set, Optional
 
 from shapely import distance as shapely_distance
@@ -30,7 +31,10 @@ class MinimumDistanceCalculator(MetricCalculator):
     """Calculate minimum 3D distance between structures.
 
     For each region pair:
-    1. Check all slice pairs (same slice and ±1 adjacent slices)
+    1. Build candidate slice pairs using contour_lookup metadata
+    2. Prioritize nearest-Z slice pairs
+    3. Expand candidates without any fixed maximum Z-gap cutoff
+    4. Prune only when Z-gap exceeds current best 3D distance
     2. For each slice pair, get boundary polygons
     3. Calculate 2D distance on slice
     4. Convert to 3D using slice height difference
@@ -151,18 +155,46 @@ class MinimumDistanceCalculator(MetricCalculator):
         Returns:
             Tuple of (minimum_distance, per_slice_pair_distances)
         """
-        # Get all slice indices for each region
-        slices_a = sorted(set(c[1] for c in contours_a))  # c[1] is slice_index
-        slices_b = sorted(set(c[1] for c in contours_b))
+        slices_a = self._get_region_slices(structure_a, contours_a)
+        slices_b = self._get_region_slices(structure_b, contours_b)
+
+        if not slices_a or not slices_b:
+            return float('inf'), {}
 
         slice_pair_distances = {}
+        best_distance = float('inf')
 
-        # Check all slice pairs: same slice and adjacent slices (±1)
+        # Seed the search with nearest-Z pairs to establish an initial bound.
         for slice_a in slices_a:
-            for slice_b in slices_b:
-                # Only calculate if slices are same or adjacent
-                slice_diff = abs(slice_a - slice_b)
-                if slice_diff > structure_a.slice_spacing * 1.5:
+            for slice_b in self._nearest_target_slices(slice_a, slices_b):
+                pair = (slice_a, slice_b)
+                if pair in slice_pair_distances:
+                    continue
+
+                dist = self._calculate_slice_pair_distance(
+                    structure_a, structure_b, slice_a, slice_b
+                )
+
+                if dist is None:
+                    continue
+
+                slice_pair_distances[pair] = dist
+                if dist < best_distance:
+                    best_distance = dist
+
+        # Expand candidate pairs with no fixed Z-gap limit.
+        # Safe pruning: if z_gap > best_distance, 3D distance cannot improve.
+        for slice_a in slices_a:
+            for slice_b in self._expand_candidate_slices(
+                source_slice=slice_a,
+                target_slices=slices_b,
+                max_z_gap=best_distance,
+            ):
+                pair = (slice_a, slice_b)
+                if pair in slice_pair_distances:
+                    continue
+
+                if abs(slice_a - slice_b) > best_distance:
                     continue
 
                 # Calculate distance for this slice pair
@@ -171,7 +203,9 @@ class MinimumDistanceCalculator(MetricCalculator):
                 )
 
                 if dist is not None:
-                    slice_pair_distances[(slice_a, slice_b)] = dist
+                    slice_pair_distances[pair] = dist
+                    if dist < best_distance:
+                        best_distance = dist
 
         # Find minimum across all slice pairs
         if slice_pair_distances:
@@ -180,6 +214,101 @@ class MinimumDistanceCalculator(MetricCalculator):
             min_distance = float('inf')
 
         return min_distance, slice_pair_distances
+
+    def _get_region_slices(
+        self,
+        structure: StructureShape,
+        contours: Set[ContourIndex],
+    ) -> list[SliceIndexType]:
+        """Get sorted slice indices for a region using contour lookup data."""
+        contour_lookup = structure.contour_lookup
+
+        if contour_lookup.empty:
+            return sorted({contour[1] for contour in contours})
+
+        labels = set(contours)
+        region_rows = contour_lookup.loc[contour_lookup['Label'].isin(labels)]
+
+        if region_rows.empty:
+            return sorted({contour[1] for contour in contours})
+
+        return sorted(region_rows['SliceIndex'].unique())
+
+    def _nearest_target_slices(
+        self,
+        source_slice: SliceIndexType,
+        target_slices: list[SliceIndexType],
+    ) -> list[SliceIndexType]:
+        """Return closest target slice(s) to source_slice in Z."""
+        if not target_slices:
+            return []
+
+        insert_at = bisect_left(target_slices, source_slice)
+        candidates = []
+
+        if insert_at < len(target_slices):
+            candidates.append(target_slices[insert_at])
+        if insert_at > 0:
+            candidates.append(target_slices[insert_at - 1])
+
+        # Preserve order while removing duplicates.
+        return list(dict.fromkeys(candidates))
+
+    def _expand_candidate_slices(
+        self,
+        source_slice: SliceIndexType,
+        target_slices: list[SliceIndexType],
+        max_z_gap: float,
+    ) -> list[SliceIndexType]:
+        """Expand target candidates from nearest to farthest in Z.
+
+        Args:
+            source_slice: Slice from structure A.
+            target_slices: Sorted slices from structure B.
+            max_z_gap: Maximum Z-gap to include. Use inf for no pruning.
+
+        Returns:
+            Ordered list of target slices, nearest-first.
+        """
+        if not target_slices:
+            return []
+
+        insert_at = bisect_left(target_slices, source_slice)
+        left = insert_at - 1
+        right = insert_at
+        ordered = []
+
+        while left >= 0 or right < len(target_slices):
+            left_gap = (
+                abs(source_slice - target_slices[left])
+                if left >= 0 else float('inf')
+            )
+            right_gap = (
+                abs(source_slice - target_slices[right])
+                if right < len(target_slices) else float('inf')
+            )
+
+            use_left = left_gap <= right_gap
+            candidate_gap = left_gap if use_left else right_gap
+
+            if candidate_gap > max_z_gap:
+                # target_slices are visited in non-decreasing Z-gap.
+                break
+
+            if use_left:
+                ordered.append(target_slices[left])
+                left -= 1
+            else:
+                ordered.append(target_slices[right])
+                right += 1
+
+        if math.isinf(max_z_gap):
+            seen = set(ordered)
+            for target_slice in target_slices:
+                if target_slice not in seen:
+                    ordered.append(target_slice)
+
+        return ordered
 
     def _calculate_slice_pair_distance(
         self,
