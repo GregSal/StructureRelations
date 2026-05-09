@@ -1,12 +1,13 @@
-"""Distance metric calculator for non-overlapping structures.
+"""Distance metric calculator for non-overlapping or touching structures.
 
 Distance measures the minimum 3D separation between two structures.
 Applicable to:
-- DISJOINT: No intersection or contact
+- DISJOINT: No intersection or contact (distance > 0)
+- BORDERS: Touching at boundaries with no interior overlap (distance = 0)
+- CONFINES: One structure confined within another with boundaries touching (distance = 0)
 - SHELTERS: Structure within convex hull (distance to actual boundary)
 
 NOT applicable to:
-- CONFINES (BORDERS_INTERIOR): N/A (distance within a structure is undefined)
 - EQUAL: N/A (identical structures have no separation)
 """
 
@@ -41,7 +42,8 @@ class MinimumDistanceCalculator(MetricCalculator):
     5. Track minimum across all region pairs and slice pairs
 
     Special cases:
-    - CONFINES: Return N/A (distance undefined)
+    - BORDERS: Return 0 (structures are touching at boundaries)
+    - CONFINES: Return 0 (structures confined with boundaries touching)
     - EQUAL: Return N/A (no separation)
     - DISJOINT: True 3D minimum distance
     - SHELTERS: Distance from contained to actual boundary (not hull)
@@ -62,10 +64,10 @@ class MinimumDistanceCalculator(MetricCalculator):
             relationship: The spatial relationship
 
         Returns:
-            True for DISJOINT, SHELTERS; False for CONFINES, EQUAL
+            True for DISJOINT, SHELTERS, BORDERS, CONFINES; False for EQUAL
         """
         rel_type = relationship.relationship_type.relation_type
-        return rel_type in ['DISJOINT', 'SHELTERS']
+        return rel_type in ['DISJOINT', 'SHELTERS', 'BORDERS', 'CONFINES']
 
     def calculate(
         self,
