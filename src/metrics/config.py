@@ -223,10 +223,36 @@ class MetricsConfig:
 
     @staticmethod
     def _extract_anatomical_labels(raw_config: Dict) -> Dict[str, str]:
-        """Extract anatomical labels from config."""
+        """Extract anatomical labels from config.
+
+        Supports both legacy flat label format and orientation-aware format.
+        Orientation-aware format example:
+            anatomical_labels: {
+                default_orientation: 'HFS',
+                orientation_labels: {
+                    HFS: {x_neg: 'R', ...}
+                }
+            }
+        """
         margin_settings = raw_config.get('margin_settings', {})
         anatomical = margin_settings.get('anatomical_labels', {})
 
+        # New format: select labels from configured default orientation.
+        if isinstance(anatomical.get('orientation_labels'), dict):
+            default_orientation = anatomical.get('default_orientation', 'HFS')
+            orientation_labels = anatomical.get('orientation_labels', {})
+            selected = orientation_labels.get(default_orientation, {})
+
+            return {
+                'x_neg': selected.get('x_neg', 'R'),
+                'x_pos': selected.get('x_pos', 'L'),
+                'y_neg': selected.get('y_neg', 'A'),
+                'y_pos': selected.get('y_pos', 'P'),
+                'z_neg': selected.get('z_neg', 'I'),
+                'z_pos': selected.get('z_pos', 'S')
+            }
+
+        # Legacy format: labels directly under anatomical_labels.
         return {
             'x_neg': anatomical.get('x_neg', 'R'),
             'x_pos': anatomical.get('x_pos', 'L'),

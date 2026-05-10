@@ -59,10 +59,13 @@ class OrthogonalMarginsCalculator(MetricCalculator):
             relationship: The spatial relationship
 
         Returns:
-            True for CONTAINS, SURROUNDS, SHELTERS, EQUAL
+            True for CONTAINS, SURROUNDS, SHELTERS, PARTITION, CONFINES, EQUAL
         """
         rel_type = relationship.relationship_type.relation_type
-        return rel_type in ['CONTAINS', 'SURROUNDS', 'SHELTERS', 'EQUAL']
+        return rel_type in [
+            'CONTAINS', 'SURROUNDS', 'SHELTERS', 'PARTITION', 'CONFINES',
+            'EQUAL'
+        ]
 
     def calculate(
         self,
@@ -449,7 +452,10 @@ class MinimumMarginCalculator(MetricCalculator):
     def is_applicable(self, relationship: StructureRelationship) -> bool:
         """Check if minimum margin applies to this relationship."""
         rel_type = relationship.relationship_type.relation_type
-        return rel_type in ['CONTAINS', 'SURROUNDS', 'SHELTERS', 'EQUAL']
+        return rel_type in [
+            'CONTAINS', 'SURROUNDS', 'SHELTERS', 'PARTITION', 'CONFINES',
+            'EQUAL'
+        ]
 
     def calculate(
         self,
@@ -474,6 +480,10 @@ class MinimumMarginCalculator(MetricCalculator):
 
         # Special case: EQUAL relationship
         if relationship.relationship_type.relation_type == 'EQUAL':
+            return MarginMetrics(minimum_margin=0.0)
+
+        # PARTITION and CONFINES have touching boundaries -> minimum margin is 0
+        if relationship.relationship_type.relation_type in ['PARTITION', 'CONFINES']:
             return MarginMetrics(minimum_margin=0.0)
 
         # Identify regions
@@ -580,7 +590,9 @@ class MaximumMarginCalculator(MetricCalculator):
     def is_applicable(self, relationship: StructureRelationship) -> bool:
         """Check if maximum margin applies to this relationship."""
         rel_type = relationship.relationship_type.relation_type
-        return rel_type in ['CONTAINS', 'SURROUNDS', 'EQUAL']
+        return rel_type in [
+            'CONTAINS', 'SURROUNDS', 'PARTITION', 'CONFINES', 'EQUAL'
+        ]
 
     def calculate(
         self,

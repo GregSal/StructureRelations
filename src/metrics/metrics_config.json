@@ -28,19 +28,49 @@
     "geometry": false
   },
   "margin_settings": {
-    "description": "Settings for margin calculations (CONTAINS, SURROUNDS, SHELTERS)",
+    "description": "Settings for margin calculations (CONTAINS, SURROUNDS, SHELTERS, PARTITION, CONFINES)",
     "calculate_orthogonal": true,
     "calculate_minimum": true,
     "calculate_maximum": false,
     "orthogonal_directions": ["x_neg", "x_pos", "y_neg", "y_pos", "z_neg", "z_pos"],
     "anatomical_labels": {
+      "description": "Direction labels by patient orientation. Default uses HFS (Head First Supine).",
       "use_anatomical": true,
-      "x_neg": "R",
-      "x_pos": "L",
-      "y_neg": "A",
-      "y_pos": "P",
-      "z_neg": "I",
-      "z_pos": "S"
+      "default_orientation": "HFS",
+      "orientation_labels": {
+        "HFS": {
+          "x_neg": "R",
+          "x_pos": "L",
+          "y_neg": "A",
+          "y_pos": "P",
+          "z_neg": "I",
+          "z_pos": "S"
+        },
+        "HFP": {
+          "x_neg": "L",
+          "x_pos": "R",
+          "y_neg": "P",
+          "y_pos": "A",
+          "z_neg": "I",
+          "z_pos": "S"
+        },
+        "FFS": {
+          "x_neg": "L",
+          "x_pos": "R",
+          "y_neg": "A",
+          "y_pos": "P",
+          "z_neg": "S",
+          "z_pos": "I"
+        },
+        "FFP": {
+          "x_neg": "R",
+          "x_pos": "L",
+          "y_neg": "P",
+          "y_pos": "A",
+          "z_neg": "S",
+          "z_pos": "I"
+        }
+      }
     }
   },
   "distance_settings": {
