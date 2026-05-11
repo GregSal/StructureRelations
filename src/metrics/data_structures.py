@@ -16,27 +16,29 @@ from types_and_classes import SliceIndexType, ROI_Type
 
 @dataclass
 class MarginMetrics:
-    """Clearance distances inside containing structure.
+    """Orthogonal and minimum clearance distances inside containing structure.
 
-    Applicable to: CONTAINS, SURROUNDS, SHELTERS relationships.
+    Applicable to: CONTAINS, SURROUNDS, SHELTERS, PARTITION, CONFINES relationships.
     Special case: EQUAL returns 0 for all margins.
 
+    Captures clearance in each cardinal direction (orthogonal_margins) and the
+    worst-case clearance across all directions (minimum_margin). These are
+    closely related and provide complementary information about the containment.
+
     Margins measure the minimum distance from the contained structure to the
-    boundary of the containing structure in each direction. This is different
-    from minimum_distance which measures gaps between disjoint structures.
+    boundary of the containing structure. This is different from minimum_distance
+    which measures gaps between disjoint structures.
     """
     # 3D aggregated summaries (derived from per-region data)
     # For multi-region structures, these represent the worst-case (minimum) across all region pairs
     orthogonal_margins: Optional[Dict[str, float]] = None  # {'x_neg', 'x_pos', 'y_neg', 'y_pos', 'z_neg', 'z_pos'}
     minimum_margin: Optional[float] = None  # Single worst-case clearance across all directions and regions
-    maximum_margin: Optional[float] = None  # Largest clearance (Hausdorff-based)
 
     # Per-region-pair data (region IDs from contour graph connected components)
     # Keys: (region_a_id, region_b_id) tuples
     # Values: metric results for that specific region pair
     per_region_orthogonal_margins: Optional[Dict[Tuple[int, int], Dict[str, float]]] = None
     per_region_minimum_margin: Optional[Dict[Tuple[int, int], float]] = None
-    per_region_maximum_margin: Optional[Dict[Tuple[int, int], float]] = None
 
     # Per-slice data for each region pair
     # Keys: (region_a_id, region_b_id) tuples
@@ -53,6 +55,34 @@ class MarginMetrics:
         if self.minimum_margin is not None and not math.isnan(self.minimum_margin):
             if self.minimum_margin < 0:
                 raise ValueError(f'Minimum margin cannot be negative: {self.minimum_margin}')
+
+
+@dataclass
+class MaximumMarginMetrics:
+    """Maximum clearance distance inside containing structure (Hausdorff-based).
+
+    Applicable to: CONTAINS, SURROUNDS, PARTITION, CONFINES, EQUAL relationships.
+    Special case: EQUAL returns 0.0.
+
+    Captures the largest clearance between the contained structure and the
+    container boundary. This represents a different aspect of the containment
+    relationship than orthogonal_margins and minimum_margin, which focus on
+    worst-case clearance. Maximum margin is useful for identifying the best-case
+    separation or for Hausdorff-based geometric analysis.
+    """
+    # 3D aggregated summary
+    maximum_margin: Optional[float] = None  # Largest clearance (Hausdorff-based)
+
+    # Per-region-pair data (region IDs from contour graph connected components)
+    # Keys: (region_a_id, region_b_id) tuples
+    # Values: maximum margin for that specific region pair
+    per_region_maximum_margin: Optional[Dict[Tuple[int, int], float]] = None
+
+    # Metadata for traceability
+    worst_case_region_pair: Optional[Tuple[int, int]] = None  # Which region pair has this maximum
+
+    def __post_init__(self):
+        """Validate that margin values are non-negative or NaN."""
         if self.maximum_margin is not None and not math.isnan(self.maximum_margin):
             if self.maximum_margin < 0:
                 raise ValueError(f'Maximum margin cannot be negative: {self.maximum_margin}')
@@ -195,6 +225,7 @@ class RelationshipMetrics:
     """
     # Metric categories
     margin: Optional[MarginMetrics] = None
+    maximum_margin: Optional[MaximumMarginMetrics] = None
     distance: Optional[DistanceMetrics] = None
     volume: Optional[VolumeMetrics] = None
     surface: Optional[SurfaceMetrics] = None
@@ -237,6 +268,8 @@ class RelationshipMetrics:
         # Add non-None metric categories
         if self.margin is not None:
             result['margin'] = self._margin_to_dict()
+        if self.maximum_margin is not None:
+            result['maximum_margin'] = self._maximum_margin_to_dict()
         if self.distance is not None:
             result['distance'] = self._distance_to_dict()
         if self.volume is not None:
@@ -255,9 +288,17 @@ class RelationshipMetrics:
         return {
             'orthogonal_margins': self.margin.orthogonal_margins,
             'minimum_margin': self.margin.minimum_margin,
-            'maximum_margin': self.margin.maximum_margin,
             'worst_case_region': self.margin.worst_case_region_pair,
             'worst_case_direction': self.margin.worst_case_direction,
+        }
+
+    def _maximum_margin_to_dict(self) -> Dict:
+        """Convert MaximumMarginMetrics to dictionary."""
+        if self.maximum_margin is None:
+            return {}
+        return {
+            'maximum_margin': self.maximum_margin.maximum_margin,
+            'worst_case_region': self.maximum_margin.worst_case_region_pair,
         }
 
     def _distance_to_dict(self) -> Dict:

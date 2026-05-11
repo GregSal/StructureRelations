@@ -20,6 +20,7 @@ from metrics import get_config as get_metrics_config, MetricCalculatorRegistry
 from metrics.data_structures import (
     RelationshipMetrics,
     MarginMetrics,
+    MaximumMarginMetrics,
     DistanceMetrics,
     VolumeMetrics,
     SurfaceMetrics,
@@ -900,14 +901,16 @@ class StructureSet:
                 Available metrics:
                 - 'orthogonal_margins': Clearance in 6 directions (±X, ±Y, ±Z)
                 - 'minimum_margin': Worst-case clearance distance
-                - 'maximum_margin': Largest clearance (Hausdorff)
+                - 'maximum_margin': Largest clearance (Hausdorff-based)
                 - 'minimum_distance': Gap between disjoint structures
 
         Returns:
-            Metric result dataclass (MarginMetrics, DistanceMetrics, etc.)
+            Metric result dataclass (MarginMetrics, MaximumMarginMetrics,
+            DistanceMetrics, etc.)
             The result is also stored in the relationship graph at:
             relationship_graph[roi_a][roi_b]['relationship'].metrics.<category>
-            where <category> is 'margin', 'distance', 'volume', 'surface', or 'geometry'.
+            where <category> is 'margin', 'maximum_margin', 'distance', 'volume',
+            'surface', or 'geometry'.
 
         Raises:
             ValueError: If metric_name is not recognized.
@@ -1010,6 +1013,8 @@ class StructureSet:
         # Store result in appropriate field based on type
         if isinstance(result, MarginMetrics):
             relationship.metrics.margin = result
+        elif isinstance(result, MaximumMarginMetrics):
+            relationship.metrics.maximum_margin = result
         elif isinstance(result, DistanceMetrics):
             relationship.metrics.distance = result
         elif isinstance(result, VolumeMetrics):

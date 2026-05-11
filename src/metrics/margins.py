@@ -6,9 +6,9 @@ Margins measure clearance distances inside containing structures. Applicable to:
 - SHELTERS: Structure within convex hull but not touching
 - EQUAL: Special case, all margins are 0
 
-This module implements three margin calculators:
-- OrthogonalMarginsCalculator: Clearance in 6 orthogonal directions (±X, ±Y, ±Z)
-- MinimumMarginCalculator: Single worst-case clearance value
+This module implements two margin calculators:
+- ContainmentMarginsCalculator: Both orthogonal and minimum clearance values together
+  (name: 'minimum_margins', calculates both metrics in one pass)
 - MaximumMarginCalculator: Largest clearance (Hausdorff-based)
 """
 
@@ -24,43 +24,36 @@ from structures import StructureShape
 from relationships import StructureRelationship
 from types_and_classes import SliceIndexType, ContourIndex
 from metrics.base import MetricCalculator, register_calculator
-from metrics.data_structures import MarginMetrics
+from metrics.data_structures import MarginMetrics, MaximumMarginMetrics
 
 logger = logging.getLogger(__name__)
 
 
 @register_calculator
-class OrthogonalMarginsCalculator(MetricCalculator):
-    """Calculate clearance in 6 orthogonal directions (±X, ±Y, ±Z).
+class ContainmentMarginsCalculator(MetricCalculator):
+    """Calculate both orthogonal and minimum clearance distances together.
 
-    For each region pair on each slice:
-    1. Get boundary polygons using RegionSlice.select('all')
-    2. Find centroid of secondary (contained) region
-    3. Generate orthogonal lines through centroid to container boundaries
-    4. Calculate clearance distances in ±X and ±Y directions
-    5. Store per-slice, per-region-pair results
+    Calculates:
+    1. Orthogonal margins: Clearance in 6 directions (±X, ±Y, ±Z)
+    2. Minimum margin: Single worst-case clearance across all directions
 
-    Z-direction margins are calculated from slice indices.
-    Final aggregated margins represent worst-case across all region pairs.
+    These metrics are calculated together in one pass as they provide complementary
+    information about containment relationships. Orthogonal margins show directional
+    clearances, while minimum margin shows the bottleneck constraint.
+
+    This is the recommended calculator for getting complete margin analysis.
     """
 
     def get_name(self) -> str:
         """Get calculator name."""
-        return 'orthogonal_margins'
+        return 'minimum_margins'
 
     def get_version(self) -> str:
         """Get calculator version."""
         return '1.0.0'
 
     def is_applicable(self, relationship: StructureRelationship) -> bool:
-        """Check if orthogonal margins apply to this relationship.
-
-        Args:
-            relationship: The spatial relationship
-
-        Returns:
-            True for CONTAINS, SURROUNDS, SHELTERS, PARTITION, CONFINES, EQUAL
-        """
+        """Check if margins apply to this relationship."""
         rel_type = relationship.relationship_type.relation_type
         return rel_type in [
             'CONTAINS', 'SURROUNDS', 'SHELTERS', 'PARTITION', 'CONFINES',
@@ -73,40 +66,66 @@ class OrthogonalMarginsCalculator(MetricCalculator):
         structure_b: StructureShape,
         relationship: StructureRelationship
     ) -> MarginMetrics:
-        """Calculate orthogonal margins for structure pair.
+        """Calculate both orthogonal and minimum margins for structure pair.
 
         Args:
-            structure_a: Container/larger structure
-            structure_b: Contained/smaller structure
+            structure_a: Container structure
+            structure_b: Contained structure
             relationship: Relationship with type information
 
         Returns:
-            MarginMetrics with per-region, per-slice, and aggregated data
+            MarginMetrics with orthogonal_margins, minimum_margin, and per-region data
         """
         if not self.is_applicable(relationship):
             self._warn_non_applicable(relationship.relationship_type)
-            return self._create_non_applicable_result()
+            na_value = self.get_non_applicable_value()
+            return MarginMetrics(
+                orthogonal_margins={
+                    'x_neg': na_value, 'x_pos': na_value,
+                    'y_neg': na_value, 'y_pos': na_value,
+                    'z_neg': na_value, 'z_pos': na_value,
+                },
+                minimum_margin=na_value,
+            )
 
-        # Special case: EQUAL relationship has all margins = 0
+        # Special case: EQUAL relationship
         if relationship.relationship_type.relation_type == 'EQUAL':
-            return self._create_equal_result()
+            return MarginMetrics(
+                orthogonal_margins={
+                    'x_neg': 0.0, 'x_pos': 0.0,
+                    'y_neg': 0.0, 'y_pos': 0.0,
+                    'z_neg': 0.0, 'z_pos': 0.0,
+                },
+                minimum_margin=0.0,
+            )
 
-        # Identify regions in both structures
+        # PARTITION and CONFINES have touching boundaries -> zero margins
+        if relationship.relationship_type.relation_type in ['PARTITION', 'CONFINES']:
+            return MarginMetrics(
+                orthogonal_margins={
+                    'x_neg': 0.0, 'x_pos': 0.0,
+                    'y_neg': 0.0, 'y_pos': 0.0,
+                    'z_neg': 0.0, 'z_pos': 0.0,
+                },
+                minimum_margin=0.0,
+            )
+
+        # Identify regions
         regions_a = self._identify_regions(structure_a)
         regions_b = self._identify_regions(structure_b)
 
         self.logger.debug(
-            'Calculating orthogonal margins: %d regions in A, %d regions in B',
+            'Calculating containment margins: %d regions in A, %d regions in B',
             len(regions_a), len(regions_b)
         )
 
-        # Calculate per-region-pair, per-slice margins
+        # Calculate per-region-pair, per-slice orthogonal margins
         per_region_slice_margins = {}
         for region_a_id, contours_a in regions_a.items():
             for region_b_id, contours_b in regions_b.items():
                 region_pair = (region_a_id, region_b_id)
                 per_region_slice_margins[region_pair] = (
-                    self._calculate_region_pair_margins(
+                    self._calculate_region_pair_orthogonal_margins(
                         structure_a, structure_b,
                         contours_a, contours_b
                     )
@@ -117,94 +136,91 @@ class OrthogonalMarginsCalculator(MetricCalculator):
             structure_a, structure_b, regions_a, regions_b
         )
 
-        # Aggregate to per-region-pair summaries
-        per_region_orthogonal = self._aggregate_to_per_region(
+        # Aggregate orthogonal to per-region-pair summaries
+        per_region_orthogonal = self._aggregate_orthogonal_to_per_region(
             per_region_slice_margins, z_margins
         )
 
-        # Aggregate to overall 3D summary (worst-case)
-        aggregated_margins, worst_case_info = self._aggregate_to_3d(
+        # Aggregate orthogonal to overall 3D summary (worst-case)
+        aggregated_orthogonal, worst_case_ortho = self._aggregate_orthogonal_to_3d(
             per_region_orthogonal
         )
 
+        # Calculate per-region-pair minimum margins
+        per_region_minimum = {}
+
+        for region_a_id, contours_a in regions_a.items():
+            for region_b_id, contours_b in regions_b.items():
+                region_pair = (region_a_id, region_b_id)
+
+                # Calculate minimum margin for this region pair
+                min_margin = self._calculate_region_pair_minimum_margin(
+                    structure_a, structure_b, contours_a, contours_b
+                )
+                per_region_minimum[region_pair] = min_margin
+
+        # Aggregate to overall minimum (worst-case across all region pairs)
+        if per_region_minimum:
+            overall_minimum = min(per_region_minimum.values())
+            min_closest_pair = min(per_region_minimum.items(), key=lambda x: x[1])[0]
+        else:
+            overall_minimum = 0.0
+            min_closest_pair = None
+
+        # Return both metrics in single MarginMetrics object
         return MarginMetrics(
-            orthogonal_margins=aggregated_margins,
+            orthogonal_margins=aggregated_orthogonal,
+            minimum_margin=overall_minimum,
             per_region_orthogonal_margins=per_region_orthogonal,
+            per_region_minimum_margin=per_region_minimum,
             slice_orthogonal_margins=per_region_slice_margins,
-            worst_case_region_pair=worst_case_info['region_pair'],
-            worst_case_direction=worst_case_info['direction'],
-            worst_case_slice=worst_case_info.get('slice'),
+            worst_case_region_pair=min_closest_pair,
+            worst_case_direction=worst_case_ortho['direction'],
+            worst_case_slice=worst_case_ortho.get('slice'),
         )
 
-    def _calculate_region_pair_margins(
+    def _calculate_region_pair_orthogonal_margins(
         self,
         structure_a: StructureShape,
         structure_b: StructureShape,
         contours_a: Set[ContourIndex],
         contours_b: Set[ContourIndex]
     ) -> Dict[SliceIndexType, Dict[str, float]]:
-        """Calculate per-slice margins for one region pair.
-
-        Args:
-            structure_a: Container structure
-            structure_b: Contained structure
-            contours_a: ContourIndex nodes for region A
-            contours_b: ContourIndex nodes for region B
-
-        Returns:
-            Dict mapping slice_index -> {'x_neg', 'x_pos', 'y_neg', 'y_pos'}
-        """
-        # Find common slices where both regions exist
-        slices_a = {contour[1] for contour in contours_a}  # contour[1] is slice_index
+        """Calculate per-slice orthogonal margins for one region pair."""
+        slices_a = {contour[1] for contour in contours_a}
         slices_b = {contour[1] for contour in contours_b}
         common_slices = slices_a & slices_b
 
         per_slice_margins = {}
 
         for slice_idx in common_slices:
-            # Get RegionSlice objects
             region_slice_a = structure_a.get_slice(slice_idx)
             region_slice_b = structure_b.get_slice(slice_idx)
 
             if region_slice_a is None or region_slice_b is None:
                 continue
 
-            # Get boundary polygons (including extrapolated boundaries)
             poly_a = region_slice_a.select('all')
             poly_b = region_slice_b.select('all')
 
             if poly_a is None or poly_b is None or poly_a.is_empty or poly_b.is_empty:
                 continue
 
-            # Calculate orthogonal margins for this slice
-            margins = self._calculate_slice_margins(poly_a, poly_b)
+            margins = self._calculate_slice_orthogonal_margins(poly_a, poly_b)
             per_slice_margins[slice_idx] = margins
 
         return per_slice_margins
 
-    def _calculate_slice_margins(
+    def _calculate_slice_orthogonal_margins(
         self,
         poly_a: Polygon,
         poly_b: Polygon
     ) -> Dict[str, float]:
-        """Calculate orthogonal margins on a single slice.
-
-        Args:
-            poly_a: Container polygon
-            poly_b: Contained polygon
-
-        Returns:
-            Dict with keys: 'x_neg', 'x_pos', 'y_neg', 'y_pos'
-        """
-        # Get centroid of contained structure
+        """Calculate orthogonal margins on a single slice."""
         centroid_b = shapely_centroid(poly_b)
         center_x, center_y = centroid_b.x, centroid_b.y
 
-        # Get bounds of container
         minx, miny, maxx, maxy = poly_a.bounds
-
-        # Create orthogonal lines through centroid to container boundaries
-        # Lines extend well beyond container to ensure intersection
         margin = max(maxx - minx, maxy - miny) * 2
 
         lines = {
@@ -228,33 +244,15 @@ class OrthogonalMarginsCalculator(MetricCalculator):
         poly_a: Polygon,
         poly_b: Polygon
     ) -> float:
-        """Calculate margin in one direction.
-
-        The margin is the length of the line segment that lies:
-        - Outside poly_b (exterior to contained structure)
-        - Inside poly_a (interior to container)
-
-        Args:
-            line: Orthogonal line from centroid in one direction
-            poly_a: Container polygon
-            poly_b: Contained polygon
-
-        Returns:
-            Margin distance in this direction
-        """
-        # Get exterior-only polygons (no holes) for simpler calculation
+        """Calculate margin in one direction."""
         from utilities import make_solid
         exterior_a = make_solid(poly_a)
         exterior_b = make_solid(poly_b)
 
-        # Find part of line outside poly_b
         try:
             line_outside_b = line.difference(exterior_b)
-
-            # Find part of that which is inside poly_a
             line_between = line_outside_b.intersection(exterior_a)
 
-            # Return length
             if line_between.is_empty:
                 return 0.0
 
@@ -273,33 +271,19 @@ class OrthogonalMarginsCalculator(MetricCalculator):
         regions_a: Dict[int, Set],
         regions_b: Dict[int, Set]
     ) -> Dict[Tuple[int, int], Dict[str, float]]:
-        """Calculate Z-direction (through-plane) margins for each region pair.
-
-        Args:
-            _structure_a: Container structure (unused, signature for consistency)
-            _structure_b: Contained structure (unused, signature for consistency)
-            regions_a: Regions in structure A
-            regions_b: Regions in structure B
-
-        Returns:
-            Dict mapping (region_a_id, region_b_id) -> {'z_neg', 'z_pos'}
-        """
+        """Calculate Z-direction margins for each region pair."""
         z_margins = {}
 
         for region_a_id, contours_a in regions_a.items():
             for region_b_id, contours_b in regions_b.items():
-                # Get slice indices for each region
-                slices_a = sorted([c[1] for c in contours_a])  # c[1] is slice_index
+                slices_a = sorted([c[1] for c in contours_a])
                 slices_b = sorted([c[1] for c in contours_b])
 
                 if not slices_a or not slices_b:
                     z_margins[(region_a_id, region_b_id)] = {'z_neg': 0.0, 'z_pos': 0.0}
                     continue
 
-                # Z margins: distance from extremes of B to extremes of A
-                # z_neg (inferior): distance from bottom of B to bottom of A
-                # z_pos (superior): distance from top of B to top of A
-                z_neg_margin = slices_b[0] - slices_a[0]  # Both in cm
+                z_neg_margin = slices_b[0] - slices_a[0]
                 z_pos_margin = slices_a[-1] - slices_b[-1]
 
                 z_margins[(region_a_id, region_b_id)] = {
@@ -309,29 +293,18 @@ class OrthogonalMarginsCalculator(MetricCalculator):
 
         return z_margins
 
-    def _aggregate_to_per_region(
+    def _aggregate_orthogonal_to_per_region(
         self,
         per_region_slice_margins: Dict[Tuple[int, int], Dict[SliceIndexType, Dict[str, float]]],
         z_margins: Dict[Tuple[int, int], Dict[str, float]]
     ) -> Dict[Tuple[int, int], Dict[str, float]]:
-        """Aggregate per-slice data to per-region-pair summaries.
-
-        For each region pair, take minimum margin in each direction across all slices.
-
-        Args:
-            per_region_slice_margins: Per-slice margins for each region pair
-            z_margins: Z-direction margins for each region pair
-
-        Returns:
-            Dict mapping (region_a_id, region_b_id) -> 6-direction margins dict
-        """
+        """Aggregate per-slice orthogonal data to per-region-pair summaries."""
         per_region = {}
 
         for region_pair, slice_margins in per_region_slice_margins.items():
             if not slice_margins:
                 continue
 
-            # Find minimum in each direction across all slices
             directions = ['x_neg', 'x_pos', 'y_neg', 'y_pos']
             aggregated = {}
 
@@ -346,7 +319,6 @@ class OrthogonalMarginsCalculator(MetricCalculator):
                 else:
                     aggregated[direction] = 0.0
 
-            # Add Z-direction margins
             if region_pair in z_margins:
                 aggregated.update(z_margins[region_pair])
             else:
@@ -357,20 +329,11 @@ class OrthogonalMarginsCalculator(MetricCalculator):
 
         return per_region
 
-    def _aggregate_to_3d(
+    def _aggregate_orthogonal_to_3d(
         self,
         per_region_orthogonal: Dict[Tuple[int, int], Dict[str, float]]
     ) -> Tuple[Dict[str, float], Dict]:
-        """Aggregate per-region data to overall 3D summary.
-
-        Take worst-case (minimum) margin in each direction across all region pairs.
-
-        Args:
-            per_region_orthogonal: Per-region-pair margins
-
-        Returns:
-            Tuple of (aggregated_margins_dict, worst_case_info_dict)
-        """
+        """Aggregate per-region orthogonal data to overall 3D summary."""
         if not per_region_orthogonal:
             return {}, {'region_pair': None, 'direction': None}
 
@@ -388,11 +351,9 @@ class OrthogonalMarginsCalculator(MetricCalculator):
             ]
 
             if values:
-                # Find minimum (worst-case) for this direction
                 min_pair = min(values, key=lambda x: x[1])
                 aggregated[direction] = min_pair[1]
 
-                # Track overall worst case
                 if min_pair[1] < worst_case_value:
                     worst_case_value = min_pair[1]
                     worst_case_region = min_pair[0]
@@ -407,117 +368,7 @@ class OrthogonalMarginsCalculator(MetricCalculator):
 
         return aggregated, worst_case_info
 
-    def _create_non_applicable_result(self) -> MarginMetrics:
-        """Create result for non-applicable relationship."""
-        na_value = self.get_non_applicable_value()
-        return MarginMetrics(
-            orthogonal_margins={
-                'x_neg': na_value, 'x_pos': na_value,
-                'y_neg': na_value, 'y_pos': na_value,
-                'z_neg': na_value, 'z_pos': na_value,
-            },
-            minimum_margin=na_value,
-            maximum_margin=na_value,
-        )
-
-    def _create_equal_result(self) -> MarginMetrics:
-        """Create result for EQUAL relationship (all margins are 0)."""
-        return MarginMetrics(
-            orthogonal_margins={
-                'x_neg': 0.0, 'x_pos': 0.0,
-                'y_neg': 0.0, 'y_pos': 0.0,
-                'z_neg': 0.0, 'z_pos': 0.0,
-            },
-            minimum_margin=0.0,
-            maximum_margin=0.0,
-        )
-
-
-@register_calculator
-class MinimumMarginCalculator(MetricCalculator):
-    """Calculate single worst-case clearance distance.
-
-    Finds the minimum distance from any point on the contained structure
-    to the boundary of the container. This is the smallest margin in any direction.
-    """
-
-    def get_name(self) -> str:
-        """Get calculator name."""
-        return 'minimum_margin'
-
-    def get_version(self) -> str:
-        """Get calculator version."""
-        return '1.0.0'
-
-    def is_applicable(self, relationship: StructureRelationship) -> bool:
-        """Check if minimum margin applies to this relationship."""
-        rel_type = relationship.relationship_type.relation_type
-        return rel_type in [
-            'CONTAINS', 'SURROUNDS', 'SHELTERS', 'PARTITION', 'CONFINES',
-            'EQUAL'
-        ]
-
-    def calculate(
-        self,
-        structure_a: StructureShape,
-        structure_b: StructureShape,
-        relationship: StructureRelationship
-    ) -> MarginMetrics:
-        """Calculate minimum margin for structure pair.
-
-        Args:
-            structure_a: Container structure
-            structure_b: Contained structure
-            relationship: Relationship with type information
-
-        Returns:
-            MarginMetrics with minimum_margin and per-region data
-        """
-        if not self.is_applicable(relationship):
-            self._warn_non_applicable(relationship.relationship_type)
-            na_value = self.get_non_applicable_value()
-            return MarginMetrics(minimum_margin=na_value)
-
-        # Special case: EQUAL relationship
-        if relationship.relationship_type.relation_type == 'EQUAL':
-            return MarginMetrics(minimum_margin=0.0)
-
-        # PARTITION and CONFINES have touching boundaries -> minimum margin is 0
-        if relationship.relationship_type.relation_type in ['PARTITION', 'CONFINES']:
-            return MarginMetrics(minimum_margin=0.0)
-
-        # Identify regions
-        regions_a = self._identify_regions(structure_a)
-        regions_b = self._identify_regions(structure_b)
-
-        # Calculate per-region-pair minimum margins
-        per_region_minimum = {}
-
-        for region_a_id, contours_a in regions_a.items():
-            for region_b_id, contours_b in regions_b.items():
-                region_pair = (region_a_id, region_b_id)
-
-                # Calculate minimum margin for this region pair
-                min_margin = self._calculate_region_pair_minimum(
-                    structure_a, structure_b, contours_a, contours_b
-                )
-                per_region_minimum[region_pair] = min_margin
-
-        # Aggregate to overall minimum (worst-case across all region pairs)
-        if per_region_minimum:
-            overall_minimum = min(per_region_minimum.values())
-            closest_pair = min(per_region_minimum.items(), key=lambda x: x[1])[0]
-        else:
-            overall_minimum = 0.0
-            closest_pair = None
-
-        return MarginMetrics(
-            minimum_margin=overall_minimum,
-            per_region_minimum_margin=per_region_minimum,
-            worst_case_region_pair=closest_pair,
-        )
-
-    def _calculate_region_pair_minimum(
+    def _calculate_region_pair_minimum_margin(
         self,
         structure_a: StructureShape,
         structure_b: StructureShape,
@@ -556,7 +407,6 @@ class MinimumMarginCalculator(MetricCalculator):
                 continue
 
             # Distance from contained boundary to container boundary
-            # Get exterior of contained structure and boundary of container
             from shapely import boundary
             boundary_b = boundary(poly_b)
             boundary_a = boundary(poly_a)
@@ -599,7 +449,7 @@ class MaximumMarginCalculator(MetricCalculator):
         structure_a: StructureShape,
         structure_b: StructureShape,
         relationship: StructureRelationship
-    ) -> MarginMetrics:
+    ) -> MaximumMarginMetrics:
         """Calculate maximum margin for structure pair.
 
         Args:
@@ -608,16 +458,16 @@ class MaximumMarginCalculator(MetricCalculator):
             relationship: Relationship with type information
 
         Returns:
-            MarginMetrics with maximum_margin and per-region data
+            MaximumMarginMetrics with maximum_margin and per-region data
         """
         if not self.is_applicable(relationship):
             self._warn_non_applicable(relationship.relationship_type)
             na_value = self.get_non_applicable_value()
-            return MarginMetrics(maximum_margin=na_value)
+            return MaximumMarginMetrics(maximum_margin=na_value)
 
         # Special case: EQUAL relationship
         if relationship.relationship_type.relation_type == 'EQUAL':
-            return MarginMetrics(maximum_margin=0.0)
+            return MaximumMarginMetrics(maximum_margin=0.0)
 
         # Identify regions
         regions_a = self._identify_regions(structure_a)
@@ -625,6 +475,8 @@ class MaximumMarginCalculator(MetricCalculator):
 
         # Calculate per-region-pair maximum margins
         per_region_maximum = {}
+        worst_region_pair = None
+        max_overall = 0.0
 
         for region_a_id, contours_a in regions_a.items():
             for region_b_id, contours_b in regions_b.items():
@@ -635,15 +487,15 @@ class MaximumMarginCalculator(MetricCalculator):
                 )
                 per_region_maximum[region_pair] = max_margin
 
-        # Aggregate to overall maximum
-        if per_region_maximum:
-            overall_maximum = max(per_region_maximum.values())
-        else:
-            overall_maximum = 0.0
+                # Track the maximum
+                if max_margin > max_overall:
+                    max_overall = max_margin
+                    worst_region_pair = region_pair
 
-        return MarginMetrics(
-            maximum_margin=overall_maximum,
+        return MaximumMarginMetrics(
+            maximum_margin=max_overall,
             per_region_maximum_margin=per_region_maximum,
+            worst_case_region_pair=worst_region_pair,
         )
 
     def _calculate_region_pair_maximum(
