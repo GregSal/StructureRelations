@@ -52,7 +52,7 @@ class StructureShape():
                 - ContourIndex,
                 - RegionIndex, and
                 - Label.
-        region_table (SliceIndexType): A table of StructureSlice.
+        region_table (SliceIndexType): A table of RegionSlice.
 
         volume_metrics (VolumeMetrics): Physical, exterior, and hull volumes
             in cm^3.
