@@ -11,6 +11,9 @@ from math import ceil, sin, cos, radians, sqrt
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import fsolve
+from shapely.geometry import Polygon
+from shapely.geometry.polygon import orient
 
 from types_and_classes import SliceIndexType, PolygonType
 from types_and_classes import DEFAULT_TRANSVERSE_TOLERANCE, SLICE_INDEX_PRECISION
@@ -601,3 +604,191 @@ def make_box(width: float, length: float = None, height: float = None,
         roi_slice = ContourPoints(xy_points, roi_num, slice_idx)
         slice_list.append(roi_slice)
     return slice_list
+
+
+def make_hourglass_polygon(circle_radius: float = 2.5,
+                           neck_thickness: float = 0.4,
+                           transition_steepness: float = 1.25,
+                           neck_half_width: float = 0.75,
+                           offset_x: float = 0.0,
+                           offset_y: float = 0.0,
+                           num_points_arc: int = 500,
+                           report_points: bool = True) -> PolygonType:
+    '''Generate a smooth hourglass polygon from circle and ellipse segments.
+
+    The shape is symmetric around both axes before offsetting. The outer lobes
+    are circle arcs and the neck is formed by the inner branches of top and
+    bottom ellipses. Circle and ellipse transitions satisfy C1 continuity.
+
+    Args:
+        circle_radius (float, optional): Radius of the two side circles.
+            Defaults to 2.5.
+        neck_thickness (float, optional): Minimum vertical thickness at the
+            neck center (x = 0). Defaults to 0.4.
+        transition_steepness (float, optional): Vertical ellipse semi-axis
+            controlling neck-to-circle transition steepness. Defaults to 1.25.
+        neck_half_width (float, optional): Horizontal ellipse semi-axis
+            controlling neck width. Defaults to 0.75.
+        offset_x (float, optional): x offset of the full shape. Defaults to 0.
+        offset_y (float, optional): y offset of the full shape. Defaults to 0.
+        num_points_arc (int, optional): Sampling points per boundary segment.
+            Defaults to 500.
+        report_points (bool, optional): If True, print key feature coordinates.
+            Defaults to True.
+
+    Raises:
+        ValueError: If any geometric parameter is invalid or no stable tangent
+            solution is found.
+
+    Returns:
+        PolygonType: The generated hourglass as a Shapely Polygon.
+    '''
+    if circle_radius <= 0:
+        raise ValueError('circle_radius must be > 0.')
+    if neck_thickness <= 0:
+        raise ValueError('neck_thickness must be > 0.')
+    if transition_steepness <= 0:
+        raise ValueError('transition_steepness must be > 0.')
+    if neck_half_width <= 0:
+        raise ValueError('neck_half_width must be > 0.')
+    if num_points_arc < 20:
+        raise ValueError('num_points_arc must be >= 20.')
+
+    r = float(circle_radius)
+    a = float(neck_half_width)
+    b = float(transition_steepness)
+    c = b + neck_thickness / 2.0
+
+    # Solve for right-side transition point (xj, yj) and circle half-spacing L.
+    def c1_system(vars_):
+        xj, yj, l_val = vars_
+        eq1 = (xj - l_val) ** 2 + yj ** 2 - r ** 2
+        eq2 = (xj ** 2) / (a ** 2) + ((yj - c) ** 2) / (b ** 2) - 1.0
+        eq3 = (xj - l_val) / yj - (xj * b ** 2) / ((yj - c) * a ** 2)
+        return [eq1, eq2, eq3]
+
+    x_guess = min(0.9 * a, a - 1e-3)
+    y_guess = neck_thickness / 2.0 + 0.2 * b
+    l_guess = r + max(0.25 * r, 1.5 * a)
+    xj, yj, l_val = fsolve(c1_system, [x_guess, y_guess, l_guess])
+
+    xj = float(xj)
+    yj = float(yj)
+    l_val = float(l_val)
+
+    if not (0 < xj < a):
+        raise ValueError('No valid transition point found: xj must be in (0, a).')
+    if yj <= 0:
+        raise ValueError('No valid transition point found: yj must be > 0.')
+    if l_val <= r:
+        raise ValueError('No valid circle spacing found: L must be > radius.')
+
+    def y_circle_top_right(x):
+        return np.sqrt(np.maximum(0.0, r ** 2 - (x - l_val) ** 2))
+
+    def y_circle_top_left(x):
+        return np.sqrt(np.maximum(0.0, r ** 2 - (x + l_val) ** 2))
+
+    def y_circle_bot_right(x):
+        return -y_circle_top_right(x)
+
+    def y_circle_bot_left(x):
+        return -y_circle_top_left(x)
+
+    def y_ellipse_top_inner(x):
+        return c - b * np.sqrt(np.maximum(0.0, 1.0 - (x ** 2) / (a ** 2)))
+
+    def y_ellipse_bottom_inner(x):
+        return -c + b * np.sqrt(np.maximum(0.0, 1.0 - (x ** 2) / (a ** 2)))
+
+    x_top_left = np.linspace(-l_val - r, -xj, num_points_arc)
+    y_top_left = y_circle_top_left(x_top_left)
+
+    x_top_mid = np.linspace(-xj, xj, num_points_arc)
+    y_top_mid = y_ellipse_top_inner(x_top_mid)
+
+    x_top_right = np.linspace(xj, l_val + r, num_points_arc)
+    y_top_right = y_circle_top_right(x_top_right)
+
+    x_bot_right = np.linspace(l_val + r, xj, num_points_arc)
+    y_bot_right = y_circle_bot_right(x_bot_right)
+
+    x_bot_mid = np.linspace(xj, -xj, num_points_arc)
+    y_bot_mid = y_ellipse_bottom_inner(x_bot_mid)
+
+    x_bot_left = np.linspace(-xj, -l_val - r, num_points_arc)
+    y_bot_left = y_circle_bot_left(x_bot_left)
+
+    x_poly = np.concatenate([
+        x_top_left, x_top_mid, x_top_right,
+        x_bot_right, x_bot_mid, x_bot_left,
+    ])
+    y_poly = np.concatenate([
+        y_top_left, y_top_mid, y_top_right,
+        y_bot_right, y_bot_mid, y_bot_left,
+    ])
+
+    x_poly = x_poly + offset_x
+    y_poly = y_poly + offset_y
+    polygon = Polygon(np.column_stack((x_poly, y_poly)))
+
+    if not polygon.is_valid:
+        polygon = polygon.buffer(0)
+    polygon = orient(polygon, sign=1.0)
+
+    left_center = (offset_x - l_val, offset_y)
+    right_center = (offset_x + l_val, offset_y)
+    top_ellipse_center = (offset_x, offset_y + c)
+    bottom_ellipse_center = (offset_x, offset_y - c)
+
+    left_circle_extents = {
+        'x_min': offset_x - l_val - r,
+        'x_max': offset_x - l_val + r,
+        'y_min': offset_y - r,
+        'y_max': offset_y + r,
+    }
+    right_circle_extents = {
+        'x_min': offset_x + l_val - r,
+        'x_max': offset_x + l_val + r,
+        'y_min': offset_y - r,
+        'y_max': offset_y + r,
+    }
+    top_ellipse_extents = {
+        'x_min': offset_x - a,
+        'x_max': offset_x + a,
+        'y_min': offset_y + c - b,
+        'y_max': offset_y + c + b,
+    }
+    bottom_ellipse_extents = {
+        'x_min': offset_x - a,
+        'x_max': offset_x + a,
+        'y_min': offset_y - c - b,
+        'y_max': offset_y - c + b,
+    }
+
+    transition_points = {
+        'top_right': (offset_x + xj, offset_y + yj),
+        'top_left': (offset_x - xj, offset_y + yj),
+        'bottom_right': (offset_x + xj, offset_y - yj),
+        'bottom_left': (offset_x - xj, offset_y - yj),
+    }
+
+    if report_points:
+        print('Hourglass geometry report')
+        print(f'  circle_radius={r:.4f}, neck_thickness={neck_thickness:.4f}')
+        print(f'  transition_steepness={b:.4f}, neck_half_width={a:.4f}')
+        print(f'  solved_circle_half_spacing={l_val:.4f}')
+
+        print(f'  left_circle_center={left_center}')
+        print(f'  right_circle_center={right_center}')
+        print(f'  left_circle_extents={left_circle_extents}')
+        print(f'  right_circle_extents={right_circle_extents}')
+
+        print(f'  top_ellipse_center={top_ellipse_center}')
+        print(f'  bottom_ellipse_center={bottom_ellipse_center}')
+        print(f'  top_ellipse_extents={top_ellipse_extents}')
+        print(f'  bottom_ellipse_extents={bottom_ellipse_extents}')
+
+        print(f'  transition_points={transition_points}')
+
+    return polygon
