@@ -640,18 +640,21 @@ def check_symbol(
             )
 
         # Check complementary pair matching
-        complementary_relation = defn.get('complementary_relation', '')
-        if (complementary_relation and
-            complementary_relation in lookup and
-            complementary_relation != relation_type):
-
-            comp_symbol = lookup[complementary_relation]['symbol']
-            if symbol != comp_symbol:
-                errors.append(
-                    f'{relation_type}: symbol \'{symbol}\' does not match '
-                    f'complementary relation {complementary_relation} '
-                    f'symbol \'{comp_symbol}\''
-                )
+        # Dropping the requirement for complementary pairs to have matching
+        # symbols, PARTITIONS and PARTITIONED are complementary but have
+        # different symbols.  In the future different symbols may be used for
+        # other complementary pairs as well.
+        #complementary_relation = defn.get('complementary_relation', '')
+        #if (complementary_relation and
+        #    complementary_relation in lookup and
+        #    complementary_relation != relation_type):
+        #    comp_symbol = lookup[complementary_relation]['symbol']
+        #    if symbol != comp_symbol:
+        #        errors.append(
+        #            f'{relation_type}: symbol \'{symbol}\' does not match '
+        #            f'complementary relation {complementary_relation} '
+        #            f'symbol \'{comp_symbol}\''
+        #        )
 
     return errors
 
