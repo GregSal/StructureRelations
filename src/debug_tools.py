@@ -2,7 +2,7 @@
 # %% Imports
 # Type imports
 
-from typing import List, Dict
+from typing import Any, List, Dict, Tuple
 
 # Standard Libraries
 from math import ceil, sin, cos, radians, sqrt
@@ -613,7 +613,7 @@ def make_hourglass_polygon(circle_radius: float = 2.5,
                            offset_x: float = 0.0,
                            offset_y: float = 0.0,
                            num_points_arc: int = 500,
-                           report_points: bool = True) -> PolygonType:
+                           report_points: bool = True) -> Tuple[PolygonType, Dict[str, Any]]:
     '''Generate a smooth hourglass polygon from circle and ellipse segments.
 
     The shape is symmetric around both axes before offsetting. The outer lobes
@@ -772,23 +772,25 @@ def make_hourglass_polygon(circle_radius: float = 2.5,
         'bottom_right': (offset_x + xj, offset_y - yj),
         'bottom_left': (offset_x - xj, offset_y - yj),
     }
-
+    geometry_report = {
+        'circle_radius': r,
+        'neck_thickness': neck_thickness,
+        'transition_steepness': b,
+        'neck_half_width': a,
+        'solved_circle_half_spacing': l_val,
+        'left_circle_center': left_center,
+        'right_circle_center': right_center,
+        'left_circle_extents': left_circle_extents,
+        'right_circle_extents': right_circle_extents,
+        'top_ellipse_center': top_ellipse_center,
+        'bottom_ellipse_center': bottom_ellipse_center,
+        'top_ellipse_extents': top_ellipse_extents,
+        'bottom_ellipse_extents': bottom_ellipse_extents,
+        'transition_points': transition_points,
+        }
     if report_points:
         print('Hourglass geometry report')
-        print(f'  circle_radius={r:.4f}, neck_thickness={neck_thickness:.4f}')
-        print(f'  transition_steepness={b:.4f}, neck_half_width={a:.4f}')
-        print(f'  solved_circle_half_spacing={l_val:.4f}')
+        for key, value in geometry_report.items():
+            print(f'  {key}: {value}')
 
-        print(f'  left_circle_center={left_center}')
-        print(f'  right_circle_center={right_center}')
-        print(f'  left_circle_extents={left_circle_extents}')
-        print(f'  right_circle_extents={right_circle_extents}')
-
-        print(f'  top_ellipse_center={top_ellipse_center}')
-        print(f'  bottom_ellipse_center={bottom_ellipse_center}')
-        print(f'  top_ellipse_extents={top_ellipse_extents}')
-        print(f'  bottom_ellipse_extents={bottom_ellipse_extents}')
-
-        print(f'  transition_points={transition_points}')
-
-    return polygon
+    return polygon, geometry_report
