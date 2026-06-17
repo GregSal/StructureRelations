@@ -1,0 +1,114 @@
+graph StructureSet {
+graph 
+    [label = "Example Structure Relations\n",
+    labelloc = t,
+    fontname = "Helvetica,Arial,sans-serif",
+    fontsize = 20,
+    layout = dot,
+    #rankdir = LR,
+    newrank = true,
+    bgcolor="#000000",
+        ranksep = 1.,
+        overlap = false,
+    
+    ]
+    subgraph Targets {
+        cluster = true;
+        color = "#888888";
+        label = "Target Structures";
+    GTV [shape = triangle,
+         color = "#ff0000",
+         label = "GTV",
+         fontcolor = "#ff0000"]
+    CTV [shape = diamond,
+         color = "#FFFF00"
+         label = "CTV",
+         fontcolor = "#FFFF00"]
+    PTV [shape = pentagon,
+         color = "#00FFFF",
+         label = "PTV",
+         fontcolor = "#00FFFF"]
+    eval_PTV [shape = pentagon,
+             color = "#00FFFF"
+             label = "eval PTV",
+             fontcolor = "#00FFFF"]
+}
+    subgraph OAR {
+        cluster = true;
+        color = "#888888";
+        label = "OAR Structures";
+        Lung_L[shape = rectangle,
+               color = "#E0FFFF",
+               label = "Lung L", 
+               fontcolor = "#E0FFFF"]
+        Lung_R[shape = rectangle,
+               color = "#FFDAB9"
+            label = "Lung R",
+            fontcolor = "#FFDAB9"]
+        Lung_B[shape = rectangle,
+               color = "#DAA532",
+               label = "Lung B",
+            fontcolor = "#DAA532"]
+}
+    edge [color = "#e27dd6ff"
+          fontcolor="#e27dd6ff",
+          fontsize="16"
+          arrowhead = none,
+          labelfontname = "Ubuntu",
+          weight = 10,
+          style = "filled,setlinewidth(5)"
+    ]
+GTV -- CTV [#label="Equals",
+        style = "tapered",
+        penwidth="10",
+        dir=both]
+#GTV -- PTV [label="Contain"]
+#GTV -- eval_PTV [label="Contain"]
+#GTV -- Skin [label="Island"]
+#GTV -- Lung_L [label="Contain"]
+#GTV -- Lung_B [label="Contain"]
+CTV -- PTV [#label="Contain",
+        style = "tapered",
+        penwidth="10",
+        dir=forward
+        headlabel="Contained",
+        taillabel="Contains"]
+#CTV -- eval_PTV [label="Contain"]
+#CTV -- Skin [label="Island"]
+CTV -- Lung_L [#label="Contain",
+        style = "dashed",
+        penwidth="3"
+        headlabel="Contained",
+        taillabel="Contains"]
+#CTV -- Lung_B [label="Contain"]
+PTV -- eval_PTV [label="Group",
+        style = "solid",
+        headlabel="Incorporates",
+        taillabel="Partitions"]
+#PTV -- Skin [label="Island"]
+PTV -- Lung_L [#label="Overlaps",
+        style = "bold"]
+#PTV -- Lung_B [label="Overlaps"]
+#eval_PTV -- Skin [label="Island"]
+eval_PTV -- Lung_L [#label="Group",
+        style = "solid",
+        headlabel="Partitions",
+        taillabel="Incorporates"]
+#eval_PTV -- Lung_B [label="Contain"]
+Lung_L -- Lung_B [#label="Contain",
+        style = "dashed",
+        headlabel="Contained",
+        taillabel="Contains"]
+Lung_R -- Lung_B [#label="Contain",
+        style = "dashed",
+        headlabel="Contained",
+        taillabel="Contains"]
+#Body -- GTV [label="Contain"]
+#Body -- CTV [label="Contain"]
+#Body -- PTV [label="Contain"]
+#Body -- eval_PTV [label="Contain"]
+#Body -- Skin [label="Cut-out"]
+#Body -- Lung_L [label="Contain"]
+#Body -- Lung_R [label="Contain"]
+#Body -- Lung_B [label="Contain"]
+}

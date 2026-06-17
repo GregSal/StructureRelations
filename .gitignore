@@ -175,11 +175,10 @@ Backup of *.do*
 .mypy_cache/
 __pycache__/
 _Test Results/
-reference/
 Test Data/
 *.bat
 src/UnUsedFunctions.py
-src/Reference_Code/
+*/Reference_Code/
 *.FCBak
 
 # Web Application Sessions

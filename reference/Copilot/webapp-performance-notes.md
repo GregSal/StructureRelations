@@ -1,0 +1,9 @@
+- Web processing in src/webapp/main.py previously instantiated StructureSet (which auto-ran finalize relationships/logical flags) and then called calculate_relationships(force=True) again, effectively duplicating core pair computation.
+- Progress bar stall root cause: pair_progress callback updated session state only; no websocket progress emitted during relationship loop, causing UI to stay near 70% until final completion message.
+- Third pass added endpoint micro-timing logs in src/webapp/main.py for /api/matrix (session load, filter prep, payload serialization, response validation, total) and /api/diagram (session load, config load, summary build, color extraction, node build, edge build split by symmetric/directional loops, total).
+- Live probe on 2026-04-10 with session ef059e09-2be7-4f9b-a1a6-c6ec5ccaeada: before avg matrix 2817.23 ms / diagram 2595.95 ms; after warm avg matrix 3047.33 ms / diagram 3154.69 ms (higher, likely from instrumentation overhead plus runtime variance/reload effects).
+- Backend status-line granularity now reports diagram phase progression in UI log (loading data, loading config, building nodes, building edges, ready with elapsed ms).
+- Contour slice switching slowdown root cause: app.js triggers a fresh /api/plot-contours POST on every slider input event, while the backend regenerates the matplotlib PNG and also touches session persistence for each read-only request; best low-risk fix is debounce + client/server plot caching + reduced session touch frequency for plot reads.
+
+- Verified minimal implementation shape for contour responsiveness: debounce the slider input in the frontend, cache image URLs in app.js by session/slice/render options, cache PNG bytes in main.py using a bounded in-memory LRU-style map keyed by identical plot requests, and call session_manager.load_session with disk persistence disabled for read-only plot requests.
+

@@ -1,0 +1,1 @@
+- Uploaded DICOM temp files are saved with a session UUID prefix; user-facing metadata should sanitize this via clean_uploaded_file_name in src/dicom.py before populating patient_info or tooltip text.
