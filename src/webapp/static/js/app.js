@@ -481,13 +481,16 @@ class WebAppClient {
 
         // Diagram controls
         document.getElementById('showDisjointToggle').addEventListener('change', () => {
+            this.ensureManualLayoutForDiagramChanges();
             this.updateDiagramPendingState();
         });
         document.getElementById('showLabelsToggle').addEventListener('change', () => {
+            this.ensureManualLayoutForDiagramChanges();
             this.updateDiagramPendingState();
         });
         document.getElementById('diagramLogicalRelationsMode').addEventListener('change', (e) => {
             console.log('Diagram logical relations mode changed to:', e.target.value);
+            this.ensureManualLayoutForDiagramChanges();
             this.diagramLogicalRelationsMode = e.target.value;
             this.updateDiagramPendingState();
         });
@@ -2373,6 +2376,12 @@ class WebAppClient {
         this.appendStatusLogLine('frontend', 'Manual layout enabled for the diagram.');
     }
 
+    ensureManualLayoutForDiagramChanges() {
+        if (!this.network) return;
+        if (this.manualLayoutActive) return;
+        this.enableManualLayout();
+    }
+
     resetDiagramLayout() {
         if (!this.latestDiagramData) return;
 
@@ -2675,6 +2684,7 @@ class WebAppClient {
     }
 
     applyDiagramSelection() {
+        this.ensureManualLayoutForDiagramChanges();
         this.diagramAppliedSelection = new Set(this.diagramSelection);
         this.hiddenNodes = new Set(
             this.structureItems
@@ -2747,6 +2757,8 @@ class WebAppClient {
             return;
         }
 
+        const positionSnapshot = this._captureDiagramPositionSnapshot();
+
         try {
             const selectedRois = this.getDiagramAppliedRois();
             if (selectedRois.length === 0) {
@@ -2790,7 +2802,7 @@ class WebAppClient {
             );
 
             const diagramRenderStart = performance.now();
-            this.renderDiagram(data);
+            this.renderDiagram(data, positionSnapshot);
             const diagramRenderMs = Math.round(performance.now() - diagramRenderStart);
             this.appendStatusLogLine(
                 'frontend',
@@ -2803,7 +2815,52 @@ class WebAppClient {
         }
     }
 
-    renderDiagram(data) {
+    _captureDiagramPositionSnapshot() {
+        if (!this.network) return null;
+
+        const nodeIds = this.network.body.data.nodes.getIds();
+        if (!nodeIds || nodeIds.length === 0) return null;
+
+        const positions = this.network.getPositions(nodeIds);
+        const hiddenNodeIds = new Set(
+            this.network.body.data.nodes
+                .get({ filter: (node) => Boolean(node.hidden) })
+                .map((node) => Number(node.id))
+        );
+        return {
+            positions,
+            hiddenNodeIds,
+        };
+    }
+
+    _restoreDiagramCoordinates(positionSnapshot) {
+        if (!this.network || !positionSnapshot || !positionSnapshot.positions) {
+            return;
+        }
+
+        const nodeIds = this.network.body.data.nodes.getIds();
+        if (!nodeIds || nodeIds.length === 0) return;
+
+        const updates = [];
+        nodeIds.forEach((id) => {
+            const numericId = Number(id);
+            const pos = positionSnapshot.positions[numericId] || positionSnapshot.positions[id];
+            if (!pos) return;
+            updates.push({
+                id,
+                x: pos.x,
+                y: pos.y,
+            });
+        });
+
+        if (updates.length > 0) {
+            this.network.body.data.nodes.update(updates);
+        }
+
+        this.network.stopSimulation();
+    }
+
+    renderDiagram(data, positionSnapshot = null) {
         const container = document.getElementById('networkDiagram');
         const showLabels = this.diagramShowLabelsApplied;
         const nodeFont = this.diagramOptions.font || {};
@@ -2836,6 +2893,7 @@ class WebAppClient {
             const roi = Number(node.id);
             const originalLabel = node.label;
             const labelHidden = this.hiddenLabels.has(roi);
+            const isHidden = this.hiddenNodes.has(roi);
             const isPhysicsFixed = this.fixedNodes.has(roi);
             return {
                 id: roi,
@@ -2857,7 +2915,8 @@ class WebAppClient {
                 face: nodeFont.face || 'Arial'
             },
                 borderWidth: 2,
-                physics: !isPhysicsFixed
+                physics: isHidden ? false : !isPhysicsFixed,
+                hidden: isHidden
             };
         });
 
@@ -2884,6 +2943,7 @@ class WebAppClient {
                 color: edge.color,
                 strokeWidth: 0
             },
+            hidden: this.hiddenNodes.has(Number(edge.from_node)) || this.hiddenNodes.has(Number(edge.to_node)),
             smooth: {
                 type: 'continuous',
                 roundness: 0.5
@@ -2917,6 +2977,10 @@ class WebAppClient {
             }
         };
 
+        if (positionSnapshot) {
+            options.physics.enabled = false;
+        }
+
         // Destroy existing network if present
         if (this.network) {
             this.network.destroy();
@@ -2927,6 +2991,9 @@ class WebAppClient {
 
         // Add event listeners
         this.network.on('click', () => this._dismissContextMenu());
+
+        this._restoreDiagramCoordinates(positionSnapshot);
+        this._applyNodeVisibilityState();
 
         // Right-click: show node context menu
         this.network.on('oncontext', (params) => {
@@ -3118,8 +3185,69 @@ class WebAppClient {
         }
     }
 
+    _applyNodeVisibilityState() {
+        if (!this.network) return;
+
+        const nodesDataSet = this.network.body.data.nodes;
+        const edgesDataSet = this.network.body.data.edges;
+        const hiddenNodeIds = new Set(Array.from(this.hiddenNodes).map(id => Number(id)));
+        const nodeIds = nodesDataSet.getIds();
+        const nodePositions = this.network.getPositions(nodeIds);
+
+        // Hiding/showing nodes should not trigger a re-layout.
+        this.network.setOptions({
+            physics: {
+                ...this.getPhysicsFromInfluence(),
+                enabled: false,
+            },
+        });
+
+        const nodeUpdates = nodesDataSet.get().map((node) => {
+            const roi = Number(node.id);
+            const isHidden = hiddenNodeIds.has(roi);
+            const isFixed = this.fixedNodes.has(roi);
+            const pos = nodePositions[roi] || {};
+            return {
+                id: roi,
+                hidden: isHidden,
+                physics: isHidden ? false : !isFixed,
+                x: pos.x,
+                y: pos.y,
+            };
+        });
+        if (nodeUpdates.length > 0) {
+            nodesDataSet.update(nodeUpdates);
+        }
+
+        const hiddenNodeIdsFromState = new Set(
+            nodesDataSet
+                .get({ filter: (node) => Boolean(node.hidden) })
+                .map((node) => Number(node.id))
+        );
+
+        const edgeUpdates = edgesDataSet.get().map((edge) => {
+            const fromNode = Number(edge.from);
+            const toNode = Number(edge.to);
+            return {
+                id: edge.id,
+                hidden: hiddenNodeIdsFromState.has(fromNode) || hiddenNodeIdsFromState.has(toNode),
+            };
+        });
+        if (edgeUpdates.length > 0) {
+            edgesDataSet.update(edgeUpdates);
+        }
+
+        const visibleNodes = nodesDataSet.get({ filter: (node) => !node.hidden });
+        this.manualLayoutActive = visibleNodes.length > 0
+            && visibleNodes.every(node => this.fixedNodes.has(Number(node.id)));
+        this.network.stopSimulation();
+        this.updateDiagramLayoutButtons();
+    }
+
     _ctxToggleVisibility(roi) {
         if (!this.network) return;
+
+        this.ensureManualLayoutForDiagramChanges();
 
         const shouldShow = !this.diagramAppliedSelection.has(roi);
 
@@ -3141,7 +3269,7 @@ class WebAppClient {
         }
 
         this.updateDiagramPendingState();
-        this.refreshDiagram();
+        this._applyNodeVisibilityState();
     }
 
     toggleEdgeLabels() {
