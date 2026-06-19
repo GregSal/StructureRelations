@@ -267,6 +267,41 @@ class TestLogicalEquals:
         assert filtered_matrix_hidden.loc[name_3, name_2] is not None
         assert filtered_matrix_hidden.loc[name_2, name_3] is not None
 
+    def test_equal_trio_deduplicates_incoming_external_edges(self):
+        '''Test: External->equal-clique duplicates become logical peers.'''
+        slice_spacing = 1
+        sphere_a = make_sphere(roi_num=1, radius=3, spacing=slice_spacing)
+        sphere_b = make_sphere(roi_num=2, radius=3, spacing=slice_spacing)
+        sphere_c = make_sphere(roi_num=3, radius=3, spacing=slice_spacing)
+        sphere_outer = make_sphere(roi_num=4, radius=8, spacing=slice_spacing)
+
+        slice_data = sphere_a + sphere_b + sphere_c + sphere_outer
+        structures = StructureSet(slice_data)
+
+        # Equal-clique relations remain present.
+        rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
+        rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
+        rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
+
+        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_3.relationship_type.relation_type == 'EQUAL'
+        assert rel_2_3.relationship_type.relation_type == 'EQUAL'
+
+        # Only canonical member should keep direct external->member relation.
+        rel_4_1 = structures.get_relationship(ROI_Type(4), ROI_Type(1))
+        rel_4_2 = structures.get_relationship(ROI_Type(4), ROI_Type(2))
+        rel_4_3 = structures.get_relationship(ROI_Type(4), ROI_Type(3))
+
+        assert rel_4_1.relationship_type.relation_type == 'CONTAINS'
+        assert rel_4_2.relationship_type.relation_type == 'CONTAINS'
+        assert rel_4_3.relationship_type.relation_type == 'CONTAINS'
+
+        assert not rel_4_1.is_logical
+        assert rel_4_2.is_logical
+        assert rel_4_3.is_logical
+        assert ROI_Type(1) in rel_4_2.intermediate_structures
+        assert ROI_Type(1) in rel_4_3.intermediate_structures
+
 
 class TestLogicalMixed:
     '''Tests for logical relationships with mixed transitive types.'''

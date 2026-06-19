@@ -919,26 +919,34 @@ class StructureSet:
                         ROI_Type(canonical_roi),
                     ]
 
-            for member_roi in component_set:
+            external_rois = sorted(
+                [
+                    roi for roi in self.relationship_graph.nodes
+                    if roi not in component_set
+                ],
+                key=lambda roi: (sort_order.get(roi, float('inf')), roi),
+            )
+
+            for member_roi in sorted(
+                component_set,
+                key=lambda roi: (sort_order.get(roi, float('inf')), roi),
+            ):
                 if member_roi == canonical_roi:
                     continue
 
-                # Mirror outgoing duplicates: member -> target
-                for target_roi in self.relationship_graph.successors(
-                        member_roi):
-                    if target_roi in component_set:
-                        continue
-
-                    member_relationship = self.relationship_graph[
-                        member_roi][target_roi]['relationship']
-                    member_type = member_relationship.relationship_type
+                for external_roi in external_rois:
+                    member_relationship, member_type = (
+                        get_effective_relationship(member_roi, external_roi)
+                    )
                     if (
-                        member_type is None
+                        member_relationship is None
+                        or member_type is None
                         or member_type.relation_type == 'EQUAL'
                     ):
                         continue
+
                     canonical_relationship, canonical_type = (
-                        get_effective_relationship(canonical_roi, target_roi)
+                        get_effective_relationship(canonical_roi, external_roi)
                     )
                     if (
                         canonical_relationship is None
@@ -949,7 +957,7 @@ class StructureSet:
                     ):
                         continue
 
-                    # Keep canonical edge direct; hide peer duplicates.
+                    # Keep canonical relationship direct; hide peer duplicate.
                     canonical_relationship.is_logical = False
                     canonical_relationship.intermediate_structures = []
 
@@ -965,54 +973,8 @@ class StructureSet:
                     ]
                     logger.debug(
                         'Identified EQUAL-derived logical relationship: '
-                        'ROI %d -> ROI %d (via canonical ROI %d)',
-                        member_roi, target_roi, canonical_roi
-                    )
-
-                # Mirror incoming duplicates: source -> member
-                for source_roi in self.relationship_graph.predecessors(
-                        member_roi):
-                    if source_roi in component_set:
-                        continue
-
-                    member_relationship = self.relationship_graph[
-                        source_roi][member_roi]['relationship']
-                    member_type = member_relationship.relationship_type
-                    if (
-                        member_type is None
-                        or member_type.relation_type == 'EQUAL'
-                    ):
-                        continue
-                    canonical_relationship, canonical_type = (
-                        get_effective_relationship(source_roi, canonical_roi)
-                    )
-                    if (
-                        canonical_relationship is None
-                        or canonical_type is None
-                        or canonical_type.relation_type == 'EQUAL'
-                        or canonical_type.relation_type
-                        != member_type.relation_type
-                    ):
-                        continue
-
-                    # Keep canonical edge direct; hide peer duplicates.
-                    canonical_relationship.is_logical = False
-                    canonical_relationship.intermediate_structures = []
-
-                    existing_intermediates = [
-                        ROI_Type(int(roi))
-                        for roi in member_relationship.intermediate_structures
-                        if int(roi) != canonical_roi
-                    ]
-                    member_relationship.is_logical = True
-                    member_relationship.intermediate_structures = [
-                        ROI_Type(canonical_roi),
-                        *existing_intermediates,
-                    ]
-                    logger.debug(
-                        'Identified EQUAL-derived logical relationship: '
-                        'ROI %d -> ROI %d (via canonical ROI %d)',
-                        source_roi, member_roi, canonical_roi
+                        'ROI %d <-> ROI %d (via canonical ROI %d)',
+                        member_roi, external_roi, canonical_roi
                     )
 
         # Handle EQUAL relationships

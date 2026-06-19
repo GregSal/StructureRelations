@@ -1331,6 +1331,7 @@ async def get_diagram_data(request: MatrixRequest):
             raise HTTPException(status_code=400, detail='Structures not yet processed')
 
         structure_set = session_data.structure_set
+        structure_set.calculate_logical_flags()
 
         # Load node shape definitions and edge styles from diagram settings
         shape_map = {}
@@ -1695,7 +1696,149 @@ async def get_diagram_data(request: MatrixRequest):
                     ))
                     directional_edges_added += 1
         directional_ms = round((time.perf_counter() - directional_start) * 1000.0)
+
+        # Apply a final EQUAL-peer dedup pass at diagram time to ensure that
+        # only one representative edge per equal-component is shown as direct
+        # for the same external relationship.
+        volume_sorted_rois = [
+            int(structure.roi)
+            for structure in structure_set.get_structures_by_volume()
+        ]
+        volume_order = {
+            roi: index for index, roi in enumerate(volume_sorted_rois)
+        }
+
+        equal_adjacency: dict[int, set[int]] = {
+            int(node.id): set() for node in nodes
+        }
+        for edge in edges:
+            if edge.relation_type != 'EQUAL':
+                continue
+            from_roi = int(edge.from_node)
+            to_roi = int(edge.to_node)
+            equal_adjacency.setdefault(from_roi, set()).add(to_roi)
+            equal_adjacency.setdefault(to_roi, set()).add(from_roi)
+
+        equal_components: list[set[int]] = []
+        visited_equal: set[int] = set()
+        for roi in sorted(equal_adjacency.keys()):
+            if roi in visited_equal:
+                continue
+            stack = [roi]
+            component: set[int] = set()
+            while stack:
+                current = stack.pop()
+                if current in visited_equal:
+                    continue
+                visited_equal.add(current)
+                component.add(current)
+                stack.extend(equal_adjacency.get(current, set()))
+            if len(component) > 1:
+                equal_components.append(component)
+
+        edges_to_remove: set[int] = set()
+        for component in equal_components:
+            canonical_roi = min(
+                component,
+                key=lambda roi: (volume_order.get(roi, float('inf')), roi),
+            )
+            external_rois = sorted(visible_rois - component)
+
+            for external_roi in external_rois:
+                grouped_candidates: dict[tuple[str, str], list[tuple[int, int]]] = {}
+
+                for index, edge in enumerate(edges):
+                    if edge.relation_type == 'EQUAL':
+                        continue
+
+                    from_roi = int(edge.from_node)
+                    to_roi = int(edge.to_node)
+                    member_roi: Optional[int] = None
+                    direction_key: Optional[str] = None
+
+                    if from_roi == external_roi and to_roi in component:
+                        member_roi = to_roi
+                        direction_key = (
+                            'symmetric'
+                            if edge.relation_type in symmetric_relations
+                            else 'external_to_member'
+                        )
+                    elif to_roi == external_roi and from_roi in component:
+                        member_roi = from_roi
+                        direction_key = (
+                            'symmetric'
+                            if edge.relation_type in symmetric_relations
+                            else 'member_to_external'
+                        )
+                    else:
+                        continue
+
+                    group_key = (edge.relation_type, direction_key)
+                    grouped_candidates.setdefault(group_key, []).append(
+                        (index, member_roi)
+                    )
+
+                for _, candidates in grouped_candidates.items():
+                    if len(candidates) <= 1:
+                        continue
+
+                    canonical_entry = next(
+                        (
+                            (index, member)
+                            for index, member in candidates
+                            if member == canonical_roi
+                        ),
+                        None,
+                    )
+                    if canonical_entry is None:
+                        # If canonical isn't visible in this relationship group,
+                        # do not force dedup because logical derivation may not
+                        # be available to the user in the current view.
+                        continue
+
+                    keep_index = canonical_entry[0]
+                    for edge_index, member_roi in candidates:
+                        if edge_index == keep_index:
+                            continue
+
+                        duplicate_edge = edges[edge_index]
+                        duplicate_edge.is_logical = True
+                        if not duplicate_edge.label.startswith('['):
+                            duplicate_edge.label = f'[{duplicate_edge.label}]'
+
+                        if request.logical_relations_mode == 'faded':
+                            relation_style = edge_styles.get(
+                                duplicate_edge.relation_type,
+                                {'color': duplicate_edge.color},
+                            )
+                            duplicate_edge.color = hex_to_rgba(
+                                relation_style.get('color', duplicate_edge.color),
+                                logical_opacity,
+                            )
+
+                        if request.logical_relations_mode in {'hide', 'limited'}:
+                            edges_to_remove.add(edge_index)
+
+        if edges_to_remove:
+            edges = [
+                edge for index, edge in enumerate(edges)
+                if index not in edges_to_remove
+            ]
+
         edge_build_ms = round((time.perf_counter() - edge_build_start) * 1000.0)
+
+        edge_debug_lines = [
+            (
+                f'{edge.from_node}->{edge.to_node} '
+                f'type={edge.relation_type} logical={edge.is_logical}'
+            )
+            for edge in edges
+        ]
+        logger.info(
+            'Diagram edge debug (%d edges): %s',
+            len(edges),
+            ', '.join(edge_debug_lines),
+        )
 
         total_ms = round((time.perf_counter() - request_start) * 1000.0)
         await connection_manager.send_status_line(
