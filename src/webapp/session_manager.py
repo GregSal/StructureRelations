@@ -4,6 +4,7 @@ Handles persistent storage, expiration, and disk usage management of user sessio
 '''
 import pickle
 import logging
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -55,21 +56,31 @@ class SessionManager:
 
     Attributes:
         sessions_dir (Path): Directory for storing session pickle files.
-        MAX_DISK_SIZE (int): Maximum total size in bytes (250 MB).
-        WARN_DISK_SIZE (int): Warning threshold in bytes (100 MB).
-        SESSION_EXPIRY (timedelta): Session expiration time (2 hours).
+        max_disk_size (int): Maximum total size in bytes.
+        warn_disk_size (int): Warning threshold in bytes.
+        session_expiry (timedelta): Session expiration time.
     '''
 
-    MAX_DISK_SIZE = 250 * 1024 * 1024  # 250 MB
-    WARN_DISK_SIZE = 100 * 1024 * 1024  # 100 MB
-    SESSION_EXPIRY = timedelta(hours=2)
+    DEFAULT_MAX_DISK_SIZE_MB = 2048
+    DEFAULT_WARN_DISK_SIZE_MB = 500
+    DEFAULT_SESSION_EXPIRY_HOURS = 8
 
-    def __init__(self, sessions_dir: Path = None):
+    MAX_DISK_SIZE = DEFAULT_MAX_DISK_SIZE_MB * 1024 * 1024
+    WARN_DISK_SIZE = DEFAULT_WARN_DISK_SIZE_MB * 1024 * 1024
+    SESSION_EXPIRY = timedelta(hours=DEFAULT_SESSION_EXPIRY_HOURS)
+
+    def __init__(
+        self,
+        sessions_dir: Path = None,
+        settings_file: Optional[Path] = None,
+    ):
         '''Initialize the SessionManager.
 
         Args:
             sessions_dir (Path, optional): Directory for session storage.
                 Defaults to './webapp_sessions'.
+            settings_file (Path, optional): Path to runtime settings JSON.
+                Defaults to 'src/webapp/config/webapp_settings.json'.
         '''
         if sessions_dir is None:
             sessions_dir = Path('webapp_sessions')
@@ -77,11 +88,77 @@ class SessionManager:
         self.sessions_dir = Path(sessions_dir)
         self.sessions_dir.mkdir(exist_ok=True)
 
+        if settings_file is None:
+            settings_file = Path(__file__).parent / 'config' / 'webapp_settings.json'
+        self.settings_file = Path(settings_file)
+
+        self.max_disk_size = self.MAX_DISK_SIZE
+        self.warn_disk_size = self.WARN_DISK_SIZE
+        self.session_expiry = self.SESSION_EXPIRY
+        self._load_runtime_settings()
+
         # In-memory cache of session metadata
         self._sessions: Dict[str, SessionData] = {}
 
         # Load existing sessions on startup
         self._load_existing_sessions()
+
+    def _load_runtime_settings(self) -> None:
+        '''Load runtime session settings from JSON with validation.'''
+        if not self.settings_file.exists():
+            logger.info(
+                'Session settings file not found at %s, using defaults',
+                self.settings_file,
+            )
+            return
+
+        try:
+            with open(self.settings_file, 'r', encoding='utf-8') as settings_handle:
+                config = json.load(settings_handle)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(
+                'Failed loading session settings from %s (%s); using defaults',
+                self.settings_file,
+                e,
+            )
+            return
+
+        settings = config.get('session_storage', config)
+
+        default_max_mb = self.DEFAULT_MAX_DISK_SIZE_MB
+        default_warn_mb = self.DEFAULT_WARN_DISK_SIZE_MB
+        default_expiry_h = self.DEFAULT_SESSION_EXPIRY_HOURS
+
+        max_mb = settings.get('max_disk_size_mb', default_max_mb)
+        warn_mb = settings.get('warn_disk_size_mb', default_warn_mb)
+        expiry_h = settings.get('session_expiry_hours', default_expiry_h)
+
+        try:
+            max_mb = float(max_mb)
+            warn_mb = float(warn_mb)
+            expiry_h = float(expiry_h)
+
+            if max_mb <= 0 or warn_mb <= 0 or expiry_h <= 0:
+                raise ValueError('all values must be positive')
+            if warn_mb >= max_mb:
+                raise ValueError('warn_disk_size_mb must be less than max_disk_size_mb')
+        except (TypeError, ValueError) as e:
+            logger.warning(
+                'Invalid session settings in %s (%s); using defaults',
+                self.settings_file,
+                e,
+            )
+            return
+
+        self.max_disk_size = int(max_mb * 1024 * 1024)
+        self.warn_disk_size = int(warn_mb * 1024 * 1024)
+        self.session_expiry = timedelta(hours=expiry_h)
+        logger.info(
+            'Session settings loaded: max=%.1f MB warn=%.1f MB expiry=%.1f h',
+            max_mb,
+            warn_mb,
+            expiry_h,
+        )
 
     def _load_existing_sessions(self):
         '''Load existing session metadata from disk on startup.'''
@@ -100,7 +177,7 @@ class SessionManager:
 
         disk_usage = self.get_disk_usage()
         num_expired = sum(1 for s in self._sessions.values()
-                         if datetime.now() - s.last_accessed > self.SESSION_EXPIRY)
+                         if datetime.now() - s.last_accessed > self.session_expiry)
 
         logger.info(
             f'Loaded {len(self._sessions)} sessions, '
@@ -133,7 +210,7 @@ class SessionManager:
         '''
         disk_usage = self.get_disk_usage()
 
-        if disk_usage <= self.MAX_DISK_SIZE:
+        if disk_usage <= self.max_disk_size:
             return
 
         logger.info(f'Disk usage {disk_usage/(1024*1024):.1f} MB exceeds limit, enforcing cleanup')
@@ -144,7 +221,7 @@ class SessionManager:
         expired_sessions = [
             (session_id, session_data)
             for session_id, session_data in self._sessions.items()
-            if now - session_data.last_accessed > self.SESSION_EXPIRY
+            if now - session_data.last_accessed > self.session_expiry
         ]
 
         for session_id, session_data in expired_sessions:
@@ -153,7 +230,7 @@ class SessionManager:
 
         # Check if we're now under the limit
         disk_usage = self.get_disk_usage()
-        if disk_usage <= self.MAX_DISK_SIZE:
+        if disk_usage <= self.max_disk_size:
             logger.info(f'Disk usage now {disk_usage/(1024*1024):.1f} MB after deleting expired sessions')
             return
 
@@ -164,7 +241,7 @@ class SessionManager:
         )
 
         for session_id, session_data in sessions_by_age:
-            if disk_usage <= self.MAX_DISK_SIZE:
+            if disk_usage <= self.max_disk_size:
                 break
 
             file_size = self._get_session_file_size(session_id)
@@ -301,7 +378,7 @@ class SessionManager:
         session_data = self._sessions[session_id]
 
         # Check if expired
-        if datetime.now() - session_data.last_accessed > self.SESSION_EXPIRY:
+        if datetime.now() - session_data.last_accessed > self.session_expiry:
             logger.info(f'Session {session_id} has expired')
             self.delete_session(session_id)
             return None
@@ -364,8 +441,8 @@ class SessionManager:
         return {
             'usage_bytes': usage,
             'usage_mb': usage / (1024 * 1024),
-            'limit_mb': self.MAX_DISK_SIZE / (1024 * 1024),
-            'warn_mb': self.WARN_DISK_SIZE / (1024 * 1024),
-            'is_warning': usage > self.WARN_DISK_SIZE,
-            'is_over_limit': usage > self.MAX_DISK_SIZE
+            'limit_mb': self.max_disk_size / (1024 * 1024),
+            'warn_mb': self.warn_disk_size / (1024 * 1024),
+            'is_warning': usage > self.warn_disk_size,
+            'is_over_limit': usage > self.max_disk_size
         }
