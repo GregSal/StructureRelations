@@ -752,6 +752,12 @@ class StructureSet:
         '''
         logger.info('Calculating logical flags for relationships')
 
+        # Recompute logical annotations from scratch each time.
+        for _, _, edge_data in self.relationship_graph.edges(data=True):
+            relationship = edge_data['relationship']
+            relationship.is_logical = False
+            relationship.intermediate_structures = []
+
         # Build transitive subgraph
         transitive_graph = self._build_transitive_subgraph()
 
@@ -759,9 +765,12 @@ class StructureSet:
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
             relationship = edge_data['relationship']
+            rel_type = relationship.relationship_type
 
             # Skip self-relationships and already marked logical
             if relationship.is_identical or relationship.is_logical:
+                continue
+            if rel_type and rel_type.relation_type == 'EQUAL':
                 continue
 
             # Check if both ROIs exist in transitive subgraph
@@ -798,6 +807,8 @@ class StructureSet:
             rel_type = relationship.relationship_type
             if not rel_type:
                 continue
+            if rel_type.relation_type == 'EQUAL':
+                continue
 
             if rel_type.relation_type not in implied_graph_cache:
                 implied_graph_cache[rel_type.relation_type] = (
@@ -829,6 +840,181 @@ class StructureSet:
                     roi_a, roi_b, intermediate_structures
                 )
 
+        # Handle EQUAL relationships by equal-components. Keep EQUAL direct,
+        # but mark duplicate non-EQUAL peer relationships as logical.
+        equal_graph = nx.Graph()
+        for roi_a, roi_b, edge_data in self.relationship_graph.edges(
+                data=True):
+            relationship = edge_data['relationship']
+            if relationship.is_identical:
+                continue
+
+            rel_type = relationship.relationship_type
+            if rel_type and rel_type.relation_type == 'EQUAL':
+                equal_graph.add_edge(roi_a, roi_b)
+
+        equal_components = [
+            component
+            for component in nx.connected_components(equal_graph)
+            if len(component) > 1
+        ]
+
+        sorted_rois = [structure.roi for structure in self.get_structures_by_volume()]
+        sort_order = {
+            roi: index for index, roi in enumerate(sorted_rois)
+        }
+
+        def get_effective_relationship(
+                source_roi: ROI_Type,
+                target_roi: ROI_Type,
+        ) -> tuple[Optional[StructureRelationship], Optional[RelationshipType]]:
+            '''Get relationship type from source->target perspective.
+
+            Returns the stored relationship object and effective relationship
+            type from source to target. If only reverse edge exists, effective
+            type is the complementary relation.
+            '''
+            if self.relationship_graph.has_edge(source_roi, target_roi):
+                relationship = self.relationship_graph[source_roi][target_roi][
+                    'relationship']
+                return relationship, relationship.relationship_type
+
+            if self.relationship_graph.has_edge(target_roi, source_roi):
+                relationship = self.relationship_graph[target_roi][source_roi][
+                    'relationship']
+                rel_type = relationship.relationship_type
+                if rel_type is None:
+                    return relationship, None
+                return relationship, rel_type.complementary
+
+            return None, None
+
+        for component in equal_components:
+            canonical_roi = min(
+                component,
+                key=lambda roi: (sort_order.get(roi, float('inf')), roi),
+            )
+            component_set = set(component)
+
+            # For EQUAL cliques, keep canonical links direct and make
+            # non-canonical peer links logical (derived via canonical).
+            peer_rois = sorted(
+                [roi for roi in component_set if roi != canonical_roi],
+                key=lambda roi: (sort_order.get(roi, float('inf')), roi),
+            )
+            for i, roi_a in enumerate(peer_rois):
+                for roi_b in peer_rois[i + 1:]:
+                    peer_relationship, peer_type = get_effective_relationship(
+                        roi_a,
+                        roi_b,
+                    )
+                    if (
+                        peer_relationship is None
+                        or peer_type is None
+                        or peer_type.relation_type != 'EQUAL'
+                    ):
+                        continue
+                    peer_relationship.is_logical = True
+                    peer_relationship.intermediate_structures = [
+                        ROI_Type(canonical_roi),
+                    ]
+
+            for member_roi in component_set:
+                if member_roi == canonical_roi:
+                    continue
+
+                # Mirror outgoing duplicates: member -> target
+                for target_roi in self.relationship_graph.successors(
+                        member_roi):
+                    if target_roi in component_set:
+                        continue
+
+                    member_relationship = self.relationship_graph[
+                        member_roi][target_roi]['relationship']
+                    member_type = member_relationship.relationship_type
+                    if (
+                        member_type is None
+                        or member_type.relation_type == 'EQUAL'
+                    ):
+                        continue
+                    canonical_relationship, canonical_type = (
+                        get_effective_relationship(canonical_roi, target_roi)
+                    )
+                    if (
+                        canonical_relationship is None
+                        or canonical_type is None
+                        or canonical_type.relation_type == 'EQUAL'
+                        or canonical_type.relation_type
+                        != member_type.relation_type
+                    ):
+                        continue
+
+                    # Keep canonical edge direct; hide peer duplicates.
+                    canonical_relationship.is_logical = False
+                    canonical_relationship.intermediate_structures = []
+
+                    existing_intermediates = [
+                        ROI_Type(int(roi))
+                        for roi in member_relationship.intermediate_structures
+                        if int(roi) != canonical_roi
+                    ]
+                    member_relationship.is_logical = True
+                    member_relationship.intermediate_structures = [
+                        ROI_Type(canonical_roi),
+                        *existing_intermediates,
+                    ]
+                    logger.debug(
+                        'Identified EQUAL-derived logical relationship: '
+                        'ROI %d -> ROI %d (via canonical ROI %d)',
+                        member_roi, target_roi, canonical_roi
+                    )
+
+                # Mirror incoming duplicates: source -> member
+                for source_roi in self.relationship_graph.predecessors(
+                        member_roi):
+                    if source_roi in component_set:
+                        continue
+
+                    member_relationship = self.relationship_graph[
+                        source_roi][member_roi]['relationship']
+                    member_type = member_relationship.relationship_type
+                    if (
+                        member_type is None
+                        or member_type.relation_type == 'EQUAL'
+                    ):
+                        continue
+                    canonical_relationship, canonical_type = (
+                        get_effective_relationship(source_roi, canonical_roi)
+                    )
+                    if (
+                        canonical_relationship is None
+                        or canonical_type is None
+                        or canonical_type.relation_type == 'EQUAL'
+                        or canonical_type.relation_type
+                        != member_type.relation_type
+                    ):
+                        continue
+
+                    # Keep canonical edge direct; hide peer duplicates.
+                    canonical_relationship.is_logical = False
+                    canonical_relationship.intermediate_structures = []
+
+                    existing_intermediates = [
+                        ROI_Type(int(roi))
+                        for roi in member_relationship.intermediate_structures
+                        if int(roi) != canonical_roi
+                    ]
+                    member_relationship.is_logical = True
+                    member_relationship.intermediate_structures = [
+                        ROI_Type(canonical_roi),
+                        *existing_intermediates,
+                    ]
+                    logger.debug(
+                        'Identified EQUAL-derived logical relationship: '
+                        'ROI %d -> ROI %d (via canonical ROI %d)',
+                        source_roi, member_roi, canonical_roi
+                    )
+
         # Handle EQUAL relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
@@ -839,27 +1025,8 @@ class StructureSet:
             rel_type = relationship.relationship_type
             if not rel_type or rel_type.relation_type != 'EQUAL':
                 continue
-
-            # Determine downstream (higher ROI number)
-            upstream_roi = min(roi_a, roi_b)
-            downstream_roi = max(roi_a, roi_b)
-
-            # Mark all outgoing edges from downstream as logical
-            for next_roi in self.relationship_graph.successors(
-                    downstream_roi):
-                if next_roi != upstream_roi:
-                    next_relationship = self.relationship_graph[
-                        downstream_roi][next_roi]['relationship']
-                    if not next_relationship.is_identical:
-                        next_relationship.is_logical = True
-                        next_relationship.intermediate_structures = [
-                            ROI_Type(upstream_roi)]
-                        logger.debug(
-                            'Identified EQUAL-derived logical '
-                            'relationship: ROI %d -> ROI %d '
-                            '(via EQUAL with ROI %d)',
-                            downstream_roi, next_roi, upstream_roi
-                        )
+            if not relationship.is_logical:
+                relationship.intermediate_structures = []
 
         logger.info('Logical flag calculation complete')
 

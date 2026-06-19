@@ -1579,8 +1579,6 @@ async def get_diagram_data(request: MatrixRequest):
                     logger.debug(f'  Filtering out {rel_type} relationship ({roi1},{roi2})')
                     continue
 
-                if rel_type == 'EQUAL':
-                    continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
                 if rel_type == 'UNKNOWN' and not request.show_unknown:
@@ -1658,8 +1656,6 @@ async def get_diagram_data(request: MatrixRequest):
                 # Debug logging
                 logger.debug('Checking from_roi=%s to to_roi=%s: relationship=%s', from_roi, to_roi, rel_type)
 
-                if rel_type == 'EQUAL':
-                    continue
                 if rel_type == 'DISJOINT' and not request.show_disjoint:
                     continue
                 if rel_type == 'UNKNOWN' and not request.show_unknown:

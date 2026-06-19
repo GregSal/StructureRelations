@@ -162,6 +162,7 @@ class TestLogicalEquals:
         # Check (1,2) is EQUAL
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
         assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert not rel_1_2.is_logical
 
         # Check (2,3) is logical
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
@@ -193,11 +194,78 @@ class TestLogicalEquals:
         # Check (1,2) is EQUAL
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
         assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert not rel_1_2.is_logical
 
         # Check (2,3) is logical
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
         assert rel_2_3 is not None
         assert rel_2_3.is_logical
+
+    def test_equal_trio_uses_canonical_for_external_edges(self):
+        '''Test: Equal trio keeps EQUAL direct and deduplicates peer edges.'''
+        slice_spacing = 1
+        sphere_a = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
+        sphere_b = make_sphere(roi_num=2, radius=6, spacing=slice_spacing)
+        sphere_c = make_sphere(roi_num=3, radius=6, spacing=slice_spacing)
+        sphere_inner = make_sphere(roi_num=4, radius=3, spacing=slice_spacing)
+
+        slice_data = sphere_a + sphere_b + sphere_c + sphere_inner
+        structures = StructureSet(slice_data)
+
+        # All equal-clique edges should remain direct.
+        rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
+        rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
+        rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
+
+        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_3.relationship_type.relation_type == 'EQUAL'
+        assert rel_2_3.relationship_type.relation_type == 'EQUAL'
+        assert not rel_1_2.is_logical
+        assert not rel_1_3.is_logical
+        assert rel_2_3.is_logical
+        assert ROI_Type(1) in rel_2_3.intermediate_structures
+
+        # Canonical ROI=1 should own direct CONTAINS->4 relation.
+        rel_1_4 = structures.get_relationship(ROI_Type(1), ROI_Type(4))
+        rel_2_4 = structures.get_relationship(ROI_Type(2), ROI_Type(4))
+        rel_3_4 = structures.get_relationship(ROI_Type(3), ROI_Type(4))
+
+        assert rel_1_4.relationship_type.relation_type == 'CONTAINS'
+        assert rel_2_4.relationship_type.relation_type == 'CONTAINS'
+        assert rel_3_4.relationship_type.relation_type == 'CONTAINS'
+        assert not rel_1_4.is_logical
+        assert rel_2_4.is_logical
+        assert rel_3_4.is_logical
+        assert ROI_Type(1) in rel_2_4.intermediate_structures
+        assert ROI_Type(1) in rel_3_4.intermediate_structures
+
+        # Limited mode hides logical duplicates when canonical is visible.
+        filtered_matrix, _ = structures.filter_relationships_by_logical_mode(
+            mode='limited',
+            visible_rois=[1, 2, 3, 4],
+        )
+        name_1 = structures.structures[1].name
+        name_2 = structures.structures[2].name
+        name_3 = structures.structures[3].name
+        name_4 = structures.structures[4].name
+
+        assert filtered_matrix.loc[name_4, name_1] is not None
+        assert filtered_matrix.loc[name_4, name_2] is None
+        assert filtered_matrix.loc[name_4, name_3] is None
+
+        # Limited mode also hides the logical EQUAL peer edge 2<->3.
+        assert filtered_matrix.loc[name_3, name_2] is None
+        assert filtered_matrix.loc[name_2, name_3] is None
+
+        # If canonical is hidden, peer logical duplicates should reappear.
+        filtered_matrix_hidden, _ = structures.filter_relationships_by_logical_mode(
+            mode='limited',
+            visible_rois=[2, 3, 4],
+        )
+        assert filtered_matrix_hidden.loc[name_4, name_2] is not None
+        assert filtered_matrix_hidden.loc[name_4, name_3] is not None
+        assert filtered_matrix_hidden.loc[name_3, name_2] is not None
+        assert filtered_matrix_hidden.loc[name_2, name_3] is not None
 
 
 class TestLogicalMixed:
