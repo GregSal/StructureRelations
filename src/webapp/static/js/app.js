@@ -2866,6 +2866,7 @@ class WebAppClient {
         const nodeFont = this.diagramOptions.font || {};
         const interaction = this.diagramOptions.interaction || {};
         const background = this.diagramOptions.Background || {};
+        const edgeLabelBackground = background.color || '#ffffff';
         const layoutSettings = this.diagramOptions.layout || {};
         this.latestDiagramData = data;
 
@@ -2941,7 +2942,9 @@ class WebAppClient {
             font: {
                 size: Number(nodeFont.edge_size || 12),
                 color: edge.color,
-                strokeWidth: 0
+                background: edgeLabelBackground,
+                strokeColor: edgeLabelBackground,
+                strokeWidth: 3
             },
             hidden: this.hiddenNodes.has(Number(edge.from_node)) || this.hiddenNodes.has(Number(edge.to_node)),
             smooth: {
