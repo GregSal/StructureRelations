@@ -12,7 +12,6 @@
         "LittleFoxTeam.vscode-python-test-adapter",
         "GitHub.copilot",
         "GitHub.copilot-chat",
-        "ms-python.isort",
         "streetsidesoftware.code-spell-checker",
         "ms-python.pylint",
         "ms-toolsai.datawrangler"
