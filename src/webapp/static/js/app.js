@@ -791,6 +791,7 @@ class WebAppClient {
                 const dicomType = struct.dicom_type || '';
                 const selectedByDefault = struct.selected_by_default !== false;
                 const filterReason = struct.filter_reason || '';
+                const hiddenByDefault = struct.hidden_by_default === true;
 
                 const item = document.createElement('div');
                 item.className = 'structure-item';
@@ -810,6 +811,8 @@ class WebAppClient {
                 `;
                 if (filterReason) {
                     item.title = `Deselected by filter: ${filterReason}`;
+                } else if (hiddenByDefault) {
+                    item.title = 'Will be hidden in diagram by default (filter rule)';
                 }
                 structuresList.appendChild(item);
                 if (selectedByDefault) {
@@ -1870,18 +1873,22 @@ class WebAppClient {
         // Collect unique DICOM types and create items.
         const dicomTypes = new Set();
         const items = [];
+        this.hiddenByDefaultRois = new Set(
+            (data.hidden_rois || []).map(r => parseInt(r))
+        );
 
         data.rows.forEach((roi, idx) => {
             const color = this.rgbToColor(data.colors[roi] || data.colors[String(roi)]);
             const name = data.row_names[idx];
             const dicomType = data.dicom_types ? (data.dicom_types[roi] || data.dicom_types[String(roi)] || '') : '';
             const codeMeaning = data.code_meanings ? (data.code_meanings[roi] || data.code_meanings[String(roi)] || '') : '';
+            const hiddenByDefault = this.hiddenByDefaultRois.has(parseInt(roi));
 
             if (dicomType) {
                 dicomTypes.add(dicomType);
             }
 
-            items.push({ roi, name, color, dicomType, codeMeaning });
+            items.push({ roi, name, color, dicomType, codeMeaning, hiddenByDefault });
         });
 
         items.sort((a, b) => {
@@ -2613,7 +2620,9 @@ class WebAppClient {
         this.structureItems.forEach(item => {
             const listItem = this.createDiagramListItem(item);
             list.appendChild(listItem);
-            this.diagramSelection.add(parseInt(item.roi));
+            if (!item.hiddenByDefault) {
+                this.diagramSelection.add(parseInt(item.roi));
+            }
         });
 
         this.diagramAppliedSelection = new Set(this.diagramSelection);
@@ -2646,8 +2655,12 @@ class WebAppClient {
 
         const metaText = metaParts.join(' • ');
 
+        if (item.hiddenByDefault) {
+            wrapper.title = 'Hidden in diagram by default (filter rule)';
+        }
+
         wrapper.innerHTML = `
-            <input type="checkbox" data-roi="${item.roi}" checked>
+            <input type="checkbox" data-roi="${item.roi}" ${item.hiddenByDefault ? '' : 'checked'}>
             <span class="item-color" style="background-color: ${item.color}"></span>
             <span class="item-id">${item.roi}</span>
             <span class="diagram-structure-text">

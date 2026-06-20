@@ -603,6 +603,7 @@ class DicomStructureFile:
         config_path, filter_config = self.load_structure_filter_rules(filter_file)
         self.structure_filter_config_path = config_path
 
+        _KNOWN_ACTIONS = {'exclude', 'hide'}
         rules = []
         for index, rule in enumerate(filter_config.get('rules', []), start=1):
             if not isinstance(rule, dict):
@@ -611,7 +612,10 @@ class DicomStructureFile:
                 continue
             if not rule.get('enabled', True):
                 continue
-            if _stringify_filter_value(rule.get('action', 'exclude')).lower() != 'exclude':
+            action = _stringify_filter_value(
+                rule.get('action', 'exclude')
+            ).lower()
+            if action not in _KNOWN_ACTIONS:
                 logger.warning('Skipping unsupported structure filter action %r '
                                'in rule %r', rule.get('action'),
                                rule.get('id', f'rule_{index}'))
@@ -620,11 +624,15 @@ class DicomStructureFile:
 
         report_rows = []
         for _, row in metadata.iterrows():
-            matched_rules = []
+            exclude_matches = []
+            hide_matches = []
             for index, rule in rules:
                 if not self._filter_rule_matches_row(row, rule):
                     continue
 
+                rule_action = _stringify_filter_value(
+                    rule.get('action', 'exclude')
+                ).lower()
                 rule_id = _stringify_filter_value(rule.get('id')) or f'rule_{index}'
                 field_name = _stringify_filter_value(rule.get('field'))
                 match_type = _stringify_filter_value(
@@ -644,8 +652,9 @@ class DicomStructureFile:
                         f"{companion_rule.get('value', companion_rule.get('pattern'))}"
                     )
 
-                matched_rules.append({
+                match_entry = {
                     'id': rule_id,
+                    'action': rule_action,
                     'description': _stringify_filter_value(
                         rule.get('description')
                     ) or rule_id,
@@ -655,12 +664,20 @@ class DicomStructureFile:
                     'reason': (
                         f'{field_name} {match_type} {rule_value}{companion_text}'
                     ),
-                })
+                }
+                if rule_action == 'hide':
+                    hide_matches.append(match_entry)
+                else:
+                    exclude_matches.append(match_entry)
 
-            filtered = bool(matched_rules)
+            # exclude takes priority: a structure matching both is excluded
+            filtered = bool(exclude_matches)
+            hidden = bool(hide_matches) and not filtered
+            matched_rules = exclude_matches + hide_matches
             report_rows.append({
                 **row.to_dict(),
                 'IsFiltered': filtered,
+                'IsHidden': hidden,
                 'SelectedByDefault': not filtered,
                 'MatchedRules': matched_rules,
                 'FilterReason': '; '.join(

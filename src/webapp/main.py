@@ -138,6 +138,7 @@ class MatrixResponse(BaseModel):
     structure_slices_interpolated: dict = Field(default_factory=dict)
     slice_relationships: dict = Field(default_factory=dict)
     faded_relationships: Optional[dict] = None
+    hidden_rois: List[int] = Field(default_factory=list)
 
 
 class DiagramNode(BaseModel):
@@ -513,6 +514,7 @@ async def preview_structures(request: SessionRequest):
                     filter_row.get('IsFiltered', False)
                 ),
                 'is_filtered': bool(filter_row.get('IsFiltered', False)),
+                'hidden_by_default': bool(filter_row.get('IsHidden', False)),
                 'filter_reason': filter_row.get('FilterReason', ''),
                 'matched_rules': filter_row.get('MatchedRules', []),
                 'num_contours': sum(
@@ -912,6 +914,31 @@ async def process_structure_set(
         )
         await asyncio.sleep(0)
 
+        # Determine which ROIs should be hidden in the diagram by default
+        try:
+            hide_filter_report = dicom_file.evaluate_structure_filters()
+            hidden_rois: list[int] = []
+            if not hide_filter_report.empty and 'IsHidden' in hide_filter_report.columns:
+                candidate_hidden = [
+                    int(roi)
+                    for roi, is_hidden
+                    in hide_filter_report['IsHidden'].items()
+                    if is_hidden
+                ]
+                selected_set = set(selected_rois) if selected_rois else None
+                hidden_rois = [
+                    roi for roi in candidate_hidden
+                    if selected_set is None or roi in selected_set
+                ]
+            session_manager.update_session_job_state(
+                session_id, hidden_rois=hidden_rois
+            )
+        except Exception as e:
+            logger.warning(
+                'Could not evaluate hide filters for session %s: %s',
+                session_id, e,
+            )
+
         # Filter contour points to only include selected ROIs
         if selected_rois:
             original_count = len(dicom_file.contour_points)
@@ -1199,6 +1226,7 @@ async def get_relationship_matrix(request: MatrixRequest):
             logical_relations_mode=request.logical_relations_mode,
             visible_rois=visible_rois
         )
+        matrix_dict['hidden_rois'] = list(getattr(session_data, 'hidden_rois', []) or [])
         matrix_generation_ms = round(
             (time.perf_counter() - matrix_generation_start) * 1000.0
         )

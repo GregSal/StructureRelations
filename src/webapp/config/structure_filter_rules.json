@@ -33,7 +33,14 @@
       "field": "DICOM Type",
       "match_type": "exact",
       "value": "Support"
+    },
+    {
+      "id": "hide-oar",
+      "description": "Hide OAR structures by default.",
+      "action": "hide",
+      "field": "DICOM Type",
+      "match_type": "exact",
+      "value": "ORGAN"
     }
-
   ]
 }
