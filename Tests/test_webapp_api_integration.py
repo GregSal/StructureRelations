@@ -3,6 +3,7 @@
 import pytest
 import os
 import asyncio
+import json
 import shutil
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi.testclient import TestClient
 from relations import RELATION_SCHEMA_VERSION, RELATIONSHIP_TYPES
 from relationships import StructureRelationship
 from structure_set import StructureSet
+import dicom as dicom_module
 from webapp.main import app
 import webapp.main as web_main
 from webapp.session_manager import SessionData, SessionManager
@@ -307,6 +309,64 @@ def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_pat
 
     assert response.status_code == 200
     assert response.json()['patient_info']['file_name'] == 'RS.GJS_Struct_Tests.Relations.dcm'
+
+
+def test_preview_applies_structure_filter_defaults(monkeypatch, tmp_path):
+    '''Preview should deselect structures matched by JSON filter rules.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'preview-filter-defaults'
+
+    source_path = Path(__file__).parent / 'RS.Pros_Equal.dcm'
+    copied_path = tmp_path / 'RS.Pros_Equal.dcm'
+    shutil.copy(source_path, copied_path)
+
+    filter_path = tmp_path / 'structure_filter_rules.json'
+    filter_path.write_text(
+        json.dumps({
+            'rules': [
+                {
+                    'id': 'bowel-exact',
+                    'field': 'Structure ID',
+                    'match_type': 'exact',
+                    'value': 'Bowel',
+                },
+                {
+                    'id': 'artifact-z-prefix',
+                    'field': 'Structure ID',
+                    'match_type': 'prefix',
+                    'value': 'Z',
+                },
+            ]
+        }),
+        encoding='utf-8',
+    )
+    monkeypatch.setattr(
+        dicom_module,
+        'DEFAULT_STRUCTURE_FILTERS_PATH',
+        filter_path,
+    )
+
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path=str(copied_path), structure_set=None),
+    )
+
+    response = client.post('/api/preview', json={'session_id': session_id})
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    bowel = next(
+        item for item in payload['structures'] if item['name'] == 'Bowel'
+    )
+    z1 = next(item for item in payload['structures'] if item['name'] == 'Z1')
+
+    assert bowel['selected_by_default'] is False
+    assert z1['selected_by_default'] is False
+    assert any(
+        item['structure_id'] == 'Bowel'
+        for item in payload['filtered_structures']
+    )
 
 
 def test_plot_contours_excludes_interpolated_by_default(monkeypatch, tmp_path):

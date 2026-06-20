@@ -4,6 +4,7 @@ These tests verify that DicomStructureFile correctly loads DICOM RT Structure
 files and extracts structure information without using deprecated DICOM fields.
 '''
 from pathlib import Path
+import json
 import shutil
 
 import pytest
@@ -177,6 +178,84 @@ class TestDicomStructureFile:
         for roi_num in roi_labels.index:
             assert roi_num in structure_names
             assert roi_labels.loc[roi_num, 'StructureName'] == structure_names[roi_num]
+
+    def test_json_structure_filters_record_matching_rules(self, tmp_path):
+        '''JSON filters should track which rule deselected each structure.'''
+        filter_path = tmp_path / 'structure_filter_rules.json'
+        filter_path.write_text(
+            json.dumps({
+                'rules': [
+                    {
+                        'id': 'bowel-by-code-meaning',
+                        'field': 'Code Meaning',
+                        'match_type': 'exact',
+                        'value': 'Intestine',
+                        'with': {
+                            'field': 'DICOM Type',
+                            'match_type': 'exact',
+                            'value': 'ORGAN',
+                        },
+                    },
+                    {
+                        'id': 'artifact-z-prefix',
+                        'field': 'Structure ID',
+                        'match_type': 'prefix',
+                        'value': 'Z',
+                    },
+                    {
+                        'id': 'avoidance-rectum-suffix',
+                        'field': 'Structure ID',
+                        'match_type': 'suffix',
+                        'value': 'Rectum',
+                        'with': {
+                            'field': 'DICOM Type',
+                            'match_type': 'exact',
+                            'value': 'AVOIDANCE',
+                        },
+                    },
+                    {
+                        'id': 'ptv-regex',
+                        'field': 'Structure ID',
+                        'match_type': 'regex',
+                        'value': '^PTV 5[68]$',
+                    },
+                ]
+            }),
+            encoding='utf-8',
+        )
+
+        dicom_file = DicomStructureFile(
+            top_dir=Path(__file__).parent,
+            file_name='RS.Pros_Equal.dcm',
+        )
+
+        excluded = dicom_file.get_excluded_structures(filter_path)
+        excluded_names = set(excluded['StructureID'])
+
+        assert {'Bowel', 'Z1', 'PTV 56', 'PTV 68'}.issubset(excluded_names)
+        assert 'Rectum' not in excluded_names
+
+        bowel_row = excluded.loc[excluded['StructureID'] == 'Bowel'].iloc[0]
+        assert any(
+            rule['id'] == 'bowel-by-code-meaning'
+            for rule in bowel_row['MatchedRules']
+        )
+
+        rectum_row = excluded.loc[
+            excluded['StructureID'] == 'Avoid a Rectum'
+        ].iloc[0]
+        assert any(
+            rule['id'] == 'avoidance-rectum-suffix'
+            for rule in rectum_row['MatchedRules']
+        )
+
+        bowel_roi = int(bowel_row['ROINumber'])
+        filtered_contours = dicom_file.filter_exclusions(filter_path)
+        remaining_rois = {int(cp['ROI']) for cp in filtered_contours}
+
+        assert bowel_roi not in remaining_rois
+        assert dicom_file.structure_filter_config_path == filter_path
+        assert not dicom_file.structure_filter_report.empty
 
 
 class TestDicomStructureFileWithDifferentFiles:

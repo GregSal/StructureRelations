@@ -778,6 +778,7 @@ class WebAppClient {
             // Populate structures list
             const structuresList = document.getElementById('structuresList');
             structuresList.innerHTML = '';
+            this.selectedStructures.clear();
 
             data.structures.forEach(struct => {
                 // Convert RGB array to CSS color string
@@ -788,13 +789,15 @@ class WebAppClient {
                 const name = struct.name || '';
                 const label = struct.code_meaning || struct.name;
                 const dicomType = struct.dicom_type || '';
+                const selectedByDefault = struct.selected_by_default !== false;
+                const filterReason = struct.filter_reason || '';
 
                 const item = document.createElement('div');
                 item.className = 'structure-item';
                 item.innerHTML = `
                     <input type="checkbox"
                            data-roi="${struct.roi}"
-                           checked>
+                           ${selectedByDefault ? 'checked' : ''}>
                     <div class="structure-color"
                          style="background-color: ${colorStr}"></div>
                     <div class="structure-info">
@@ -805,8 +808,13 @@ class WebAppClient {
                         <span class="structure-contours">${struct.num_contours} contour${struct.num_contours !== 1 ? 's' : ''}</span>
                     </div>
                 `;
+                if (filterReason) {
+                    item.title = `Deselected by filter: ${filterReason}`;
+                }
                 structuresList.appendChild(item);
-                this.selectedStructures.add(struct.roi);
+                if (selectedByDefault) {
+                    this.selectedStructures.add(struct.roi);
+                }
             });
 
             this.updateStructureSetBadge();
