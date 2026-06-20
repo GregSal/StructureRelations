@@ -41,6 +41,15 @@
       "field": "DICOM Type",
       "match_type": "exact",
       "value": "ORGAN"
+    },
+    {
+      "id": "hide-Avoidance",
+      "description": "Hide OAR structures by default.",
+      "action": "hide",
+      "field": "DICOM Type",
+      "match_type": "exact",
+      "value": "AVOIDANCE"
     }
+
   ]
 }
