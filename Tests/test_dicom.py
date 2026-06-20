@@ -190,12 +190,7 @@ class TestDicomStructureFile:
                         'field': 'Code Meaning',
                         'match_type': 'exact',
                         'value': 'Intestine',
-                        'with': {
-                            'field': 'DICOM Type',
-                            'match_type': 'exact',
-                            'value': 'ORGAN',
                         },
-                    },
                     {
                         'id': 'artifact-z-prefix',
                         'field': 'Structure ID',
@@ -232,7 +227,8 @@ class TestDicomStructureFile:
         excluded = dicom_file.get_excluded_structures(filter_path)
         excluded_names = set(excluded['StructureID'])
 
-        assert {'Bowel', 'Z1', 'PTV 56', 'PTV 68'}.issubset(excluded_names)
+        assert {'Bowel', 'Z1', 'Z2', 'Z3', 'PTV 56',
+                'Avoid a Rectum','Avoid b Rectum'}.issubset(excluded_names)
         assert 'Rectum' not in excluded_names
 
         bowel_row = excluded.loc[excluded['StructureID'] == 'Bowel'].iloc[0]
