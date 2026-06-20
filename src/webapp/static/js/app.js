@@ -35,6 +35,7 @@ class WebAppClient {
         this.latestDiagramData = null;
         this.hiddenNodes = new Set();    // ROI ids hidden via context menu
         this.hiddenLabels = new Set();   // ROI ids with label hidden
+        this.hiddenEdges = new Set();    // edge keys hidden via context menu
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
         this._dragFrozen = [];
@@ -2886,6 +2887,11 @@ class WebAppClient {
         this.hiddenNodes = new Set(Array.from(this.hiddenNodes).filter(id => renderedNodeIds.has(Number(id))));
         this.hiddenLabels = new Set(Array.from(this.hiddenLabels).filter(id => renderedNodeIds.has(Number(id))));
         this.fixedNodes = new Set(Array.from(this.fixedNodes).filter(id => renderedNodeIds.has(Number(id))));
+
+        const renderedEdgeKeys = new Set(data.edges.map(edge => this._buildEdgeKey(edge)));
+        this.hiddenEdges = new Set(
+            Array.from(this.hiddenEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
@@ -2929,9 +2935,12 @@ class WebAppClient {
             const displayLabel = edge.is_logical && baseLabel && !String(baseLabel).startsWith('[')
                 ? `[${baseLabel}]`
                 : baseLabel;
+            const edgeKey = this._buildEdgeKey(edge);
+            const isHiddenByToggle = this.hiddenEdges.has(edgeKey);
             return ({
             from: edge.from_node,
             to: edge.to_node,
+            _edgeKey: edgeKey,
             label: showLabels ? displayLabel : '',
             originalLabel: displayLabel,
             title: this.buildEdgeTooltip(edge, data.nodes),
@@ -2946,7 +2955,9 @@ class WebAppClient {
                 strokeColor: edgeLabelBackground,
                 strokeWidth: 3
             },
-            hidden: this.hiddenNodes.has(Number(edge.from_node)) || this.hiddenNodes.has(Number(edge.to_node)),
+            hidden: isHiddenByToggle
+                || this.hiddenNodes.has(Number(edge.from_node))
+                || this.hiddenNodes.has(Number(edge.to_node)),
             smooth: {
                 type: 'continuous',
                 roundness: 0.5
@@ -2998,7 +3009,7 @@ class WebAppClient {
         this._restoreDiagramCoordinates(positionSnapshot);
         this._applyNodeVisibilityState();
 
-        // Right-click: show node context menu
+        // Right-click: show node/edge context menu
         this.network.on('oncontext', (params) => {
             params.event.preventDefault();
             this._dismissContextMenu();
@@ -3007,6 +3018,13 @@ class WebAppClient {
             const targetNode = hitNode ?? (params.nodes.length > 0 ? params.nodes[0] : null);
             if (targetNode !== null && targetNode !== undefined) {
                 this._showNodeContextMenu(Number(targetNode), params.event);
+                return;
+            }
+
+            const hitEdge = domPoint ? this.network.getEdgeAt(domPoint) : null;
+            const targetEdge = hitEdge ?? (params.edges.length > 0 ? params.edges[0] : null);
+            if (targetEdge !== null && targetEdge !== undefined) {
+                this._showEdgeContextMenu(targetEdge, params.event);
             }
         });
 
@@ -3072,6 +3090,16 @@ class WebAppClient {
             this._contextMenu.remove();
             this._contextMenu = null;
         }
+    }
+
+    _buildEdgeKey(edge) {
+        if (!edge) return null;
+        const fromNode = Number(edge.from_node ?? edge.from);
+        const toNode = Number(edge.to_node ?? edge.to);
+        const relationType = String(edge.relation_type ?? edge.relationType ?? '').toUpperCase();
+        const label = String(edge.originalLabel ?? edge.label ?? '');
+        const isLogical = Boolean(edge.is_logical ?? edge.isLogical);
+        return [fromNode, toNode, relationType, isLogical ? 1 : 0, label].join('|');
     }
 
     _showNodeContextMenu(roi, event) {
@@ -3148,6 +3176,23 @@ class WebAppClient {
         document.addEventListener('mousedown', dismiss, true);
     }
 
+    _showEdgeContextMenu(edgeId, event) {
+        if (!this.network) return;
+        const edge = this.network.body.data.edges.get(edgeId);
+        if (!edge || !edge._edgeKey) return;
+
+        const edgeKey = edge._edgeKey;
+        const isHidden = this.hiddenEdges.has(edgeKey);
+
+        this._showSimpleContextMenu([
+            {
+                label: isHidden ? 'Show Relation' : 'Hide Relation',
+                active: isHidden,
+                action: () => this._ctxToggleEdgeVisibility(edgeId),
+            },
+        ], event);
+    }
+
     _ctxToggleFixed(roi) {
         if (!this.network) return;
         if (this.fixedNodes.has(roi)) {
@@ -3186,6 +3231,22 @@ class WebAppClient {
                 { id: roi, _originalLabel: original, label: '' },
             ]);
         }
+    }
+
+    _ctxToggleEdgeVisibility(edgeId) {
+        if (!this.network) return;
+
+        const edge = this.network.body.data.edges.get(edgeId);
+        if (!edge || !edge._edgeKey) return;
+
+        const edgeKey = edge._edgeKey;
+        if (this.hiddenEdges.has(edgeKey)) {
+            this.hiddenEdges.delete(edgeKey);
+        } else {
+            this.hiddenEdges.add(edgeKey);
+        }
+
+        this._applyNodeVisibilityState();
     }
 
     _applyNodeVisibilityState() {
@@ -3231,9 +3292,13 @@ class WebAppClient {
         const edgeUpdates = edgesDataSet.get().map((edge) => {
             const fromNode = Number(edge.from);
             const toNode = Number(edge.to);
+            const edgeKey = edge._edgeKey;
+            const hiddenByEdgeToggle = edgeKey ? this.hiddenEdges.has(edgeKey) : false;
             return {
                 id: edge.id,
-                hidden: hiddenNodeIdsFromState.has(fromNode) || hiddenNodeIdsFromState.has(toNode),
+                hidden: hiddenByEdgeToggle
+                    || hiddenNodeIdsFromState.has(fromNode)
+                    || hiddenNodeIdsFromState.has(toNode),
             };
         });
         if (edgeUpdates.length > 0) {
@@ -4304,6 +4369,7 @@ class WebAppClient {
         this.sortableInitScheduled = false;
         this.hiddenNodes.clear();
         this.hiddenLabels.clear();
+        this.hiddenEdges.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
         this.summaryRowOrder = [];
