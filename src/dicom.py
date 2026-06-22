@@ -1,9 +1,10 @@
 '''DICOM Structure File handling module.
 '''
 # %% Imports
-from typing import Optional, List
+from typing import Any, Optional, List
 from pathlib import Path
 import logging
+import json
 import re
 
 import numpy as np
@@ -18,6 +19,23 @@ from types_and_classes import ROI_Type, SliceIndexType
 #logging.basicConfig(level=logging.INFO)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+DEFAULT_STRUCTURE_FILTERS_PATH = (
+    Path(__file__).parent / 'webapp' / 'config' / 'structure_filter_rules.json'
+)
+
+STRUCTURE_FILTER_FIELDS = {
+    'Structure Code',
+    'Coding Scheme',
+    'Code Meaning',
+    'Structure Name',
+    'DICOM Type',
+    'Density',
+    'ROI Physical Property',
+    'Structure ID',
+    'Generation Method',
+    'Generation Description',
+}
 
 _UPLOAD_PREFIX_PATTERN = re.compile(
     r'^(?:'
@@ -36,6 +54,20 @@ def clean_uploaded_file_name(file_name: str | Path) -> str:
         if match is None:
             return cleaned_name
         cleaned_name = match.group(1)
+
+
+def _stringify_filter_value(value: object) -> str:
+    '''Normalize filter values to strings for matching.'''
+    if value is None:
+        return ''
+
+    try:
+        if pd.isna(value):
+            return ''
+    except TypeError:
+        pass
+
+    return str(value)
 
 
 class DicomStructureFile:
@@ -110,6 +142,8 @@ class DicomStructureFile:
 
         # Calculate resolution (may use structure dimensions as fallback)
         self.resolution = self.calculate_structure_resolution()
+        self.structure_filter_report = pd.DataFrame()
+        self.structure_filter_config_path: Optional[Path] = None
 
         # Round contour points based on calculated resolution
         #if self.resolution is not None:
@@ -300,6 +334,115 @@ class DicomStructureFile:
             structure_data[ROI_Type(roi.ROINumber)] = str(roi.ROIName)
         return structure_data
 
+    def get_structure_filter_metadata(self) -> pd.DataFrame:
+        '''Build a per-ROI metadata table for JSON-driven structure filters.'''
+        if not self.is_structure_file():
+            logger.warning('File %s is not a RT Structure file', self.file_name)
+            return pd.DataFrame()
+
+        contour_counts: dict[ROI_Type, int] = {}
+        for contour_point in self.contour_points or []:
+            roi_number = ROI_Type(contour_point['ROI'])
+            contour_counts[roi_number] = contour_counts.get(roi_number, 0) + 1
+
+        metadata_by_roi: dict[ROI_Type, dict[str, Any]] = {}
+
+        for roi_number, structure_id in self.structure_names.items():
+            metadata_by_roi[roi_number] = {
+                'ROINumber': roi_number,
+                'Structure ID': structure_id,
+                'Structure Name': '',
+                'DICOM Type': '',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'Density': '',
+                'ROI Physical Property': '',
+                'Generation Method': '',
+                'Generation Description': '',
+                'Contour Count': contour_counts.get(roi_number, 0),
+                'Has Contours': contour_counts.get(roi_number, 0) > 0,
+            }
+
+        for roi in getattr(self.dataset, 'StructureSetROISequence', []):
+            roi_number = ROI_Type(roi.ROINumber)
+            roi_metadata = metadata_by_roi.setdefault(
+                roi_number,
+                {
+                    'ROINumber': roi_number,
+                    'Contour Count': contour_counts.get(roi_number, 0),
+                    'Has Contours': contour_counts.get(roi_number, 0) > 0,
+                },
+            )
+            roi_metadata['Structure ID'] = _stringify_filter_value(
+                getattr(roi, 'ROIName', '')
+            )
+            roi_metadata['Generation Method'] = _stringify_filter_value(
+                getattr(roi, 'ROIGenerationAlgorithm', '')
+            )
+            roi_metadata['Generation Description'] = _stringify_filter_value(
+                getattr(roi, 'ROIGenerationDescription', '')
+            )
+
+        for roi in self.dataset.get('RTROIObservationsSequence', []):
+            roi_number = ROI_Type(roi.ReferencedROINumber)
+            roi_metadata = metadata_by_roi.setdefault(
+                roi_number,
+                {
+                    'ROINumber': roi_number,
+                    'Structure ID': self.structure_names.get(roi_number, ''),
+                    'Contour Count': contour_counts.get(roi_number, 0),
+                    'Has Contours': contour_counts.get(roi_number, 0) > 0,
+                },
+            )
+            roi_metadata['Structure Name'] = _stringify_filter_value(
+                getattr(roi, 'ROIObservationDescription', '')
+            )
+            roi_metadata['DICOM Type'] = _stringify_filter_value(
+                getattr(roi, 'RTROIInterpretedType', '')
+            )
+
+            code_sequence = roi.get('RTROIIdentificationCodeSequence')
+            if code_sequence:
+                roi_code = code_sequence[0]
+                roi_metadata['Structure Code'] = _stringify_filter_value(
+                    getattr(roi_code, 'CodeValue', '')
+                )
+                roi_metadata['Coding Scheme'] = _stringify_filter_value(
+                    getattr(roi_code, 'CodingSchemeDesignator', '')
+                )
+                roi_metadata['Code Meaning'] = _stringify_filter_value(
+                    getattr(roi_code, 'CodeMeaning', '')
+                )
+
+            physical_properties = roi.get('ROIPhysicalPropertiesSequence')
+            if physical_properties:
+                physical_property = physical_properties[0]
+                roi_metadata['ROI Physical Property'] = _stringify_filter_value(
+                    getattr(physical_property, 'ROIPhysicalProperty', '')
+                )
+                roi_metadata['Density'] = _stringify_filter_value(
+                    getattr(physical_property, 'ROIPhysicalPropertyValue', '')
+                )
+
+        if not metadata_by_roi:
+            return pd.DataFrame()
+
+        metadata = pd.DataFrame(metadata_by_roi.values())
+        metadata.sort_values('ROINumber', inplace=True)
+        metadata.set_index('ROINumber', inplace=True, drop=False)
+
+        for field_name in STRUCTURE_FILTER_FIELDS:
+            if field_name not in metadata.columns:
+                metadata[field_name] = ''
+
+        if 'Contour Count' not in metadata.columns:
+            metadata['Contour Count'] = 0
+        if 'Has Contours' not in metadata.columns:
+            metadata['Has Contours'] = False
+
+        return metadata
+
     def get_roi_labels(self):
         '''Get detailed ROI labels and codes from the structure set.
 
@@ -337,172 +480,262 @@ class DicomStructureFile:
         roi_labels.set_index('ROINumber', inplace=True)
         return roi_labels
 
+    def load_structure_filter_rules(
+        self,
+        filter_file: Optional[str | Path] = None,
+    ) -> tuple[Optional[Path], dict]:
+        '''Load structure filtering rules from a JSON file.'''
+        config_path = Path(filter_file) if filter_file else DEFAULT_STRUCTURE_FILTERS_PATH
+
+        if not config_path.exists():
+            logger.info('Structure filter config not found at %s', config_path)
+            return None, {'rules': []}
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as config_handle:
+                config = json.load(config_handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning('Failed to load structure filter config %s: %s',
+                           config_path, exc)
+            return config_path, {'rules': []}
+
+        if not isinstance(config, dict):
+            logger.warning('Structure filter config %s must contain a JSON object',
+                           config_path)
+            return config_path, {'rules': []}
+
+        rules = config.get('rules', [])
+        if not isinstance(rules, list):
+            logger.warning('Structure filter config %s has non-list rules',
+                           config_path)
+            config['rules'] = []
+
+        return config_path, config
+
+    def _filter_rule_matches_value(
+        self,
+        actual_value: object,
+        rule: dict,
+    ) -> bool:
+        '''Return True when a single rule condition matches a value.'''
+        field_value = _stringify_filter_value(actual_value)
+        match_type = _stringify_filter_value(
+            rule.get('match_type', rule.get('match'))
+        ).lower()
+        expected_value = _stringify_filter_value(
+            rule.get('value', rule.get('pattern'))
+        )
+        case_sensitive = bool(rule.get('case_sensitive', False))
+
+        if not match_type or not expected_value:
+            return False
+
+        if match_type == 'regex':
+            flags = 0 if case_sensitive else re.IGNORECASE
+            try:
+                return re.search(expected_value, field_value, flags) is not None
+            except re.error as exc:
+                logger.warning('Invalid regex in structure filter rule %r: %s',
+                               rule.get('id', '<unnamed>'), exc)
+                return False
+
+        if not case_sensitive:
+            field_value = field_value.lower()
+            expected_value = expected_value.lower()
+
+        if match_type == 'exact':
+            return field_value == expected_value
+        if match_type == 'prefix':
+            return field_value.startswith(expected_value)
+        if match_type == 'suffix':
+            return field_value.endswith(expected_value)
+
+        logger.warning('Unsupported structure filter match type %r in rule %r',
+                       match_type, rule.get('id', '<unnamed>'))
+        return False
+
+    def _filter_rule_matches_row(
+        self,
+        row: pd.Series,
+        rule: dict,
+    ) -> bool:
+        '''Return True when a structure row satisfies a filter rule.'''
+        field_name = _stringify_filter_value(rule.get('field'))
+        if field_name not in STRUCTURE_FILTER_FIELDS:
+            logger.warning('Unsupported structure filter field %r in rule %r',
+                           field_name, rule.get('id', '<unnamed>'))
+            return False
+
+        if not self._filter_rule_matches_value(row.get(field_name, ''), rule):
+            return False
+
+        companion_rule = rule.get('with')
+        if companion_rule is None:
+            return True
+
+        if not isinstance(companion_rule, dict):
+            logger.warning('Companion filter in rule %r must be a JSON object',
+                           rule.get('id', '<unnamed>'))
+            return False
+
+        companion_field = _stringify_filter_value(companion_rule.get('field'))
+        if companion_field not in STRUCTURE_FILTER_FIELDS:
+            logger.warning('Unsupported companion filter field %r in rule %r',
+                           companion_field, rule.get('id', '<unnamed>'))
+            return False
+
+        return self._filter_rule_matches_value(
+            row.get(companion_field, ''),
+            companion_rule,
+        )
+
+    def evaluate_structure_filters(
+        self,
+        filter_file: Optional[str | Path] = None,
+    ) -> pd.DataFrame:
+        '''Evaluate JSON filter rules against structure metadata.'''
+        metadata = self.get_structure_filter_metadata()
+        if metadata.empty:
+            self.structure_filter_report = pd.DataFrame()
+            self.structure_filter_config_path = None
+            return pd.DataFrame()
+
+        config_path, filter_config = self.load_structure_filter_rules(filter_file)
+        self.structure_filter_config_path = config_path
+
+        _KNOWN_ACTIONS = {'exclude', 'hide'}
+        rules = []
+        for index, rule in enumerate(filter_config.get('rules', []), start=1):
+            if not isinstance(rule, dict):
+                logger.warning('Skipping non-object structure filter rule #%d',
+                               index)
+                continue
+            if not rule.get('enabled', True):
+                continue
+            action = _stringify_filter_value(
+                rule.get('action', 'exclude')
+            ).lower()
+            if action not in _KNOWN_ACTIONS:
+                logger.warning('Skipping unsupported structure filter action %r '
+                               'in rule %r', rule.get('action'),
+                               rule.get('id', f'rule_{index}'))
+                continue
+            rules.append((index, rule))
+
+        report_rows = []
+        for _, row in metadata.iterrows():
+            exclude_matches = []
+            hide_matches = []
+            for index, rule in rules:
+                if not self._filter_rule_matches_row(row, rule):
+                    continue
+
+                rule_action = _stringify_filter_value(
+                    rule.get('action', 'exclude')
+                ).lower()
+                rule_id = _stringify_filter_value(rule.get('id')) or f'rule_{index}'
+                field_name = _stringify_filter_value(rule.get('field'))
+                match_type = _stringify_filter_value(
+                    rule.get('match_type', rule.get('match'))
+                )
+                rule_value = _stringify_filter_value(
+                    rule.get('value', rule.get('pattern'))
+                )
+                companion_rule = rule.get('with') if isinstance(
+                    rule.get('with'), dict
+                ) else None
+                companion_text = ''
+                if companion_rule is not None:
+                    companion_text = (
+                        f"; with {companion_rule.get('field')} "
+                        f"{companion_rule.get('match_type', companion_rule.get('match'))} "
+                        f"{companion_rule.get('value', companion_rule.get('pattern'))}"
+                    )
+
+                match_entry = {
+                    'id': rule_id,
+                    'action': rule_action,
+                    'description': _stringify_filter_value(
+                        rule.get('description')
+                    ) or rule_id,
+                    'field': field_name,
+                    'match_type': match_type,
+                    'value': rule_value,
+                    'reason': (
+                        f'{field_name} {match_type} {rule_value}{companion_text}'
+                    ),
+                }
+                if rule_action == 'hide':
+                    hide_matches.append(match_entry)
+                else:
+                    exclude_matches.append(match_entry)
+
+            # exclude takes priority: a structure matching both is excluded
+            filtered = bool(exclude_matches)
+            hidden = bool(hide_matches) and not filtered
+            matched_rules = exclude_matches + hide_matches
+            report_rows.append({
+                **row.to_dict(),
+                'IsFiltered': filtered,
+                'IsHidden': hidden,
+                'SelectedByDefault': not filtered,
+                'MatchedRules': matched_rules,
+                'FilterReason': '; '.join(
+                    match['reason'] for match in matched_rules
+                ),
+            })
+
+        report = pd.DataFrame(report_rows)
+        report.set_index('ROINumber', inplace=True, drop=False)
+        self.structure_filter_report = report.copy()
+        return report
+
     def filter_exclusions(self,
-                         exclude_prefixes: List[str] = None,
-                         case_sensitive: bool = False,
-                         exclude_empty: bool = True) -> List[ContourPoints]:
-        '''Filter out unwanted structures from the contour points list.
-
-        This method is similar to drop_exclusions in RS_DICOM_Utilities.py.
-        It removes structures based on naming patterns and optionally excludes
-        structures without contour data.
-
-        Args:
-            exclude_prefixes (List[str], optional): List of prefixes to exclude.
-                Defaults to ['x', 'z'] which are commonly used for temporary
-                or excluded structures.
-            case_sensitive (bool, optional): Whether prefix matching should be
-                case sensitive. Defaults to False.
-            exclude_empty (bool, optional): Whether to exclude ROIs that have
-                no contour points. Defaults to True.
-
-        Returns:
-            List[ContourPoints]: Filtered list of contour points with excluded
-                structures removed.
-        '''
-        if exclude_prefixes is None:
-            exclude_prefixes = ['x', 'z', 'DPV']
-
-        # Get structure names
-        roi_name_lookup = self.structure_names
-        if not roi_name_lookup:
-            logger.warning("No structure names found, cannot filter exclusions")
+                         filter_file: Optional[str | Path] = None
+                         ) -> List[ContourPoints]:
+        '''Filter contour points using rules loaded from a JSON file.'''
+        filter_report = self.evaluate_structure_filters(filter_file)
+        if filter_report.empty:
             return self.contour_points or []
 
-        # Get contour points if not already loaded
-        if self.contour_points is None:
-            self.get_contour_points()
-
-        if not self.contour_points:
-            logger.info("No contour points to filter")
-            return []
-
-        # Identify ROIs to exclude based on naming patterns
-        excluded_rois = set()
-
-        for roi_num, struct_name in roi_name_lookup.items():
-            if case_sensitive:
-                struct_name_check = struct_name
-            else:
-                struct_name_check = struct_name.lower()
-
-            for prefix in exclude_prefixes:
-                prefix_check = prefix if case_sensitive else prefix.lower()
-
-                if struct_name_check.startswith(prefix_check):
-                    excluded_rois.add(roi_num)
-                    logger.debug("Excluding ROI %s ('%s') - matches prefix '%s'",
-                                 roi_num, struct_name, prefix)
-                    break
-
-        # If excluding empty structures, identify ROIs with no contour data
-        if exclude_empty:
-            # Get ROIs that have contour points
-            rois_with_contours = set(cp['ROI'] for cp in self.contour_points)
-
-            # Find ROIs in structure set but not in contour points
-            all_rois = set(self.structure_names.keys())
-            empty_rois = all_rois - rois_with_contours
-
-            for roi_num in empty_rois:
-                excluded_rois.add(roi_num)
-                struct_name = roi_name_lookup.get(roi_num, 'Unknown')
-                logger.debug('Excluding ROI %s (\'%s\') - no contour data',
-                             roi_num, struct_name)
-
-        # Filter contour points
+        excluded_rois = set(
+            filter_report.loc[filter_report['IsFiltered'], 'ROINumber']
+        )
         filtered_contour_points = [
             cp for cp in self.contour_points
             if cp['ROI'] not in excluded_rois
         ]
-
-        # Update structure_names to remove excluded ROIs
         self.structure_names = {
             roi: name for roi, name in self.structure_names.items()
             if roi not in excluded_rois
         }
 
-        # Update stored contour points and DataFrame
         original_count = len(self.contour_points)
         filtered_count = len(filtered_contour_points)
         excluded_count = original_count - filtered_count
 
         logger.info('Filtered %d contours from %d excluded ROIs. '
-                   'Remaining: %d contours from %d ROIs',
+                    'Remaining: %d contours from %d ROIs',
                    excluded_count, len(excluded_rois), filtered_count,
                    len(set(cp['ROI'] for cp in filtered_contour_points)))
 
-        # Optionally update the stored data
         self.contour_points = filtered_contour_points
         return filtered_contour_points
 
     def get_excluded_structures(self,
-                               exclude_prefixes: List[str] = None,
-                               case_sensitive: bool = False) -> pd.DataFrame:
-        '''Get information about structures that would be excluded by filtering.
-
-        This method returns information about structures that would be excluded
-        without actually filtering them, useful for inspection and validation.
-
-        Args:
-            exclude_prefixes (List[str], optional): List of prefixes to check
-                for exclusion. Defaults to ['x', 'z', 'DPV'].
-            case_sensitive (bool, optional): Whether prefix matching should be
-                case sensitive. Defaults to False.
-
-        Returns:
-            pd.DataFrame: DataFrame with information about excluded structures
-                including ROINumber, StructureID, and exclusion reason.
-        '''
-        if exclude_prefixes is None:
-            exclude_prefixes = ['x', 'z', 'DPV']
-
-        structure_names = self.get_structure_names()
-        if structure_names.empty:
+                               filter_file: Optional[str | Path] = None
+                               ) -> pd.DataFrame:
+        '''Get the structures excluded by the configured JSON rules.'''
+        filter_report = self.evaluate_structure_filters(filter_file)
+        if filter_report.empty:
             return pd.DataFrame()
 
-        # Get contour points to check for empty structures
-        if self.contour_points is None:
-            self.get_contour_points()
-
-        if self.contour_points:
-            rois_with_contours = set(cp['ROI'] for cp in self.contour_points)
-        else:
-            rois_with_contours = set()
-
-        excluded_info = []
-
-        for _, row in structure_names.iterrows():
-            roi_num = row['ROINumber']
-            struct_name = row['StructureID']
-            exclusion_reasons = []
-
-            # Check naming patterns
-            if case_sensitive:
-                struct_name_check = struct_name
-            else:
-                struct_name_check = struct_name.lower()
-
-            for prefix in exclude_prefixes:
-                prefix_check = prefix if case_sensitive else prefix.lower()
-
-                if struct_name_check.startswith(prefix_check):
-                    exclusion_reasons.append(f"Name starts with '{prefix}'")
-                    break
-
-            # Check for empty contours
-            if roi_num not in rois_with_contours:
-                exclusion_reasons.append("No contour data")
-
-            # Only include structures that would be excluded
-            if exclusion_reasons:
-                excluded_info.append({
-                    'ROINumber': roi_num,
-                    'StructureID': struct_name,
-                    'ExclusionReason': '; '.join(exclusion_reasons)
-                })
-
-        return pd.DataFrame(excluded_info)
+        excluded = filter_report[filter_report['IsFiltered']].copy()
+        excluded.rename(columns={
+            'Structure ID': 'StructureID',
+            'Structure Name': 'StructureName',
+        }, inplace=True)
+        return excluded.reset_index(drop=True)
 
     def find_image_files(self,
                         modalities: Optional[List[str]] = None,

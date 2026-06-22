@@ -33,6 +33,8 @@ class SessionData:
         job_error (Optional[str]): Last processing error message, if any.
         job_computed_at (Optional[datetime]): Timestamp of latest completed job.
         job_provenance (dict): Additional job metadata for API responses.
+        hidden_rois (List[int]): ROI numbers that match a 'hide' filter rule
+            and should be hidden from the diagram by default.
     '''
     dicom_file_path: str
     structure_set: Optional[object] = None
@@ -46,6 +48,7 @@ class SessionData:
     job_error: Optional[str] = None
     job_computed_at: Optional[datetime] = None
     job_provenance: dict = field(default_factory=dict)
+    hidden_rois: List[int] = field(default_factory=list)
 
 
 class SessionManager:

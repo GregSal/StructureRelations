@@ -12,6 +12,7 @@ import asyncio
 import tempfile
 import json
 import time
+from contextlib import asynccontextmanager
 from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -45,8 +46,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    '''Manage application startup and shutdown lifecycle.'''
+    logger.info('Starting StructureRelations web application')
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            logger.debug('Periodic cleanup task cancelled during shutdown')
+
+
 # Initialize FastAPI app
-app = FastAPI(title='StructureRelations', version='1.0.3')
+app = FastAPI(title='StructureRelations', version='1.0.3', lifespan=lifespan)
 
 # Add middleware to log all requests
 @app.middleware("http")
@@ -84,6 +100,7 @@ class UploadResponse(BaseModel):
 class PreviewResponse(BaseModel):
     session_id: str
     structures: List[dict]
+    filtered_structures: List[dict] = Field(default_factory=list)
     patient_info: dict
     disk_usage_mb: float
 
@@ -121,6 +138,7 @@ class MatrixResponse(BaseModel):
     structure_slices_interpolated: dict = Field(default_factory=dict)
     slice_relationships: dict = Field(default_factory=dict)
     faded_relationships: Optional[dict] = None
+    hidden_rois: List[int] = Field(default_factory=list)
 
 
 class DiagramNode(BaseModel):
@@ -261,16 +279,6 @@ class RelationshipResultResponse(RelationshipContractMixin):
     session_id: str
     status: str
     pairs: List[StructurePairResult]
-
-
-# Startup event
-@app.on_event('startup')
-async def startup_event():
-    '''Initialize the application and start cleanup task.'''
-    logger.info('Starting StructureRelations web application')
-
-    # Start background cleanup task
-    asyncio.create_task(periodic_cleanup())
 
 
 async def periodic_cleanup():
@@ -458,6 +466,23 @@ async def preview_structures(request: SessionRequest):
         # Extract structure metadata
         structures = []
         structure_names = dicom_file.get_structure_names()
+        filter_report = dicom_file.evaluate_structure_filters()
+        filter_lookup = {}
+        filtered_structures = []
+        if not filter_report.empty:
+            filter_lookup = filter_report.to_dict(orient='index')
+            for _, row in filter_report.iterrows():
+                if not row.get('IsFiltered', False) or not row.get(
+                    'Has Contours', False
+                ):
+                    continue
+                filtered_structures.append({
+                    'roi': int(row['ROINumber']),
+                    'structure_id': row.get('Structure ID', ''),
+                    'structure_name': row.get('Structure Name', ''),
+                    'filter_reason': row.get('FilterReason', ''),
+                    'matched_rules': row.get('MatchedRules', []),
+                })
 
         # Get ROI labels (DICOM Type and Code Meaning)
         roi_labels = dicom_file.get_roi_labels()
@@ -474,6 +499,8 @@ async def preview_structures(request: SessionRequest):
 
         # Build structure list
         for roi, name in structure_names.items():
+            filter_row = filter_lookup.get(roi, {})
+
             # Get DICOM Type and Code Meaning from roi_labels
             dicom_type = ''
             code_meaning = ''
@@ -487,6 +514,13 @@ async def preview_structures(request: SessionRequest):
                 'dicom_type': dicom_type,
                 'code_meaning': code_meaning,
                 'color': colors.get(roi, [128, 128, 128]),  # Default gray
+                'selected_by_default': not bool(
+                    filter_row.get('IsFiltered', False)
+                ),
+                'is_filtered': bool(filter_row.get('IsFiltered', False)),
+                'hidden_by_default': bool(filter_row.get('IsHidden', False)),
+                'filter_reason': filter_row.get('FilterReason', ''),
+                'matched_rules': filter_row.get('MatchedRules', []),
                 'num_contours': sum(
                     1 for cp in dicom_file.contour_points if cp['ROI'] == roi
                 )
@@ -532,6 +566,7 @@ async def preview_structures(request: SessionRequest):
         return PreviewResponse(
             session_id=request.session_id,
             structures=structures,
+            filtered_structures=filtered_structures,
             patient_info=patient_info,
             disk_usage_mb=disk_info['usage_mb']
         )
@@ -883,6 +918,31 @@ async def process_structure_set(
         )
         await asyncio.sleep(0)
 
+        # Determine which ROIs should be hidden in the diagram by default
+        try:
+            hide_filter_report = dicom_file.evaluate_structure_filters()
+            hidden_rois: list[int] = []
+            if not hide_filter_report.empty and 'IsHidden' in hide_filter_report.columns:
+                candidate_hidden = [
+                    int(roi)
+                    for roi, is_hidden
+                    in hide_filter_report['IsHidden'].items()
+                    if is_hidden
+                ]
+                selected_set = set(selected_rois) if selected_rois else None
+                hidden_rois = [
+                    roi for roi in candidate_hidden
+                    if selected_set is None or roi in selected_set
+                ]
+            session_manager.update_session_job_state(
+                session_id, hidden_rois=hidden_rois
+            )
+        except Exception as e:
+            logger.warning(
+                'Could not evaluate hide filters for session %s: %s',
+                session_id, e,
+            )
+
         # Filter contour points to only include selected ROIs
         if selected_rois:
             original_count = len(dicom_file.contour_points)
@@ -1170,6 +1230,7 @@ async def get_relationship_matrix(request: MatrixRequest):
             logical_relations_mode=request.logical_relations_mode,
             visible_rois=visible_rois
         )
+        matrix_dict['hidden_rois'] = list(getattr(session_data, 'hidden_rois', []) or [])
         matrix_generation_ms = round(
             (time.perf_counter() - matrix_generation_start) * 1000.0
         )

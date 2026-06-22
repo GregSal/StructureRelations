@@ -16,6 +16,61 @@ diagram_settings.json.
 
 - `relationship_definitions.json` (in parent src/ directory) - Main configuration file for all relationship type definitions
 - `diagram_settings.json` - Visual styling for diagrams including colors, edge styles, and node shapes
+- `structure_filter_rules.json` - Automatic deselection rules for the Select Structures page
+
+## Structure Filter Rules
+
+The webapp can deselect structures automatically during preview using
+`structure_filter_rules.json`. Each rule targets one of the supported labels
+from the DICOM metadata and can optionally require a second matching field.
+
+Supported `field` values:
+
+- `Structure Code`
+- `Coding Scheme`
+- `Code Meaning`
+- `Structure Name`
+- `DICOM Type`
+- `Density`
+- `ROI Physical Property`
+- `Structure ID`
+- `Generation Method`
+- `Generation Description`
+
+Supported `match_type` values:
+
+- `exact`
+- `prefix`
+- `suffix`
+- `regex`
+
+Example:
+
+```json
+{
+  "rules": [
+    {
+      "id": "artifact-z-prefix",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "prefix",
+      "value": "Z"
+    },
+    {
+      "id": "avoidance-rectum",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "suffix",
+      "value": "Rectum",
+      "with": {
+        "field": "DICOM Type",
+        "match_type": "exact",
+        "value": "AVOIDANCE"
+      }
+    }
+  ]
+}
+```
 
 ## Customization Guide
 
