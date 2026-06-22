@@ -129,6 +129,8 @@ class DiagramNode(BaseModel):
     color: str
     shape: str
     title: str  # Tooltip
+    side_tag: Optional[str] = None  # 'L', 'R', 'B', or None for layout constraint
+    opt_group_key: Optional[str] = None  # Normalized key for opt-prefix grouping
 
 
 class DiagramEdge(BaseModel):
@@ -143,6 +145,8 @@ class DiagramEdge(BaseModel):
     dashes: bool
     arrows: Optional[str] = None
     is_logical: bool = False
+    layout_candidate: bool = True  # True if edge used for layout optimization, False if excluded
+    edge_weight_for_crossing: float = 1.0  # 0.5 for OVERLAPS, 1.0 for others (used in crossing cost)
 
 
 class DiagramResponse(BaseModel):
@@ -1299,6 +1303,52 @@ async def export_matrix(export_format: str, session_id: str, row_rois: Optional[
         raise HTTPException(status_code=400, detail='Invalid format. Use csv, excel, or json')
 
 
+def parse_side_tag(label: str) -> Optional[str]:
+    """Extract side tag (L, R, B) from label if present at end.
+
+    Args:
+        label: Structure label (e.g., 'Parotid L', 'Bladder', 'PTV 48 B')
+
+    Returns:
+        'L', 'R', 'B', or None
+    """
+    if not label:
+        return None
+    normalized = label.strip()
+    if normalized.endswith(' L') or normalized.endswith(' R') or normalized.endswith(' B'):
+        return normalized[-1]
+    return None
+
+
+def extract_opt_group_key(label: str) -> Optional[str]:
+    """Extract opt grouping key by removing trailing group letters (a/b/c) and opt prefix.
+
+    For opt labels: ignore trailing a/b/c when computing group key.
+    For non-opt labels: use full suffix.
+
+    Args:
+        label: Structure label (e.g., 'opt Parotid L a', 'Bladder')
+
+    Returns:
+        Normalized group key or None if not an opt label
+    """
+    if not label:
+        return None
+    normalized = label.strip()
+
+    if not normalized.startswith('opt'):
+        return None
+
+    # Remove 'opt' prefix and leading whitespace
+    suffix = normalized[3:].strip()
+
+    # Remove trailing single letter (a/b/c) if present and preceded by space
+    if suffix and suffix[-1] in ('a', 'b', 'c') and len(suffix) > 1 and suffix[-2] == ' ':
+        suffix = suffix[:-2].strip()
+
+    return suffix if suffix else None
+
+
 @app.post('/api/diagram', response_model=DiagramResponse)
 async def get_diagram_data(request: MatrixRequest):
     '''Generate network diagram data for relationship visualization.
@@ -1527,12 +1577,18 @@ async def get_diagram_data(request: MatrixRequest):
                 tooltip_lines.append(f'Regions: {num_regions}')
             tooltip = '\n'.join(tooltip_lines)
 
+            # Extract layout metadata for deterministic layout
+            side_tag = parse_side_tag(name)
+            opt_group_key = extract_opt_group_key(name)
+
             nodes.append(DiagramNode(
                 id=roi,
                 label=name,
                 color=color_hex,
                 shape=shape_map.get(dicom_type, default_shape),
-                title=tooltip
+                title=tooltip,
+                side_tag=side_tag,
+                opt_group_key=opt_group_key
             ))
             roi_to_name[roi] = name
         node_build_ms = round((time.perf_counter() - node_build_start) * 1000.0)
@@ -1604,6 +1660,14 @@ async def get_diagram_data(request: MatrixRequest):
                         rel.is_logical,
                         style,
                     )
+
+                    # Compute layout metadata
+                    layout_candidate = not (
+                        rel_type == 'DISJOINT' or
+                        (request.logical_relations_mode == 'faded' and rel.is_logical)
+                    )
+                    edge_weight = 0.5 if rel_type == 'OVERLAPS' else 1.0
+
                     edges.append(DiagramEdge(
                         from_node=roi1,
                         to_node=roi2,
@@ -1616,6 +1680,8 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        layout_candidate=layout_candidate,
+                        edge_weight_for_crossing=edge_weight,
                     ))
                     symmetric_edges_added += 1
         symmetric_ms = round((time.perf_counter() - symmetric_start) * 1000.0)
@@ -1681,6 +1747,14 @@ async def get_diagram_data(request: MatrixRequest):
                         rel.is_logical,
                         style,
                     )
+
+                    # Compute layout metadata
+                    layout_candidate = not (
+                        rel_type == 'DISJOINT' or
+                        (request.logical_relations_mode == 'faded' and rel.is_logical)
+                    )
+                    edge_weight = 0.5 if rel_type == 'OVERLAPS' else 1.0
+
                     edges.append(DiagramEdge(
                         from_node=from_roi,
                         to_node=to_roi,
@@ -1693,6 +1767,8 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        layout_candidate=layout_candidate,
+                        edge_weight_for_crossing=edge_weight,
                     ))
                     directional_edges_added += 1
         directional_ms = round((time.perf_counter() - directional_start) * 1000.0)

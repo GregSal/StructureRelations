@@ -627,3 +627,214 @@ def test_structure_set_serializes_slice_relationships():
     assert serialized['1.0000'][0]['rois'] == [1, 2]
     assert serialized['1.0000'][0]['label'] == 'Alpha / Beta: OVERLAPS'
     assert serialized['1.0000'][0]['has_boundary'] is True
+
+
+# ============ LAYOUT METADATA TESTS (Phase 5) ============
+
+def test_diagram_payload_includes_layout_metadata(monkeypatch, tmp_path):
+    '''Verify diagram payload includes layout metadata for deterministic pre-layout.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-layout-metadata'
+    fake_set = _make_fake_diagram_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    # Verify nodes include layout metadata
+    assert payload['nodes']
+    node = payload['nodes'][0]
+    assert 'side_tag' in node  # Should be L, R, B, or None
+    assert 'opt_group_key' in node  # Should be string or None
+
+    # Verify edges include layout metadata
+    assert payload['edges']
+    edge = payload['edges'][0]
+    assert 'layout_candidate' in edge  # Should be True or False
+    assert 'edge_weight_for_crossing' in edge  # Should be 0.5 or 1.0
+
+
+def test_diagram_disjoint_edges_excluded_from_layout(monkeypatch, tmp_path):
+    '''Verify disjoint edges are marked as not layout_candidate.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-disjoint-exclude'
+
+    # Create a structure set with DISJOINT relationship
+    rel = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['DISJOINT'],
+    )
+    fake_set = FakeDiagramStructureSet(relationship=rel)
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['edges']
+
+    # Disjoint edges should have layout_candidate=False
+    edge = payload['edges'][0]
+    assert edge['layout_candidate'] is False
+
+
+def test_diagram_overlaps_edges_have_half_weight(monkeypatch, tmp_path):
+    '''Verify OVERLAPS edges are marked with edge_weight_for_crossing=0.5.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-overlaps-weight'
+
+    # Create a structure set with OVERLAPS relationship
+    rel = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['OVERLAPS'],
+    )
+    fake_set = FakeDiagramStructureSet(relationship=rel)
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['edges']
+
+    # OVERLAPS edges should have edge_weight_for_crossing=0.5
+    edge = payload['edges'][0]
+    assert edge['edge_weight_for_crossing'] == 0.5
+    assert edge['layout_candidate'] is True  # Not disjoint
+
+
+def test_diagram_side_tag_parsing_LRB(monkeypatch, tmp_path):
+    '''Verify node labels ending with L/R/B are parsed correctly for side bias.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-side-tags'
+
+    # Create structure set with custom names
+    class CustomFakeDiagramSet:
+        def __init__(self):
+            self.relationship_graph = nx.DiGraph()
+            self.relationship_graph.add_edge(1, 2, relationship=StructureRelationship(
+                de27im=None,
+                is_identical=False,
+                _override_type=RELATIONSHIP_TYPES['CONTAINS'],
+            ))
+            self.tolerance = 0.1
+            self.dicom_structure_file = None
+            self._summary_df = pd.DataFrame(
+                [
+                    {'ROI': 1, 'Name': 'PTV L', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
+                    {'ROI': 2, 'Name': 'PTV R', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
+                ]
+            )
+        def summary(self):
+            return self._summary_df
+        def get_relationship(self, from_roi, to_roi):
+            if from_roi == 1 and to_roi == 2:
+                return self.relationship_graph.edges[1, 2]['relationship']
+            return None
+
+    fake_set = CustomFakeDiagramSet()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    nodes = {n['id']: n for n in payload['nodes']}
+
+    # Node 1 should have side_tag='L'
+    assert nodes[1]['side_tag'] == 'L'
+    # Node 2 should have side_tag='R'
+    assert nodes[2]['side_tag'] == 'R'
+
+
+def test_diagram_opt_grouping_key_extraction(monkeypatch, tmp_path):
+    '''Verify opt-prefixed labels are grouped correctly by normalized key.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-opt-grouping'
+
+    # Create structure set with opt names
+    class OptFakeDiagramSet:
+        def __init__(self):
+            self.relationship_graph = nx.DiGraph()
+            self.relationship_graph.add_edge(1, 2, relationship=StructureRelationship(
+                de27im=None,
+                is_identical=False,
+                _override_type=RELATIONSHIP_TYPES['OVERLAPS'],
+            ))
+            self.tolerance = 0.1
+            self.dicom_structure_file = None
+            self._summary_df = pd.DataFrame(
+                [
+                    {'ROI': 1, 'Name': 'opt Brainstem a', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
+                    {'ROI': 2, 'Name': 'opt Brainstem b', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
+                ]
+            )
+        def summary(self):
+            return self._summary_df
+        def get_relationship(self, from_roi, to_roi):
+            if from_roi == 1 and to_roi == 2:
+                return self.relationship_graph.edges[1, 2]['relationship']
+            return None
+
+    fake_set = OptFakeDiagramSet()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    nodes = {n['id']: n for n in payload['nodes']}
+
+    # Both nodes should have the same opt_group_key (normalized "Brainstem")
+    assert nodes[1]['opt_group_key'] == nodes[2]['opt_group_key']
+    # Trailing a/b should be stripped
+    assert nodes[1]['opt_group_key'] == 'Brainstem'

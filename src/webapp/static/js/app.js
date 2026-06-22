@@ -84,7 +84,6 @@ class WebAppClient {
                 }
             }
         };
-        this.layoutInfluence = 30;
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -240,12 +239,6 @@ class WebAppClient {
             }
         }
 
-        const defaultInfluence = Number(this.diagramOptions.layout.local_global_default);
-        this.setLayoutInfluence(
-            Number.isFinite(defaultInfluence) ? defaultInfluence : this.layoutInfluence,
-            false
-        );
-
         this.tooltipsConfig = this.symbolConfig.tooltips || {};
     }
 
@@ -255,81 +248,6 @@ class WebAppClient {
 
     interpolateNumber(localValue, globalValue, weight) {
         return localValue + (globalValue - localValue) * weight;
-    }
-
-    getLayoutInfluenceWeight() {
-        const minValue = Number(this.diagramOptions.layout.local_global_min ?? 0);
-        const maxValue = Number(this.diagramOptions.layout.local_global_max ?? 100);
-        const clamped = this.clampNumber(this.layoutInfluence, minValue, maxValue);
-        if (maxValue <= minValue) {
-            return 0;
-        }
-        return (clamped - minValue) / (maxValue - minValue);
-    }
-
-    getPhysicsFromInfluence() {
-        const localPhysics = this.diagramOptions.physics.local || {};
-        const globalPhysics = this.diagramOptions.physics.global || {};
-        const weight = this.getLayoutInfluenceWeight();
-
-        return {
-            enabled: this.diagramOptions.physics.enabled !== false,
-            stabilization: {
-                iterations: Number(this.diagramOptions.physics.stabilization_iterations || 200)
-            },
-            barnesHut: {
-                gravitationalConstant: this.interpolateNumber(
-                    Number(localPhysics.gravitationalConstant ?? -700),
-                    Number(globalPhysics.gravitationalConstant ?? -2000),
-                    weight
-                ),
-                springConstant: this.interpolateNumber(
-                    Number(localPhysics.springConstant ?? 0.008),
-                    Number(globalPhysics.springConstant ?? 0.04),
-                    weight
-                ),
-                springLength: this.interpolateNumber(
-                    Number(localPhysics.springLength ?? 80),
-                    Number(globalPhysics.springLength ?? 150),
-                    weight
-                ),
-                damping: this.interpolateNumber(
-                    Number(localPhysics.damping ?? 0.55),
-                    Number(globalPhysics.damping ?? 0.28),
-                    weight
-                ),
-                centralGravity: this.interpolateNumber(
-                    Number(localPhysics.centralGravity ?? 0.02),
-                    Number(globalPhysics.centralGravity ?? 0.15),
-                    weight
-                )
-            }
-        };
-    }
-
-    setLayoutInfluence(value, shouldUpdateNetwork) {
-        const minValue = Number(this.diagramOptions.layout.local_global_min ?? 0);
-        const maxValue = Number(this.diagramOptions.layout.local_global_max ?? 100);
-        const safeValue = Number.isFinite(value) ? value : this.layoutInfluence;
-        this.layoutInfluence = this.clampNumber(safeValue, minValue, maxValue);
-
-        const slider = document.getElementById('layoutInfluenceSlider');
-        const label = document.getElementById('layoutInfluenceLabel');
-        if (slider) {
-            slider.min = String(minValue);
-            slider.max = String(maxValue);
-            slider.value = String(this.layoutInfluence);
-        }
-
-        if (label) {
-            const localWeight = 100 - this.getLayoutInfluenceWeight() * 100;
-            label.textContent = `Local ${Math.round(localWeight)}%`;
-        }
-
-        if (shouldUpdateNetwork && this.network) {
-            this.network.setOptions({ physics: this.getPhysicsFromInfluence() });
-            this.network.startSimulation();
-        }
     }
 
     // Helper to convert RGB array to CSS color string
@@ -494,9 +412,6 @@ class WebAppClient {
             this.ensureManualLayoutForDiagramChanges();
             this.diagramLogicalRelationsMode = e.target.value;
             this.updateDiagramPendingState();
-        });
-        document.getElementById('layoutInfluenceSlider').addEventListener('input', (e) => {
-            this.setLayoutInfluence(Number(e.target.value), true);
         });
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
             this.applyDiagramSelection();
@@ -2392,7 +2307,6 @@ class WebAppClient {
         this.renderDiagram(this.latestDiagramData);
 
         if (this.network) {
-            this.network.setOptions({ physics: this.getPhysicsFromInfluence() });
             this.network.fit();
             this.network.startSimulation();
         }
@@ -2861,6 +2775,343 @@ class WebAppClient {
         this.network.stopSimulation();
     }
 
+    // ============ PRE-LAYOUT ENGINE ============
+
+    /**
+     * Computes initial node positions using deterministic rule-based layout.
+     * Returns a map of {nodeId: {x, y}} or null if pre-layout should be skipped.
+     */
+    computeDeterministicLayout(nodesData, edgesData, layoutRules) {
+        if (!layoutRules || !layoutRules.enabled) {
+            return null;
+        }
+
+        // Build constraint graph from layout-candidate edges only
+        const candidateEdges = edgesData.filter(e => e.layout_candidate !== false);
+        const nodeIds = new Set(nodesData.map(n => n.id));
+
+        if (candidateEdges.length === 0 || nodesData.length === 0) {
+            return null;
+        }
+
+        // Detect global layout style
+        const layoutStyle = this.selectLayoutStyle(nodesData, candidateEdges, layoutRules);
+
+        let positions = {};
+
+        if (layoutStyle === 'tree') {
+            positions = this.applyTreeLayout(nodesData, candidateEdges, layoutRules);
+        } else if (layoutStyle === 'cycle') {
+            positions = this.applyCycleLayout(nodesData, candidateEdges, layoutRules);
+        }
+
+        // Apply soft constraints: side bias (L/R/B) and opt grouping
+        if (layoutRules.side_bias && layoutRules.side_bias.enabled) {
+            this.applySideBiasConstraints(positions, nodesData, layoutRules.side_bias.strength);
+        }
+        if (layoutRules.opt_grouping && layoutRules.opt_grouping.enabled) {
+            this.applyOptGroupingConstraints(positions, nodesData, layoutRules.opt_grouping.tightness);
+        }
+
+        return positions;
+    }
+
+    selectLayoutStyle(nodesData, edgesData, layoutRules) {
+        const mode = layoutRules.global_style?.mode || 'auto';
+
+        if (mode !== 'auto') {
+            return mode;
+        }
+
+        // Auto: Detect if graph is tree-like or cycle-heavy
+        const inDegree = {};
+        const outDegree = {};
+        nodesData.forEach(n => {
+            inDegree[n.id] = 0;
+            outDegree[n.id] = 0;
+        });
+
+        edgesData.forEach(e => {
+            outDegree[e.from_node] = (outDegree[e.from_node] || 0) + 1;
+            inDegree[e.to_node] = (inDegree[e.to_node] || 0) + 1;
+        });
+
+        // Count containment-like edges (CONTAINS, SURROUNDS, etc.)
+        const hierarchicalEdges = edgesData.filter(e =>
+            ['CONTAINS', 'WITHIN', 'SURROUNDS', 'ENCLOSED', 'SHELTERS', 'SHELTERED', 'CONFINES', 'CONFINED'].includes(e.relation_type)
+        ).length;
+
+        // If >50% of candidate edges are hierarchical, use tree; otherwise cycle
+        return hierarchicalEdges > edgesData.length * 0.5 ? 'tree' : 'cycle';
+    }
+
+    applyTreeLayout(nodesData, edgesData, layoutRules) {
+        // Simple hierarchical layout using containment edges to determine depth
+        const positions = {};
+        const nodeIds = nodesData.map(n => n.id);
+        const depth = {};
+        const visited = new Set();
+
+        // Find root nodes (in-degree 0 or only incoming edges from logical relationships)
+        const hierarchicalEdges = edgesData.filter(e =>
+            ['CONTAINS', 'WITHIN', 'SURROUNDS', 'ENCLOSED', 'SHELTERS', 'SHELTERED', 'CONFINES', 'CONFINED'].includes(e.relation_type)
+        );
+
+        const incomingHierarchical = {};
+        nodeIds.forEach(id => incomingHierarchical[id] = 0);
+        hierarchicalEdges.forEach(e => {
+            incomingHierarchical[e.to_node] = (incomingHierarchical[e.to_node] || 0) + 1;
+        });
+
+        const roots = nodeIds.filter(id => incomingHierarchical[id] === 0);
+
+        // BFS to compute depth
+        const queue = roots.map(r => ({ node: r, depth: 0 }));
+        while (queue.length > 0) {
+            const { node, depth: d } = queue.shift();
+            if (visited.has(node)) continue;
+            visited.add(node);
+            depth[node] = d;
+
+            hierarchicalEdges
+                .filter(e => e.from_node === node)
+                .forEach(e => {
+                    if (!visited.has(e.to_node)) {
+                        queue.push({ node: e.to_node, depth: d + 1 });
+                    }
+                });
+        }
+
+        // Unvisited nodes get depth 0
+        nodeIds.forEach(id => {
+            if (depth[id] === undefined) depth[id] = 0;
+        });
+
+        // Group nodes by depth
+        const depthGroups = {};
+        nodeIds.forEach(id => {
+            const d = depth[id];
+            if (!depthGroups[d]) depthGroups[d] = [];
+            depthGroups[d].push(id);
+        });
+
+        // Assign positions: vertical by depth, horizontal within depth
+        const maxDepth = Math.max(...Object.keys(depthGroups).map(Number));
+        const verticalSpacing = maxDepth > 0 ? 400 / (maxDepth + 1) : 200;
+        const horizontalSpacing = 150;
+
+        Object.keys(depthGroups).forEach(depthStr => {
+            const d = Number(depthStr);
+            const nodes = depthGroups[d];
+            const yPos = 200 + d * verticalSpacing;
+            const totalWidth = (nodes.length - 1) * horizontalSpacing;
+            const startX = -totalWidth / 2;
+
+            nodes.forEach((nodeId, index) => {
+                positions[nodeId] = {
+                    x: startX + index * horizontalSpacing,
+                    y: yPos
+                };
+            });
+        });
+
+        return positions;
+    }
+
+    applyCycleLayout(nodesData, edgesData, layoutRules) {
+        // Circular layout: arrange nodes in a circle, weighted by edge density
+        const positions = {};
+        const nodeIds = nodesData.map(n => n.id);
+        const n = nodeIds.length;
+
+        if (n === 0) return positions;
+
+        const radius = Math.max(150, n * 30);
+        const angleStep = (2 * Math.PI) / n;
+
+        // Simple circular arrangement
+        nodeIds.forEach((nodeId, index) => {
+            const angle = index * angleStep;
+            positions[nodeId] = {
+                x: radius * Math.cos(angle),
+                y: radius * Math.sin(angle)
+            };
+        });
+
+        return positions;
+    }
+
+    applySideBiasConstraints(positions, nodesData, strength) {
+        // L nodes biased right, R nodes biased left, B nodes between L/R pairs
+        const lNodes = nodesData.filter(n => n.side_tag === 'L').map(n => n.id);
+        const rNodes = nodesData.filter(n => n.side_tag === 'R').map(n => n.id);
+        const bNodes = nodesData.filter(n => n.side_tag === 'B').map(n => n.id);
+
+        // Compute canvas bounds
+        const xs = Object.values(positions).map(p => p.x);
+        const ys = Object.values(positions).map(p => p.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const width = maxX - minX || 200;
+
+        // Apply bias: move L nodes right, R nodes left
+        lNodes.forEach(nodeId => {
+            if (positions[nodeId]) {
+                positions[nodeId].x += width * strength * 0.3;
+            }
+        });
+
+        rNodes.forEach(nodeId => {
+            if (positions[nodeId]) {
+                positions[nodeId].x -= width * strength * 0.3;
+            }
+        });
+
+        // B nodes: pull toward center between L/R pairs if available
+        bNodes.forEach(nodeId => {
+            // Simple heuristic: move toward x=0 (center)
+            if (positions[nodeId]) {
+                positions[nodeId].x *= (1 - strength * 0.2);
+            }
+        });
+    }
+
+    applyOptGroupingConstraints(positions, nodesData, tightness) {
+        // Group opt-prefixed nodes with same trailing key (ignoring a/b/c)
+        const optGroups = {};
+
+        nodesData.forEach(n => {
+            if (n.opt_group_key) {
+                if (!optGroups[n.opt_group_key]) {
+                    optGroups[n.opt_group_key] = [];
+                }
+                optGroups[n.opt_group_key].push(n.id);
+            }
+        });
+
+        // For each group, pull nodes toward their centroid
+        Object.values(optGroups).forEach(nodeIds => {
+            if (nodeIds.length < 2) return;
+
+            // Compute centroid
+            let cx = 0, cy = 0;
+            nodeIds.forEach(nodeId => {
+                if (positions[nodeId]) {
+                    cx += positions[nodeId].x;
+                    cy += positions[nodeId].y;
+                }
+            });
+            cx /= nodeIds.length;
+            cy /= nodeIds.length;
+
+            // Pull nodes toward centroid
+            nodeIds.forEach(nodeId => {
+                if (positions[nodeId]) {
+                    positions[nodeId].x += (cx - positions[nodeId].x) * tightness * 0.1;
+                    positions[nodeId].y += (cy - positions[nodeId].y) * tightness * 0.1;
+                }
+            });
+        });
+    }
+
+    // ============ EDGE ROUTING: CROSSING DETECTION & SELECTIVE CURVATURE ============
+
+    /**
+     * Detects edge crossings given node positions.
+     * Returns a set of edge keys that participate in crossings.
+     */
+    detectEdgeCrossings(positions, edgesData, candidateEdgesOnly = true) {
+        const crossingParticipants = new Set();
+
+        if (edgesData.length < 2) return crossingParticipants;
+
+        // Filter to candidate edges if requested
+        const edgesToCheck = candidateEdgesOnly
+            ? edgesData.filter(e => e.layout_candidate !== false)
+            : edgesData;
+
+        for (let i = 0; i < edgesToCheck.length; i++) {
+            for (let j = i + 1; j < edgesToCheck.length; j++) {
+                const e1 = edgesToCheck[i];
+                const e2 = edgesToCheck[j];
+
+                // Skip edges sharing a node
+                if (e1.from_node === e2.from_node || e1.from_node === e2.to_node ||
+                    e1.to_node === e2.from_node || e1.to_node === e2.to_node) {
+                    continue;
+                }
+
+                const p1 = positions[String(e1.from_node)];
+                const p2 = positions[String(e1.to_node)];
+                const p3 = positions[String(e2.from_node)];
+                const p4 = positions[String(e2.to_node)];
+
+                if (p1 && p2 && p3 && p4 && this.doSegmentsCross(p1, p2, p3, p4)) {
+                    crossingParticipants.add(this._buildEdgeKey(e1));
+                    crossingParticipants.add(this._buildEdgeKey(e2));
+                }
+            }
+        }
+
+        return crossingParticipants;
+    }
+
+    /**
+     * Tests if two line segments (p1-p2) and (p3-p4) cross.
+     * Uses cross product method.
+     */
+    doSegmentsCross(p1, p2, p3, p4) {
+        const ccw = (A, B, C) => {
+            return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
+        };
+        return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+    }
+
+    /**
+     * Determines edge curvature based on crossings and edge weights.
+     * Returns a map of edgeKey -> smoothness config (straight or curved).
+     */
+    computeEdgeCurvature(crossingParticipants, edgesData, layoutRules) {
+        const edgeCurvatureMap = {};
+        const overlapsWeight = 0.5;  // OVERLAPS edges cost less to curve
+        const otherWeight = 1.0;
+
+        // Sort crossing participants by weight (OVERLAPS have lower priority to receive curves)
+        const sortedCrossings = Array.from(crossingParticipants)
+            .map(edgeKey => {
+                const edge = edgesData.find(e => this._buildEdgeKey(e) === edgeKey);
+                const weight = edge && edge.relation_type === 'OVERLAPS' ? overlapsWeight : otherWeight;
+                return { edgeKey, weight, edge };
+            })
+            .sort((a, b) => a.weight - b.weight);  // OVERLAPS first (lower priority)
+
+        // Decide which edges to curve: prefer OVERLAPS edges to absorb the curvature cost
+        const curvatureThreshold = layoutRules?.edge_routing?.curvature_threshold || 0.5;
+        const edgesToCurve = new Set();
+
+        // Apply curvature to ~50% of crossing edges (preference for OVERLAPS)
+        const curvatureBudget = Math.ceil(sortedCrossings.length * curvatureThreshold);
+        for (let i = 0; i < Math.min(curvatureBudget, sortedCrossings.length); i++) {
+            edgesToCurve.add(sortedCrossings[i].edgeKey);
+        }
+
+        // Generate smoothness config for all edges
+        edgesData.forEach(edge => {
+            const edgeKey = this._buildEdgeKey(edge);
+            const isCrossing = crossingParticipants.has(edgeKey);
+            const shouldCurve = edgesToCurve.has(edgeKey);
+
+            edgeCurvatureMap[edgeKey] = {
+                type: 'continuous',
+                roundness: (isCrossing && shouldCurve) ? 0.5 : 0
+            };
+        });
+
+        return edgeCurvatureMap;
+    }
+
     renderDiagram(data, positionSnapshot = null) {
         const container = document.getElementById('networkDiagram');
         const showLabels = this.diagramShowLabelsApplied;
@@ -2895,6 +3146,13 @@ class WebAppClient {
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
+        // Compute pre-layout positions if not using manual snapshot
+        let preLayoutPositions = null;
+        if (!positionSnapshot) {
+            const layoutRules = this.diagramOptions?.layout?.layout_rules;
+            preLayoutPositions = this.computeDeterministicLayout(data.nodes, data.edges, layoutRules);
+        }
+
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => {
             const roi = Number(node.id);
@@ -2902,10 +3160,15 @@ class WebAppClient {
             const labelHidden = this.hiddenLabels.has(roi);
             const isHidden = this.hiddenNodes.has(roi);
             const isPhysicsFixed = this.fixedNodes.has(roi);
+
+            // Apply pre-layout position if available
+            const preLayoutPos = preLayoutPositions?.[String(roi)];
+
             return {
                 id: roi,
                 _originalLabel: originalLabel,
                 label: labelHidden ? '' : originalLabel,
+                ...(preLayoutPos && { x: preLayoutPos.x, y: preLayoutPos.y }),
             color: {
                 background: node.color,
                 border: this.darkenColor(node.color),
@@ -2926,6 +3189,16 @@ class WebAppClient {
                 hidden: isHidden
             };
         });
+
+        // Compute edge curvature for conflict resolution (selective curvature)
+        let edgeCurvatureMap = {};
+        if (preLayoutPositions) {
+            const layoutRules = this.diagramOptions?.layout?.layout_rules;
+            const crossingParticipants = this.detectEdgeCrossings(preLayoutPositions, data.edges, true);
+            if (crossingParticipants.size > 0) {
+                edgeCurvatureMap = this.computeEdgeCurvature(crossingParticipants, data.edges, layoutRules);
+            }
+        }
 
         // Prepare edges for vis-network
         const edges = data.edges.map(edge => {
@@ -2958,9 +3231,9 @@ class WebAppClient {
             hidden: isHiddenByToggle
                 || this.hiddenNodes.has(Number(edge.from_node))
                 || this.hiddenNodes.has(Number(edge.to_node)),
-            smooth: {
+            smooth: edgeCurvatureMap[edgeKey] || {
                 type: 'continuous',
-                roundness: 0.5
+                roundness: 0
             }
         });
         });
@@ -2977,7 +3250,17 @@ class WebAppClient {
                 }
             },
             physics: {
-                ...this.getPhysicsFromInfluence()
+                enabled: this.diagramOptions.physics.enabled !== false,
+                stabilization: {
+                    iterations: Number(this.diagramOptions.physics.stabilization_iterations || 200)
+                },
+                barnesHut: {
+                    gravitationalConstant: Number(this.diagramOptions.physics.local?.gravitationalConstant ?? -700),
+                    springConstant: Number(this.diagramOptions.physics.local?.springConstant ?? 0.008),
+                    springLength: Number(this.diagramOptions.physics.local?.springLength ?? 80),
+                    damping: Number(this.diagramOptions.physics.local?.damping ?? 0.55),
+                    centralGravity: Number(this.diagramOptions.physics.local?.centralGravity ?? 0.02)
+                }
             },
             interaction: {
                 hover: interaction.hover !== false,
