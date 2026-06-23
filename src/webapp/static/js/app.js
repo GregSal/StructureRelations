@@ -84,6 +84,9 @@ class WebAppClient {
                 }
             }
         };
+        this.layoutInfluence = Number(
+            this.diagramOptions.layout.local_global_default ?? 30
+        );
 
         // Plot transform state
         this.plotScale = 1.0;
@@ -157,6 +160,7 @@ class WebAppClient {
         };
         const groupedDiagramLayout = configOptions.diagram_layout || configOptions['Diagram Layout'] || {};
         const configLayoutRaw = groupedDiagramLayout.layout || configOptions.layout || {};
+        const configLayoutRules = groupedDiagramLayout.layout_rules || configOptions.layout_rules || {};
         const configLayout = {
             ...configLayoutRaw,
             improvedLayout: configLayoutRaw.improved_layout ?? configLayoutRaw.improvedLayout,
@@ -196,6 +200,10 @@ class WebAppClient {
             layout: {
                 ...this.diagramOptions.layout,
                 ...configLayout,
+                layout_rules: {
+                    ...(this.diagramOptions.layout.layout_rules || {}),
+                    ...configLayoutRules,
+                },
             },
             physics: {
                 ...this.diagramOptions.physics,
@@ -240,6 +248,7 @@ class WebAppClient {
         }
 
         this.tooltipsConfig = this.symbolConfig.tooltips || {};
+        this.setLayoutInfluence(this.layoutInfluence, false);
     }
 
     clampNumber(value, minValue, maxValue) {
@@ -248,6 +257,96 @@ class WebAppClient {
 
     interpolateNumber(localValue, globalValue, weight) {
         return localValue + (globalValue - localValue) * weight;
+    }
+
+    setLayoutInfluence(influence, applyToNetwork = true) {
+        const min = Number(this.diagramOptions.layout.local_global_min ?? 0);
+        const max = Number(this.diagramOptions.layout.local_global_max ?? 100);
+        const fallback = Number(this.diagramOptions.layout.local_global_default ?? min);
+        const numericInfluence = Number(influence);
+        const requested = Number.isFinite(numericInfluence)
+            ? numericInfluence
+            : fallback;
+        const lower = Math.min(min, max);
+        const upper = Math.max(min, max);
+        const clamped = this.clampNumber(requested, lower, upper);
+
+        this.layoutInfluence = clamped;
+        this.diagramOptions.layout.local_global_default = clamped;
+
+        if (!applyToNetwork || !this.network) {
+            return;
+        }
+
+        this.network.setOptions({
+            physics: this.getPhysicsFromInfluence(),
+        });
+
+        if (this.manualLayoutActive) {
+            this.network.stopSimulation();
+        } else {
+            this.network.startSimulation();
+        }
+    }
+
+    getPhysicsFromInfluence() {
+        const physics = this.diagramOptions.physics || {};
+        const local = physics.local || {};
+        const global = physics.global || {};
+        const min = Number(this.diagramOptions.layout.local_global_min ?? 0);
+        const max = Number(this.diagramOptions.layout.local_global_max ?? 100);
+        const span = max - min;
+        const rawWeight = span === 0 ? 0 : (this.layoutInfluence - min) / span;
+        const weight = this.clampNumber(rawWeight, 0, 1);
+
+        const getValue = (localValue, globalValue, fallback) => {
+            const localNum = Number(localValue);
+            const globalNum = Number(globalValue);
+            if (Number.isFinite(localNum) && Number.isFinite(globalNum)) {
+                return this.interpolateNumber(localNum, globalNum, weight);
+            }
+            if (Number.isFinite(localNum)) {
+                return localNum;
+            }
+            if (Number.isFinite(globalNum)) {
+                return globalNum;
+            }
+            return fallback;
+        };
+
+        return {
+            enabled: physics.enabled !== false,
+            stabilization: {
+                iterations: Number(physics.stabilization_iterations || 200),
+            },
+            barnesHut: {
+                gravitationalConstant: getValue(
+                    local.gravitationalConstant,
+                    global.gravitationalConstant,
+                    -700,
+                ),
+                springConstant: getValue(
+                    local.springConstant,
+                    global.springConstant,
+                    0.008,
+                ),
+                springLength: getValue(
+                    local.springLength,
+                    global.springLength,
+                    80,
+                ),
+                damping: getValue(
+                    local.damping,
+                    global.damping,
+                    0.55,
+                ),
+                centralGravity: getValue(
+                    local.centralGravity,
+                    global.centralGravity,
+                    0.02,
+                ),
+            },
+        };
     }
 
     // Helper to convert RGB array to CSS color string
@@ -2815,7 +2914,7 @@ class WebAppClient {
             return null;
         }
 
-        // Detect global layout style
+        // Use tree/cycle as initial starting point only
         const layoutStyle = this.selectLayoutStyle(nodesData, candidateEdges, layoutRules);
 
         let positions = {};
@@ -2832,6 +2931,11 @@ class WebAppClient {
         }
         if (layoutRules.opt_grouping && layoutRules.opt_grouping.enabled) {
             this.applyOptGroupingConstraints(positions, nodesData, layoutRules.opt_grouping.tightness);
+        }
+
+        // PRIORITY: Aggressively minimize edge crossings above all other rules
+        if (layoutRules.crossing_minimization && layoutRules.crossing_minimization.enabled) {
+            this.minimizeCrossingsPrimary(positions, nodesData, candidateEdges, layoutRules);
         }
 
         return positions;
@@ -3037,6 +3141,8 @@ class WebAppClient {
         });
     }
 
+    minimizeCrossingsPrimary(positions, nodesData, edgesData, layoutRules) {\n        /**\n         * Sugiyama-style crossing minimization using barycenter method.\n         * Proven algorithm for reducing edge crossings as primary objective.\n         */\n        const layers = this.assignLayersForCrossingMinimization(nodesData, edgesData);\n        if (!layers || layers.length < 2) return;\n\n        // Apply iterative barycenter method (forward/backward passes)\n        const maxIterations = 6;\n        for (let iter = 0; iter < maxIterations; iter++) {\n            let improved = false;\n\n            // Forward pass\n            for (let l = 1; l < layers.length; l++) {\n                improved |= this.barycentricOrderingPass(\n                    positions, layers[l], layers[l - 1], edgesData\n                );\n            }\n\n            // Backward pass\n            for (let l = layers.length - 2; l >= 0; l--) {\n                improved |= this.barycentricOrderingPass(\n                    positions, layers[l], layers[l + 1], edgesData\n                );\n            }\n\n            if (!improved) break;\n        }\n    }\n\n    assignLayersForCrossingMinimization(nodesData, edgesData) {\n        const nodeIds = new Set(nodesData.map(n => Number(n.id)));\n        const inDegree = {};\n        nodeIds.forEach(id => inDegree[id] = 0);\n\n        const hierarchicalRelations = ['CONTAINS', 'WITHIN', 'SURROUNDS', 'ENCLOSED', 'SHELTERS', 'SHELTERED', 'CONFINES', 'CONFINED'];\n        const outgoing = {};\n        nodeIds.forEach(id => outgoing[id] = []);\n\n        edgesData.forEach(e => {\n            if (hierarchicalRelations.includes(e.relation_type)) {\n                const from = Number(e.from_node);\n                const to = Number(e.to_node);\n                if (nodeIds.has(from) && nodeIds.has(to)) {\n                    outgoing[from].push(to);\n                    inDegree[to]++;\n                }\n            }\n        });\n\n        const layers = [];\n        const assigned = new Set();\n        let queue = Array.from(nodeIds).filter(id => inDegree[id] === 0);\n\n        if (queue.length === 0) {\n            // No hierarchy, group sequentially\n            const sorted = Array.from(nodeIds).sort((a, b) => a - b);\n            const layerSize = Math.ceil(Math.sqrt(sorted.length));\n            for (let i = 0; i < sorted.length; i += layerSize) {\n                layers.push(sorted.slice(i, i + layerSize));\n            }\n            return layers;\n        }\n\n        while (queue.length > 0) {\n            const layer = queue.slice();\n            layers.push(layer);\n            queue = [];\n\n            layer.forEach(nodeId => {\n                assigned.add(nodeId);\n                outgoing[nodeId].forEach(to => {\n                    if (!assigned.has(to)) {\n                        const readyToAdd = edgesData.every(e => {\n                            if (Number(e.to_node) !== to || !hierarchicalRelations.includes(e.relation_type)) return true;\n                            return assigned.has(Number(e.from_node));\n                        });\n                        if (readyToAdd && !queue.includes(to)) queue.push(to);\n                    }\n                });\n            });\n        }\n\n        return layers.length > 0 ? layers : null;\n    }\n\n    barycentricOrderingPass(positions, layer, refLayer, edgesData) {\n        if (!layer || layer.length < 2) return false;\n\n        const barycenters = {};\n        layer.forEach(nodeId => {\n            const neighbors = edgesData\n                .filter(e => (Number(e.from_node) === nodeId || Number(e.to_node) === nodeId) &&\n                    refLayer.includes(Number(e.from_node) === nodeId ? e.to_node : e.from_node))\n                .map(e => positions[String(Number(e.from_node) === nodeId ? e.to_node : e.from_node)]?.x || 0)\n                .sort((a, b) => a - b);\n\n            barycenters[nodeId] = neighbors.length > 0\n                ? neighbors[Math.floor(neighbors.length / 2)]\n                : positions[String(nodeId)]?.x || 0;\n        });\n\n        const orderedLayer = [...layer].sort((a, b) => barycenters[a] - barycenters[b]);\n        let improved = false;\n\n        for (let i = 0; i < orderedLayer.length - 1; i++) {\n            const crossCurr = this.countCrossingsForPair(orderedLayer[i], orderedLayer[i + 1], edgesData, positions);\n            [orderedLayer[i], orderedLayer[i + 1]] = [orderedLayer[i + 1], orderedLayer[i]];\n            const crossSwap = this.countCrossingsForPair(orderedLayer[i], orderedLayer[i + 1], edgesData, positions);\n\n            if (crossSwap >= crossCurr) {\n                [orderedLayer[i], orderedLayer[i + 1]] = [orderedLayer[i + 1], orderedLayer[i]];\n            } else {\n                improved = true;\n            }\n        }\n\n        const xMin = Math.min(...layer.map(n => positions[String(n)]?.x || 0));\n        const xMax = Math.max(...layer.map(n => positions[String(n)]?.x || 0));\n        const spacing = (xMax - xMin) / Math.max(layer.length - 1, 1);\n\n        orderedLayer.forEach((nodeId, idx) => {\n            positions[String(nodeId)] = {\n                x: xMin + idx * spacing,\n                y: positions[String(nodeId)]?.y || 0\n            };\n        });\n\n        return improved;\n    }\n\n    countCrossingsForPair(node1, node2, edgesData, positions) {\n        let crossings = 0;\n        const edges1 = edgesData.filter(e => Number(e.from_node) === node1 || Number(e.to_node) === node1);\n        const edges2 = edgesData.filter(e => Number(e.from_node) === node2 || Number(e.to_node) === node2);\n\n        for (const e1 of edges1) {\n            for (const e2 of edges2) {\n                const p1 = positions[String(e1.from_node)];\n                const p2 = positions[String(e1.to_node)];\n                const p3 = positions[String(e2.from_node)];\n                const p4 = positions[String(e2.to_node)];\n                if (p1 && p2 && p3 && p4 && this.doSegmentsCross(p1, p2, p3, p4)) crossings++;\n            }\n        }\n        return crossings;\n    }
+
     // ============ EDGE ROUTING: CROSSING DETECTION & SELECTIVE CURVATURE ============
 
     /**
@@ -3096,23 +3202,29 @@ class WebAppClient {
      */
     computeEdgeCurvature(crossingParticipants, edgesData, layoutRules) {
         const edgeCurvatureMap = {};
-        const overlapsWeight = 0.5;  // OVERLAPS edges cost less to curve
-        const otherWeight = 1.0;
+        const edgeRouting = layoutRules?.edge_routing || {};
+        const baseRoundness = Number(edgeRouting.base_roundness ?? 0.18);
+        const crossingRoundness = Number(edgeRouting.crossing_roundness ?? 0.45);
+        const curvatureThreshold = Number(edgeRouting.curvature_threshold ?? 0.5);
+        const relationWeights = edgeRouting.relation_weights || {};
+        const defaultWeight = 1.0;
 
-        // Sort crossing participants by weight (OVERLAPS have lower priority to receive curves)
+        // Sort crossing participants by weight so lower-weight relationships
+        // absorb the curvature first.
         const sortedCrossings = Array.from(crossingParticipants)
             .map(edgeKey => {
                 const edge = edgesData.find(e => this._buildEdgeKey(e) === edgeKey);
-                const weight = edge && edge.relation_type === 'OVERLAPS' ? overlapsWeight : otherWeight;
+                const relationType = String(edge?.relation_type || '').toUpperCase();
+                const weight = Number(relationWeights[relationType] ?? defaultWeight);
                 return { edgeKey, weight, edge };
             })
             .sort((a, b) => a.weight - b.weight);  // OVERLAPS first (lower priority)
 
-        // Decide which edges to curve: prefer OVERLAPS edges to absorb the curvature cost
-        const curvatureThreshold = layoutRules?.edge_routing?.curvature_threshold || 0.5;
+        // Decide which edges to curve: prefer lower-weight relationships to absorb
+        // the curvature cost.
         const edgesToCurve = new Set();
 
-        // Apply curvature to ~50% of crossing edges (preference for OVERLAPS)
+        // Apply curvature to a configurable share of crossing edges.
         const curvatureBudget = Math.ceil(sortedCrossings.length * curvatureThreshold);
         for (let i = 0; i < Math.min(curvatureBudget, sortedCrossings.length); i++) {
             edgesToCurve.add(sortedCrossings[i].edgeKey);
@@ -3126,7 +3238,7 @@ class WebAppClient {
 
             edgeCurvatureMap[edgeKey] = {
                 type: 'continuous',
-                roundness: (isCrossing && shouldCurve) ? 0.5 : 0
+                roundness: isCrossing && shouldCurve ? crossingRoundness : baseRoundness
             };
         });
 
@@ -3254,7 +3366,7 @@ class WebAppClient {
                 || this.hiddenNodes.has(Number(edge.to_node)),
             smooth: edgeCurvatureMap[edgeKey] || {
                 type: 'continuous',
-                roundness: 0
+                roundness: 0.18
             }
         });
         });
@@ -3270,19 +3382,7 @@ class WebAppClient {
                     type: 'continuous'
                 }
             },
-            physics: {
-                enabled: this.diagramOptions.physics.enabled !== false,
-                stabilization: {
-                    iterations: Number(this.diagramOptions.physics.stabilization_iterations || 200)
-                },
-                barnesHut: {
-                    gravitationalConstant: Number(this.diagramOptions.physics.local?.gravitationalConstant ?? -700),
-                    springConstant: Number(this.diagramOptions.physics.local?.springConstant ?? 0.008),
-                    springLength: Number(this.diagramOptions.physics.local?.springLength ?? 80),
-                    damping: Number(this.diagramOptions.physics.local?.damping ?? 0.55),
-                    centralGravity: Number(this.diagramOptions.physics.local?.centralGravity ?? 0.02)
-                }
-            },
+            physics: this.getPhysicsFromInfluence(),
             interaction: {
                 hover: interaction.hover !== false,
                 tooltipDelay: Number(interaction.tooltipDelay || 100),
@@ -3295,7 +3395,9 @@ class WebAppClient {
             }
         };
 
-        if (positionSnapshot) {
+        // Disable physics when we have preLayout from crossing minimization
+        // The deterministic layout is optimized and physics would undo the work
+        if (positionSnapshot || preLayoutPositions) {
             options.physics.enabled = false;
         }
 

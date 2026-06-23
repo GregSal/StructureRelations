@@ -1382,26 +1382,28 @@ def parse_side_tag(label: str) -> Optional[str]:
 
 
 def extract_opt_group_key(label: str) -> Optional[str]:
-    """Extract opt grouping key by removing trailing group letters (a/b/c) and opt prefix.
+    """Extract grouping key by removing trailing group letters (a/b/c) and opt/eval prefix.
 
-    For opt labels: ignore trailing a/b/c when computing group key.
-    For non-opt labels: use full suffix.
+    For opt/eval labels: ignore trailing a/b/c when computing group key.
+    For non-opt/eval labels: return None.
 
     Args:
-        label: Structure label (e.g., 'opt Parotid L a', 'Bladder')
+        label: Structure label (e.g., 'opt Parotid L a', 'eval PTV b', 'Bladder')
 
     Returns:
-        Normalized group key or None if not an opt label
+        Normalized group key or None if not an opt/eval label
     """
     if not label:
         return None
     normalized = label.strip()
 
-    if not normalized.startswith('opt'):
+    # Check for opt or eval prefix
+    if normalized.lower().startswith('opt '):
+        suffix = normalized[3:].strip()
+    elif normalized.lower().startswith('eval '):
+        suffix = normalized[4:].strip()
+    else:
         return None
-
-    # Remove 'opt' prefix and leading whitespace
-    suffix = normalized[3:].strip()
 
     # Remove trailing single letter (a/b/c) if present and preceded by space
     if suffix and suffix[-1] in ('a', 'b', 'c') and len(suffix) > 1 and suffix[-2] == ' ':

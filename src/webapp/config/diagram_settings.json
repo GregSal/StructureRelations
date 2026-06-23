@@ -148,16 +148,16 @@
         "local": {
           "gravitational_constant": -700,
           "spring_constant": 0.008,
-          "spring_length": 80,
+          "spring_length": 115,
           "damping": 0.55,
-          "central_gravity": 0.02
+          "central_gravity": 0.015
         },
         "global": {
           "gravitational_constant": -2000,
           "spring_constant": 0.04,
-          "spring_length": 150,
+          "spring_length": 220,
           "damping": 0.28,
-          "central_gravity": 0.15
+          "central_gravity": 0.09
         }
       },
       "layout_rules": {
@@ -167,6 +167,19 @@
           "enabled": true,
           "overlap_crossing_weight": 0.5,
           "other_crossing_weight": 1.0
+        },
+        "edge_routing": {
+          "enabled": true,
+          "curvature_threshold": 0.5,
+          "base_roundness": 0.18,
+          "crossing_roundness": 0.45,
+          "relation_weights": {
+            "OVERLAPS": 0.1,
+            "CONTAINS": 1.5,
+            "WITHIN": 1.5,
+            "PARTITIONS": 0.75,
+            "PARTITIONED": 0.75
+          }
         },
         "edge_exclusion": {
           "exclude_disjoint": true,

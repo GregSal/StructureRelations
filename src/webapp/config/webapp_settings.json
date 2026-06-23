@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "session_storage": {
     "max_disk_size_mb": 2048,
-    "warn_disk_size_mb": 500,
+    "warn_disk_size_mb": 1500,
     "session_expiry_hours": 8
   }
 }
