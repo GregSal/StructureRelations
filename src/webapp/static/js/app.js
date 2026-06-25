@@ -3141,7 +3141,225 @@ class WebAppClient {
         });
     }
 
-    minimizeCrossingsPrimary(positions, nodesData, edgesData, layoutRules) {\n        /**\n         * Sugiyama-style crossing minimization using barycenter method.\n         * Proven algorithm for reducing edge crossings as primary objective.\n         */\n        const layers = this.assignLayersForCrossingMinimization(nodesData, edgesData);\n        if (!layers || layers.length < 2) return;\n\n        // Apply iterative barycenter method (forward/backward passes)\n        const maxIterations = 6;\n        for (let iter = 0; iter < maxIterations; iter++) {\n            let improved = false;\n\n            // Forward pass\n            for (let l = 1; l < layers.length; l++) {\n                improved |= this.barycentricOrderingPass(\n                    positions, layers[l], layers[l - 1], edgesData\n                );\n            }\n\n            // Backward pass\n            for (let l = layers.length - 2; l >= 0; l--) {\n                improved |= this.barycentricOrderingPass(\n                    positions, layers[l], layers[l + 1], edgesData\n                );\n            }\n\n            if (!improved) break;\n        }\n    }\n\n    assignLayersForCrossingMinimization(nodesData, edgesData) {\n        const nodeIds = new Set(nodesData.map(n => Number(n.id)));\n        const inDegree = {};\n        nodeIds.forEach(id => inDegree[id] = 0);\n\n        const hierarchicalRelations = ['CONTAINS', 'WITHIN', 'SURROUNDS', 'ENCLOSED', 'SHELTERS', 'SHELTERED', 'CONFINES', 'CONFINED'];\n        const outgoing = {};\n        nodeIds.forEach(id => outgoing[id] = []);\n\n        edgesData.forEach(e => {\n            if (hierarchicalRelations.includes(e.relation_type)) {\n                const from = Number(e.from_node);\n                const to = Number(e.to_node);\n                if (nodeIds.has(from) && nodeIds.has(to)) {\n                    outgoing[from].push(to);\n                    inDegree[to]++;\n                }\n            }\n        });\n\n        const layers = [];\n        const assigned = new Set();\n        let queue = Array.from(nodeIds).filter(id => inDegree[id] === 0);\n\n        if (queue.length === 0) {\n            // No hierarchy, group sequentially\n            const sorted = Array.from(nodeIds).sort((a, b) => a - b);\n            const layerSize = Math.ceil(Math.sqrt(sorted.length));\n            for (let i = 0; i < sorted.length; i += layerSize) {\n                layers.push(sorted.slice(i, i + layerSize));\n            }\n            return layers;\n        }\n\n        while (queue.length > 0) {\n            const layer = queue.slice();\n            layers.push(layer);\n            queue = [];\n\n            layer.forEach(nodeId => {\n                assigned.add(nodeId);\n                outgoing[nodeId].forEach(to => {\n                    if (!assigned.has(to)) {\n                        const readyToAdd = edgesData.every(e => {\n                            if (Number(e.to_node) !== to || !hierarchicalRelations.includes(e.relation_type)) return true;\n                            return assigned.has(Number(e.from_node));\n                        });\n                        if (readyToAdd && !queue.includes(to)) queue.push(to);\n                    }\n                });\n            });\n        }\n\n        return layers.length > 0 ? layers : null;\n    }\n\n    barycentricOrderingPass(positions, layer, refLayer, edgesData) {\n        if (!layer || layer.length < 2) return false;\n\n        const barycenters = {};\n        layer.forEach(nodeId => {\n            const neighbors = edgesData\n                .filter(e => (Number(e.from_node) === nodeId || Number(e.to_node) === nodeId) &&\n                    refLayer.includes(Number(e.from_node) === nodeId ? e.to_node : e.from_node))\n                .map(e => positions[String(Number(e.from_node) === nodeId ? e.to_node : e.from_node)]?.x || 0)\n                .sort((a, b) => a - b);\n\n            barycenters[nodeId] = neighbors.length > 0\n                ? neighbors[Math.floor(neighbors.length / 2)]\n                : positions[String(nodeId)]?.x || 0;\n        });\n\n        const orderedLayer = [...layer].sort((a, b) => barycenters[a] - barycenters[b]);\n        let improved = false;\n\n        for (let i = 0; i < orderedLayer.length - 1; i++) {\n            const crossCurr = this.countCrossingsForPair(orderedLayer[i], orderedLayer[i + 1], edgesData, positions);\n            [orderedLayer[i], orderedLayer[i + 1]] = [orderedLayer[i + 1], orderedLayer[i]];\n            const crossSwap = this.countCrossingsForPair(orderedLayer[i], orderedLayer[i + 1], edgesData, positions);\n\n            if (crossSwap >= crossCurr) {\n                [orderedLayer[i], orderedLayer[i + 1]] = [orderedLayer[i + 1], orderedLayer[i]];\n            } else {\n                improved = true;\n            }\n        }\n\n        const xMin = Math.min(...layer.map(n => positions[String(n)]?.x || 0));\n        const xMax = Math.max(...layer.map(n => positions[String(n)]?.x || 0));\n        const spacing = (xMax - xMin) / Math.max(layer.length - 1, 1);\n\n        orderedLayer.forEach((nodeId, idx) => {\n            positions[String(nodeId)] = {\n                x: xMin + idx * spacing,\n                y: positions[String(nodeId)]?.y || 0\n            };\n        });\n\n        return improved;\n    }\n\n    countCrossingsForPair(node1, node2, edgesData, positions) {\n        let crossings = 0;\n        const edges1 = edgesData.filter(e => Number(e.from_node) === node1 || Number(e.to_node) === node1);\n        const edges2 = edgesData.filter(e => Number(e.from_node) === node2 || Number(e.to_node) === node2);\n\n        for (const e1 of edges1) {\n            for (const e2 of edges2) {\n                const p1 = positions[String(e1.from_node)];\n                const p2 = positions[String(e1.to_node)];\n                const p3 = positions[String(e2.from_node)];\n                const p4 = positions[String(e2.to_node)];\n                if (p1 && p2 && p3 && p4 && this.doSegmentsCross(p1, p2, p3, p4)) crossings++;\n            }\n        }\n        return crossings;\n    }
+
+    minimizeCrossingsPrimary(positions, nodesData, edgesData, layoutRules) {
+        /**
+         * Sugiyama-style crossing minimization using barycenter method.
+         * Proven algorithm for reducing edge crossings as primary objective.
+         */
+        const layers = this.assignLayersForCrossingMinimization(
+            nodesData, edgesData
+        );
+        if (!layers || layers.length < 2) return;
+
+        const maxIterations = 6;
+        for (let iter = 0; iter < maxIterations; iter++) {
+            let improved = false;
+
+            for (let layerIndex = 1; layerIndex < layers.length; layerIndex++) {
+                improved = this.barycentricOrderingPass(
+                    positions,
+                    layers[layerIndex],
+                    layers[layerIndex - 1],
+                    edgesData,
+                ) || improved;
+            }
+
+            for (let layerIndex = layers.length - 2; layerIndex >= 0;
+                layerIndex--) {
+                improved = this.barycentricOrderingPass(
+                    positions,
+                    layers[layerIndex],
+                    layers[layerIndex + 1],
+                    edgesData,
+                ) || improved;
+            }
+
+            if (!improved) {
+                break;
+            }
+        }
+    }
+
+    assignLayersForCrossingMinimization(nodesData, edgesData) {
+        const nodeIds = new Set(nodesData.map(node => Number(node.id)));
+        const inDegree = {};
+        nodeIds.forEach(nodeId => {
+            inDegree[nodeId] = 0;
+        });
+
+        const hierarchicalRelations = [
+            'CONTAINS',
+            'WITHIN',
+            'SURROUNDS',
+            'ENCLOSED',
+            'SHELTERS',
+            'SHELTERED',
+            'CONFINES',
+            'CONFINED',
+        ];
+        const outgoing = {};
+        nodeIds.forEach(nodeId => {
+            outgoing[nodeId] = [];
+        });
+
+        edgesData.forEach(edge => {
+            if (!hierarchicalRelations.includes(edge.relation_type)) {
+                return;
+            }
+
+            const fromNode = Number(edge.from_node);
+            const toNode = Number(edge.to_node);
+            if (nodeIds.has(fromNode) && nodeIds.has(toNode)) {
+                outgoing[fromNode].push(toNode);
+                inDegree[toNode] += 1;
+            }
+        });
+
+        const layers = [];
+        const assigned = new Set();
+        let queue = Array.from(nodeIds).filter(nodeId => inDegree[nodeId] === 0);
+
+        if (queue.length === 0) {
+            const sorted = Array.from(nodeIds).sort((left, right) => left - right);
+            const layerSize = Math.ceil(Math.sqrt(sorted.length));
+            for (let index = 0; index < sorted.length; index += layerSize) {
+                layers.push(sorted.slice(index, index + layerSize));
+            }
+            return layers;
+        }
+
+        while (queue.length > 0) {
+            const layer = queue.slice();
+            layers.push(layer);
+            queue = [];
+
+            layer.forEach(nodeId => {
+                assigned.add(nodeId);
+                outgoing[nodeId].forEach(toNode => {
+                    if (assigned.has(toNode)) {
+                        return;
+                    }
+
+                    const readyToAdd = edgesData.every(edge => {
+                        if (Number(edge.to_node) !== toNode) {
+                            return true;
+                        }
+                        if (!hierarchicalRelations.includes(edge.relation_type)) {
+                            return true;
+                        }
+                        return assigned.has(Number(edge.from_node));
+                    });
+                    if (readyToAdd && !queue.includes(toNode)) {
+                        queue.push(toNode);
+                    }
+                });
+            });
+        }
+
+        return layers.length > 0 ? layers : null;
+    }
+
+    barycentricOrderingPass(positions, layer, refLayer, edgesData) {
+        if (!layer || layer.length < 2) {
+            return false;
+        }
+
+        const barycenters = {};
+        layer.forEach(nodeId => {
+            const neighbors = edgesData
+                .filter(edge => (
+                    Number(edge.from_node) === nodeId ||
+                    Number(edge.to_node) === nodeId
+                ) && refLayer.includes(
+                    Number(edge.from_node) === nodeId
+                        ? Number(edge.to_node)
+                        : Number(edge.from_node)
+                ))
+                .map(edge => positions[String(
+                    Number(edge.from_node) === nodeId
+                        ? Number(edge.to_node)
+                        : Number(edge.from_node)
+                )]?.x || 0)
+                .sort((left, right) => left - right);
+
+            barycenters[nodeId] = neighbors.length > 0
+                ? neighbors[Math.floor(neighbors.length / 2)]
+                : positions[String(nodeId)]?.x || 0;
+        });
+
+        const orderedLayer = [...layer].sort(
+            (left, right) => barycenters[left] - barycenters[right]
+        );
+        let improved = false;
+
+        for (let index = 0; index < orderedLayer.length - 1; index++) {
+            const crossCurrent = this.countCrossingsForPair(
+                orderedLayer[index],
+                orderedLayer[index + 1],
+                edgesData,
+                positions,
+            );
+            [orderedLayer[index], orderedLayer[index + 1]] = [
+                orderedLayer[index + 1],
+                orderedLayer[index],
+            ];
+            const crossSwapped = this.countCrossingsForPair(
+                orderedLayer[index],
+                orderedLayer[index + 1],
+                edgesData,
+                positions,
+            );
+
+            if (crossSwapped >= crossCurrent) {
+                [orderedLayer[index], orderedLayer[index + 1]] = [
+                    orderedLayer[index + 1],
+                    orderedLayer[index],
+                ];
+            } else {
+                improved = true;
+            }
+        }
+
+        const xMin = Math.min(...layer.map(node => positions[String(node)]?.x || 0));
+        const xMax = Math.max(...layer.map(node => positions[String(node)]?.x || 0));
+        const spacing = (xMax - xMin) / Math.max(layer.length - 1, 1);
+
+        orderedLayer.forEach((nodeId, index) => {
+            positions[String(nodeId)] = {
+                x: xMin + index * spacing,
+                y: positions[String(nodeId)]?.y || 0,
+            };
+        });
+
+        return improved;
+    }
+
+    countCrossingsForPair(node1, node2, edgesData, positions) {
+        let crossings = 0;
+        const edges1 = edgesData.filter(edge => (
+            Number(edge.from_node) === node1 || Number(edge.to_node) === node1
+        ));
+        const edges2 = edgesData.filter(edge => (
+            Number(edge.from_node) === node2 || Number(edge.to_node) === node2
+        ));
+
+        for (const edge1 of edges1) {
+            for (const edge2 of edges2) {
+                const point1 = positions[String(edge1.from_node)];
+                const point2 = positions[String(edge1.to_node)];
+                const point3 = positions[String(edge2.from_node)];
+                const point4 = positions[String(edge2.to_node)];
+                if (
+                    point1 && point2 && point3 && point4 &&
+                    this.doSegmentsCross(point1, point2, point3, point4)
+                ) {
+                    crossings += 1;
+                }
+            }
+        }
+        return crossings;
+    }
 
     // ============ EDGE ROUTING: CROSSING DETECTION & SELECTIVE CURVATURE ============
 

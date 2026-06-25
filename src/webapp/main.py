@@ -6,6 +6,7 @@ matrix visualization.
 '''
 import sys
 import os
+import re
 import logging
 import uuid
 import asyncio
@@ -149,6 +150,7 @@ class DiagramNode(BaseModel):
     title: str  # Tooltip
     side_tag: Optional[str] = None  # 'L', 'R', 'B', or None for layout constraint
     opt_group_key: Optional[str] = None  # Normalized key for opt-prefix grouping
+    target_group_key: Optional[str] = None  # Normalized key for target dose-level grouping
 
 
 class DiagramEdge(BaseModel):
@@ -1412,6 +1414,42 @@ def extract_opt_group_key(label: str) -> Optional[str]:
     return suffix if suffix else None
 
 
+_TARGET_GROUP_PATTERN = re.compile(
+    r'(?P<family>I?[GCPIH]TV)\s*(?P<dose>\d+)(?:[a-c])?\b',
+    re.IGNORECASE,
+)
+
+
+def extract_target_group_key(label: str) -> Optional[str]:
+    """Extract a target dose-group key from a structure label.
+
+    Detects target volumes named with a family prefix (GTV, CTV, PTV, ITV,
+    HTV, IGTV) followed by dose digits and an optional lowercase variant
+    letter (a/b/c). The variant letter denotes a member of the same dose
+    group, so it is excluded from the key. For example 'PTV70', 'PTV70a' and
+    'PTV70b' all map to the key 'PTV70'.
+
+    Args:
+        label: Structure label (e.g., 'PTV70', 'CTV 56 b', 'Bladder').
+
+    Returns:
+        Normalized group key (family + dose) or None if not a target volume.
+    """
+    if not label:
+        return None
+    stripped = label.strip()
+    # opt/eval structures are handled by opt grouping, not target grouping.
+    lowered = stripped.lower()
+    if lowered.startswith('opt ') or lowered.startswith('eval '):
+        return None
+    match = _TARGET_GROUP_PATTERN.search(stripped)
+    if not match:
+        return None
+    family = match.group('family').upper()
+    dose = match.group('dose')
+    return f'{family}{dose}'
+
+
 @app.post('/api/diagram', response_model=DiagramResponse)
 async def get_diagram_data(request: MatrixRequest):
     '''Generate network diagram data for relationship visualization.
@@ -1643,6 +1681,7 @@ async def get_diagram_data(request: MatrixRequest):
             # Extract layout metadata for deterministic layout
             side_tag = parse_side_tag(name)
             opt_group_key = extract_opt_group_key(name)
+            target_group_key = extract_target_group_key(name)
 
             nodes.append(DiagramNode(
                 id=roi,
@@ -1651,7 +1690,8 @@ async def get_diagram_data(request: MatrixRequest):
                 shape=shape_map.get(dicom_type, default_shape),
                 title=tooltip,
                 side_tag=side_tag,
-                opt_group_key=opt_group_key
+                opt_group_key=opt_group_key,
+                target_group_key=target_group_key
             ))
             roi_to_name[roi] = name
         node_build_ms = round((time.perf_counter() - node_build_start) * 1000.0)

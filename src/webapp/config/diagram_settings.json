@@ -161,12 +161,36 @@
         }
       },
       "layout_rules": {
-        "description": "Deterministic rule-based layout optimization for diagram edge crossing minimization and constraint application",
+        "description": "Constraint-based stress layout (cola.js) parameters for the relationship diagram. Computed headlessly client-side; vis-network renders with physics off.",
         "enabled": true,
-        "crossing_minimization": {
+        "link_distance": 95,
+        "node_padding": 16,
+        "convergence": {
+          "unconstrained_iters": 20,
+          "user_iters": 20,
+          "all_iters": 25,
+          "description": "cola iteration budget: stress-only, then user constraints, then all constraints."
+        },
+        "flow": {
           "enabled": true,
-          "overlap_crossing_weight": 0.5,
-          "other_crossing_weight": 1.0
+          "gap": 80,
+          "description": "Vertical separation for hierarchical/directional relations (container/parent kept above the contained/child node)."
+        },
+        "side_bias": {
+          "enabled": true,
+          "gap": 130,
+          "align_level": true,
+          "description": "L nodes to the right, R nodes to the left, B between; each L/R/B set kept level for symmetry."
+        },
+        "opt_grouping": {
+          "enabled": true,
+          "link_distance": 45,
+          "description": "opt/eval structures pulled tightly to their base structure via short links (tighter than target groups)."
+        },
+        "target_grouping": {
+          "enabled": true,
+          "padding": 32,
+          "description": "Target volumes sharing a dose level (e.g. PTV70 / PTV70a / PTV70b) clustered as a cola group with looser padding."
         },
         "edge_routing": {
           "enabled": true,
@@ -180,30 +204,6 @@
             "PARTITIONS": 0.75,
             "PARTITIONED": 0.75
           }
-        },
-        "edge_exclusion": {
-          "exclude_disjoint": true,
-          "exclude_faded_logical": true,
-          "exclude_hidden": true
-        },
-        "side_bias": {
-          "enabled": true,
-          "strength": 0.7,
-          "description": "L nodes biased right, R nodes biased left, B nodes centered between L/R pairs"
-        },
-        "opt_grouping": {
-          "enabled": true,
-          "tightness": 0.6,
-          "description": "Group opt-prefixed nodes by normalized trailing portion (ignoring trailing a/b/c group letters)"
-        },
-        "straight_edges": {
-          "enabled": true,
-          "description": "Use straight edges by default; curve only when needed to reduce crossing cost"
-        },
-        "global_style": {
-          "mode": "auto",
-          "mode_options": ["auto", "tree", "cycle"],
-          "description": "auto: choose tree or cycle based on graph diagnostics; tree: containment-driven hierarchy; cycle: circular layout for dense cyclic graphs"
         }
       }
     }
