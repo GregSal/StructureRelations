@@ -24,6 +24,14 @@ The webapp can deselect structures automatically during preview using
 `structure_filter_rules.json`. Each rule targets one of the supported labels
 from the DICOM metadata and can optionally require a second matching field.
 
+The top-level configuration supports:
+
+- `name`
+- `description`
+- `include by default`
+- `display by default`
+- `skip_manual_selection`
+
 Supported `field` values:
 
 - `Structure Code`
@@ -43,11 +51,29 @@ Supported `match_type` values:
 - `prefix`
 - `suffix`
 - `regex`
+- `structure list`
+
+Supported `action` values:
+
+- `exclude` - remove the structure from processing
+- `hide` - keep the structure selected but hide it in the diagram
+- `include` - explicitly include the structure for processing
+- `display` - explicitly show the structure in the diagram
+
+Rules are evaluated in file order. When multiple rules match the same structure,
+later rules override earlier ones.
+
+For `structure list`, the `value` must be a JSON array of exact `Structure ID`
+strings.
 
 Example:
 
 ```json
 {
+  "name": "Example filter rules",
+  "include by default": true,
+  "display by default": true,
+  "skip_manual_selection": false,
   "rules": [
     {
       "id": "artifact-z-prefix",

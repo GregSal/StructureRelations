@@ -1,0 +1,57 @@
+{
+  "name": "Default rules",
+  "description": "Default structure selection rules for the webapp.",
+  "include by default": true,
+  "display by default": true,
+  "skip_manual_selection": false,
+  "rules": [
+    {
+      "id": "artifact-z-prefix",
+      "description": "Deselect helper or artifact structures with a Z prefix",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "prefix",
+      "value": "Z"
+    },
+    {
+      "id": "helper-x-prefix",
+      "description": "Deselect helper or temporary structures with an X prefix",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "prefix",
+      "value": "X"
+    },
+    {
+      "id": "dpv-prefix",
+      "description": "Deselect structures with the DPV prefix",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "prefix",
+      "value": "DPV"
+    },
+    {
+      "id": "support-structures",
+      "description": "Deselect structures with Support type.",
+      "action": "exclude",
+      "field": "DICOM Type",
+      "match_type": "exact",
+      "value": "Support"
+    },
+    {
+      "id": "hide-oar",
+      "description": "Hide OAR structures by default.",
+      "action": "hide",
+      "field": "DICOM Type",
+      "match_type": "exact",
+      "value": "ORGAN"
+    },
+    {
+      "id": "hide-Avoidance",
+      "description": "Hide OAR structures by default.",
+      "action": "hide",
+      "field": "DICOM Type",
+      "match_type": "exact",
+      "value": "AVOIDANCE"
+    }
+  ]
+}

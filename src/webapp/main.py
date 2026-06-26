@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
 import io
+import networkx as nx
 
-from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -83,7 +84,11 @@ connection_manager = ConnectionManager()
 processing_tasks: Dict[str, asyncio.Task] = {}
 cancel_events: Dict[str, asyncio.Event] = {}
 _plot_response_cache: OrderedDict = OrderedDict()
-PLOT_RESPONSE_CACHE_MAX_ENTRIES = 128
+PLOT_RESPONSE_CACHE_MAX_ENTRIES = int(os.getenv('SR_PLOT_CACHE_MAX_ENTRIES', '32'))
+PLOT_RESPONSE_CACHE_MAX_BYTES = (
+    int(os.getenv('SR_PLOT_CACHE_MAX_MB', '32')) * 1024 * 1024
+)
+_plot_response_cache_bytes = 0
 
 # Mount static files
 static_dir = Path(__file__).parent / 'static'
@@ -104,6 +109,7 @@ class PreviewResponse(BaseModel):
     filtered_structures: List[dict] = Field(default_factory=list)
     patient_info: dict
     disk_usage_mb: float
+    skip_manual_selection: bool = False
 
 
 class SessionRequest(BaseModel):
@@ -291,9 +297,304 @@ async def periodic_cleanup():
         session_manager.enforce_disk_limit()
 
 
+def _query_bool(value: Optional[str], default: bool = False) -> bool:
+    '''Parse common truthy query-string values to bool.'''
+    if value is None:
+        return default
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+
+def _resolve_output_path(
+    output_path: Optional[str],
+    output_dir: Optional[str],
+    dicom_path: Path,
+    image_format: str,
+) -> Optional[Path]:
+    '''Resolve the optional output path for automated diagram export.'''
+    suffix = f'.{image_format}'
+
+    if output_path:
+        candidate = Path(output_path)
+        if candidate.suffix == '':
+            candidate = candidate.with_suffix(suffix)
+        return candidate
+
+    if output_dir:
+        directory = Path(output_dir)
+        file_name = f'{dicom_path.stem}_diagram{suffix}'
+        return directory / file_name
+
+    return None
+
+
+def _build_automated_structure_set(
+    dicom_path: Path,
+    filter_path: Optional[Path],
+) -> StructureSet:
+    '''Build a processed StructureSet from DICOM and optional filter config.'''
+    dicom_file = DicomStructureFile(
+        top_dir=dicom_path.parent,
+        file_path=dicom_path,
+    )
+
+    filter_report = dicom_file.evaluate_structure_filters(filter_path)
+    selected_rois: List[int] = []
+    if not filter_report.empty:
+        selected_rois = [
+            int(roi)
+            for roi, is_selected in filter_report['SelectedByDefault'].items()
+            if bool(is_selected)
+        ]
+
+    if selected_rois:
+        dicom_file.contour_points = [
+            cp for cp in dicom_file.contour_points
+            if int(cp['ROI']) in set(selected_rois)
+        ]
+        dicom_file.structure_names = {
+            int(roi): name
+            for roi, name in dicom_file.structure_names.items()
+            if int(roi) in set(selected_rois)
+        }
+
+    structure_set = StructureSet(
+        dicom_structure_file=dicom_file,
+        auto_calculate_relationships=False,
+        auto_calculate_logical_flags=False,
+    )
+    structure_set.calculate_relationships(force=True)
+    structure_set.calculate_logical_flags()
+    return structure_set
+
+
+def _render_automated_diagram_image(
+    structure_set: StructureSet,
+    image_format: str,
+) -> bytes:
+    '''Render a static diagram image from a processed StructureSet.'''
+    summary_df = structure_set.summary()
+    if summary_df.empty:
+        raise ValueError('No structures available for diagram rendering')
+
+    diagram_settings = _load_diagram_settings()
+    rel_styles = diagram_settings.get('relationship_styles', {})
+    definitions = _load_relationship_definitions()
+    relation_labels = {
+        rel.get('relation_type'): rel.get('label', rel.get('relation_type', ''))
+        for rel in definitions.get('Relationships', [])
+        if rel.get('relation_type')
+    }
+
+    node_names = {
+        int(row['ROI']): str(row['Name'])
+        for _, row in summary_df.iterrows()
+    }
+
+    node_colors: dict[int, str] = {
+        int(row['ROI']): '#b7bec8'
+        for _, row in summary_df.iterrows()
+    }
+    if structure_set.dicom_structure_file and hasattr(
+        structure_set.dicom_structure_file, 'dataset'
+    ):
+        for roi_contour in getattr(
+            structure_set.dicom_structure_file.dataset,
+            'ROIContourSequence',
+            [],
+        ):
+            roi_num = int(getattr(roi_contour, 'ReferencedROINumber', 0))
+            rgb = getattr(roi_contour, 'ROIDisplayColor', None)
+            if rgb and len(rgb) >= 3:
+                node_colors[roi_num] = '#{:02x}{:02x}{:02x}'.format(
+                    int(rgb[0]), int(rgb[1]), int(rgb[2])
+                )
+
+    graph = nx.DiGraph()
+    for roi, name in node_names.items():
+        graph.add_node(roi, label=name)
+
+    for source, target, edge_data in structure_set.relationship_graph.edges(data=True):
+        relationship = edge_data.get('relationship')
+        if relationship is None or relationship.relationship_type is None:
+            continue
+
+        rel_type = relationship.relationship_type.relation_type
+        if rel_type in {'DISJOINT', 'UNKNOWN'}:
+            continue
+        if bool(getattr(relationship, 'is_logical', False)):
+            continue
+
+        style = rel_styles.get(rel_type, {})
+        graph.add_edge(
+            int(source),
+            int(target),
+            relation_type=rel_type,
+            label=relation_labels.get(rel_type, rel_type),
+            color=style.get('color', '#6b7280'),
+            width=float(style.get('width', 2)),
+        )
+
+    if graph.number_of_nodes() == 0:
+        raise ValueError('No graph nodes available for diagram rendering')
+
+    positions = nx.spring_layout(graph, seed=42)
+
+    fig, ax = plt.subplots(figsize=(12, 9))
+    ax.set_facecolor('#f8fafc')
+
+    nx.draw_networkx_nodes(
+        graph,
+        positions,
+        node_color=[node_colors.get(node, '#b7bec8') for node in graph.nodes()],
+        node_size=1900,
+        edgecolors='#0f172a',
+        linewidths=1.0,
+        ax=ax,
+    )
+
+    edge_colors = [graph.edges[edge].get('color', '#6b7280') for edge in graph.edges()]
+    edge_widths = [graph.edges[edge].get('width', 2.0) for edge in graph.edges()]
+    nx.draw_networkx_edges(
+        graph,
+        positions,
+        edge_color=edge_colors,
+        width=edge_widths,
+        arrows=True,
+        arrowstyle='-|>',
+        arrowsize=14,
+        ax=ax,
+    )
+
+    nx.draw_networkx_labels(
+        graph,
+        positions,
+        labels={node: node_names.get(node, str(node)) for node in graph.nodes()},
+        font_size=9,
+        font_color='#111827',
+        ax=ax,
+    )
+
+    edge_labels = {
+        (u, v): graph.edges[(u, v)].get('label', '')
+        for u, v in graph.edges()
+        if graph.edges[(u, v)].get('label')
+    }
+    if edge_labels:
+        nx.draw_networkx_edge_labels(
+            graph,
+            positions,
+            edge_labels=edge_labels,
+            font_size=8,
+            font_color='#1f2937',
+            rotate=False,
+            ax=ax,
+        )
+
+    ax.set_title('StructureRelations Diagram', fontsize=14, color='#0f172a')
+    ax.axis('off')
+    fig.tight_layout()
+
+    output = io.BytesIO()
+    save_format = 'jpeg' if image_format == 'jpg' else image_format
+    fig.savefig(output, format=save_format, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    return output.getvalue()
+
+
+@app.get('/api/automation/diagram-image')
+async def automated_diagram_image(
+    dicom_path: str,
+    filter_path: Optional[str] = None,
+    output_path: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    image_format: str = 'png',
+):
+    '''Generate and return a diagram image directly from URL parameters.'''
+    normalized_format = image_format.lower().strip()
+    if normalized_format not in {'png', 'jpeg', 'jpg', 'pdf'}:
+        raise HTTPException(
+            status_code=400,
+            detail='image_format must be one of png, jpeg, jpg, pdf',
+        )
+
+    dicom_file_path = Path(dicom_path)
+    if not dicom_file_path.exists() or not dicom_file_path.is_file():
+        raise HTTPException(status_code=400, detail='dicom_path does not exist')
+
+    filter_file_path: Optional[Path] = None
+    if filter_path:
+        filter_file_path = Path(filter_path)
+        if not filter_file_path.exists() or not filter_file_path.is_file():
+            raise HTTPException(status_code=400, detail='filter_path does not exist')
+
+    try:
+        structure_set = _build_automated_structure_set(
+            dicom_path=dicom_file_path,
+            filter_path=filter_file_path,
+        )
+        image_bytes = _render_automated_diagram_image(
+            structure_set=structure_set,
+            image_format=normalized_format,
+        )
+    except Exception as exc:
+        logger.error('Automated diagram generation failed: %s', exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Failed generating automated diagram: {exc}',
+        ) from exc
+
+    resolved_output_path = _resolve_output_path(
+        output_path=output_path,
+        output_dir=output_dir,
+        dicom_path=dicom_file_path,
+        image_format='jpeg' if normalized_format == 'jpg' else normalized_format,
+    )
+    if resolved_output_path is not None:
+        resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved_output_path.write_bytes(image_bytes)
+
+    extension = 'jpeg' if normalized_format == 'jpg' else normalized_format
+    media_type = {
+        'png': 'image/png',
+        'jpeg': 'image/jpeg',
+        'jpg': 'image/jpeg',
+        'pdf': 'application/pdf',
+    }[normalized_format]
+    return StreamingResponse(
+        io.BytesIO(image_bytes),
+        media_type=media_type,
+        headers={
+            'Content-Disposition': (
+                f'attachment; filename="{dicom_file_path.stem}_diagram.{extension}"'
+            )
+        },
+    )
+
+
 @app.get('/', response_class=HTMLResponse)
-async def root():
+async def root(request: Request):
     '''Serve the main application page.'''
+    direct_image = _query_bool(request.query_params.get('direct_image'), default=False)
+    if direct_image:
+        dicom_path = request.query_params.get('dicom_path')
+        filter_path = request.query_params.get('filter_path')
+        output_path = request.query_params.get('output_path')
+        output_dir = request.query_params.get('output_dir')
+        image_format = request.query_params.get('image_format', 'png')
+
+        if not dicom_path:
+            raise HTTPException(
+                status_code=400,
+                detail='dicom_path is required when direct_image=true',
+            )
+        return await automated_diagram_image(
+            dicom_path=dicom_path,
+            filter_path=filter_path,
+            output_path=output_path,
+            output_dir=output_dir,
+            image_format=image_format,
+        )
+
     html_file = Path(__file__).parent / 'static' / 'index.html'
     if html_file.exists():
         return HTMLResponse(
@@ -453,7 +754,7 @@ async def preview_structures(request: SessionRequest):
         PreviewResponse: Structure metadata and patient information.
     '''
     # Load session
-    session_data = session_manager.load_session(request.session_id)
+    session_data = session_manager.load_session(request.session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -465,14 +766,20 @@ async def preview_structures(request: SessionRequest):
             file_path=file_path
         )
 
+        filter_config_path, filter_config = dicom_file.load_structure_filter_rules()
+
         # Extract structure metadata
         structures = []
         structure_names = dicom_file.get_structure_names()
-        filter_report = dicom_file.evaluate_structure_filters()
+        filter_report = dicom_file.evaluate_structure_filters(filter_config_path)
         filter_lookup = {}
         filtered_structures = []
+        matched_structure_count = 0
         if not filter_report.empty:
             filter_lookup = filter_report.to_dict(orient='index')
+            matched_structure_count = int(
+                (filter_report['MatchedRules'].str.len() > 0).sum()
+            )
             for _, row in filter_report.iterrows():
                 if not row.get('IsFiltered', False) or not row.get(
                     'Has Contours', False
@@ -516,8 +823,8 @@ async def preview_structures(request: SessionRequest):
                 'dicom_type': dicom_type,
                 'code_meaning': code_meaning,
                 'color': colors.get(roi, [128, 128, 128]),  # Default gray
-                'selected_by_default': not bool(
-                    filter_row.get('IsFiltered', False)
+                'selected_by_default': bool(
+                    filter_row.get('SelectedByDefault', not filter_row.get('IsFiltered', False))
                 ),
                 'is_filtered': bool(filter_row.get('IsFiltered', False)),
                 'hidden_by_default': bool(filter_row.get('IsHidden', False)),
@@ -533,6 +840,17 @@ async def preview_structures(request: SessionRequest):
 
         # Sort by ROI number
         structures.sort(key=lambda s: s['roi'])
+
+        logger.info(
+            'Preview filter summary for session %s: total=%d matched=%d '
+            'selected=%d filtered=%d hidden=%d',
+            request.session_id,
+            len(filter_report) if not filter_report.empty else 0,
+            matched_structure_count,
+            int(sum(1 for s in structures if s['selected_by_default'])),
+            int(sum(1 for s in structures if s['is_filtered'])),
+            int(sum(1 for s in structures if s['hidden_by_default'])),
+        )
 
         # Get patient and structure-set metadata from existing DICOM info
         structure_set_info = dicom_file.get_structure_set_info()
@@ -570,7 +888,8 @@ async def preview_structures(request: SessionRequest):
             structures=structures,
             filtered_structures=filtered_structures,
             patient_info=patient_info,
-            disk_usage_mb=disk_info['usage_mb']
+            disk_usage_mb=disk_info['usage_mb'],
+            skip_manual_selection=bool(filter_config.get('skip_manual_selection', False))
         )
 
     except Exception as e:
@@ -590,7 +909,7 @@ async def process_structures(request: ProcessRequest):
     Returns:
         dict: Confirmation message.
     '''
-    session_data = session_manager.load_session(request.session_id)
+    session_data = session_manager.load_session(request.session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -652,7 +971,7 @@ async def process_structures(request: ProcessRequest):
 @app.get('/api/jobs/{session_id}/status', response_model=JobStatusResponse)
 async def get_job_status(session_id: str):
     '''Get status for a relationship processing job.'''
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -676,7 +995,7 @@ async def get_job_status(session_id: str):
 @app.get('/api/jobs/{session_id}/result', response_model=RelationshipResultResponse)
 async def get_job_result(session_id: str):
     '''Return relationship pair results for a completed session job.'''
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
     if session_data.structure_set is None:
@@ -730,7 +1049,7 @@ async def get_job_result(session_id: str):
 @app.post('/api/jobs/{session_id}/cancel', response_model=JobStatusResponse)
 async def cancel_job(session_id: str):
     '''Request cancellation for an in-flight processing job.'''
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -748,7 +1067,7 @@ async def cancel_job(session_id: str):
                     'cancel_requested_at': datetime.now().isoformat(),
                 },
             )
-            session_data = session_manager.load_session(session_id)
+            session_data = session_manager.load_session(session_id, touch=False)
         return JobStatusResponse(
             job_id=session_id,
             session_id=session_id,
@@ -1185,7 +1504,7 @@ async def get_relationship_matrix(request: MatrixRequest):
         'Loading processed session data...',
     )
     session_load_start = time.perf_counter()
-    session_data = session_manager.load_session(request.session_id)
+    session_data = session_manager.load_session(request.session_id, touch=False)
     session_load_ms = round((time.perf_counter() - session_load_start) * 1000.0)
     if session_data is None:
         logger.error(f'Session {request.session_id} not found or expired')
@@ -1315,7 +1634,7 @@ async def export_matrix(export_format: str, session_id: str, row_rois: Optional[
     Returns:
         FileResponse or StreamingResponse: The exported file.
     '''
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(session_id, touch=False)
     if session_data is None:
         raise HTTPException(status_code=404, detail='Session expired, please re-upload')
 
@@ -1473,7 +1792,7 @@ async def get_diagram_data(request: MatrixRequest):
             'Loading data for relationship diagram...',
         )
         session_load_start = time.perf_counter()
-        session_data = session_manager.load_session(request.session_id)
+        session_data = session_manager.load_session(request.session_id, touch=False)
         session_load_ms = round((time.perf_counter() - session_load_start) * 1000.0)
         if session_data is None:
             raise HTTPException(status_code=404, detail='Session expired, please re-upload')
@@ -2151,10 +2470,21 @@ def _get_cached_plot_bytes(cache_key: tuple) -> Optional[bytes]:
 
 def _store_cached_plot_bytes(cache_key: tuple, image_bytes: bytes) -> None:
     '''Store plot bytes in a small bounded LRU cache.'''
+    global _plot_response_cache_bytes
+
+    previous_bytes = _plot_response_cache.get(cache_key)
+    if previous_bytes is not None:
+        _plot_response_cache_bytes -= len(previous_bytes)
+
     _plot_response_cache[cache_key] = image_bytes
     _plot_response_cache.move_to_end(cache_key)
-    while len(_plot_response_cache) > PLOT_RESPONSE_CACHE_MAX_ENTRIES:
-        _plot_response_cache.popitem(last=False)
+    _plot_response_cache_bytes += len(image_bytes)
+    while (
+        len(_plot_response_cache) > PLOT_RESPONSE_CACHE_MAX_ENTRIES
+        or _plot_response_cache_bytes > PLOT_RESPONSE_CACHE_MAX_BYTES
+    ):
+        _, evicted_bytes = _plot_response_cache.popitem(last=False)
+        _plot_response_cache_bytes -= len(evicted_bytes)
 
 
 @app.post('/api/plot-contours')
@@ -2322,7 +2652,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         session_id (str): The session ID.
     '''
     # Verify session exists
-    session_data = session_manager.load_session(session_id)
+    session_data = session_manager.load_session(session_id, touch=False)
     if session_data is None:
         await websocket.accept()
         await connection_manager.send_error(session_id, 'Session expired, please re-upload')

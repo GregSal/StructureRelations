@@ -5,6 +5,7 @@ Handles persistent storage, expiration, and disk usage management of user sessio
 import pickle
 import logging
 import json
+import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -98,9 +99,12 @@ class SessionManager:
         self.max_disk_size = self.MAX_DISK_SIZE
         self.warn_disk_size = self.WARN_DISK_SIZE
         self.session_expiry = self.SESSION_EXPIRY
+        self.max_cached_sessions = int(
+            os.getenv('SR_MAX_CACHED_SESSIONS', '1')
+        )
         self._load_runtime_settings()
 
-        # In-memory cache of session metadata
+        # In-memory cache of hot sessions only (lazy disk loading).
         self._sessions: Dict[str, SessionData] = {}
 
         # Load existing sessions on startup
@@ -131,20 +135,28 @@ class SessionManager:
         default_max_mb = self.DEFAULT_MAX_DISK_SIZE_MB
         default_warn_mb = self.DEFAULT_WARN_DISK_SIZE_MB
         default_expiry_h = self.DEFAULT_SESSION_EXPIRY_HOURS
+        default_cached_sessions = self.max_cached_sessions
 
         max_mb = settings.get('max_disk_size_mb', default_max_mb)
         warn_mb = settings.get('warn_disk_size_mb', default_warn_mb)
         expiry_h = settings.get('session_expiry_hours', default_expiry_h)
+        cached_sessions = settings.get(
+            'max_cached_sessions',
+            default_cached_sessions,
+        )
 
         try:
             max_mb = float(max_mb)
             warn_mb = float(warn_mb)
             expiry_h = float(expiry_h)
+            cached_sessions = int(cached_sessions)
 
             if max_mb <= 0 or warn_mb <= 0 or expiry_h <= 0:
                 raise ValueError('all values must be positive')
             if warn_mb >= max_mb:
                 raise ValueError('warn_disk_size_mb must be less than max_disk_size_mb')
+            if cached_sessions <= 0:
+                raise ValueError('max_cached_sessions must be positive')
         except (TypeError, ValueError) as e:
             logger.warning(
                 'Invalid session settings in %s (%s); using defaults',
@@ -156,37 +168,68 @@ class SessionManager:
         self.max_disk_size = int(max_mb * 1024 * 1024)
         self.warn_disk_size = int(warn_mb * 1024 * 1024)
         self.session_expiry = timedelta(hours=expiry_h)
+        self.max_cached_sessions = cached_sessions
         logger.info(
-            'Session settings loaded: max=%.1f MB warn=%.1f MB expiry=%.1f h',
+            'Session settings loaded: max=%.1f MB warn=%.1f MB '
+            'expiry=%.1f h cached_sessions=%d',
             max_mb,
             warn_mb,
             expiry_h,
+            cached_sessions,
         )
 
     def _load_existing_sessions(self):
-        '''Load existing session metadata from disk on startup.'''
+        '''Index existing sessions without unpickling all data at startup.'''
         session_files = list(self.sessions_dir.glob('*.pkl'))
-
-        for session_file in session_files:
-            session_id = session_file.stem
-            try:
-                with open(session_file, 'rb') as f:
-                    session_data = pickle.load(f)
-                    self._sessions[session_id] = session_data
-            except Exception as e:
-                logger.error(f'Failed to load session {session_id}: {e}')
-                # Delete corrupted session file
-                session_file.unlink(missing_ok=True)
-
         disk_usage = self.get_disk_usage()
-        num_expired = sum(1 for s in self._sessions.values()
-                         if datetime.now() - s.last_accessed > self.session_expiry)
+        now = datetime.now().timestamp()
+        expiry_seconds = self.session_expiry.total_seconds()
+        num_expired = sum(
+            1
+            for session_file in session_files
+            if now - session_file.stat().st_mtime > expiry_seconds
+        )
 
         logger.info(
-            f'Loaded {len(self._sessions)} sessions, '
+            f'Indexed {len(session_files)} session files, '
             f'{disk_usage / (1024*1024):.1f} MB disk usage, '
-            f'{num_expired} expired'
+            f'{num_expired} likely expired by file timestamp'
         )
+
+    def _load_session_from_disk(self, session_id: str) -> Optional[SessionData]:
+        '''Load and cache one session from disk on demand.'''
+        session_file = self.sessions_dir / f'{session_id}.pkl'
+        if not session_file.exists():
+            return None
+
+        try:
+            with open(session_file, 'rb') as f:
+                session_data = pickle.load(f)
+        except Exception as e:
+            logger.error(f'Failed to load session {session_id}: {e}')
+            session_file.unlink(missing_ok=True)
+            return None
+
+        self._sessions[session_id] = session_data
+        self._evict_cached_sessions(exclude={session_id})
+        return session_data
+
+    def _evict_cached_sessions(self, exclude: Optional[set[str]] = None) -> None:
+        '''Evict oldest cached sessions from memory (disk copy is retained).'''
+        if self.max_cached_sessions <= 0:
+            return
+
+        exclude = exclude or set()
+        while len(self._sessions) > self.max_cached_sessions:
+            candidates = [
+                (sid, data.last_accessed)
+                for sid, data in self._sessions.items()
+                if sid not in exclude
+            ]
+            if not candidates:
+                break
+            oldest_session_id = min(candidates, key=lambda item: item[1])[0]
+            del self._sessions[oldest_session_id]
 
     def get_disk_usage(self) -> int:
         '''Calculate total disk usage of all session files.
@@ -220,14 +263,25 @@ class SessionManager:
 
         now = datetime.now()
 
-        # Step 1: Delete expired sessions
-        expired_sessions = [
-            (session_id, session_data)
-            for session_id, session_data in self._sessions.items()
-            if now - session_data.last_accessed > self.session_expiry
-        ]
+        # Build a lightweight age index from session files.
+        sessions_by_age: list[tuple[str, datetime, int]] = []
+        for session_file in self.sessions_dir.glob('*.pkl'):
+            session_id = session_file.stem
+            file_size = self._get_session_file_size(session_id)
+            try:
+                with open(session_file, 'rb') as f:
+                    session_data = pickle.load(f)
+                last_accessed = session_data.last_accessed
+            except Exception as e:
+                logger.error(f'Failed to scan session {session_id}: {e}')
+                self.delete_session(session_id)
+                continue
+            sessions_by_age.append((session_id, last_accessed, file_size))
 
-        for session_id, session_data in expired_sessions:
+        # Step 1: Delete expired sessions
+        for session_id, last_accessed, _ in sessions_by_age:
+            if now - last_accessed <= self.session_expiry:
+                continue
             self.delete_session(session_id)
             logger.info(f'Deleted expired session {session_id}')
 
@@ -238,21 +292,15 @@ class SessionManager:
             return
 
         # Step 2: Delete oldest sessions by LRU until under limit
-        sessions_by_age = sorted(
-            self._sessions.items(),
-            key=lambda item: item[1].last_accessed
-        )
-
-        for session_id, session_data in sessions_by_age:
+        sessions_by_age.sort(key=lambda item: item[1])
+        for session_id, last_accessed, file_size in sessions_by_age:
             if disk_usage <= self.max_disk_size:
                 break
-
-            file_size = self._get_session_file_size(session_id)
             self.delete_session(session_id)
             disk_usage -= file_size
             logger.info(
                 f'Deleted oldest session {session_id} '
-                f'(last accessed {session_data.last_accessed}), '
+                f'(last accessed {last_accessed}), '
                 f'disk usage now {disk_usage/(1024*1024):.1f} MB'
             )
 
@@ -285,8 +333,10 @@ class SessionManager:
             bool: True if successful, False if session not found.
         '''
         if session_id not in self._sessions:
-            logger.error(f'Session {session_id} not found in cache')
-            return False
+            session_data = self._load_session_from_disk(session_id)
+            if session_data is None:
+                logger.error(f'Session {session_id} not found in cache or disk')
+                return False
 
         session_data = self._sessions[session_id]
         session_data.structure_set = structure_set
@@ -297,6 +347,7 @@ class SessionManager:
             with open(session_file, 'wb') as f:
                 pickle.dump(session_data, f)
             logger.info(f'Updated structure_set for session {session_id}')
+            self._evict_cached_sessions(exclude={session_id})
             return True
         except OSError as e:
             logger.error(f'Failed to save structure_set for session {session_id}: {e}')
@@ -313,8 +364,10 @@ class SessionManager:
             bool: True if saved successfully, False otherwise.
         '''
         if session_id not in self._sessions:
-            logger.error(f'Session {session_id} not found in cache')
-            return False
+            session_data = self._load_session_from_disk(session_id)
+            if session_data is None:
+                logger.error(f'Session {session_id} not found in cache or disk')
+                return False
 
         session_data = self._sessions[session_id]
         for key, value in state_updates.items():
@@ -325,6 +378,7 @@ class SessionManager:
         try:
             with open(session_file, 'wb') as f:
                 pickle.dump(session_data, f)
+            self._evict_cached_sessions(exclude={session_id})
             return True
         except OSError as e:
             logger.error(f'Failed to save job state for session {session_id}: {e}')
@@ -353,6 +407,7 @@ class SessionManager:
 
             # Update in-memory cache
             self._sessions[session_id] = session_data
+            self._evict_cached_sessions(exclude={session_id})
 
         except OSError as e:
             logger.error(f'Failed to save session {session_id}: {e}')
@@ -376,7 +431,9 @@ class SessionManager:
         '''
         # Check in-memory cache first
         if session_id not in self._sessions:
-            return None
+            session_data = self._load_session_from_disk(session_id)
+            if session_data is None:
+                return None
 
         session_data = self._sessions[session_id]
 
@@ -399,6 +456,7 @@ class SessionManager:
             # If save fails, still return the session data
             logger.warning(f'Failed to update last_accessed for session {session_id}')
 
+        self._evict_cached_sessions(exclude={session_id})
         return session_data
 
     def delete_session(self, session_id: str):
@@ -419,6 +477,7 @@ class SessionManager:
         Returns:
             List[tuple]: List of (session_id, session_data) tuples.
         '''
+        # Keep list_sessions lightweight: do not force-load uncached sessions.
         return sorted(
             self._sessions.items(),
             key=lambda item: item[1].last_accessed,

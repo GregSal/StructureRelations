@@ -62,12 +62,34 @@ def _stringify_filter_value(value: object) -> str:
         return ''
 
     try:
-        if pd.isna(value):
+        is_na_value = pd.isna(value)
+        if isinstance(is_na_value, (bool, np.bool_)) and is_na_value:
             return ''
+        if isinstance(is_na_value, (list, tuple, np.ndarray, pd.Series)):
+            if bool(np.all(is_na_value)):
+                return ''
     except TypeError:
         pass
 
+    if isinstance(value, (list, tuple, set)):
+        return json.dumps(list(value), ensure_ascii=True)
+
     return str(value)
+
+
+def _coerce_filter_bool(value: object, default: bool = False) -> bool:
+    '''Normalize filter config values to booleans.'''
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'true', '1', 'yes', 'y', 'on'}:
+            return True
+        if normalized in {'false', '0', 'no', 'n', 'off'}:
+            return False
+    return bool(value)
 
 
 class DicomStructureFile:
@@ -549,10 +571,39 @@ class DicomStructureFile:
             return field_value.startswith(expected_value)
         if match_type == 'suffix':
             return field_value.endswith(expected_value)
+        if match_type == 'structure list':
+            logger.warning(
+                'structure list match type requires row-level handling in rule %r',
+                rule.get('id', '<unnamed>'),
+            )
+            return False
 
         logger.warning('Unsupported structure filter match type %r in rule %r',
                        match_type, rule.get('id', '<unnamed>'))
         return False
+
+    def _filter_rule_matches_structure_list(
+        self,
+        actual_value: object,
+        rule: dict,
+    ) -> bool:
+        '''Return True when a structure ID matches a list-based rule.'''
+        raw_value = rule.get('value', rule.get('pattern'))
+        if not isinstance(raw_value, list):
+            logger.warning('structure list match in rule %r must use a JSON list',
+                           rule.get('id', '<unnamed>'))
+            return False
+
+        actual_text = _stringify_filter_value(actual_value)
+        if not actual_text:
+            return False
+
+        expected_values = {
+            _stringify_filter_value(item)
+            for item in raw_value
+            if _stringify_filter_value(item)
+        }
+        return actual_text in expected_values
 
     def _filter_rule_matches_row(
         self,
@@ -603,14 +654,22 @@ class DicomStructureFile:
         config_path, filter_config = self.load_structure_filter_rules(filter_file)
         self.structure_filter_config_path = config_path
 
-        _KNOWN_ACTIONS = {'exclude', 'hide'}
+        _KNOWN_ACTIONS = {'exclude', 'hide', 'include', 'display'}
+        include_by_default = _coerce_filter_bool(
+            filter_config.get('include by default', filter_config.get('include_by_default')),
+            default=True,
+        )
+        display_by_default = _coerce_filter_bool(
+            filter_config.get('display by default', filter_config.get('display_by_default')),
+            default=True,
+        )
         rules = []
         for index, rule in enumerate(filter_config.get('rules', []), start=1):
             if not isinstance(rule, dict):
                 logger.warning('Skipping non-object structure filter rule #%d',
                                index)
                 continue
-            if not rule.get('enabled', True):
+            if not _coerce_filter_bool(rule.get('enabled', True), default=True):
                 continue
             action = _stringify_filter_value(
                 rule.get('action', 'exclude')
@@ -624,20 +683,36 @@ class DicomStructureFile:
 
         report_rows = []
         for _, row in metadata.iterrows():
-            exclude_matches = []
-            hide_matches = []
+            selected_state = include_by_default
+            display_state = display_by_default
+            matched_rules = []
+            final_match = None
             for index, rule in rules:
-                if not self._filter_rule_matches_row(row, rule):
+                field_name = _stringify_filter_value(rule.get('field'))
+                match_type = _stringify_filter_value(
+                    rule.get('match_type', rule.get('match'))
+                ).lower()
+                if match_type == 'structure list':
+                    if field_name != 'Structure ID':
+                        logger.warning(
+                            'structure list match type is only supported for Structure ID in rule %r',
+                            rule.get('id', '<unnamed>'),
+                        )
+                        continue
+                    matches = self._filter_rule_matches_structure_list(
+                        row.get(field_name, ''),
+                        rule,
+                    )
+                else:
+                    matches = self._filter_rule_matches_row(row, rule)
+
+                if not matches:
                     continue
 
                 rule_action = _stringify_filter_value(
                     rule.get('action', 'exclude')
                 ).lower()
                 rule_id = _stringify_filter_value(rule.get('id')) or f'rule_{index}'
-                field_name = _stringify_filter_value(rule.get('field'))
-                match_type = _stringify_filter_value(
-                    rule.get('match_type', rule.get('match'))
-                )
                 rule_value = _stringify_filter_value(
                     rule.get('value', rule.get('pattern'))
                 )
@@ -665,24 +740,29 @@ class DicomStructureFile:
                         f'{field_name} {match_type} {rule_value}{companion_text}'
                     ),
                 }
-                if rule_action == 'hide':
-                    hide_matches.append(match_entry)
-                else:
-                    exclude_matches.append(match_entry)
+                matched_rules.append(match_entry)
+                final_match = match_entry
 
-            # exclude takes priority: a structure matching both is excluded
-            filtered = bool(exclude_matches)
-            hidden = bool(hide_matches) and not filtered
-            matched_rules = exclude_matches + hide_matches
+                if rule_action == 'exclude':
+                    selected_state = False
+                elif rule_action == 'include':
+                    selected_state = True
+                elif rule_action == 'hide':
+                    display_state = False
+                elif rule_action == 'display':
+                    display_state = True
+
+            filtered = not selected_state
+            hidden = not display_state
             report_rows.append({
                 **row.to_dict(),
                 'IsFiltered': filtered,
                 'IsHidden': hidden,
-                'SelectedByDefault': not filtered,
+                'SelectedByDefault': selected_state,
+                'DisplayedByDefault': display_state,
                 'MatchedRules': matched_rules,
-                'FilterReason': '; '.join(
-                    match['reason'] for match in matched_rules
-                ),
+                'FinalMatch': final_match,
+                'FilterReason': final_match['reason'] if final_match else '',
             })
 
         report = pd.DataFrame(report_rows)

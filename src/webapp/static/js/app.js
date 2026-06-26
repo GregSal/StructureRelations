@@ -2,6 +2,7 @@ class WebAppClient {
     constructor() {
         this.sessionId = null;
         this.websocket = null;
+        this.skipManualSelection = false;
         this.selectedStructures = new Set();
         this.sortableRows = null;
         this.sortableColumns = null;
@@ -515,6 +516,9 @@ class WebAppClient {
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
             this.applyDiagramSelection();
         });
+        document.getElementById('exportDiagramBtn').addEventListener('click', () => {
+            this.exportDiagram();
+        });
         document.getElementById('manualLayoutBtn').addEventListener('click', () => {
             this.enableManualLayout();
         });
@@ -654,8 +658,12 @@ class WebAppClient {
             // Load preview
             await this.loadPreview();
 
-            // Show selection stage
-            this.showStage('selection');
+            if (this.skipManualSelection) {
+                await this.startProcessing();
+            } else {
+                // Show selection stage
+                this.showStage('selection');
+            }
 
         } catch (error) {
             console.error('Upload error:', error);
@@ -777,6 +785,7 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            this.skipManualSelection = data.skip_manual_selection === true;
 
             // Update patient info
             const patientInfo = document.getElementById('patientInfo');
@@ -848,9 +857,12 @@ class WebAppClient {
                 });
             });
 
+            return data;
+
         } catch (error) {
             console.error('Preview error:', error);
             alert('Failed to load structure preview.');
+            return null;
         }
     }
 
@@ -2521,6 +2533,111 @@ class WebAppClient {
         } catch (error) {
             console.error('Export error:', error);
             alert('Failed to export matrix.');
+        }
+    }
+
+    async exportDiagram() {
+        const wrapper = document.querySelector('#tab-diagram .network-diagram-wrapper');
+        if (!wrapper || !this.network) {
+            alert('Diagram is not ready to export.');
+            return;
+        }
+
+        const formatSelect = document.getElementById('diagramExportFormat');
+        const requestedFormat = (formatSelect?.value || 'png').toLowerCase();
+        const format = ['png', 'jpeg', 'pdf'].includes(requestedFormat)
+            ? requestedFormat
+            : 'png';
+
+        if (typeof window.html2canvas !== 'function') {
+            alert('Diagram export library is unavailable.');
+            return;
+        }
+
+        this._dismissContextMenu();
+
+        const hiddenElements = [
+            '#structureSetBadge',
+            '#structureSetBadgeTooltip',
+            '.vis-navigation',
+            '.vis-manipulation',
+            '.vis-edit-mode',
+            '.vis-close',
+        ];
+
+        const hiddenState = [];
+        for (const selector of hiddenElements) {
+            wrapper.querySelectorAll(selector).forEach((element) => {
+                hiddenState.push({
+                    element,
+                    visibility: element.style.visibility,
+                    pointerEvents: element.style.pointerEvents,
+                });
+                element.style.visibility = 'hidden';
+                element.style.pointerEvents = 'none';
+            });
+        }
+
+        try {
+            const scale = Math.max(window.devicePixelRatio || 1, 1.5);
+            const canvas = await window.html2canvas(wrapper, {
+                backgroundColor: '#f8fafc',
+                useCORS: true,
+                scale,
+                logging: false,
+            });
+
+            const filePrefix = `relationship_diagram_${this.sessionId || 'export'}`;
+
+            if (format === 'pdf') {
+                const jsPdfLib = window.jspdf?.jsPDF;
+                if (!jsPdfLib) {
+                    throw new Error('PDF export library is unavailable.');
+                }
+
+                const pdf = new jsPdfLib({
+                    orientation: canvas.width >= canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height],
+                    compress: true,
+                });
+                const imageData = canvas.toDataURL('image/png');
+                pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${filePrefix}.pdf`);
+                return;
+            }
+
+            const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+            const blob = await new Promise((resolve, reject) => {
+                canvas.toBlob(
+                    (result) => {
+                        if (result) {
+                            resolve(result);
+                        } else {
+                            reject(new Error('Canvas export failed.'));
+                        }
+                    },
+                    mimeType,
+                    0.92,
+                );
+            });
+
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `${filePrefix}.${format}`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Diagram export error:', error);
+            alert('Failed to export diagram.');
+        } finally {
+            hiddenState.forEach(({ element, visibility, pointerEvents }) => {
+                element.style.visibility = visibility;
+                element.style.pointerEvents = pointerEvents;
+            });
         }
     }
 
@@ -4982,6 +5099,7 @@ class WebAppClient {
         // Reset application state for new analysis
         this.sessionId = null;
         this.selectedStructures.clear();
+        this.skipManualSelection = false;
         this.summaryData = null;
         this.patientInfo = null;
         this.structureItems = [];

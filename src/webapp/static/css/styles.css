@@ -1443,6 +1443,18 @@ tbody tr:hover {
     border-radius: 4px;
 }
 
+.diagram-export-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.diagram-export-control label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
 .network-diagram-wrapper {
     position: relative;
 }

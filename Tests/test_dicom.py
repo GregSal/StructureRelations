@@ -292,5 +292,182 @@ class TestDicomStructureFileWithDifferentFiles:
                 assert roi_labels.loc[roi_num, 'StructureName'] == structure_names[roi_num]
 
 
+class TestStructureFilterRuleOptions:
+    '''Unit tests for extended structure_filter_rules behavior.'''
+
+    @staticmethod
+    def _build_filter_test_file(metadata_rows, config):
+        '''Create a lightweight DicomStructureFile test double.'''
+        dicom_file = DicomStructureFile.__new__(DicomStructureFile)
+        metadata = pd.DataFrame(metadata_rows)
+        dicom_file.get_structure_filter_metadata = lambda: metadata
+        dicom_file.load_structure_filter_rules = (
+            lambda filter_file=None: (None, config)
+        )
+        dicom_file.structure_filter_report = pd.DataFrame()
+        dicom_file.structure_filter_config_path = None
+        return dicom_file
+
+    def test_structure_list_match_type_uses_exact_structure_id(self):
+        '''structure list should match exact Structure ID values only.'''
+        dicom_file = self._build_filter_test_file(
+            metadata_rows=[
+                {'ROINumber': 1, 'Structure ID': 'PTV56'},
+                {'ROINumber': 2, 'Structure ID': 'ptv56'},
+                {'ROINumber': 3, 'Structure ID': 'Rectum'},
+            ],
+            config={
+                'include by default': False,
+                'display by default': True,
+                'rules': [
+                    {
+                        'id': 'include-structure-list',
+                        'action': 'include',
+                        'field': 'Structure ID',
+                        'match_type': 'structure list',
+                        'value': ['PTV56', 'Rectum'],
+                    }
+                ],
+            },
+        )
+
+        report = dicom_file.evaluate_structure_filters()
+
+        assert not bool(report.loc[1, 'IsFiltered'])
+        assert bool(report.loc[2, 'IsFiltered'])
+        assert not bool(report.loc[3, 'IsFiltered'])
+
+    def test_last_matching_rule_overrides_previous_matches(self):
+        '''Later matching rules should override earlier matching rules.'''
+        dicom_file = self._build_filter_test_file(
+            metadata_rows=[
+                {'ROINumber': 1, 'Structure ID': 'A'},
+                {'ROINumber': 2, 'Structure ID': 'B'},
+                {'ROINumber': 3, 'Structure ID': 'C'},
+            ],
+            config={
+                'include by default': False,
+                'display by default': False,
+                'rules': [
+                    {
+                        'id': 'include-a',
+                        'action': 'include',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'A',
+                    },
+                    {
+                        'id': 'exclude-a',
+                        'action': 'exclude',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'A',
+                    },
+                    {
+                        'id': 'display-b',
+                        'action': 'display',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'B',
+                    },
+                    {
+                        'id': 'hide-b',
+                        'action': 'hide',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'B',
+                    },
+                    {
+                        'id': 'hide-c',
+                        'action': 'hide',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'C',
+                    },
+                    {
+                        'id': 'display-c',
+                        'action': 'display',
+                        'field': 'Structure ID',
+                        'match_type': 'exact',
+                        'value': 'C',
+                    },
+                ],
+            },
+        )
+
+        report = dicom_file.evaluate_structure_filters()
+
+        assert bool(report.loc[1, 'IsFiltered'])
+        assert bool(report.loc[2, 'IsHidden'])
+        assert not bool(report.loc[3, 'IsHidden'])
+        assert report.loc[1, 'FinalMatch']['id'] == 'exclude-a'
+        assert report.loc[2, 'FinalMatch']['id'] == 'hide-b'
+        assert report.loc[3, 'FinalMatch']['id'] == 'display-c'
+
+    def test_include_display_defaults_accept_boolean_like_strings(self):
+        '''Top-level defaults should coerce common true/false string values.'''
+        dicom_file = self._build_filter_test_file(
+            metadata_rows=[
+                {'ROINumber': 1, 'Structure ID': 'OnlyStructure'},
+            ],
+            config={
+                'include by default': 'false',
+                'display by default': 'true',
+                'rules': [],
+            },
+        )
+
+        report = dicom_file.evaluate_structure_filters()
+
+        assert bool(report.loc[1, 'IsFiltered'])
+        assert not bool(report.loc[1, 'IsHidden'])
+        assert not bool(report.loc[1, 'SelectedByDefault'])
+        assert bool(report.loc[1, 'DisplayedByDefault'])
+
+    def test_invalid_regex_rule_is_skipped_gracefully(self, caplog):
+        '''Invalid regex should not abort evaluation of other valid rules.'''
+        dicom_file = self._build_filter_test_file(
+            metadata_rows=[
+                {'ROINumber': 1, 'Structure ID': 'PTV56'},
+                {'ROINumber': 2, 'Structure ID': 'Rectum'},
+            ],
+            config={
+                'include by default': False,
+                'display by default': True,
+                'rules': [
+                    {
+                        'id': 'invalid-regex-rule',
+                        'action': 'include',
+                        'field': 'Structure ID',
+                        'match_type': 'regex',
+                        'value': '(*bad',
+                    },
+                    {
+                        'id': 'valid-ptv-regex',
+                        'action': 'include',
+                        'field': 'Structure ID',
+                        'match_type': 'regex',
+                        'value': r'^PTV\d+$',
+                    },
+                ],
+            },
+        )
+
+        with caplog.at_level('WARNING', logger='dicom'):
+            report = dicom_file.evaluate_structure_filters()
+
+        # Evaluation continues and valid regex still applies.
+        assert not bool(report.loc[1, 'IsFiltered'])
+        assert bool(report.loc[2, 'IsFiltered'])
+        assert report.loc[1, 'FinalMatch']['id'] == 'valid-ptv-regex'
+
+        # Invalid regex is reported but does not raise.
+        assert any(
+            'Invalid regex in structure filter rule' in record.message
+            and 'invalid-regex-rule' in record.message
+            for record in caplog.records
+        )
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

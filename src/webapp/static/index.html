@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="static/css/styles.css?v=39">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script type="text/javascript" src="static/js/cola.min.js"></script>
 </head>
 <body>
@@ -118,6 +120,15 @@
                                         <option value="show">Show All</option>
                                         <option value="faded">Faded</option>
                                     </select>
+                                </div>
+                                <div class="diagram-export-control">
+                                    <label for="diagramExportFormat">Save as:</label>
+                                    <select id="diagramExportFormat" class="logical-mode-select">
+                                        <option value="png" selected>PNG</option>
+                                        <option value="jpeg">JPEG</option>
+                                        <option value="pdf">PDF</option>
+                                    </select>
+                                    <button class="btn btn-secondary" id="exportDiagramBtn">Save Diagram</button>
                                 </div>
                                 <div class="button-group">
                                     <button class="btn btn-primary" id="applyDiagramBtn" disabled>Apply</button>
@@ -425,7 +436,7 @@
         </footer>
     </div>
 
-                    <script src="static/js/app.js?v=129"></script>
+                    <script src="static/js/app.js?v=130"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

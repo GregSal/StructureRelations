@@ -71,6 +71,64 @@ The application will be available at: http://localhost:8000
    - Export relationship matrix as CSV, Excel, or JSON
    - Files include complete relationship data
 
+### URL Automation (Stage 3)
+
+The web app supports URL-driven automation for direct diagram generation:
+
+- Endpoint: `/api/automation/diagram-image`
+- Required query parameter:
+   - `dicom_path`: Full path to a DICOM RT structure file
+- Optional query parameters:
+   - `filter_path`: Full path to a custom `structure_filter_rules.json`
+   - `output_path`: Full path to save the resulting image file
+   - `output_dir`: Directory path to save the resulting image file
+   - `image_format`: `png` (default), `jpeg`, `jpg`, or `pdf`
+
+Example:
+
+```text
+http://localhost:8000/api/automation/diagram-image?dicom_path=D:/data/RS.case.dcm&filter_path=D:/data/filters.json&output_dir=D:/exports&image_format=png
+```
+
+You can also call the root URL with `direct_image=true` to return the image
+directly from the main web app route:
+
+```text
+http://localhost:8000/?direct_image=true&dicom_path=D:/data/RS.case.dcm&filter_path=D:/data/filters.json&output_path=D:/exports/case_diagram.png
+```
+
+### Automated vis-network Layout Tuning
+
+For iterative layout tuning without manual UI interaction, use the headless
+layout tuner:
+
+```bash
+python src/webapp/layout_tuner.py --dicom-path tests/RS.GJS_Struct_Tests.Relations.dcm
+```
+
+Run fully unattended (starts/stops uvicorn automatically):
+
+```bash
+python src/webapp/layout_tuner.py --start-server --dicom-path tests/RS.GJS_Struct_Tests.Relations.dcm
+```
+
+What it does automatically:
+- opens the web app in headless Chrome
+- uploads the DICOM file and runs processing
+- applies a set of layout-rule variants to vis-network
+- scores each variant with deterministic layout metrics
+   (edge-crossing count, edge-length variance, node spacing penalty)
+- writes screenshots and a JSON report under
+   `src/webapp/layout_tuner_output/`
+
+Optional flags:
+- `--apply-best`: write best discovered `layout_rules` back to
+   `src/webapp/config/diagram_settings.json`
+- `--start-server`: start/stop uvicorn automatically for a single tuning run
+- `--base-url http://127.0.0.1:8000`: target an existing server
+- `--no-headless`: run with visible browser window
+- `--timeout-seconds 300`: override processing timeout
+
 ### Architecture
 
 **Backend (FastAPI)**
@@ -88,6 +146,7 @@ The application will be available at: http://localhost:8000
 - Expiration: 2 hours of inactivity
 - Disk limit: 250 MB (warning at 100 MB)
 - Cleanup: Expired sessions deleted first, then oldest by LRU
+- In-memory session cache: configurable max cached sessions (`max_cached_sessions`)
 - Persistence: Sessions saved as pickle files in `sessions/` directory
 
 ### Testing
@@ -154,6 +213,16 @@ Edit `src/webapp/main.py` to customize:
 - `MAX_DISK_USAGE_MB`: Maximum disk usage (default: 250 MB)
 - `DISK_WARNING_THRESHOLD_MB`: Warning threshold (default: 100 MB)
 - `CLEANUP_INTERVAL_MINUTES`: Background cleanup frequency (default: 30 minutes)
+
+Session storage runtime settings can also be configured in
+`src/webapp/config/webapp_settings.json` under `session_storage`:
+- `max_disk_size_mb`
+- `warn_disk_size_mb`
+- `session_expiry_hours`
+- `max_cached_sessions`
+
+`max_cached_sessions` controls how many sessions stay resident in memory at
+once (lower values reduce RAM usage on constrained machines).
 
 ### Security Notes
 
