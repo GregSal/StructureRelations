@@ -184,7 +184,7 @@
         },
         "opt_grouping": {
           "enabled": true,
-          "link_distance": 45,
+          "link_distance": 30.0,
           "description": "opt/eval structures pulled tightly to their base structure via short links (tighter than target groups)."
         },
         "target_grouping": {
@@ -246,14 +246,21 @@
             "mode": "worst",
             "mode_options": {
               "worst": "Show only minimum margin (worst-case clearance)",
-              "all": "Show all 6 directions (±X, ±Y, ±Z / ±LR, ±AP, ±SI)",
-              "transverse": "Show in-plane directions only (±X, ±Y / ±LR, ±AP)",
-              "longitudinal": "Show through-plane direction only (±Z / ±SI)",
+              "all": "Show all 6 directions (\u00b1X, \u00b1Y, \u00b1Z / \u00b1LR, \u00b1AP, \u00b1SI)",
+              "transverse": "Show in-plane directions only (\u00b1X, \u00b1Y / \u00b1LR, \u00b1AP)",
+              "longitudinal": "Show through-plane direction only (\u00b1Z / \u00b1SI)",
               "custom": "Show specific directions listed in 'custom_directions'"
             },
-            "custom_directions": ["x_neg", "x_pos", "y_neg", "y_pos", "z_neg", "z_pos"],
+            "custom_directions": [
+              "x_neg",
+              "x_pos",
+              "y_neg",
+              "y_pos",
+              "z_neg",
+              "z_pos"
+            ],
             "direction_labels": {
-              "description": "How to label directions: 'anatomical' (R/L/A/P/S/I), 'geometric' (±X/±Y/±Z), or 'abbreviated' (+X/-X)",
+              "description": "How to label directions: 'anatomical' (R/L/A/P/S/I), 'geometric' (\u00b1X/\u00b1Y/\u00b1Z), or 'abbreviated' (+X/-X)",
               "mode": "anatomical",
               "anatomical_map": {
                 "x_neg": "R",

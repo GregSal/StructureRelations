@@ -2,6 +2,7 @@ class WebAppClient {
     constructor() {
         this.sessionId = null;
         this.websocket = null;
+        this.previewFilterPath = new URLSearchParams(window.location.search).get('filter_path');
         this.skipManualSelection = false;
         this.selectedStructures = new Set();
         this.sortableRows = null;
@@ -776,7 +777,8 @@ class WebAppClient {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    session_id: this.sessionId
+                    session_id: this.sessionId,
+                    filter_path: this.previewFilterPath || undefined
                 })
             });
 
@@ -3026,6 +3028,8 @@ class WebAppClient {
         // Build constraint graph from layout-candidate edges only
         const candidateEdges = edgesData.filter(e => e.layout_candidate !== false);
         const nodeIds = new Set(nodesData.map(n => n.id));
+        const baseLinkDistance = Number(layoutRules.link_distance ?? 95);
+        const nodePadding = Number(layoutRules.node_padding ?? 16);
 
         if (candidateEdges.length === 0 || nodesData.length === 0) {
             return null;
@@ -3044,14 +3048,38 @@ class WebAppClient {
 
         // Apply soft constraints: side bias (L/R/B) and opt grouping
         if (layoutRules.side_bias && layoutRules.side_bias.enabled) {
-            this.applySideBiasConstraints(positions, nodesData, layoutRules.side_bias.strength);
+            const sideGap = Number(layoutRules.side_bias.gap ?? baseLinkDistance);
+            const sideStrength = this.clampNumber(
+                sideGap / Math.max(baseLinkDistance + nodePadding, 1),
+                0.1,
+                1.5,
+            );
+            this.applySideBiasConstraints(positions, nodesData, sideStrength);
         }
         if (layoutRules.opt_grouping && layoutRules.opt_grouping.enabled) {
-            this.applyOptGroupingConstraints(positions, nodesData, layoutRules.opt_grouping.tightness);
+            const optLinkDistance = Number(
+                layoutRules.opt_grouping.link_distance ?? baseLinkDistance
+            );
+            const optTightness = this.clampNumber(
+                1 - (optLinkDistance / Math.max(baseLinkDistance + nodePadding, 1)),
+                0.05,
+                0.95,
+            );
+            this.applyOptGroupingConstraints(positions, nodesData, optTightness);
         }
 
-        // PRIORITY: Aggressively minimize edge crossings above all other rules
-        if (layoutRules.crossing_minimization && layoutRules.crossing_minimization.enabled) {
+        if (layoutRules.flow && layoutRules.flow.enabled) {
+            const flowGap = Number(layoutRules.flow.gap ?? baseLinkDistance);
+            this.applyFlowConstraints(positions, nodesData, candidateEdges, flowGap);
+        }
+
+        // PRIORITY: Aggressively minimize edge crossings above all other rules.
+        // The previous gate depended on a config key that is absent in the
+        // current layout settings, which prevented the tuning harness from
+        // influencing the rendered diagram.
+        const crossingMinimizationEnabled =
+            layoutRules.crossing_minimization?.enabled !== false;
+        if (crossingMinimizationEnabled) {
             this.minimizeCrossingsPrimary(positions, nodesData, candidateEdges, layoutRules);
         }
 
@@ -3181,6 +3209,85 @@ class WebAppClient {
         });
 
         return positions;
+    }
+
+    applyFlowConstraints(positions, nodesData, edgesData, gap) {
+        const hierarchicalRelations = [
+            'CONTAINS',
+            'WITHIN',
+            'SURROUNDS',
+            'ENCLOSED',
+            'SHELTERS',
+            'SHELTERED',
+            'CONFINES',
+            'CONFINED',
+        ];
+        const hierarchicalEdges = edgesData.filter(edge => (
+            hierarchicalRelations.includes(edge.relation_type)
+        ));
+        if (hierarchicalEdges.length === 0) {
+            return;
+        }
+
+        const nodeIds = nodesData.map(node => node.id);
+        const incomingHierarchical = {};
+        const outgoingHierarchical = {};
+        nodeIds.forEach(id => {
+            incomingHierarchical[id] = 0;
+            outgoingHierarchical[id] = [];
+        });
+
+        hierarchicalEdges.forEach(edge => {
+            incomingHierarchical[edge.to_node] =
+                (incomingHierarchical[edge.to_node] || 0) + 1;
+            outgoingHierarchical[edge.from_node].push(edge.to_node);
+        });
+
+        const roots = nodeIds.filter(id => incomingHierarchical[id] === 0);
+        const depth = {};
+        const visited = new Set();
+        const queue = roots.map(id => ({ id, level: 0 }));
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (visited.has(current.id)) {
+                continue;
+            }
+            visited.add(current.id);
+            depth[current.id] = current.level;
+
+            outgoingHierarchical[current.id].forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push({ id: childId, level: current.level + 1 });
+                }
+            });
+        }
+
+        nodeIds.forEach(id => {
+            if (depth[id] === undefined) {
+                depth[id] = 0;
+            }
+        });
+
+        const minY = Math.min(...Object.values(positions).map(pos => pos.y));
+        const levelGroups = {};
+        nodeIds.forEach(id => {
+            const level = depth[id];
+            if (!levelGroups[level]) {
+                levelGroups[level] = [];
+            }
+            levelGroups[level].push(id);
+        });
+
+        Object.entries(levelGroups).forEach(([levelStr, ids]) => {
+            const level = Number(levelStr);
+            const targetY = minY + (level * gap);
+            ids.forEach(id => {
+                if (positions[id]) {
+                    positions[id].y += (targetY - positions[id].y) * 0.4;
+                }
+            });
+        });
     }
 
     applySideBiasConstraints(positions, nodesData, strength) {

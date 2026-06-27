@@ -116,6 +116,11 @@ class SessionRequest(BaseModel):
     session_id: str
 
 
+class PreviewRequest(BaseModel):
+    session_id: str
+    filter_path: Optional[str] = None
+
+
 class MatrixRequest(BaseModel):
     session_id: str
     row_rois: Optional[List[int]] = None
@@ -744,7 +749,7 @@ async def upload_dicom(file: UploadFile = File(...)):
 
 
 @app.post('/api/preview', response_model=PreviewResponse)
-async def preview_structures(request: SessionRequest):
+async def preview_structures(request: PreviewRequest):
     '''Get DICOM structure metadata without full processing.
 
     Args:
@@ -766,7 +771,15 @@ async def preview_structures(request: SessionRequest):
             file_path=file_path
         )
 
-        filter_config_path, filter_config = dicom_file.load_structure_filter_rules()
+        filter_path = None
+        if request.filter_path:
+            filter_path = Path(request.filter_path)
+            if not filter_path.exists() or not filter_path.is_file():
+                raise HTTPException(status_code=400, detail='filter_path does not exist')
+
+        filter_config_path, filter_config = dicom_file.load_structure_filter_rules(
+            filter_path
+        )
 
         # Extract structure metadata
         structures = []

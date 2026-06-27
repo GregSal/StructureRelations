@@ -19,13 +19,16 @@ import copy
 import json
 import logging
 import os
+import pickle
 import subprocess
 import time
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -45,7 +48,7 @@ class CandidateResult:
     name: str
     rules: Dict[str, Any]
     metrics: Dict[str, float]
-    screenshot_path: str
+    screenshot_path: str = ''
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -98,6 +101,7 @@ def _upload_and_process(
     dicom_path: Path,
     timeout: int,
 ) -> None:
+    api_base_url = base_url.split('?', 1)[0].rstrip('/')
     LOGGER.info('Opening %s', base_url)
     driver.get(base_url)
 
@@ -114,13 +118,118 @@ def _upload_and_process(
     except TimeoutException:
         LOGGER.info('Selection stage not shown; expecting auto-processing path')
 
-    _wait_for_stage(driver, 'stage-results', timeout=timeout)
+    session_id = WebDriverWait(driver, 30).until(
+        lambda d: d.execute_script(
+            'return window.app && window.app.sessionId ? window.app.sessionId : null;'
+        )
+    )
+    job_status_url = f'{api_base_url}/api/jobs/{session_id}/status'
+    LOGGER.info('Tracking backend job for session=%s url=%s', session_id, job_status_url)
+    deadline = time.time() + timeout
+    poll_count = 0
+    last_status = None
+    while time.time() < deadline:
+        poll_count += 1
+        try:
+            with urlopen(job_status_url, timeout=15) as response:
+                payload = json.load(response)
+        except (URLError, TimeoutError, socket.timeout, OSError, json.JSONDecodeError, Exception):
+            LOGGER.debug('Transient status poll failure for %s', job_status_url, exc_info=True)
+            time.sleep(0.5)
+            continue
+
+        status = str(payload.get('status', '')).lower()
+        if status != last_status:
+            LOGGER.info(
+                'Job poll %s for session=%s -> status=%s stage=%s progress=%s message=%s',
+                poll_count,
+                session_id,
+                status,
+                payload.get('stage', ''),
+                payload.get('progress', ''),
+                payload.get('message', ''),
+            )
+            last_status = status
+        if status == 'completed':
+            break
+        if status in {'failed', 'cancelled'}:
+            raise RuntimeError(f'Job ended early with status={status}: {payload!r}')
+        time.sleep(0.5)
+    else:
+        raise TimeoutError(
+            f'Processing did not complete within {timeout}s; '
+            f'last_status={last_status!r}; session_id={session_id}; '
+            f'job_status_url={job_status_url}'
+        )
+
+    session_data_path = (
+        Path(__file__).resolve().parents[2] / 'webapp_sessions' / f'{session_id}.pkl'
+    )
+    if not session_data_path.exists():
+        raise FileNotFoundError(f'Session data not found: {session_data_path}')
+
+    with open(session_data_path, 'rb') as f:
+        session_data = pickle.load(f)
+
+    hidden_rois = {int(roi) for roi in getattr(session_data, 'hidden_rois', []) or []}
+    structure_set = getattr(session_data, 'structure_set', None)
+    if structure_set is None:
+        raise RuntimeError(f'Session has no structure set: {session_id}')
+
+    summary_df = structure_set.summary()
+    visible_rois = [
+        int(roi)
+        for roi in summary_df['ROI'].tolist()
+        if int(roi) not in hidden_rois
+    ]
+    if not visible_rois:
+        visible_rois = [int(roi) for roi in summary_df['ROI'].tolist()]
+
+    LOGGER.info(
+        'Requesting diagram payload for %s visible rois (session=%s)',
+        len(visible_rois),
+        session_id,
+    )
+    diagram_request = {
+        'session_id': session_id,
+        'row_rois': visible_rois,
+        'col_rois': visible_rois,
+        'show_disjoint': False,
+        'show_unknown': False,
+        'logical_relations_mode': 'limited',
+    }
+    req = Request(
+        f'{api_base_url}/api/diagram',
+        data=json.dumps(diagram_request).encode('utf-8'),
+        headers={'Content-Type': 'application/json'},
+        method='POST',
+    )
+    with urlopen(req, timeout=60) as response:
+        diagram_data = json.load(response)
+    LOGGER.info(
+        'Diagram payload received: %s node(s), %s edge(s)',
+        len(diagram_data.get('nodes', [])),
+        len(diagram_data.get('edges', [])),
+    )
+
+    LOGGER.info('Rendering diagram in browser')
+    driver.execute_script(
+        '''const data = arguments[0];
+const snapshot = window.app && window.app._captureDiagramPositionSnapshot
+  ? window.app._captureDiagramPositionSnapshot()
+  : null;
+window.app.renderDiagram(data, snapshot);''',
+        diagram_data,
+    )
+    LOGGER.info('Browser render call returned')
+
     WebDriverWait(driver, 60).until(
         lambda d: d.execute_script(
             'return Boolean(window.app && window.app.network && '
             'window.app.latestDiagramData);'
         )
     )
+    LOGGER.info('Browser diagram state is ready')
 
 
 def _wait_for_server(base_url: str, timeout_s: int = 45) -> None:
@@ -283,7 +392,10 @@ def _capture_diagram_screenshot(driver: webdriver.Chrome, output_path: Path) -> 
     element.screenshot(str(output_path))
 
 
-def _candidate_variants(base_rules: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
+def _candidate_variants(
+    base_rules: Dict[str, Any],
+    full_search: bool = False,
+) -> List[Tuple[str, Dict[str, Any]]]:
     variants: List[Tuple[str, Dict[str, Any]]] = []
     variants.append(('baseline', copy.deepcopy(base_rules)))
 
@@ -312,14 +424,29 @@ def _candidate_variants(base_rules: Dict[str, Any]) -> List[Tuple[str, Dict[str,
             suffix = f"{delta:+g}".replace('.', 'p').replace('+', 'plus').replace('-', 'minus')
             variants.append((f'{name}_{suffix}', candidate))
 
-    add_variant('link_distance', ['link_distance'], [-25, -15, 15, 25])
-    add_variant('node_padding', ['node_padding'], [-6, -3, 3, 6])
-    add_variant('flow_gap', ['flow', 'gap'], [-25, -12, 12, 25])
-    add_variant('side_gap', ['side_bias', 'gap'], [-35, -20, 20, 35])
-    add_variant('opt_link_distance', ['opt_grouping', 'link_distance'], [-15, -8, 8, 15])
-    add_variant('target_padding', ['target_grouping', 'padding'], [-10, -6, 6, 10])
-    add_variant('curvature_threshold', ['edge_routing', 'curvature_threshold'], [-0.2, -0.1, 0.1, 0.2])
-    add_variant('crossing_roundness', ['edge_routing', 'crossing_roundness'], [-0.12, -0.06, 0.06, 0.12])
+    # Fast default profile: focus on the parameters that most often move score.
+    add_variant('link_distance', ['link_distance'], [-15, 15])
+    add_variant('node_padding', ['node_padding'], [-3, 3])
+    add_variant('flow_gap', ['flow', 'gap'], [-12, 12])
+    add_variant('opt_link_distance', ['opt_grouping', 'link_distance'], [-15, -8, 8])
+
+    if full_search:
+        add_variant('link_distance_ext', ['link_distance'], [-25, 25])
+        add_variant('node_padding_ext', ['node_padding'], [-6, 6])
+        add_variant('flow_gap_ext', ['flow', 'gap'], [-25, 25])
+        add_variant('side_gap', ['side_bias', 'gap'], [-35, -20, 20, 35])
+        add_variant('opt_link_distance_ext', ['opt_grouping', 'link_distance'], [15])
+        add_variant('target_padding', ['target_grouping', 'padding'], [-10, -6, 6, 10])
+        add_variant(
+            'curvature_threshold',
+            ['edge_routing', 'curvature_threshold'],
+            [-0.2, -0.1, 0.1, 0.2],
+        )
+        add_variant(
+            'crossing_roundness',
+            ['edge_routing', 'crossing_roundness'],
+            [-0.12, -0.06, 0.06, 0.12],
+        )
 
     return variants
 
@@ -328,12 +455,17 @@ def _run_search(
     driver: webdriver.Chrome,
     base_rules: Dict[str, Any],
     screenshots_dir: Path,
+    full_search: bool,
+    screenshot_mode: str,
 ) -> List[CandidateResult]:
     results: List[CandidateResult] = []
-    for name, rules in _candidate_variants(base_rules):
+    for name, rules in _candidate_variants(base_rules, full_search=full_search):
         metrics = _apply_and_measure(driver, rules)
-        shot = screenshots_dir / f'{name}.png'
-        _capture_diagram_screenshot(driver, shot)
+        shot = ''
+        if screenshot_mode == 'all':
+            shot_path = screenshots_dir / f'{name}.png'
+            _capture_diagram_screenshot(driver, shot_path)
+            shot = str(shot_path)
         LOGGER.info(
             'Candidate %-24s score=%8.2f crossings=%3.0f edge_std=%7.2f min_node_dist=%7.2f',
             name,
@@ -347,10 +479,27 @@ def _run_search(
                 name=name,
                 rules=rules,
                 metrics=metrics,
-                screenshot_path=str(shot),
+                screenshot_path=shot,
             )
         )
     return results
+
+
+def _capture_key_screenshots(
+    driver: webdriver.Chrome,
+    baseline: CandidateResult,
+    best: CandidateResult,
+    screenshots_dir: Path,
+) -> None:
+    seen: set[str] = set()
+    for result in (baseline, best):
+        if result.name in seen:
+            continue
+        _apply_and_measure(driver, result.rules)
+        shot_path = screenshots_dir / f'{result.name}.png'
+        _capture_diagram_screenshot(driver, shot_path)
+        result.screenshot_path = str(shot_path)
+        seen.add(result.name)
 
 
 def _select_best(results: List[CandidateResult]) -> CandidateResult:
@@ -410,6 +559,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--timeout-seconds', type=int, default=300)
     parser.add_argument('--server-start-timeout-seconds', type=int, default=45)
     parser.add_argument('--apply-best', action='store_true')
+    parser.add_argument(
+        '--filter-path',
+        default=str(Path(__file__).resolve().parents[2] / 'tests' / 'Pros_Equal_target_rules.json'),
+    )
     parser.add_argument('--start-server', action='store_true')
     parser.add_argument('--server-host', default='127.0.0.1')
     parser.add_argument('--server-port', type=int, default=8000)
@@ -419,6 +572,17 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get('SR_LAYOUT_TUNER_PYTHON', os.sys.executable),
     )
     parser.add_argument('--no-headless', action='store_true')
+    parser.add_argument(
+        '--full-search',
+        action='store_true',
+        help='Evaluate the full candidate set (slower but broader sweep).',
+    )
+    parser.add_argument(
+        '--screenshot-mode',
+        choices=['none', 'key', 'all'],
+        default='key',
+        help='Screenshot policy: none, key candidates (baseline+best), or all.',
+    )
     parser.add_argument('--verbose', action='store_true')
     return parser.parse_args()
 
@@ -440,10 +604,20 @@ def main() -> int:
     report_path = output_dir / 'layout_tuning_report.json'
 
     original_rules = _load_layout_rules(config_path)
+    filter_path = Path(args.filter_path)
+    if not filter_path.exists() or not filter_path.is_file():
+        fallback_filter_path = Path(__file__).resolve().parents[2] / 'tests' / 'Pros_Equal_target_rules.json'
+        if fallback_filter_path.exists() and fallback_filter_path.is_file():
+            filter_path = fallback_filter_path
+        else:
+            raise FileNotFoundError(f'Filter path does not exist: {filter_path}')
 
     driver: Optional[webdriver.Chrome] = None
     server_process: Optional[subprocess.Popen[str]] = None
     try:
+        base_url = (
+            f'{args.base_url.rstrip("/")}/?filter_path={quote(str(filter_path.resolve()))}'
+        )
         if args.start_server:
             project_root = Path(__file__).resolve().parents[2]
             server_process = _start_server(
@@ -461,7 +635,7 @@ def main() -> int:
         driver = _chrome_driver(headless=not args.no_headless)
         _upload_and_process(
             driver=driver,
-            base_url=args.base_url,
+            base_url=base_url,
             dicom_path=dicom_path,
             timeout=args.timeout_seconds,
         )
@@ -470,9 +644,19 @@ def main() -> int:
             driver=driver,
             base_rules=original_rules,
             screenshots_dir=screenshots_dir,
+            full_search=bool(args.full_search),
+            screenshot_mode=str(args.screenshot_mode),
         )
         baseline = next(result for result in results if result.name == 'baseline')
         best = _select_best(results)
+
+        if args.screenshot_mode == 'key':
+            _capture_key_screenshots(
+                driver=driver,
+                baseline=baseline,
+                best=best,
+                screenshots_dir=screenshots_dir,
+            )
 
         _write_report(
             output_path=report_path,
