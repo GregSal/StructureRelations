@@ -185,4 +185,5 @@ src/UnUsedFunctions.py
 webapp_sessions/
 # Selenium ChromeDriver
 */ChromeDriver/*
-src/webapp/layout_tuner_output/
+layout_tuner_output/
+layout_tuner_output_cola/
