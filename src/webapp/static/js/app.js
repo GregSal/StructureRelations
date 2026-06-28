@@ -42,6 +42,8 @@ class WebAppClient {
         this.manualLayoutActive = false;
         this._dragFrozen = [];
         this._contextMenu = null;        // active context menu DOM element
+        this._initialDiagramFitTimer = null;
+        this._initialDiagramFitAttempts = 0;
         this._invalidTooltipRelationshipModesWarned = new Set();
         this.diagramOptions = {
             font: {
@@ -3014,6 +3016,43 @@ class WebAppClient {
         this.network.stopSimulation();
     }
 
+    scheduleInitialDiagramFit(maxAttempts = 20) {
+        if (this._initialDiagramFitTimer) {
+            clearTimeout(this._initialDiagramFitTimer);
+            this._initialDiagramFitTimer = null;
+        }
+        this._initialDiagramFitAttempts = 0;
+
+        const tryFit = () => {
+            if (!this.network) {
+                this._initialDiagramFitTimer = null;
+                return;
+            }
+
+            const container = document.getElementById('networkDiagram');
+            const visible = Boolean(container)
+                && container.clientWidth > 0
+                && container.clientHeight > 0;
+
+            if (visible) {
+                this.network.redraw();
+                this.network.fit({ animation: false });
+                this._initialDiagramFitTimer = null;
+                return;
+            }
+
+            this._initialDiagramFitAttempts += 1;
+            if (this._initialDiagramFitAttempts >= maxAttempts) {
+                this._initialDiagramFitTimer = null;
+                return;
+            }
+
+            this._initialDiagramFitTimer = setTimeout(tryFit, 50);
+        };
+
+        this._initialDiagramFitTimer = setTimeout(tryFit, 0);
+    }
+
     // ============ PRE-LAYOUT ENGINE ============
 
     /**
@@ -4164,6 +4203,13 @@ class WebAppClient {
 
         this._restoreDiagramCoordinates(positionSnapshot);
         this._applyNodeVisibilityState();
+
+        // On first render (no prior position snapshot), fit the full graph.
+        // Rendering can happen before the results stage is visible, so defer
+        // until the container has non-zero size.
+        if (!positionSnapshot) {
+            this.scheduleInitialDiagramFit();
+        }
 
         // Right-click: show node/edge context menu
         this.network.on('oncontext', (params) => {
@@ -5555,6 +5601,10 @@ class WebAppClient {
         if (this.network) {
             this.network.destroy();
             this.network = null;
+        }
+        if (this._initialDiagramFitTimer) {
+            clearTimeout(this._initialDiagramFitTimer);
+            this._initialDiagramFitTimer = null;
         }
         if (this.summarySortable) {
             this.summarySortable.destroy();
