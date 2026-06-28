@@ -3360,6 +3360,12 @@ class WebAppClient {
                     nodesData, candidateEdges, layoutRules
                 );
                 if (colaPositions && Object.keys(colaPositions).length > 0) {
+                    this.optimizeCrossingsByLocalSwaps(
+                        colaPositions,
+                        nodesData,
+                        candidateEdges,
+                        layoutRules,
+                    );
                     return colaPositions;
                 }
                 console.warn(
@@ -3420,7 +3426,112 @@ class WebAppClient {
             this.minimizeCrossingsPrimary(positions, nodesData, candidateEdges, layoutRules);
         }
 
+        this.optimizeCrossingsByLocalSwaps(
+            positions,
+            nodesData,
+            candidateEdges,
+            layoutRules,
+        );
+
         return positions;
+    }
+
+    countTotalEdgeCrossings(positions, edgesData) {
+        if (!edgesData || edgesData.length < 2) {
+            return 0;
+        }
+
+        let crossings = 0;
+        for (let i = 0; i < edgesData.length; i++) {
+            for (let j = i + 1; j < edgesData.length; j++) {
+                const e1 = edgesData[i];
+                const e2 = edgesData[j];
+
+                // Adjacent edges cannot cross in the graph-theoretic sense.
+                if (e1.from_node === e2.from_node ||
+                    e1.from_node === e2.to_node ||
+                    e1.to_node === e2.from_node ||
+                    e1.to_node === e2.to_node) {
+                    continue;
+                }
+
+                const p1 = positions[String(e1.from_node)];
+                const p2 = positions[String(e1.to_node)];
+                const p3 = positions[String(e2.from_node)];
+                const p4 = positions[String(e2.to_node)];
+
+                if (p1 && p2 && p3 && p4 && this.doSegmentsCross(p1, p2, p3, p4)) {
+                    crossings += 1;
+                }
+            }
+        }
+        return crossings;
+    }
+
+    optimizeCrossingsByLocalSwaps(positions, nodesData, edgesData, layoutRules) {
+        if (!positions || !nodesData || nodesData.length < 4) {
+            return;
+        }
+
+        const edgeRouting = layoutRules?.edge_routing || {};
+        const maxPasses = Math.max(1, Number(edgeRouting.local_swap_passes ?? 8));
+        const maxNodes = Math.max(4, Number(edgeRouting.local_swap_max_nodes ?? 40));
+        if (nodesData.length > maxNodes) {
+            return;
+        }
+
+        const nodeIds = nodesData
+            .map(node => Number(node.id))
+            .filter(id => positions[String(id)]);
+        if (nodeIds.length < 4) {
+            return;
+        }
+
+        let bestCrossings = this.countTotalEdgeCrossings(positions, edgesData);
+        if (bestCrossings === 0) {
+            return;
+        }
+
+        for (let pass = 0; pass < maxPasses; pass++) {
+            let improvedInPass = false;
+
+            for (let i = 0; i < nodeIds.length - 1; i++) {
+                for (let j = i + 1; j < nodeIds.length; j++) {
+                    const a = nodeIds[i];
+                    const b = nodeIds[j];
+                    const keyA = String(a);
+                    const keyB = String(b);
+                    const posA = positions[keyA];
+                    const posB = positions[keyB];
+                    if (!posA || !posB) {
+                        continue;
+                    }
+
+                    // Try swapping node positions and keep it if crossings drop.
+                    positions[keyA] = { x: posB.x, y: posB.y };
+                    positions[keyB] = { x: posA.x, y: posA.y };
+
+                    const swappedCrossings = this.countTotalEdgeCrossings(
+                        positions,
+                        edgesData,
+                    );
+                    if (swappedCrossings < bestCrossings) {
+                        bestCrossings = swappedCrossings;
+                        improvedInPass = true;
+                        if (bestCrossings === 0) {
+                            return;
+                        }
+                    } else {
+                        positions[keyA] = posA;
+                        positions[keyB] = posB;
+                    }
+                }
+            }
+
+            if (!improvedInPass) {
+                return;
+            }
+        }
     }
 
     selectLayoutStyle(nodesData, edgesData, layoutRules) {
