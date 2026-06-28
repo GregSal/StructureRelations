@@ -3020,6 +3020,280 @@ class WebAppClient {
      * Computes initial node positions using deterministic rule-based layout.
      * Returns a map of {nodeId: {x, y}} or null if pre-layout should be skipped.
      */
+    computeColaLayout(nodesData, candidateEdges, layoutRules) {
+        // Constraint-based stress layout using the bundled WebCola solver.
+        // Returns a deterministic { String(nodeId): {x, y} } position map.
+        if (typeof cola === 'undefined' || !cola.Layout) {
+            return null;
+        }
+
+        const baseLinkDistance = Number(layoutRules.link_distance ?? 95);
+        const nodePadding = Number(layoutRules.node_padding ?? 16);
+        const convergence = layoutRules.convergence || {};
+        const unconstrainedIters = Number(convergence.unconstrained_iters ?? 20);
+        const userIters = Number(convergence.user_iters ?? 20);
+        const allIters = Number(convergence.all_iters ?? 25);
+
+        // Deterministic 2D seed (circular) so the stress solver starts spread
+        // out and converges to a balanced planar layout rather than collapsing
+        // into a vertical line.
+        const seed = this.applyCycleLayout(
+            nodesData, candidateEdges, layoutRules
+        );
+
+        // Build cola nodes (rectangles centred on x/y) keyed by array index.
+        const idToIndex = {};
+        const colaNodes = nodesData.map((node, index) => {
+            idToIndex[node.id] = index;
+            const seedPos = seed[node.id] || { x: 0, y: 0 };
+            const labelLength = String(node.label || node.id).length;
+            const width = Math.max(60, labelLength * 8) + nodePadding * 2;
+            const height = 30 + nodePadding * 2;
+            return { id: node.id, x: seedPos.x, y: seedPos.y, width, height };
+        });
+
+        // Undirected links from layout-candidate edges (deduped).
+        const links = [];
+        const seenPairs = new Set();
+        candidateEdges.forEach(edge => {
+            const s = idToIndex[edge.from_node];
+            const t = idToIndex[edge.to_node];
+            if (s === undefined || t === undefined || s === t) {
+                return;
+            }
+            const key = s < t ? `${s}-${t}` : `${t}-${s}`;
+            if (seenPairs.has(key)) {
+                return;
+            }
+            seenPairs.add(key);
+            links.push({ source: s, target: t });
+        });
+
+        // Disjoint cola groups cluster similar structures with a bounding box
+        // (opt/eval variant families and target dose families).
+        const groups = this.buildColaGroups(
+            nodesData, idToIndex, layoutRules, nodePadding,
+        );
+
+        // Constraints: side bias (L/R/B) by default. Directional "flow"
+        // separation is opt-in (flow.cola_strict) because hard vertical
+        // layering collapses a tree-like graph into a single column and works
+        // against the desired 2D spread.
+        const constraints = [];
+        if (layoutRules.flow && layoutRules.flow.enabled
+            && layoutRules.flow.cola_strict) {
+            const flowGap = Number(layoutRules.flow.gap ?? baseLinkDistance);
+            this.addColaFlowConstraints(
+                candidateEdges, idToIndex, flowGap, constraints,
+            );
+        }
+        if (layoutRules.side_bias && layoutRules.side_bias.enabled) {
+            const sideGap = Number(
+                layoutRules.side_bias.gap ?? baseLinkDistance
+            );
+            const alignLevel = layoutRules.side_bias.align_level === true;
+            this.addColaSideBiasConstraints(
+                nodesData, idToIndex, sideGap, alignLevel, constraints,
+            );
+        }
+
+        // jaccardLinkLengths lengthens links between densely connected nodes,
+        // which (with avoidOverlaps + groups) spreads the graph into a readable
+        // planar layout with few crossings instead of a column.
+        const layout = new cola.Layout()
+            .nodes(colaNodes)
+            .links(links)
+            .avoidOverlaps(true)
+            .jaccardLinkLengths(baseLinkDistance, 0.7);
+        if (groups.length > 0) {
+            layout.groups(groups);
+        }
+        if (constraints.length > 0) {
+            layout.constraints(constraints);
+        }
+        layout.start(unconstrainedIters, userIters, allIters, 0, false);
+
+        const positions = {};
+        colaNodes.forEach(node => {
+            positions[String(node.id)] = { x: node.x, y: node.y };
+        });
+
+        // Give the solver a second chance to reorder the graph with a
+        // crossing-focused pass before we apply the final aspect normalization.
+        this.minimizeCrossingsPrimary(
+            positions, nodesData, candidateEdges, layoutRules
+        );
+
+        const aspectRatio = Math.max(
+            1,
+            Number(layoutRules.aspect_ratio ?? 2.3)
+        );
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        Object.values(positions).forEach(node => {
+            minX = Math.min(minX, node.x);
+            maxX = Math.max(maxX, node.x);
+            minY = Math.min(minY, node.y);
+            maxY = Math.max(maxY, node.y);
+        });
+        const spanX = Math.max(1, maxX - minX);
+        const spanY = Math.max(1, maxY - minY);
+        const currentAspect = spanX / spanY;
+        const stretch = currentAspect < aspectRatio
+            ? Math.sqrt(aspectRatio / currentAspect)
+            : 1;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        colaNodes.forEach(node => {
+            positions[String(node.id)] = {
+                x: centerX + (node.x - centerX) * stretch,
+                y: centerY + (node.y - centerY) / stretch,
+            };
+        });
+        return positions;
+    }
+
+    buildColaGroups(nodesData, idToIndex, layoutRules, nodePadding) {
+        // Build disjoint cola groups from grouping metadata. opt/eval families
+        // take precedence over target-dose families so each node joins at most
+        // one group (a cola requirement).
+        const groups = [];
+        const used = new Set();
+        const addKeyGroups = (keyField, enabled, padding, maxSize) => {
+            if (!enabled) {
+                return;
+            }
+            const buckets = {};
+            nodesData.forEach(node => {
+                const key = node[keyField];
+                if (!key) {
+                    return;
+                }
+                const idx = idToIndex[node.id];
+                if (idx === undefined || used.has(idx)) {
+                    return;
+                }
+                (buckets[key] = buckets[key] || []).push(idx);
+            });
+            Object.values(buckets).forEach(leaves => {
+                // Box small variant families so they cluster, but leave large
+                // hub-centred families (e.g. a base PTV with many opt/eval
+                // partitions) unboxed so the stress solver can spread them and
+                // avoid the dense central tangle a tight bounding box causes.
+                if (leaves.length >= 2 && leaves.length <= maxSize) {
+                    leaves.forEach(idx => used.add(idx));
+                    groups.push({ leaves: leaves.slice(), padding });
+                }
+            });
+        };
+
+        const optGrouping = layoutRules.opt_grouping || {};
+        const targetGrouping = layoutRules.target_grouping || {};
+        addKeyGroups(
+            'opt_group_key',
+            optGrouping.enabled,
+            Number(optGrouping.padding ?? nodePadding * 2),
+            Number(optGrouping.max_group_size ?? 4),
+        );
+        addKeyGroups(
+            'target_group_key',
+            targetGrouping.enabled,
+            Number(targetGrouping.padding ?? 32),
+            Number(targetGrouping.max_group_size ?? 4),
+        );
+        return groups;
+    }
+
+    addColaFlowConstraints(candidateEdges, idToIndex, gap, constraints) {
+        // Keep the parent/container of a hierarchical relation above its child
+        // via y-axis separation constraints (left + gap <= right).
+        const parentFromTo = new Set([
+            'CONTAINS', 'SURROUNDS', 'SHELTERS', 'CONFINES',
+        ]);
+        const parentToFrom = new Set([
+            'WITHIN', 'ENCLOSED', 'SHELTERED', 'CONFINED',
+        ]);
+        candidateEdges.forEach(edge => {
+            const relation = edge.relation_type;
+            const s = idToIndex[edge.from_node];
+            const t = idToIndex[edge.to_node];
+            if (s === undefined || t === undefined || s === t) {
+                return;
+            }
+            let parent;
+            let child;
+            if (parentFromTo.has(relation)) {
+                parent = s;
+                child = t;
+            } else if (parentToFrom.has(relation)) {
+                parent = t;
+                child = s;
+            } else {
+                return;
+            }
+            constraints.push({
+                axis: 'y', left: parent, right: child, gap,
+            });
+        });
+    }
+
+    addColaSideBiasConstraints(
+        nodesData, idToIndex, gap, alignLevel, constraints
+    ) {
+        // L structures biased right, R left, B between, via x-axis ordering
+        // (R left of B left of L). Optionally keep each side set level (same y).
+        const leftSet = [];
+        const rightSet = [];
+        const betweenSet = [];
+        nodesData.forEach(node => {
+            const idx = idToIndex[node.id];
+            if (idx === undefined) {
+                return;
+            }
+            if (node.side_tag === 'L') {
+                leftSet.push(idx);
+            } else if (node.side_tag === 'R') {
+                rightSet.push(idx);
+            } else if (node.side_tag === 'B') {
+                betweenSet.push(idx);
+            }
+        });
+
+        const pairCount = rightSet.length * betweenSet.length
+            + betweenSet.length * leftSet.length
+            + rightSet.length * leftSet.length;
+        const MAX_SIDE_PAIRS = 2000;
+        if (pairCount > MAX_SIDE_PAIRS) {
+            return;
+        }
+
+        const sep = (left, right) => constraints.push({
+            axis: 'x', left, right, gap,
+        });
+        rightSet.forEach(r => betweenSet.forEach(b => sep(r, b)));
+        betweenSet.forEach(b => leftSet.forEach(l => sep(b, l)));
+        rightSet.forEach(r => leftSet.forEach(l => sep(r, l)));
+
+        if (alignLevel) {
+            const alignSet = indices => {
+                if (indices.length < 2) {
+                    return;
+                }
+                constraints.push({
+                    type: 'alignment',
+                    axis: 'y',
+                    offsets: indices.map(idx => ({ node: idx, offset: 0 })),
+                });
+            };
+            alignSet(leftSet);
+            alignSet(rightSet);
+            alignSet(betweenSet);
+        }
+    }
+
     computeDeterministicLayout(nodesData, edgesData, layoutRules) {
         if (!layoutRules || !layoutRules.enabled) {
             return null;
@@ -3035,7 +3309,31 @@ class WebAppClient {
             return null;
         }
 
-        // Use tree/cycle as initial starting point only
+        // Preferred engine: constraint-based stress layout (WebCola). It uses
+        // group/separation constraints driven by the backend grouping metadata
+        // (opt_group_key, target_group_key, side_tag) to cluster similar
+        // structures and reduce edge crossings far more effectively than the
+        // legacy tree/cycle + barycenter heuristic, which remains as a fallback.
+        const engine = String(layoutRules.engine || 'cola').toLowerCase();
+        if (engine === 'cola' && typeof cola !== 'undefined' && cola.Layout) {
+            try {
+                const colaPositions = this.computeColaLayout(
+                    nodesData, candidateEdges, layoutRules
+                );
+                if (colaPositions && Object.keys(colaPositions).length > 0) {
+                    return colaPositions;
+                }
+                console.warn(
+                    'Cola layout returned no positions; using legacy layout.'
+                );
+            } catch (err) {
+                console.warn(
+                    'Cola layout failed; using legacy layout.', err
+                );
+            }
+        }
+
+        // Legacy fallback: tree/cycle as initial starting point only
         const layoutStyle = this.selectLayoutStyle(nodesData, candidateEdges, layoutRules);
 
         let positions = {};
@@ -3376,7 +3674,7 @@ class WebAppClient {
         );
         if (!layers || layers.length < 2) return;
 
-        const maxIterations = 6;
+        const maxIterations = 10;
         for (let iter = 0; iter < maxIterations; iter++) {
             let improved = false;
 
@@ -3512,36 +3810,46 @@ class WebAppClient {
                 : positions[String(nodeId)]?.x || 0;
         });
 
-        const orderedLayer = [...layer].sort(
+        let orderedLayer = [...layer].sort(
             (left, right) => barycenters[left] - barycenters[right]
         );
         let improved = false;
 
-        for (let index = 0; index < orderedLayer.length - 1; index++) {
-            const crossCurrent = this.countCrossingsForPair(
-                orderedLayer[index],
-                orderedLayer[index + 1],
-                edgesData,
-                positions,
-            );
-            [orderedLayer[index], orderedLayer[index + 1]] = [
-                orderedLayer[index + 1],
-                orderedLayer[index],
-            ];
-            const crossSwapped = this.countCrossingsForPair(
-                orderedLayer[index],
-                orderedLayer[index + 1],
-                edgesData,
-                positions,
-            );
+        const MAX_SWEEPS = 6;
+        for (let sweep = 0; sweep < MAX_SWEEPS; sweep++) {
+            let sweepImproved = false;
 
-            if (crossSwapped >= crossCurrent) {
+            for (let index = 0; index < orderedLayer.length - 1; index++) {
+                const crossCurrent = this.countCrossingsForPair(
+                    orderedLayer[index],
+                    orderedLayer[index + 1],
+                    edgesData,
+                    positions,
+                );
                 [orderedLayer[index], orderedLayer[index + 1]] = [
                     orderedLayer[index + 1],
                     orderedLayer[index],
                 ];
-            } else {
-                improved = true;
+                const crossSwapped = this.countCrossingsForPair(
+                    orderedLayer[index],
+                    orderedLayer[index + 1],
+                    edgesData,
+                    positions,
+                );
+
+                if (crossSwapped >= crossCurrent) {
+                    [orderedLayer[index], orderedLayer[index + 1]] = [
+                        orderedLayer[index + 1],
+                        orderedLayer[index],
+                    ];
+                } else {
+                    improved = true;
+                    sweepImproved = true;
+                }
+            }
+
+            if (!sweepImproved) {
+                break;
             }
         }
 
