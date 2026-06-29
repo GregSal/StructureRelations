@@ -6,28 +6,52 @@
   "skip_manual_selection": false,
   "rules": [
     {
-      "id": "artifact-z-prefix",
-      "description": "Deselect helper or artifact structures with a Z prefix",
+      "id": "Z-Structures",
+      "description": "Deselect helper or artifact structures (with a Z prefix)",
       "action": "exclude",
       "field": "Structure ID",
       "match_type": "prefix",
       "value": "Z"
     },
     {
-      "id": "helper-x-prefix",
-      "description": "Deselect helper or temporary structures with an X prefix",
+      "id": "unreviewed-structures",
+      "description": "Deselect unreviewed auto-contour structures (with a $ prefix)",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "prefix",
+      "value": "$"
+    },
+    {
+      "id": "resident-contours",
+      "description": "Deselect resident structures (with an X prefix)",
       "action": "exclude",
       "field": "Structure ID",
       "match_type": "prefix",
       "value": "X"
     },
     {
-      "id": "dpv-prefix",
-      "description": "Deselect structures with the DPV prefix",
+      "id": "BOB-prefix",
+      "description": "Exclude structures with the BOB prefix these are dose optimization structures.",
       "action": "exclude",
       "field": "Structure ID",
       "match_type": "prefix",
-      "value": "DPV"
+      "value": "BOB"
+    },
+    {
+      "id": "Dose Structures",
+      "description": "Exclude dose structures (e.g. D105).",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "regex",
+      "value": "^D[0-9]+"
+    },
+    {
+      "id": "Wires",
+      "description": "Deselect wire structures (containing Wire)",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "regex",
+      "value": ".*[wW]ire.*"
     },
     {
       "id": "support-structures",
@@ -38,28 +62,31 @@
       "value": "Support"
     },
     {
-      "id": "GTV-type",
-      "description": "Select  GTV structures",
+      "id": "Utility-structures",
+      "description": "Exclude utility planning structures",
+      "action": "exclude",
+      "field": "Structure ID",
+      "match_type": "structure list",
+      "value": ["Baseline",
+                "Matchplane",
+                "CIED"
+               ]
+    },
+    {
+      "id": "Target-label",
+      "description": "Select Target structures by their name",
       "action": "display",
       "field": "Structure ID",
       "match_type": "regex",
-      "value": ".*GTV.*"
+      "value": ".*[GCPIH]+TV.*"
     },
     {
-      "id": "CTV-type",
-      "description": "Select  CTV structures",
+      "id": "Target-type",
+      "description": "Select Target DICOM types",
       "action": "display",
       "field": "DICOM Type",
-      "match_type": "exact",
-      "value": "CTV"
-    },
-    {
-      "id": "PTV-type",
-      "description": "Select  PTV structures",
-      "action": "display",
-      "field": "Structure ID",
       "match_type": "regex",
-      "value": ".*PTV.*"
+      "value": "[GCP]TV"
     }
   ]
 }
