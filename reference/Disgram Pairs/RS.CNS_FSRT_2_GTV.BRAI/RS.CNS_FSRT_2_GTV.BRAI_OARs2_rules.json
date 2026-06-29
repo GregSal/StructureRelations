@@ -1,0 +1,23 @@
+{
+  "name": "Pros_Equal Targets",
+  "description": "For diagram generation testing with Pros_Equal.dcm.",
+  "include by default": false,
+  "display by default": true,
+  "skip_manual_selection": true,
+  "rules": [
+    {
+      "id": "Test Selection",
+      "description": "Select structured for diagram layout testing",
+      "action": "include",
+      "field": "Structure ID",
+      "match_type": "structure list",
+      "value": ["Skin",
+                "BODY",
+                "opt Brain",
+                "Brain",
+                "Cochlea R",
+                "Cochlea L"
+               ]
+    }
+  ]
+}
