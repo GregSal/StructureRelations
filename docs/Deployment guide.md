@@ -159,22 +159,30 @@ Notes:
 - Put /ws before / to avoid route shadowing.
 - Keep these settings in this vhost only so other apps keep their own timeout behavior.
 
-## Uvicorn service isolation (Windows)
-Run this app as its own service with unique runtime settings.
+## Uvicorn startup isolation (Windows Task Scheduler)
+Run this app as its own scheduled task with unique runtime settings.
 
-Example NSSM setup:
-1. Install service:
-   nssm install StructureRelations-Uvicorn python.exe -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src\webapp
-2. Set working directory to project root.
-3. Set dedicated stdout and stderr logs.
-4. Set service-specific TEMP and TMP directories.
-5. Start service.
+Recommended Task Scheduler setup:
+1. Create a task named `StructureRelations-Uvicorn`.
+2. Set the trigger to run at startup or at logon, depending on whether the machine should host the app unattended.
+3. Configure the action to start Uvicorn from the project root:
+    - Program/script: `python.exe`
+    - Add arguments: `-m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp`
+    - Start in: project root
+4. Set the task to run whether the user is logged on or not.
+5. Enable highest privileges if the environment requires it.
+6. Redirect stdout and stderr to project-local log files by launching through a wrapper command, if needed.
+7. Set service-equivalent TEMP and TMP locations before launching Uvicorn, if the deployment needs isolated temp storage.
 
-Recommended service properties:
-- AppDirectory: project root
-- AppStdout: project-local log file
-- AppStderr: project-local log file
-- TEMP and TMP: project-local temp folder
+Recommended task properties:
+- Run only when network is available, if Apache depends on the backend being reachable during boot.
+- Restart on failure, if you want the backend to recover automatically.
+- Use a dedicated project-local log file for any wrapper output.
+- Keep TEMP and TMP in project-local temp folders when possible.
+
+Example wrapper command for the action if per-task environment variables are needed:
+
+     cmd.exe /c "set TEMP=D:\Path\To\StructureRelations\webapp_temp && set TMP=D:\Path\To\StructureRelations\webapp_temp && python -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src\webapp"
 
 ## Security and interference prevention checklist
 1. Unique ServerName per app.
@@ -182,7 +190,7 @@ Recommended service properties:
 3. No global ProxyPass rules.
 4. Per-vhost logs (access and error).
 5. Uvicorn bound to 127.0.0.1 only.
-6. Dedicated Windows service per app.
+6. Dedicated Task Scheduler task per app.
 7. Dedicated temp and log locations per app.
 8. Default catch-all vhost denies unknown hosts.
 
