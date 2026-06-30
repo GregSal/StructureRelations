@@ -159,6 +159,43 @@ Notes:
 - Put /ws before / to avoid route shadowing.
 - Keep these settings in this vhost only so other apps keep their own timeout behavior.
 
+## Python virtual environment setup (Windows)
+Use a dedicated virtual environment for this app so Python packages do not interfere
+with other hosted applications.
+
+Recommended from the project root:
+1. Create the virtual environment:
+
+    py -3 -m venv .venv
+
+2. Activate it in PowerShell:
+
+    .\.venv\Scripts\Activate.ps1
+
+3. Upgrade pip and install dependencies:
+
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+
+4. Verify the interpreter path and package set:
+
+    python -c "import sys; print(sys.executable)"
+    pip list
+
+5. Deactivate when finished:
+
+    deactivate
+
+If PowerShell blocks activation scripts, allow local scripts for your user:
+
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+Task Scheduler note:
+- For this app's scheduled task, set Program/script to the virtual environment
+  interpreter instead of a global Python installation, for example:
+
+      C:\webapps\StructureRelations\.venv\Scripts\python.exe
+
 ## Uvicorn startup isolation (Windows Task Scheduler)
 Run this app as its own scheduled task with unique runtime settings.
 
@@ -166,7 +203,7 @@ Recommended Task Scheduler setup:
 1. Create a task named `StructureRelations-Uvicorn`.
 2. Set the trigger to run at startup or at logon, depending on whether the machine should host the app unattended.
 3. Configure the action to start Uvicorn from the project root:
-    - Program/script: `python.exe`
+    - Program/script: `C:\webapps\StructureRelations\.venv\Scripts\python.exe`
     - Add arguments: `-m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp`
     - Start in: project root
 4. Set the task to run whether the user is logged on or not.
@@ -182,7 +219,21 @@ Recommended task properties:
 
 Example wrapper command for the action if per-task environment variables are needed:
 
-     cmd.exe /c "set TEMP=D:\Path\To\StructureRelations\webapp_temp && set TMP=D:\Path\To\StructureRelations\webapp_temp && python -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src\webapp"
+    cmd.exe /c "set TEMP=""C:\webapps\StructureRelations\TEMP"" && set TMP="C:\webapps\StructureRelations\TEMP" && C:\webapps\StructureRelations\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir C:\webapps\StructureRelations\src\webapp"
+
+## Optional: Offline or locked-down network deployment
+If the server cannot reach public CDNs, vendor frontend JavaScript dependencies
+locally under `src/webapp/static/js` and update script tags in `static/index.html`
+to local paths.
+
+Recommended libraries to vendor locally:
+- SortableJS (currently loaded from jsDelivr)
+- vis-network (currently loaded from unpkg)
+- html2canvas (currently loaded from jsDelivr)
+- jsPDF (currently loaded from jsDelivr)
+
+Note:
+- `cola.min.js` is already local and does not require CDN access.
 
 ## Security and interference prevention checklist
 1. Unique ServerName per app.
