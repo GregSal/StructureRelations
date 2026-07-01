@@ -25,6 +25,19 @@ Relevant implementation points:
 - App A: 127.0.0.1:8102
 - App B: 127.0.0.1:8103
 
+## Concrete deployment values for PHYSICSAPPSPV1
+Use these exact values for this environment:
+
+- Apache host/server name: PHYSICSAPPSPV1
+- Application root: C:\webapps\StructureRelations
+- Python interpreter: C:\webapps\StructureRelations\.venv\Scripts\python.exe
+- Backend bind: 127.0.0.1:8101
+- Uvicorn module args: -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp
+
+Important:
+- Keep all ProxyPass directives inside VirtualHost blocks only.
+- Keep sections for other hosted apps commented out in the active Apache config file if this file is used as a single combined config.
+
 ## Apache module requirements
 Enable:
 - mod_proxy
@@ -119,16 +132,16 @@ Use a default vhost so unknown host headers do not land in a real app.
 
 ## StructureRelations vhost with per-vhost long-job timeout tuning
     <VirtualHost *:80>
-        ServerName structurerelations.example.com
-        Redirect permanent / https://structurerelations.example.com/
+        ServerName PHYSICSAPPSPV1
+        Redirect permanent / https://PHYSICSAPPSPV1/
     </VirtualHost>
 
     <VirtualHost *:443>
-        ServerName structurerelations.example.com
+        ServerName PHYSICSAPPSPV1
 
         SSLEngine on
-        SSLCertificateFile "C:/Apache24/conf/ssl/structurerelations.crt"
-        SSLCertificateKeyFile "C:/Apache24/conf/ssl/structurerelations.key"
+        SSLCertificateFile "C:/Apache24/conf/ssl/physicsappspv1.crt"
+        SSLCertificateKeyFile "C:/Apache24/conf/ssl/physicsappspv1.key"
 
         ProxyPreserveHost On
         RequestHeader set X-Forwarded-Proto "https"
@@ -205,7 +218,7 @@ Recommended Task Scheduler setup:
 3. Configure the action to start Uvicorn from the project root:
     - Program/script: `C:\webapps\StructureRelations\.venv\Scripts\python.exe`
     - Add arguments: `-m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp`
-    - Start in: project root
+    - Start in: `C:\webapps\StructureRelations`
 4. Set the task to run whether the user is logged on or not.
 5. Enable highest privileges if the environment requires it.
 6. Redirect stdout and stderr to project-local log files by launching through a wrapper command, if needed.
