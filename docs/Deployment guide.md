@@ -29,6 +29,8 @@ Relevant implementation points:
 Use these exact values for this environment:
 
 - Apache host/server name: PHYSICSAPPSPV1
+- Public Apache endpoint: http://PHYSICSAPPSPV1:8001
+- Apache port 80 policy: blocked (deny all)
 - Application root: C:\webapps\StructureRelations
 - Python interpreter: C:\webapps\StructureRelations\.venv\Scripts\python.exe
 - Backend bind: 127.0.0.1:8101
@@ -64,7 +66,10 @@ Use a default vhost so unknown host headers do not land in a real app.
 
     <VirtualHost *:80>
         ServerName default.invalid
-        Redirect 404 /
+        ServerAlias PHYSICSAPPSPV1
+        <Location />
+            Require all denied
+        </Location>
         ErrorLog  "logs/default_http_error.log"
         CustomLog "logs/default_http_access.log" combined
     </VirtualHost>
@@ -130,21 +135,13 @@ Use a default vhost so unknown host headers do not land in a real app.
         CustomLog "logs/app-b_access.log" combined
     </VirtualHost>
 
-## StructureRelations vhost with per-vhost long-job timeout tuning
-    <VirtualHost *:80>
+## StructureRelations vhost with per-vhost long-job timeout tuning (port 8001)
+    Listen 8001
+
+    <VirtualHost *:8001>
         ServerName PHYSICSAPPSPV1
-        Redirect permanent / https://PHYSICSAPPSPV1/
-    </VirtualHost>
-
-    <VirtualHost *:443>
-        ServerName PHYSICSAPPSPV1
-
-        SSLEngine on
-        SSLCertificateFile "C:/Apache24/conf/ssl/physicsappspv1.crt"
-        SSLCertificateKeyFile "C:/Apache24/conf/ssl/physicsappspv1.key"
-
         ProxyPreserveHost On
-        RequestHeader set X-Forwarded-Proto "https"
+        RequestHeader set X-Forwarded-Proto "http"
 
         # Per-vhost timeout tuning for long DICOM jobs
         Timeout 1800
@@ -171,31 +168,50 @@ Use a default vhost so unknown host headers do not land in a real app.
 Notes:
 - Put /ws before / to avoid route shadowing.
 - Keep these settings in this vhost only so other apps keep their own timeout behavior.
+- Allow inbound TCP 8001 in the server firewall.
+- Port 80 remains blocked by design for this scenario.
 
 ## Python virtual environment setup (Windows)
 Use a dedicated virtual environment for this app so Python packages do not interfere
 with other hosted applications.
 
+Important:
+- Prefer a machine-wide Python installation for server deployment.
+- Do not build the production virtual environment from a per-user Python under
+    a user profile such as `C:\Users\<user>\AppData\Local\Python\...`.
+- A venv created from a per-user interpreter may work interactively but fail
+    from Task Scheduler or other non-interactive contexts with access-denied or
+    missing-interpreter errors.
+
 Recommended from the project root:
-1. Create the virtual environment:
+1. Install or choose a machine-wide Python interpreter.
 
-    py -3 -m venv .venv
+   Example path:
 
-2. Activate it in PowerShell:
+    C:\Python312\python.exe
+
+2. Create the virtual environment:
+
+    C:\Python312\python.exe -m venv .venv
+
+   If you must use the Python launcher, first verify that it resolves to a
+   machine-wide installation rather than a per-user installation.
+
+3. Activate it in PowerShell:
 
     .\.venv\Scripts\Activate.ps1
 
-3. Upgrade pip and install dependencies:
+4. Upgrade pip and install dependencies:
 
     python -m pip install --upgrade pip
     pip install -r requirements.txt
 
-4. Verify the interpreter path and package set:
+5. Verify the interpreter path and package set:
 
     python -c "import sys; print(sys.executable)"
     pip list
 
-5. Deactivate when finished:
+6. Deactivate when finished:
 
     deactivate
 
@@ -208,6 +224,9 @@ Task Scheduler note:
   interpreter instead of a global Python installation, for example:
 
       C:\webapps\StructureRelations\.venv\Scripts\python.exe
+- If `C:\webapps\StructureRelations\.venv\Scripts\python.exe -V` reports a
+    missing or inaccessible base interpreter, rebuild `.venv` from a machine-wide
+    Python before continuing.
 
 ## Uvicorn startup isolation (Windows Task Scheduler)
 Run this app as its own scheduled task with unique runtime settings.
@@ -215,24 +234,62 @@ Run this app as its own scheduled task with unique runtime settings.
 Recommended Task Scheduler setup:
 1. Create a task named `StructureRelations-Uvicorn`.
 2. Set the trigger to run at startup or at logon, depending on whether the machine should host the app unattended.
-3. Configure the action to start Uvicorn from the project root:
-    - Program/script: `C:\webapps\StructureRelations\.venv\Scripts\python.exe`
-    - Add arguments: `-m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp`
+3. Configure the action to start Uvicorn from the project root, either directly
+     or through a wrapper file.
+        - Preferred wrapper Program/script: `C:\webapps\StructureRelations\start_uvicorn.cmd`
+        - Direct Program/script alternative: `C:\webapps\StructureRelations\.venv\Scripts\python.exe`
+        - Direct Add arguments: `-m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src/webapp`
     - Start in: `C:\webapps\StructureRelations`
 4. Set the task to run whether the user is logged on or not.
 5. Enable highest privileges if the environment requires it.
-6. Redirect stdout and stderr to project-local log files by launching through a wrapper command, if needed.
-7. Set service-equivalent TEMP and TMP locations before launching Uvicorn, if the deployment needs isolated temp storage.
+6. Prefer a non-interactive task configuration over an interactive-only task.
+7. Redirect stdout and stderr to a project-local log file through a wrapper file.
+8. Set service-equivalent TEMP and TMP locations only if the deployment needs
+     isolated temp storage or the default Windows temp location causes issues.
 
 Recommended task properties:
 - Run only when network is available, if Apache depends on the backend being reachable during boot.
 - Restart on failure, if you want the backend to recover automatically.
 - Use a dedicated project-local log file for any wrapper output.
-- Keep TEMP and TMP in project-local temp folders when possible.
+- Treat custom TEMP and TMP as optional, not required for normal operation.
+- Avoid `LogonType: Interactive` for unattended startup.
+- If the task shows as running but nothing is listening on port 8101, inspect
+    the wrapper log and verify the scheduled task account can execute the venv
+    interpreter.
 
-Example wrapper command for the action if per-task environment variables are needed:
+Recommended wrapper file contents (`C:\webapps\StructureRelations\start_uvicorn.cmd`):
 
-    cmd.exe /c "set TEMP=""C:\webapps\StructureRelations\TEMP"" && set TMP="C:\webapps\StructureRelations\TEMP" && C:\webapps\StructureRelations\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir C:\webapps\StructureRelations\src\webapp"
+The repository includes this file directly as [start_uvicorn.cmd](d:/OneDrive%20-%20Queen's%20University/Python/Projects/StructureRelations/start_uvicorn.cmd). Copy it with the deployed application root or adapt it in place for the target server.
+
+        @echo off
+        setlocal
+
+        set "APP_ROOT=C:\webapps\StructureRelations"
+        set "VENV_PY=%APP_ROOT%\.venv\Scripts\python.exe"
+        set "LOG_DIR=%APP_ROOT%\logs"
+        set "LOG_FILE=%LOG_DIR%\uvicorn-startup.log"
+
+        if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+        cd /d "%APP_ROOT%"
+
+        echo ==== %date% %time% starting uvicorn ====>> "%LOG_FILE%"
+        echo APP_ROOT=%APP_ROOT%>> "%LOG_FILE%"
+        echo VENV_PY=%VENV_PY%>> "%LOG_FILE%"
+
+        "%VENV_PY%" -m uvicorn main:app --host 127.0.0.1 --port 8101 --app-dir src\webapp >> "%LOG_FILE%" 2>&1
+
+        echo ==== %date% %time% uvicorn exited with errorlevel %errorlevel% ====>> "%LOG_FILE%"
+
+        endlocal
+
+Notes from troubleshooting:
+- A task can appear present in Task Scheduler while the webapp is still down.
+- The decisive check is whether something is listening on `127.0.0.1:8101`.
+- Manual task start succeeding while unattended startup fails usually indicates
+    a task account, logon type, interpreter, or environment mismatch.
+- If `LastTaskResult` indicates abnormal termination, prefer the wrapper file
+    above so startup errors are captured in a log.
 
 ## Optional: Offline or locked-down network deployment
 If the server cannot reach public CDNs, vendor frontend JavaScript dependencies
@@ -261,10 +318,13 @@ Note:
 ## Validation steps
 1. Apache config test passes.
 2. Apache restart succeeds.
-3. Each hostname serves only its corresponding backend.
-4. StructureRelations upload and long processing succeed.
-5. WebSocket status in UI remains connected during long jobs.
-6. Logs appear only in this app’s log files.
+3. The scheduled task launches without requiring an interactive user session.
+4. `Test-NetConnection 127.0.0.1 -Port 8101` succeeds after task startup.
+5. Direct backend access to `http://127.0.0.1:8101/` responds without connection failure.
+6. Apache access to `http://PHYSICSAPPSPV1:8001/` succeeds.
+7. StructureRelations upload and long processing succeed.
+8. WebSocket status in UI remains connected during long jobs.
+9. Wrapper or application logs show successful startup and remain app-local.
 
 ## Operational tuning guidance
 If large uploads fail:
