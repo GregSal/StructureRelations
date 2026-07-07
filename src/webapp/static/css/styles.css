@@ -127,6 +127,14 @@ header h1 {
     background-color: #dbeafe;
 }
 
+.upload-area.uploading {
+    cursor: wait;
+    pointer-events: none;
+    border-color: var(--primary-color);
+    background-color: #eff6ff;
+    opacity: 0.9;
+}
+
 .upload-icon {
     color: var(--primary-color);
     margin-bottom: 1rem;
@@ -139,6 +147,14 @@ header h1 {
 .file-info {
     font-size: 0.875rem;
     color: var(--text-secondary);
+}
+
+.upload-status {
+    min-height: 1.2rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: 0.75rem;
 }
 
 .disk-warning {

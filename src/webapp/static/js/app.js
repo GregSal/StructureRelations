@@ -114,6 +114,7 @@ class WebAppClient {
         this.plotDebounceTimer = null;
         this.plotDebounceMs = 120;
         this.lastRenderedPlotKey = null;
+        this.uploadInProgress = false;
 
         this.loadSymbolConfig();  // Load config on initialization
         this.initializeEventListeners();
@@ -368,7 +369,11 @@ class WebAppClient {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
 
-        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('click', () => {
+            if (!this.uploadInProgress) {
+                fileInput.click();
+            }
+        });
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -380,12 +385,12 @@ class WebAppClient {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
+            if (!this.uploadInProgress && files.length > 0) {
                 this.handleFileSelect(files[0]);
             }
         });
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
+            if (!this.uploadInProgress && e.target.files.length > 0) {
                 this.handleFileSelect(e.target.files[0]);
             }
         });
@@ -613,11 +618,45 @@ class WebAppClient {
         this.setLayoutInfluence(this.layoutInfluence, false);
     }
 
+    setUploadAcknowledgement(fileName) {
+        this.uploadInProgress = true;
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        if (uploadArea) {
+            uploadArea.classList.add('uploading');
+            uploadArea.setAttribute('aria-busy', 'true');
+        }
+        if (uploadStatus) {
+            uploadStatus.textContent = `Loading ${fileName}...`;
+        }
+    }
+
+    clearUploadAcknowledgement() {
+        this.uploadInProgress = false;
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        if (uploadArea) {
+            uploadArea.classList.remove('uploading');
+            uploadArea.removeAttribute('aria-busy');
+        }
+        if (uploadStatus) {
+            uploadStatus.textContent = '';
+        }
+    }
+
     async handleFileSelect(file) {
         if (!file.name.endsWith('.dcm')) {
             alert('Please select a DICOM (.dcm) file');
             return;
         }
+
+        if (this.uploadInProgress) {
+            return;
+        }
+
+        this.setUploadAcknowledgement(file.name);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -660,6 +699,7 @@ class WebAppClient {
 
             // Load preview
             await this.loadPreview();
+            this.clearUploadAcknowledgement();
 
             if (this.skipManualSelection) {
                 await this.startProcessing();
@@ -669,6 +709,7 @@ class WebAppClient {
             }
 
         } catch (error) {
+            this.clearUploadAcknowledgement();
             console.error('Upload error:', error);
             alert('Failed to upload file. Please try again.');
         }
@@ -5713,6 +5754,7 @@ class WebAppClient {
             this.network.destroy();
             this.network = null;
         }
+        this.clearUploadAcknowledgement();
         if (this._initialDiagramFitTimer) {
             clearTimeout(this._initialDiagramFitTimer);
             this._initialDiagramFitTimer = null;
