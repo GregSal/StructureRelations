@@ -2623,6 +2623,68 @@ class WebAppClient {
             });
         }
 
+        const exportMarginPx = 24;
+        const cropBounds = (() => {
+            const nodesData = this.network?.body?.data?.nodes;
+            const networkContainer = document.getElementById('networkDiagram');
+            if (!nodesData || !networkContainer) {
+                return null;
+            }
+            if (typeof this.network.getBoundingBox !== 'function'
+                || typeof this.network.canvasToDOM !== 'function') {
+                return null;
+            }
+
+            const visibleNodes = nodesData.get({
+                filter: (node) => !node.hidden,
+            });
+            if (!visibleNodes || visibleNodes.length === 0) {
+                return null;
+            }
+
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            visibleNodes.forEach((node) => {
+                const nodeId = Number(node.id);
+                if (!Number.isFinite(nodeId)) {
+                    return;
+                }
+
+                const nodeBounds = this.network.getBoundingBox(nodeId);
+                if (!nodeBounds) {
+                    return;
+                }
+
+                minX = Math.min(minX, nodeBounds.left);
+                minY = Math.min(minY, nodeBounds.top);
+                maxX = Math.max(maxX, nodeBounds.right);
+                maxY = Math.max(maxY, nodeBounds.bottom);
+            });
+
+            if (!Number.isFinite(minX) || !Number.isFinite(minY)
+                || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+                return null;
+            }
+
+            const topLeftDom = this.network.canvasToDOM({ x: minX, y: minY });
+            const bottomRightDom = this.network.canvasToDOM({ x: maxX, y: maxY });
+
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const networkRect = networkContainer.getBoundingClientRect();
+            const offsetLeft = networkRect.left - wrapperRect.left;
+            const offsetTop = networkRect.top - wrapperRect.top;
+
+            return {
+                left: offsetLeft + topLeftDom.x - exportMarginPx,
+                top: offsetTop + topLeftDom.y - exportMarginPx,
+                right: offsetLeft + bottomRightDom.x + exportMarginPx,
+                bottom: offsetTop + bottomRightDom.y + exportMarginPx,
+            };
+        })();
+
         try {
             const scale = Math.max(window.devicePixelRatio || 1, 1.5);
             const canvas = await window.html2canvas(wrapper, {
@@ -2631,6 +2693,30 @@ class WebAppClient {
                 scale,
                 logging: false,
             });
+
+            let outputCanvas = canvas;
+            if (cropBounds && wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+                const scaleX = canvas.width / wrapper.clientWidth;
+                const scaleY = canvas.height / wrapper.clientHeight;
+
+                const sx = Math.max(0, Math.floor(cropBounds.left * scaleX));
+                const sy = Math.max(0, Math.floor(cropBounds.top * scaleY));
+                const ex = Math.min(canvas.width, Math.ceil(cropBounds.right * scaleX));
+                const ey = Math.min(canvas.height, Math.ceil(cropBounds.bottom * scaleY));
+                const sw = Math.max(1, ex - sx);
+                const sh = Math.max(1, ey - sy);
+
+                if (sw < canvas.width || sh < canvas.height) {
+                    const croppedCanvas = document.createElement('canvas');
+                    croppedCanvas.width = sw;
+                    croppedCanvas.height = sh;
+                    const ctx = croppedCanvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+                        outputCanvas = croppedCanvas;
+                    }
+                }
+            }
 
             const filePrefix = `relationship_diagram_${this.sessionId || 'export'}`;
 
@@ -2641,20 +2727,27 @@ class WebAppClient {
                 }
 
                 const pdf = new jsPdfLib({
-                    orientation: canvas.width >= canvas.height ? 'landscape' : 'portrait',
+                    orientation: outputCanvas.width >= outputCanvas.height ? 'landscape' : 'portrait',
                     unit: 'px',
-                    format: [canvas.width, canvas.height],
+                    format: [outputCanvas.width, outputCanvas.height],
                     compress: true,
                 });
-                const imageData = canvas.toDataURL('image/png');
-                pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+                const imageData = outputCanvas.toDataURL('image/png');
+                pdf.addImage(
+                    imageData,
+                    'PNG',
+                    0,
+                    0,
+                    outputCanvas.width,
+                    outputCanvas.height,
+                );
                 pdf.save(`${filePrefix}.pdf`);
                 return;
             }
 
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const blob = await new Promise((resolve, reject) => {
-                canvas.toBlob(
+                outputCanvas.toBlob(
                     (result) => {
                         if (result) {
                             resolve(result);
