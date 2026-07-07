@@ -3150,7 +3150,7 @@ class WebAppClient {
         this.network.stopSimulation();
     }
 
-    scheduleInitialDiagramFit(maxAttempts = 20) {
+    scheduleInitialDiagramFit(maxAttempts = 120) {
         if (this._initialDiagramFitTimer) {
             clearTimeout(this._initialDiagramFitTimer);
             this._initialDiagramFitTimer = null;
@@ -3170,7 +3170,11 @@ class WebAppClient {
 
             if (visible) {
                 this.network.redraw();
-                this.network.fit({ animation: false });
+                this.network.fit({
+                    animation: false,
+                    // Keep a small margin so the graph fills the viewport.
+                    padding: 12,
+                });
                 this._initialDiagramFitTimer = null;
                 return;
             }
@@ -3301,6 +3305,10 @@ class WebAppClient {
             1,
             Number(layoutRules.aspect_ratio ?? 2.3)
         );
+        const spreadMultiplier = Math.max(
+            1,
+            Number(layoutRules.initial_spread ?? 1.6)
+        );
         let minX = Infinity;
         let maxX = -Infinity;
         let minY = Infinity;
@@ -3322,8 +3330,8 @@ class WebAppClient {
 
         colaNodes.forEach(node => {
             positions[String(node.id)] = {
-                x: centerX + (node.x - centerX) * stretch,
-                y: centerY + (node.y - centerY) / stretch,
+                x: centerX + (node.x - centerX) * stretch * spreadMultiplier,
+                y: centerY + (node.y - centerY) / stretch * spreadMultiplier,
             };
         });
         return positions;
@@ -5789,6 +5797,11 @@ class WebAppClient {
 
         // Show selected stage
         document.getElementById(`stage-${stageName}`).style.display = 'block';
+
+        // Ensure the initial graph fit runs when results become visible.
+        if (stageName === 'results' && this.network) {
+            this.scheduleInitialDiagramFit();
+        }
     }
 
     resetApp() {

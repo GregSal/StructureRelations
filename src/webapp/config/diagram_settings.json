@@ -164,8 +164,9 @@
         "description": "Constraint-based stress layout (cola.js) parameters for the relationship diagram. Computed headlessly client-side; vis-network renders with physics off.",
         "enabled": true,
         "engine": "cola",
-        "link_distance": 120,
-        "node_padding": 16,
+        "link_distance": 210,
+        "node_padding": 26,
+        "initial_spread": 1.8,
         "aspect_ratio": 2.3,
         "convergence": {
           "unconstrained_iters": 20,
@@ -176,25 +177,25 @@
         "flow": {
           "enabled": true,
           "cola_strict": false,
-          "gap": 80,
+          "gap": 140,
           "description": "Vertical separation for hierarchical/directional relations. Opt-in for the cola engine (cola_strict): hard layering collapses tree-like graphs into a column, so it is off by default and the 2D stress spread is used instead."
         },
         "side_bias": {
           "enabled": true,
-          "gap": 130,
+          "gap": 220,
           "align_level": true,
           "description": "L nodes to the right, R nodes to the left, B between; each L/R/B set kept level for symmetry."
         },
         "opt_grouping": {
           "enabled": true,
-          "link_distance": 30.0,
-          "padding": 24,
+          "link_distance": 70.0,
+          "padding": 36,
           "max_group_size": 4,
           "description": "opt/eval variants clustered in a tight cola group. Families larger than max_group_size (hub-centred bases with many partitions) are left unboxed so the stress solver spreads them instead of collapsing them into a central tangle."
         },
         "target_grouping": {
           "enabled": true,
-          "padding": 32,
+          "padding": 56,
           "max_group_size": 4,
           "description": "Target volumes sharing a dose level (e.g. PTV70 / PTV70a / PTV70b) clustered as a cola group with looser padding. Families larger than max_group_size are left unboxed to spread."
         },
