@@ -39,11 +39,11 @@
     },
     {
       "id": "Dose Structures",
-      "description": "Exclude dose structures (e.g. D105 or Dose).",
+      "description": "Exclude dose structures (e.g. D105 or Dose 105).",
       "action": "exclude",
       "field": "Structure ID",
       "match_type": "regex",
-      "value": "^[Dd]([Oo][Ss][Ee])?[0-9]+"
+      "value": "^[Dd]([Oo][Ss][Ee])? ?[0-9]+"
     },
     {
       "id": "Wires",
