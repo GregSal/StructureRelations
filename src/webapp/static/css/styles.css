@@ -558,27 +558,61 @@ header h1 {
     gap: 0.5rem 1rem;
 }
 
-.diagram-search {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.diagram-selection-controls {
+    display: grid;
+    grid-template-columns: minmax(220px, auto) minmax(150px, 220px) minmax(220px, 1fr);
+    gap: 0.75rem;
+    align-items: end;
     margin-bottom: 0.75rem;
-    flex-wrap: wrap;
 }
 
-.diagram-search input {
-    flex: 1;
-    min-width: 220px;
+.diagram-selection-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.diagram-selection-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.diagram-selection-control label {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.diagram-selection-control input,
+.diagram-selection-control select {
+    width: 100%;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    background-color: var(--card-bg);
+    color: var(--text-primary);
     font-size: 0.9rem;
 }
 
-.diagram-search input:focus {
+.diagram-selection-control input:focus,
+.diagram-selection-control select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.diagram-selection-add-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.diagram-selection-add-mode input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
 }
 
 .structure-set-badge {
@@ -751,6 +785,15 @@ header h1 {
         margin: 0.5rem auto;
         max-height: calc(100vh - 1rem);
         padding: 0.8rem;
+    }
+
+    .diagram-selection-controls {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .diagram-selection-add-mode {
+        padding-top: 0.2rem;
     }
 }
 

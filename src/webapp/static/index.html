@@ -159,9 +159,25 @@
                                     <h3 id="diagramStructureModalTitle">Select Structures to Display</h3>
                                     <button type="button" class="btn btn-secondary btn-sm" id="diagramStructureModalCloseBtn">Close</button>
                                 </div>
-                                <div class="diagram-search">
-                                    <label for="diagramSearchInput">Search:</label>
-                                    <input type="text" id="diagramSearchInput" placeholder="Search ID or type...">
+                                <div class="diagram-selection-controls" aria-label="Structure selection filters">
+                                    <div class="diagram-selection-bulk">
+                                        <button type="button" class="btn btn-secondary btn-sm" id="diagramSelectAllBtn">Select All</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" id="diagramClearAllBtn">Clear All</button>
+                                    </div>
+                                    <div class="diagram-selection-control">
+                                        <label for="diagramTypeFilter">DICOM Type:</label>
+                                        <select id="diagramTypeFilter" class="dicom-filter">
+                                            <option value="">All Types</option>
+                                        </select>
+                                    </div>
+                                    <div class="diagram-selection-control">
+                                        <label for="diagramStructureTextFilter">Structure ID contains:</label>
+                                        <input type="text" id="diagramStructureTextFilter" placeholder="Case-sensitive name text">
+                                    </div>
+                                    <label class="diagram-selection-add-mode" for="diagramAddToCurrentSelection">
+                                        <input type="checkbox" id="diagramAddToCurrentSelection">
+                                        <span>Add to current selection</span>
+                                    </label>
                                 </div>
                                 <div class="diagram-structure-list" id="diagramStructureList"></div>
                                 <div class="diagram-config-controls">
@@ -437,7 +453,7 @@
         </footer>
     </div>
 
-                    <script src="static/js/app.js?v=142"></script>
+                    <script src="static/js/app.js?v=143"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

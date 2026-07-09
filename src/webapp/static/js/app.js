@@ -30,6 +30,9 @@ class WebAppClient {
         this.diagramAppliedSelection = new Set();
         this.diagramSelectionPending = false;
         this.diagramSelectionModalOpen = false;
+        this.diagramFilterText = '';
+        this.diagramFilterDicomType = '';
+        this.diagramFilterAddMode = false;
         this.patientInfo = null;
         this.structureItems = [];
         this.structureItemsByRoi = new Map();
@@ -536,9 +539,42 @@ class WebAppClient {
         document.getElementById('copyFromMatrixBtn').addEventListener('click', () => {
             this.copyFromMatrixToDiagram();
         });
-        document.getElementById('diagramSearchInput').addEventListener('input', (e) => {
-            this.filterDiagramSelectionList(e.target.value);
-        });
+        const diagramTextFilter = document.getElementById('diagramStructureTextFilter');
+        if (diagramTextFilter) {
+            diagramTextFilter.addEventListener('input', (e) => {
+                this.diagramFilterText = e.target.value || '';
+                this.applyDiagramModalFilters({ updateSelection: true });
+            });
+        }
+
+        const diagramTypeFilter = document.getElementById('diagramTypeFilter');
+        if (diagramTypeFilter) {
+            diagramTypeFilter.addEventListener('change', (e) => {
+                this.diagramFilterDicomType = e.target.value || '';
+                this.applyDiagramModalFilters({ updateSelection: true });
+            });
+        }
+
+        const diagramAddToCurrent = document.getElementById('diagramAddToCurrentSelection');
+        if (diagramAddToCurrent) {
+            diagramAddToCurrent.addEventListener('change', (e) => {
+                this.diagramFilterAddMode = e.target.checked === true;
+            });
+        }
+
+        const diagramSelectAll = document.getElementById('diagramSelectAllBtn');
+        if (diagramSelectAll) {
+            diagramSelectAll.addEventListener('click', () => {
+                this.selectAllDiagramStructures();
+            });
+        }
+
+        const diagramClearAll = document.getElementById('diagramClearAllBtn');
+        if (diagramClearAll) {
+            diagramClearAll.addEventListener('click', () => {
+                this.clearAllDiagramStructures();
+            });
+        }
 
         // Select All/None buttons
         document.getElementById('selectAllRowsBtn').addEventListener('click', () => {
@@ -1975,6 +2011,7 @@ class WebAppClient {
         items.forEach(item => {
             this.structureItemsByRoi.set(parseInt(item.roi), item);
         });
+        this.populateDiagramStructureTypeFilter();
     }
 
     ensureSortableListsInitialized() {
@@ -2855,14 +2892,11 @@ class WebAppClient {
         const modal = document.getElementById('diagramStructureModal');
         if (!modal) return;
 
-        const searchInput = document.getElementById('diagramSearchInput');
-        if (searchInput) {
-            searchInput.value = '';
-            this.filterDiagramSelectionList('');
-        }
+        this.resetDiagramModalFilters();
 
         modal.style.display = 'block';
         this.diagramSelectionModalOpen = true;
+        document.getElementById('diagramStructureTextFilter')?.focus();
         document.getElementById('structureSetBadgeTooltip')?.classList.remove('visible');
     }
 
@@ -2874,6 +2908,7 @@ class WebAppClient {
             this.syncDiagramSelection(this.diagramAppliedSelection);
         }
 
+        this.resetDiagramModalFilters();
         modal.style.display = 'none';
         this.diagramSelectionModalOpen = false;
     }
@@ -2893,10 +2928,13 @@ class WebAppClient {
             }
         });
 
+        this.populateDiagramStructureTypeFilter();
+
         this.diagramAppliedSelection = new Set(this.diagramSelection);
         this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
         this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
         this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
+        this.resetDiagramModalFilters();
         this.updateDiagramPendingState();
         this.updateStructureSetBadge();
 
@@ -2909,9 +2947,9 @@ class WebAppClient {
         const wrapper = document.createElement('label');
         wrapper.className = 'diagram-structure-item';
         wrapper.dataset.roi = item.roi;
-        wrapper.dataset.name = item.name.toLowerCase();
-        wrapper.dataset.dicomType = (item.dicomType || '').toLowerCase();
-        wrapper.dataset.codeMeaning = (item.codeMeaning || '').toLowerCase();
+        wrapper.dataset.name = item.name || '';
+        wrapper.dataset.dicomType = item.dicomType || '';
+        wrapper.dataset.codeMeaning = item.codeMeaning || '';
 
         const metaParts = [];
         if (item.dicomType) {
@@ -2951,25 +2989,125 @@ class WebAppClient {
         return wrapper;
     }
 
-    filterDiagramSelectionList(query) {
-        const normalized = query.trim().toLowerCase();
-        const tokens = normalized.split(/\s+/).filter(Boolean);
-        const items = document.querySelectorAll('.diagram-structure-item');
+    populateDiagramStructureTypeFilter() {
+        const typeFilter = document.getElementById('diagramTypeFilter');
+        if (!typeFilter) return;
+
+        const currentValue = this.diagramFilterDicomType || '';
+        const types = Array.from(new Set(
+            this.structureItems
+                .map(item => (item.dicomType || '').trim())
+                .filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
+
+        typeFilter.innerHTML = '<option value="">All Types</option>';
+        types.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            typeFilter.appendChild(option);
+        });
+
+        typeFilter.value = types.includes(currentValue) ? currentValue : '';
+    }
+
+    resetDiagramModalFilters() {
+        this.diagramFilterText = '';
+        this.diagramFilterDicomType = '';
+        this.diagramFilterAddMode = false;
+
+        const textInput = document.getElementById('diagramStructureTextFilter');
+        if (textInput) {
+            textInput.value = '';
+        }
+
+        const typeFilter = document.getElementById('diagramTypeFilter');
+        if (typeFilter) {
+            typeFilter.value = '';
+        }
+
+        const addModeCheckbox = document.getElementById('diagramAddToCurrentSelection');
+        if (addModeCheckbox) {
+            addModeCheckbox.checked = false;
+        }
+
+        this.applyDiagramModalFilters({ updateSelection: false });
+    }
+
+    applyDiagramModalFilters({ updateSelection = true } = {}) {
+        const items = document.querySelectorAll('#diagramStructureList .diagram-structure-item');
+        const matches = new Set();
+        const selectedType = this.diagramFilterDicomType || '';
+        const textFilter = this.diagramFilterText || '';
 
         items.forEach(item => {
-            if (!normalized) {
-                item.style.display = '';
+            const roi = parseInt(item.dataset.roi, 10);
+            if (!Number.isFinite(roi)) {
+                item.style.display = 'none';
                 return;
             }
 
-            const roiText = item.dataset.roi || '';
             const nameText = item.dataset.name || '';
             const typeText = item.dataset.dicomType || '';
-            const labelText = item.dataset.codeMeaning || '';
-            const haystack = [roiText, nameText, typeText, labelText].join(' ');
-            const matchesAny = tokens.some(token => haystack.includes(token));
+            const matchesType = selectedType === '' || typeText === selectedType;
+            const matchesText = textFilter === '' || nameText.includes(textFilter);
+            const isMatch = matchesType && matchesText;
 
-            item.style.display = matchesAny ? '' : 'none';
+            item.style.display = isMatch ? '' : 'none';
+            if (isMatch) {
+                matches.add(roi);
+            }
+        });
+
+        if (!updateSelection) {
+            return matches;
+        }
+
+        if (this.diagramFilterAddMode) {
+            matches.forEach((roi) => {
+                this.diagramSelection.add(roi);
+            });
+        } else {
+            this.diagramSelection = new Set(matches);
+        }
+
+        this.syncDiagramCheckboxes();
+        this.updateDiagramPendingState();
+        return matches;
+    }
+
+    filterDiagramSelectionList(query) {
+        if (typeof query === 'string') {
+            this.diagramFilterText = query;
+            const textInput = document.getElementById('diagramStructureTextFilter');
+            if (textInput && textInput.value !== query) {
+                textInput.value = query;
+            }
+        }
+        return this.applyDiagramModalFilters({ updateSelection: true });
+    }
+
+    selectAllDiagramStructures() {
+        this.diagramSelection = new Set(
+            this.structureItems
+                .map(item => parseInt(item.roi, 10))
+                .filter(roi => Number.isFinite(roi))
+        );
+        this.syncDiagramCheckboxes();
+        this.updateDiagramPendingState();
+    }
+
+    clearAllDiagramStructures() {
+        this.diagramSelection = new Set();
+        this.syncDiagramCheckboxes();
+        this.updateDiagramPendingState();
+    }
+
+    syncDiagramCheckboxes() {
+        const checkboxes = document.querySelectorAll('#diagramStructureList input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            const roi = parseInt(cb.dataset.roi, 10);
+            cb.checked = this.diagramSelection.has(roi);
         });
     }
 
@@ -3032,13 +3170,8 @@ class WebAppClient {
 
     syncDiagramSelection(newSelection) {
         this.diagramSelection = new Set(newSelection);
+        this.syncDiagramCheckboxes();
         this.updateDiagramPendingState();
-
-        const checkboxes = document.querySelectorAll('#diagramStructureList input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-            const roi = parseInt(cb.dataset.roi);
-            cb.checked = this.diagramSelection.has(roi);
-        });
     }
 
     async refreshDiagram() {
