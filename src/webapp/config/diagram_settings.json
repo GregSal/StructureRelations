@@ -164,7 +164,7 @@
         "description": "Constraint-based stress layout (cola.js) parameters for the relationship diagram. Computed headlessly client-side; vis-network renders with physics off.",
         "enabled": true,
         "engine": "cola",
-        "link_distance": 210,
+        "link_distance": 100,
         "node_padding": 26,
         "initial_spread": 1.8,
         "aspect_ratio": 2.3,
