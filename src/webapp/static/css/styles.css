@@ -157,6 +157,128 @@ header h1 {
     margin-top: 0.75rem;
 }
 
+.landing-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.landing-options .card {
+    height: 100%;
+}
+
+.folder-scan-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.folder-scan-note {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.folder-scan-summary {
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.folder-scan-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.folder-scan-path {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.folder-scan-toggle {
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.folder-scan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.network-scan-results {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    max-height: 340px;
+    overflow-y: auto;
+    background: var(--card-bg);
+}
+
+.network-scan-empty {
+    padding: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.network-scan-item {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.network-scan-item:last-child {
+    border-bottom: none;
+}
+
+.network-scan-item:hover,
+.network-scan-item.selected {
+    background-color: #eff6ff;
+}
+
+.network-scan-item input[type="radio"] {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+}
+
+.network-scan-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.network-scan-item-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.network-scan-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+}
+
+.network-scan-item-path {
+    font-size: 0.8rem;
+    color: var(--primary-color);
+    word-break: break-word;
+}
+
 .disk-warning {
     margin-top: 1rem;
     padding: 1rem;

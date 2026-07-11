@@ -1,6 +1,10 @@
 {
   "description": "Runtime settings for webapp session storage and expiry behavior",
   "version": "1.0.0",
+  "folder_scan": {
+    "root_path": "./Test Data/Anonymized Cases",
+    "include_subdirectories": true
+  },
   "session_storage": {
     "max_disk_size_mb": 2048,
     "warn_disk_size_mb": 1500,

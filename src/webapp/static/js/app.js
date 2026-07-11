@@ -112,6 +112,10 @@ class WebAppClient {
         this.sliceRelationships = {};
         this.contourStructureLabels = {};
         this.contourStructureColors = {};
+        this.networkFolderConfig = { root_path: '', include_subdirectories: true };
+        this.networkFolderResults = [];
+        this.selectedNetworkFilePath = '';
+        this.networkFolderScanInProgress = false;
         this.plotImageCache = new Map();
         this.maxPlotCacheEntries = 48;
         this.plotDebounceTimer = null;
@@ -120,6 +124,7 @@ class WebAppClient {
         this.uploadInProgress = false;
 
         this.loadSymbolConfig();  // Load config on initialization
+        this.loadWebAppSettings();
         this.initializeEventListeners();
     }
 
@@ -398,6 +403,27 @@ class WebAppClient {
             }
         });
 
+        const scanNetworkFolderBtn = document.getElementById('scanNetworkFolderBtn');
+        if (scanNetworkFolderBtn) {
+            scanNetworkFolderBtn.addEventListener('click', () => {
+                this.scanNetworkFolder();
+            });
+        }
+
+        const loadNetworkFileBtn = document.getElementById('loadNetworkFileBtn');
+        if (loadNetworkFileBtn) {
+            loadNetworkFileBtn.addEventListener('click', () => {
+                this.loadSelectedNetworkFile();
+            });
+        }
+
+        const includeSubdirectoriesToggle = document.getElementById('includeSubdirectoriesToggle');
+        if (includeSubdirectoriesToggle) {
+            includeSubdirectoriesToggle.addEventListener('change', () => {
+                this.networkFolderConfig.include_subdirectories = includeSubdirectoriesToggle.checked;
+            });
+        }
+
         // Structure selection - use correct IDs from HTML
         document.getElementById('selectAllBtn').addEventListener('click', () => {
             this.selectAllStructures(true);
@@ -654,6 +680,90 @@ class WebAppClient {
         this.setLayoutInfluence(this.layoutInfluence, false);
     }
 
+    async loadWebAppSettings() {
+        try {
+            const response = await fetch('/api/config/webapp-settings');
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+            this.networkFolderConfig = {
+                root_path: data.root_path || '',
+                include_subdirectories: data.include_subdirectories !== false,
+            };
+
+            const rootPathElement = document.getElementById('networkFolderPath');
+            if (rootPathElement) {
+                rootPathElement.textContent = this.networkFolderConfig.root_path || 'Not configured';
+            }
+
+            const includeToggle = document.getElementById('includeSubdirectoriesToggle');
+            if (includeToggle) {
+                includeToggle.checked = this.networkFolderConfig.include_subdirectories;
+            }
+        } catch (error) {
+            console.error('Error loading webapp settings:', error);
+        }
+    }
+
+    setNetworkFolderStatus(message, isError = false) {
+        const statusElement = document.getElementById('networkFolderStatus');
+        if (!statusElement) {
+            return;
+        }
+        statusElement.textContent = message || '';
+        statusElement.style.color = isError ? 'var(--error-color)' : 'var(--primary-color)';
+    }
+
+    updateNetworkFolderLoadButton() {
+        const loadButton = document.getElementById('loadNetworkFileBtn');
+        if (loadButton) {
+            loadButton.disabled = !this.selectedNetworkFilePath;
+        }
+    }
+
+    async handleSessionLoad(data, options = {}) {
+        const { keepUploadAcknowledgement = false } = options;
+        this.sessionId = data.session_id;
+
+        const diskWarning = document.getElementById('diskWarning');
+        const warningParagraph = diskWarning?.querySelector('p');
+        const defaultDiskWarning =
+            '⚠️ Session storage usage is high. Older sessions may be automatically deleted.';
+        if (data.disk_warning) {
+            if (diskWarning) {
+                diskWarning.style.display = 'block';
+            }
+            if (warningParagraph) {
+                warningParagraph.textContent =
+                    typeof data.disk_warning === 'string' && data.disk_warning.trim()
+                        ? data.disk_warning
+                        : defaultDiskWarning;
+            }
+        } else {
+            if (diskWarning) {
+                diskWarning.style.display = 'none';
+            }
+            if (warningParagraph) {
+                warningParagraph.textContent = defaultDiskWarning;
+            }
+        }
+
+        this.connectWebSocket();
+        await this.loadPreview();
+
+        if (!keepUploadAcknowledgement) {
+            this.clearUploadAcknowledgement();
+        }
+
+        if (this.skipManualSelection) {
+            await this.startProcessing();
+        } else {
+            this.showStage('selection');
+        }
+    }
+
     setUploadAcknowledgement(fileName) {
         this.uploadInProgress = true;
         const uploadArea = document.getElementById('uploadArea');
@@ -679,6 +789,168 @@ class WebAppClient {
         }
         if (uploadStatus) {
             uploadStatus.textContent = '';
+        }
+    }
+
+    async scanNetworkFolder() {
+        const scanButton = document.getElementById('scanNetworkFolderBtn');
+        const includeToggle = document.getElementById('includeSubdirectoriesToggle');
+        const includeSubdirectories = includeToggle ? includeToggle.checked : true;
+        const rootPath = this.networkFolderConfig.root_path || 'configured folder';
+
+        if (this.networkFolderScanInProgress) {
+            return;
+        }
+
+        this.networkFolderScanInProgress = true;
+        if (scanButton) {
+            scanButton.disabled = true;
+        }
+        this.setNetworkFolderStatus(
+            `Scanning ${rootPath}${includeSubdirectories ? ' and subdirectories' : ''}...`,
+            false,
+        );
+
+        try {
+            const response = await fetch(
+                `/api/network/structure-files?include_subdirectories=${includeSubdirectories}`
+            );
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Scan failed');
+            }
+
+            const data = await response.json();
+            this.networkFolderConfig.root_path = data.root_path || this.networkFolderConfig.root_path;
+            this.networkFolderConfig.include_subdirectories = data.include_subdirectories !== false;
+
+            const rootPathElement = document.getElementById('networkFolderPath');
+            if (rootPathElement) {
+                rootPathElement.textContent = this.networkFolderConfig.root_path || 'Not configured';
+            }
+
+            this.selectedNetworkFilePath = '';
+            this.networkFolderResults = Array.isArray(data.files) ? data.files : [];
+            this.renderNetworkFolderResults(this.networkFolderResults);
+            this.updateNetworkFolderLoadButton();
+
+            this.setNetworkFolderStatus(
+                `${this.networkFolderResults.length} DICOM structure file${this.networkFolderResults.length === 1 ? '' : 's'} found.`,
+                false,
+            );
+        } catch (error) {
+            console.error('Network folder scan error:', error);
+            this.networkFolderResults = [];
+            this.renderNetworkFolderResults([]);
+            this.selectedNetworkFilePath = '';
+            this.updateNetworkFolderLoadButton();
+            this.setNetworkFolderStatus(
+                'Failed to scan the configured folder. Check access to the shared path.',
+                true,
+            );
+        } finally {
+            this.networkFolderScanInProgress = false;
+            if (scanButton) {
+                scanButton.disabled = false;
+            }
+        }
+    }
+
+    renderNetworkFolderResults(files) {
+        const container = document.getElementById('networkFolderResults');
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+
+        if (!files || files.length === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'network-scan-empty';
+            emptyState.textContent = 'No DICOM RT Structure files found.';
+            container.appendChild(emptyState);
+            return;
+        }
+
+        const selectedPath = this.selectedNetworkFilePath;
+        files.forEach((fileInfo, index) => {
+            const item = document.createElement('label');
+            item.className = 'network-scan-item';
+            if (fileInfo.file_path === selectedPath) {
+                item.classList.add('selected');
+            }
+
+            const relativePath = fileInfo.relative_path || fileInfo.file_name || fileInfo.file_path;
+            const displayLabel = fileInfo.display_label || fileInfo.structure_set || fileInfo.file_name;
+            item.innerHTML = `
+                <input type="radio" name="networkFileSelection" value="${this.escapeHtml(fileInfo.file_path)}" ${index === 0 && !selectedPath ? 'checked' : ''}>
+                <div class="network-scan-item-body">
+                    <div class="network-scan-item-title">${this.escapeHtml(displayLabel)}</div>
+                    <div class="network-scan-item-meta">
+                        <span>Patient: ${this.escapeHtml(fileInfo.patient_name || 'N/A')}</span>
+                        <span>ID: ${this.escapeHtml(fileInfo.patient_id || 'N/A')}</span>
+                        <span>Study: ${this.escapeHtml(fileInfo.study_id || 'N/A')}</span>
+                        <span>Series: ${this.escapeHtml(fileInfo.series_number || 'N/A')}</span>
+                    </div>
+                    <div class="network-scan-item-path">${this.escapeHtml(relativePath)}</div>
+                </div>
+            `;
+
+            const radio = item.querySelector('input[type="radio"]');
+            radio.addEventListener('change', () => {
+                this.selectedNetworkFilePath = fileInfo.file_path;
+                this.updateNetworkFolderLoadButton();
+                container.querySelectorAll('.network-scan-item').forEach((otherItem) => {
+                    otherItem.classList.toggle('selected', otherItem === item);
+                });
+            });
+
+            if (index === 0 && !selectedPath) {
+                this.selectedNetworkFilePath = fileInfo.file_path;
+                this.updateNetworkFolderLoadButton();
+            }
+
+            container.appendChild(item);
+        });
+    }
+
+    async loadSelectedNetworkFile() {
+        if (!this.selectedNetworkFilePath) {
+            alert('Please select a DICOM structure file first.');
+            return;
+        }
+
+        const loadButton = document.getElementById('loadNetworkFileBtn');
+        if (loadButton) {
+            loadButton.disabled = true;
+        }
+        this.setNetworkFolderStatus('Loading selected file...', false);
+
+        try {
+            const response = await fetch('/api/network/load', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    file_path: this.selectedNetworkFilePath,
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Load failed');
+            }
+
+            const data = await response.json();
+            await this.handleSessionLoad(data);
+            this.setNetworkFolderStatus('Selected file loaded.', false);
+        } catch (error) {
+            console.error('Network file load error:', error);
+            this.setNetworkFolderStatus('Failed to load the selected file.', true);
+            alert('Failed to load the selected file.');
+        } finally {
+            this.updateNetworkFolderLoadButton();
         }
     }
 
@@ -708,42 +980,7 @@ class WebAppClient {
             }
 
             const data = await response.json();
-            this.sessionId = data.session_id;
-
-            // Update disk warning
-            const diskWarning = document.getElementById('diskWarning');
-            const warningParagraph = diskWarning?.querySelector('p');
-            const defaultDiskWarning =
-                '⚠️ Session storage usage is high. Older sessions may be automatically deleted.';
-            if (data.disk_warning) {
-                diskWarning.style.display = 'block';
-                if (warningParagraph) {
-                    warningParagraph.textContent =
-                        typeof data.disk_warning === 'string' && data.disk_warning.trim()
-                            ? data.disk_warning
-                            : defaultDiskWarning;
-                }
-            } else {
-                diskWarning.style.display = 'none';
-                if (warningParagraph) {
-                    warningParagraph.textContent = defaultDiskWarning;
-                }
-            }
-
-            // Connect websocket
-            this.connectWebSocket();
-
-            // Load preview
-            await this.loadPreview();
-            this.clearUploadAcknowledgement();
-
-            if (this.skipManualSelection) {
-                await this.startProcessing();
-            } else {
-                // Show selection stage
-                this.showStage('selection');
-            }
-
+            await this.handleSessionLoad(data);
         } catch (error) {
             this.clearUploadAcknowledgement();
             console.error('Upload error:', error);
@@ -5974,6 +6211,9 @@ class WebAppClient {
         this.currentSort = { column: 'roi', ascending: true };
         this.manualLayoutActive = false;
         this._dragFrozen = [];
+        this.networkFolderResults = [];
+        this.selectedNetworkFilePath = '';
+        this.networkFolderScanInProgress = false;
         this._dismissContextMenu();
         if (this.websocket) {
             this.websocket.close();
@@ -5994,6 +6234,12 @@ class WebAppClient {
             this.network = null;
         }
         this.clearUploadAcknowledgement();
+        this.setNetworkFolderStatus('');
+        this.updateNetworkFolderLoadButton();
+        const networkFolderResults = document.getElementById('networkFolderResults');
+        if (networkFolderResults) {
+            networkFolderResults.innerHTML = '';
+        }
         if (this._initialDiagramFitTimer) {
             clearTimeout(this._initialDiagramFitTimer);
             this._initialDiagramFitTimer = null;

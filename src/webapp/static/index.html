@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=39">
+    <link rel="stylesheet" href="static/css/styles.css?v=40">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -28,22 +28,45 @@
         <main>
             <!-- Stage 1: Upload -->
             <section class="stage" id="stage-upload">
-                <div class="card">
-                    <h2>Upload DICOM RT Structure Set</h2>
-                    <div class="upload-area" id="uploadArea">
-                        <input type="file" id="fileInput" accept=".dcm" style="display: none;">
-                        <div class="upload-prompt">
-                            <svg class="upload-icon" viewBox="0 0 24 24" width="48" height="48">
-                                <path fill="currentColor" d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
-                            </svg>
-                            <p>Click to upload or drag and drop</p>
-                            <p class="file-info">DICOM RT Structure Set (.dcm)</p>
-                            <p class="upload-status" id="uploadStatus" aria-live="polite"></p>
+                <div class="landing-options">
+                    <div class="card">
+                        <h2>Upload DICOM RT Structure Set</h2>
+                        <div class="upload-area" id="uploadArea">
+                            <input type="file" id="fileInput" accept=".dcm" style="display: none;">
+                            <div class="upload-prompt">
+                                <svg class="upload-icon" viewBox="0 0 24 24" width="48" height="48">
+                                    <path fill="currentColor" d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
+                                </svg>
+                                <p>Click to upload or drag and drop</p>
+                                <p class="file-info">DICOM RT Structure Set (.dcm)</p>
+                                <p class="upload-status" id="uploadStatus" aria-live="polite"></p>
+                            </div>
                         </div>
                     </div>
-                    <div class="disk-warning" id="diskWarning" style="display: none;">
-                        <p>⚠️ Session storage usage is high. Older sessions may be automatically deleted.</p>
+
+                    <div class="card folder-scan-card">
+                        <h2>Browse Shared Folder</h2>
+                        <p class="folder-scan-note">
+                            Scan the configured network folder and choose a structure file directly.
+                        </p>
+                        <div class="folder-scan-summary">
+                            <span class="folder-scan-label">Starting folder</span>
+                            <span class="folder-scan-path" id="networkFolderPath">Loading...</span>
+                        </div>
+                        <label class="toggle-label folder-scan-toggle">
+                            <input type="checkbox" id="includeSubdirectoriesToggle" checked>
+                            <span>Include subdirectories</span>
+                        </label>
+                        <div class="button-group folder-scan-actions">
+                            <button class="btn btn-primary" id="scanNetworkFolderBtn">Scan Folder</button>
+                            <button class="btn btn-secondary" id="loadNetworkFileBtn" disabled>Load Selected File</button>
+                        </div>
+                        <p class="upload-status" id="networkFolderStatus" aria-live="polite"></p>
+                        <div class="network-scan-results" id="networkFolderResults"></div>
                     </div>
+                </div>
+                <div class="disk-warning" id="diskWarning" style="display: none;">
+                    <p>⚠️ Session storage usage is high. Older sessions may be automatically deleted.</p>
                 </div>
             </section>
 

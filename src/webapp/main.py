@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import io
 import networkx as nx
+import pydicom
 
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -89,6 +90,7 @@ PLOT_RESPONSE_CACHE_MAX_BYTES = (
     int(os.getenv('SR_PLOT_CACHE_MAX_MB', '32')) * 1024 * 1024
 )
 _plot_response_cache_bytes = 0
+_webapp_settings_state = {'data': {}, 'mtime': None}
 
 # Mount static files
 static_dir = Path(__file__).parent / 'static'
@@ -101,6 +103,33 @@ class UploadResponse(BaseModel):
     session_id: str
     disk_usage_mb: float
     disk_warning: bool
+
+
+class FolderScanSettingsResponse(BaseModel):
+    root_path: str
+    include_subdirectories: bool
+
+
+class FolderScanFileEntry(BaseModel):
+    structure_set: str
+    patient_name: str
+    patient_id: str
+    study_id: str
+    series_number: str
+    file_name: str
+    file_path: str
+    relative_path: str
+    display_label: str
+
+
+class FolderScanResponse(BaseModel):
+    root_path: str
+    include_subdirectories: bool
+    files: List[FolderScanFileEntry]
+
+
+class NetworkFileLoadRequest(BaseModel):
+    file_path: str
 
 
 class PreviewResponse(BaseModel):
@@ -220,6 +249,178 @@ def _load_diagram_settings() -> dict:
     except (IOError, OSError, json.JSONDecodeError) as exc:
         logger.warning('Failed to load diagram settings: %s', exc)
         return {}
+
+
+def _load_webapp_settings() -> dict:
+    """Load webapp runtime settings from disk.
+
+    Returns:
+        dict: Webapp settings dictionary or an empty dictionary on failure.
+    """
+    settings_file = Path(__file__).parent / 'config' / 'webapp_settings.json'
+    if not settings_file.exists():
+        logger.warning('Webapp settings file not found: %s', settings_file)
+        return {}
+
+    try:
+        current_mtime = settings_file.stat().st_mtime
+        cached_data = _webapp_settings_state['data']
+        if cached_data and _webapp_settings_state['mtime'] == current_mtime:
+            return cached_data
+
+        with open(settings_file, 'r', encoding='utf-8') as settings_handle:
+            settings = json.load(settings_handle)
+            _webapp_settings_state['data'] = settings
+            _webapp_settings_state['mtime'] = current_mtime
+            return settings
+    except (IOError, OSError, json.JSONDecodeError) as exc:
+        logger.warning('Failed to load webapp settings: %s', exc)
+        return {}
+
+
+def _workspace_root() -> Path:
+    """Return the repository root for resolving relative config paths."""
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_config_path(path_value: str | Path, base_dir: Optional[Path] = None) -> Path:
+    """Resolve a configured path relative to the workspace when needed."""
+    candidate = Path(path_value)
+    if candidate.is_absolute():
+        return candidate
+
+    resolved_base = base_dir or _workspace_root()
+    return (resolved_base / candidate).resolve()
+
+
+def _coerce_bool(value: object, default: bool = False) -> bool:
+    """Normalize config values to booleans."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'1', 'true', 'yes', 'y', 'on'}:
+            return True
+        if normalized in {'0', 'false', 'no', 'n', 'off'}:
+            return False
+    return bool(value)
+
+
+def _get_folder_scan_settings() -> dict:
+    """Return the configured folder-scan settings with defaults applied."""
+    settings = _load_webapp_settings()
+    folder_scan = settings.get('folder_scan', settings.get('folder_scan_settings', {}))
+    root_path_value = folder_scan.get('root_path', './Test Data/Anonymized Cases')
+    include_subdirectories = _coerce_bool(
+        folder_scan.get('include_subdirectories', True),
+        default=True,
+    )
+    root_path = _resolve_config_path(root_path_value)
+    return {
+        'root_path': str(root_path),
+        'include_subdirectories': include_subdirectories,
+    }
+
+
+def _build_structure_file_info(struct_file: Path) -> dict:
+    """Extract display metadata for a potential DICOM RT Structure file."""
+    try:
+        dataset = pydicom.dcmread(struct_file, stop_before_pixels=True)
+    except pydicom.errors.InvalidDicomError:
+        return {}
+    except OSError as exc:
+        logger.debug('Skipping unreadable file %s: %s', struct_file, exc)
+        return {}
+
+    if 'RTSTRUCT' not in str(getattr(dataset, 'Modality', '')):
+        return {}
+
+    full_name = str(dataset.get('PatientName', ''))
+    last_name = full_name.split('^', maxsplit=1)[0] if '^' in full_name else full_name
+    structure_set = str(dataset.get('StructureSetLabel', ''))
+    study_id = str(dataset.get('StudyID', ''))
+    series_number = str(dataset.get('SeriesNumber', ''))
+    structure_info = {
+        'StructureSet': structure_set,
+        'PatientName': full_name,
+        'PatientLastName': last_name,
+        'PatientID': str(dataset.get('PatientID', '')),
+        'StudyID': study_id,
+        'SeriesNumber': series_number,
+        'File': str(struct_file),
+        'FileName': struct_file.name,
+        'StructureLabel': structure_set,
+        'DisplayLabel': (
+            '{StructureSet:<16s}\t'
+            '{PatientName:>20s}\t({PatientID:^7s})\t'
+            '{StudyID:^8s}\t{SeriesNumber:^8s}'
+        ).format(
+            StructureSet=structure_set,
+            PatientName=full_name,
+            PatientID=str(dataset.get('PatientID', '')),
+            StudyID=study_id,
+            SeriesNumber=series_number,
+        ),
+    }
+    return structure_info
+
+
+def _scan_structure_files(root_path: Path, include_subdirectories: bool) -> List[dict]:
+    """Scan a folder for RT Structure files and return display metadata."""
+    if include_subdirectories:
+        candidates = root_path.rglob('*.dcm')
+    else:
+        candidates = root_path.glob('*.dcm')
+
+    structure_files = []
+    for struct_file in candidates:
+        if not struct_file.is_file():
+            continue
+        struct_info = _build_structure_file_info(struct_file)
+        if not struct_info:
+            continue
+        try:
+            struct_info['RelativePath'] = str(struct_file.relative_to(root_path))
+        except ValueError:
+            struct_info['RelativePath'] = struct_file.name
+        structure_files.append(struct_info)
+
+    structure_files.sort(
+        key=lambda item: (
+            item.get('StructureSet', '').lower(),
+            item.get('PatientName', '').lower(),
+            item.get('RelativePath', '').lower(),
+        )
+    )
+    return structure_files
+
+
+def _create_session_for_file(
+    file_path: Path,
+    session_id: Optional[str] = None,
+) -> tuple[str, SessionData, dict]:
+    """Create and persist a session for an existing DICOM file path."""
+    if session_id is None:
+        session_id = str(uuid.uuid4())
+    session_data = SessionData(
+        dicom_file_path=str(file_path),
+        structure_set=None,
+        created_at=datetime.now(),
+        last_accessed=datetime.now(),
+    )
+    session_manager.save_session(session_id, session_data)
+    disk_info = session_manager.get_disk_usage_info()
+    return session_id, session_data, disk_info
+
+
+def _path_within_base(candidate: Path, base: Path) -> bool:
+    """Return True when candidate is inside base after resolving both paths."""
+    try:
+        return candidate.resolve().is_relative_to(base.resolve())
+    except ValueError:
+        return False
 
 
 def _load_relationship_definitions() -> dict:
@@ -693,6 +894,57 @@ async def get_symbol_config():
         ) from e
 
 
+@app.get('/api/config/webapp-settings', response_model=FolderScanSettingsResponse)
+async def get_webapp_settings():
+    """Get runtime webapp settings used by the landing page."""
+    folder_scan = _get_folder_scan_settings()
+    return FolderScanSettingsResponse(**folder_scan)
+
+
+@app.get('/api/network/structure-files', response_model=FolderScanResponse)
+async def scan_network_structure_files(include_subdirectories: Optional[bool] = None):
+    """Scan the configured folder for RT Structure files."""
+    try:
+        folder_scan = _get_folder_scan_settings()
+        root_path = Path(folder_scan['root_path'])
+        if include_subdirectories is None:
+            include_subdirectories = folder_scan['include_subdirectories']
+
+        if not root_path.exists() or not root_path.is_dir():
+            raise HTTPException(
+                status_code=404,
+                detail=f'Scan folder not found: {root_path}',
+            )
+
+        scanned_files = _scan_structure_files(root_path, include_subdirectories)
+        return FolderScanResponse(
+            root_path=str(root_path),
+            include_subdirectories=include_subdirectories,
+            files=[
+                FolderScanFileEntry(
+                    structure_set=str(file_info.get('StructureSet', '')),
+                    patient_name=str(file_info.get('PatientName', '')),
+                    patient_id=str(file_info.get('PatientID', '')),
+                    study_id=str(file_info.get('StudyID', '')),
+                    series_number=str(file_info.get('SeriesNumber', '')),
+                    file_name=str(file_info.get('FileName', '')),
+                    file_path=str(file_info.get('File', '')),
+                    relative_path=str(file_info.get('RelativePath', '')),
+                    display_label=str(file_info.get('DisplayLabel', '')),
+                )
+                for file_info in scanned_files
+            ],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception('Failed to scan configured folder: %s', exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Failed to scan configured folder: {exc}',
+        ) from exc
+
+
 @app.post('/api/upload', response_model=UploadResponse)
 async def upload_dicom(file: UploadFile = File(...)):
     '''Upload a DICOM RT Structure Set file and create a new session.
@@ -724,18 +976,7 @@ async def upload_dicom(file: UploadFile = File(...)):
         logger.info('Uploaded DICOM file %s for session %s', file.filename, session_id)
 
         # Create session data
-        session_data = SessionData(
-            dicom_file_path=str(file_path),
-            structure_set=None,
-            created_at=datetime.now(),
-            last_accessed=datetime.now()
-        )
-
-        # Save session
-        session_manager.save_session(session_id, session_data)
-
-        # Get disk usage info
-        disk_info = session_manager.get_disk_usage_info()
+        session_id, _, disk_info = _create_session_for_file(file_path, session_id=session_id)
 
         return UploadResponse(
             session_id=session_id,
@@ -746,6 +987,35 @@ async def upload_dicom(file: UploadFile = File(...)):
     except Exception as e:
         logger.error('Error uploading file: %s', e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/api/network/load', response_model=UploadResponse)
+async def load_network_dicom(request: NetworkFileLoadRequest):
+    """Create a session for a DICOM file already present on a shared path."""
+    folder_scan = _get_folder_scan_settings()
+    root_path = Path(folder_scan['root_path'])
+    file_path = _resolve_config_path(request.file_path)
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail=f'File not found: {file_path}')
+
+    if root_path.exists() and not _path_within_base(file_path, root_path):
+        raise HTTPException(
+            status_code=403,
+            detail='Selected file is outside the configured scan folder',
+        )
+
+    try:
+        session_id, _, disk_info = _create_session_for_file(file_path)
+        logger.info('Loaded shared DICOM file %s for session %s', file_path, session_id)
+        return UploadResponse(
+            session_id=session_id,
+            disk_usage_mb=disk_info['usage_mb'],
+            disk_warning=disk_info['is_warning'],
+        )
+    except Exception as e:
+        logger.error('Error loading shared DICOM file %s: %s', file_path, e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post('/api/preview', response_model=PreviewResponse)
