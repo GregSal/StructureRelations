@@ -1,0 +1,999 @@
+Timestamp,DryRun,TemplateFileName,TemplateType,OldID,NewID,PatternType,Status
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Celiac trunk,A_Celiac,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,MesentericA S,A_Mesenteric_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Abdomen.xml,Structure,Trachea,Trachea,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Genitalia,Genitals,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,iliac crest L,Bone_Ilium_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,iliac crest R,Bone_Ilium_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Node Int iliac L,LN_Iliac_Int_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Node Int iliac R,LN_Iliac_Int_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Anus.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder 1 Phase.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Node ext iliac L,LN_Iliac_Ext_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Node ext iliac R,LN_Iliac_Ext_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Node Int iliac L,LN_Iliac_Int_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Node Int iliac R,LN_Iliac_Int_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Presacral space,Spc_Presacral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Bladder Two Phase.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Axillary vessels,A_Subclavian,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Breast L,Breast_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Breast R,Breast_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Cricoid,Cricoid,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Nodes Axilla I,LN_Ax_L1,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Nodes Axilla II,LN_Ax_L2,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Nodes Axilla III,LN_Ax_L3,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Nodes IMC,LN_IMNs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Nodes SC,LN_Sclav,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Pectoralis minor,Musc_PectMinor,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Scar Wire,ScarWire,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Breast.xml,Structure,Thyroid,Glnd_Thyroid,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,opt BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Celiac trunk,A_Celiac,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,MesentericA S,A_Mesenteric_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Spleen,Spleen,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,Trachea,Trachea,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,V_CavaInferior,V_Venacava_I,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Esophagus.xml,Structure,V_CavaSuperior,V_Venacava_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Hippocampi,Hippocampi,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Hippocampus L,Hippocampus_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Hippocampus R,Hippocampus_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,opt BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,PRV5 Hippocampi,PRV5_Hippocampi,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT Hippo.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,opt BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Bone Marrow,BoneMarrow,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Bowel Space,Spc_Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Node ext iliac L,LN_Iliac_Ext_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Node ext iliac R,LN_Iliac_Ext_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Node Int iliac L,LN_Iliac_Int_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Node Int iliac R,LN_Iliac_Int_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Node Para-Aortic,LN_Paraaortic,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,opt Bone Marrow,opt_BoneMarrow,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,opt Bowel Space,opt_Spc_Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Presacral space,Spc_Presacral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Vagina Empty,Vagina_Empty,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne VMAT.xml,Structure,Vagina Full,Vagina_Full,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Femora lHead L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Femora lHead R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Node ext iliac L,LN_Iliac_Ext_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Node ext iliac R,LN_Iliac_Ext_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Node Int iliac L,LN_Iliac_Int_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Node Int iliac R,LN_Iliac_Int_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Node Para-Aortic,LN_Paraaortic,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Gyne.xml,Structure,Vagina,Vagina,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Heme.xml,Structure,,,,NoChangesNeeded
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Lips,Lips,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,OralCavity,Cavity_Oral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PharynxConst,Musc_Constrict,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,PRV8 SpinalCanal,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Submandibular B,Glnd_Submands,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Structure,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Lips,Lips,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,OralCavity,Cavity_Oral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,PharynxConst,Musc_Constrict,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Submandibular B,Glnd_Submands,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Structure,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Lips,Lips,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,OralCavity,Cavity_Oral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,PharynxConst,Musc_Constrict,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Submandibular B,Glnd_Submands,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN VMAT.xml,Structure,V_CavaSuperior,V_Venacava_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,BrachialPlex L,BrachialPlex_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,BrachialPlex R,BrachialPlex_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,PulmonaryA,A_Pulmonary,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,Trachea,Trachea,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,V_CavaInferior,V_Venacava_I,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung SBRT.xml,Structure,V_CavaSuperior,V_Venacava_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,BrachialPlex L,BrachialPlex_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,BrachialPlex R,BrachialPlex_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,Trachea,Trachea,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,V_CavaInferior,V_Venacava_I,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Lung VMAT.xml,Structure,V_CavaSuperior,V_Venacava_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Presacral space,Spc_Presacral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate 2Ph VMAT.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Normal Tissue,NormalTissue,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Presacral space,Spc_Presacral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate SIB 68 in 25.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,PenileBulb,PenileBulb,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Presacral space,Spc_Presacral,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Prostate,Prostate,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,PRV4 Rectum,PRV4_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Seminal Ves B,SeminalVes,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Prostate.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Genitalia,Genitals,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Node ext iliac L,LN_Iliac_Ext_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Node ext iliac R,LN_Iliac_Ext_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Node Int iliac L,LN_Iliac_Int_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Node Int iliac R,LN_Iliac_Int_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Rectum.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Bowel,Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Celiac trunk,A_Celiac,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,MesentericA S,A_Mesenteric_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Renal hilum,Kidney_Hilums,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Spleen,Spleen,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,V_CavaInferior,V_Venacava_I,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal SBRT.xml,Structure,V_CavaSuperior,V_Venacava_S,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,BrachialPlex L,BrachialPlex_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,BrachialPlex R,BrachialPlex_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lacrimal B,Glnd_Lacrimals,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lacrimal L,Glnd_Lacrimal_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lacrimal R,Glnd_Lacrimal_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Lips,Lips,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Mucosa Avoid,Avoid_Mucosa,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Skin.xml,Structure,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,BrachialPlex L,BrachialPlex_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,BrachialPlex R,BrachialPlex_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Duodenum,Duodenum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,PharynxConst,Musc_Constrict,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,PRV2 BrainStem,PRV2_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,PRV2 SpinalCord,PRV2_SpinalCord,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Sacral plexus,SacralPlex,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,SpinalCord,SpinalCord,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,ThecalSac,ThecalSac,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Trachea,Trachea,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Ureter,Urethra,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Spine.xml,Structure,Urethra,Urethra,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Bowel Space,Spc_Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ABDO.xml,Objective,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Genitalia,Genitals,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,iliac crest L,Bone_Ilium_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,iliac crest R,Bone_Ilium_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Large Bowel,Bowel_Large,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ANAL 36 in 20.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 20 in 5.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 40 in 16.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,BLAD 52.5 in 2.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 40 in 15.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS 60 in 30.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,Hippocampi,Hippocampi,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,CNS Hippo.xml,Objective,PRV5 Hippocampi,PRV5_Hippocampi,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 41.4 in 23.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Lung L,Lung_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,Lung R,Lung_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,ESO 50 in 25.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,PRV5 Optics,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 18 in 1.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 27 in 3.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Avoid INNER,Avoid_INNER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Avoid MID,Avoid_MID,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Avoid OUTER,Avoid_OUTER,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,opt Brain,opt_Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,FSRT in SRS 32.5 in 5.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Bone Marrow,BoneMarrow,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Bowel Space,Spc_Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,opt Bone Marrow,opt_BoneMarrow,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,opt Bowel Space,opt_Spc_Bowel,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,GYNE 45 in 25.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Avoid Shoulder,Avoid_Shoulder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,BR + op PRV,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,BrainStem PRV5,Brainstem_PR5,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Larynx opt,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticNerve PRV5,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Orbit L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Orbit R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid L opt,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid R opt,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV 5BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV5 OpticNerve,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,PRV8 SpinalCanal,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,SpinalCanal PRV5,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,SpinalCanal PRV8,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 50 in 20.xml,Objective,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Avoid Shoulder,Avoid_Shoulder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,BR + op PRV,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,BrainStem PRV5,Brainstem_PR5,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Larynx opt,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticNerve PRV5,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Orbit L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Orbit R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid L opt,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid R opt,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV 5BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV5 OpticNerve,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,PRV8 SpinalCanal,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,SpinalCanal PRV5,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,SpinalCanal PRV8,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 60 in 30.xml,Objective,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Avoid Shoulder,Avoid_Shoulder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,BR + op PRV,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,BrainStem PRV5,Brainstem_PR5,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Larynx opt,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticNerve PRV5,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Orbit L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Orbit R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid L opt,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid R opt,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV 5BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV5 OpticNerve,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,PRV8 SpinalCanal,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,SpinalCanal PRV5,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,SpinalCanal PRV8,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 66 in 33.xml,Objective,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Avoid Shoulder,Avoid_Shoulder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,BR + op PRV,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Brain,Brain,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,BrainStem,Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,BrainStem PRV5,Brainstem_PR5,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Cochlea L,Cochlea_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Cochlea R,Cochlea_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Globe L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Globe R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Larynx,Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Larynx opt,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Lens L,Lens_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Lens R,Lens_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Mandible,Bone_Mandible,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,opt Larynx,opt_Larynx,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,opt Parotid L,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,opt Parotid R,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticChiasm,OpticChiasm,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticNerve L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticNerve PRV5,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticNerve R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticNrv_L,OpticNrv_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,OpticNrv_R,OpticNrv_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Orbit L,Eye_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Orbit R,Eye_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid B,Parotids,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid L opt,opt_Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid R opt,opt_Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid_L,Parotid_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Parotid_R,Parotid_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV 5BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV BR + op,PRV_BR+op,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV5 BrainStem,PRV5_Brainstem,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV5 OpticNerve,PRV5_OpticNrv,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,PRV8 SpinalCanal,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,SpinalCanal PRV5,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,SpinalCanal PRV8,PRV8_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Submandibular L,Glnd_Submand_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,HN 70 in 35.xml,Objective,Submandibular R,Glnd_Submand_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LARY 5250.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LARY 5250.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 20 in 5.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 20 in 5.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 20 in 5.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 40 in 15.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 40 in 15.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 40 in 15.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 40 in 15.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 40 in 15.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 45 in 30.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 45 in 30.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 45 in 30.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 45 in 30.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 45 in 30.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 55 in 20.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 55 in 20.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 55 in 20.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 15.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 15.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 15.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 30.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 30.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 30.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,LUNG 60 in 30.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PELB 46 in 23.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PELB 46 in 23.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PELB 46 in 23.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PELB 46 in 23.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PELB 46 in 23.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 20 in 10.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 20 in 10.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 20 in 10.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 20 in 10.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 24 in 12.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 24 in 12.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 24 in 12.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 24 in 12.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 30 in 15.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 30 in 15.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 30 in 15.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 30 in 15.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 35 in 5.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 37.5 in 15.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,PRV4 Rectum,PRV4_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 40 in 5.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 60 in 20.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 66 in 33.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 68 in 25.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,Avoid a Rectum,Avoid_a_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,Avoid b Rectum,Avoid_b_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,opt Bladder,opt_Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,PROS 76 in 38.xml,Objective,opt Rectum,opt_Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,Bladder,Bladder,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,Femoral Head L,Femur_Head_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,Femoral Head R,Femur_Head_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,PelvicNodes,LN_Pelvics,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,Rectum,Rectum,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,RECT 25 in 5.xml,Objective,Small Bowel,Bowel_Small,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Kidney B,Kidneys,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Kidney L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Kidney R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Kidney_L,Kidney_L,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Kidney_R,Kidney_R,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Liver,Liver,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,PRV5 SpinalCanal,PRV5_SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,Renal.xml,Objective,Stomach,Stomach,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 48 in 4 NTO.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 54 in 3 NTO.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 5 NTO.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,BronchialTree,Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Chest Wall,Chestwall,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Heart,Heart,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Lung B,Lungs,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,PRV20 Brl Tree,PRV20_Bronchus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,Skin,Skin,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR 60 in 8 NTO.xml,Objective,SpinalCanal,SpinalCanal,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 27 in 3.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 27 in 3.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 27 in 3.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 27 in 3.xml,Objective,PRV2 SpinalCord,PRV2_SpinalCord,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 27 in 3.xml,Objective,SpinalCord,SpinalCord,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 30 in 5.xml,Objective,Aorta,A_Aorta,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 30 in 5.xml,Objective,Avoid Post,Avoid_Post,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 30 in 5.xml,Objective,Esophagus,Esophagus,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 30 in 5.xml,Objective,PRV2 SpinalCord,PRV2_SpinalCord,ID_attribute,Modified
+2026-05-19 15:21:11.870856,False,SABR SPINE 30 in 5.xml,Objective,SpinalCord,SpinalCord,ID_attribute,Modified
