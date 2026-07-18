@@ -1,0 +1,2486 @@
+﻿StructureId,VolumeType
+Anal Canal,None
+Anal canal,Nodes
+Anal canal,None
+Ano-Rectum,Organ
+Anorectosigmoid,Organ
+Anus,None
+Anus,Organ
+Aorta,Avoidance
+Aorta,Nodes
+Aorta,None
+Aorta,Organ
+Axillary vessels,None
+Axillary vessels,Organ
+AxillaryNerves R,None
+BODY,BODY
+BONE,Organ
+BRAIN,Avoidance
+BRAIN,Organ
+BREAST_L,None
+Bladder,Avoidance
+Bladder,None
+Bladder,Organ
+Bladder,PTV
+Bladder wall,Organ
+Body,BODY
+Body - Bolus,Avoidance
+Body+Mask,Avoidance
+Body-Board,Avoidance
+Body-Bolus,Avoidance
+Body-Bolus,Control
+Body-Bolus,None
+Body-PTV 1,Avoidance
+Body-PTV 30,Avoidance
+Body-PTV 36,Avoidance
+Body-PTV 36+1,Avoidance
+Body-PTV 45,Avoidance
+Body-PTV 50.4,Avoidance
+Body-PTV 54,Avoidance
+Body-PTV 54,None
+Body-PTV 59.4,Avoidance
+Body-PTV BOTH+20,Avoidance
+Body-PTV INF+20,Avoidance
+Body-PTV L+20,Avoidance
+Body-PTV LT+20,Avoidance
+Body-PTV RT+20,Avoidance
+Body-PTV SUP+20,Avoidance
+Body-PTV+.8,Avoidance
+Body-PTV+0.8,None
+Body-PTV+20,Avoidance
+Body-PTV1+20,Avoidance
+Body-PTV1upp+20,Avoidance
+Body-PTV2+20,Avoidance
+Body-PTV2low+20,Avoidance
+Body-PTV54,Avoidance
+Body-PTV54+0.8cm,None
+Body-PTV54+1,Avoidance
+Body-PTV59.4,Avoidance
+Body-PTVLLL+2,Avoidance
+Bone,None
+Bone,Organ
+Bone Marrow,Organ
+Bones,None
+Bones,Organ
+Bowel,None
+Bowel,Organ
+Bowel Bag,None
+Bowel Space,Organ
+Bowel bag,Organ
+BowelBag,None
+BowelBag,Organ
+BrachialPlex L,Organ
+BrachialPlex R,Organ
+BrachialPlexsL,None
+BrachialPlexsR,None
+BrachialPlexus L,None
+BrachialPlexus L,Organ
+BrachialPlexus R,None
+BrachialPlexus R,Organ
+BrachialPlexus_L,Organ
+BrachialPlexus_R,Organ
+Brachial_plexusR,None
+Brain,Avoidance
+Brain,CTV
+Brain,None
+Brain,Organ
+Brain Stem,None
+Brain-CTV,Control
+BrainStem,None
+BrainStem,Organ
+Breast L,None
+Breast L,Organ
+Breast R,Organ
+Bronchial Tree,Organ
+BronchialTree,None
+BronchialTree,Organ
+CTV,CTV
+CTV,PTV
+CTV  45,CTV
+CTV 1,CTV
+CTV 1,None
+CTV 1 21Gy,CTV
+CTV 1 32.5Gy/5#,CTV
+CTV 1 35gy,CTV
+CTV 2,CTV
+CTV 2.0 Gy - new,CTV
+CTV 2.3 Gy - new,None
+CTV 2.6 Gy - new,None
+CTV 20,CTV
+CTV 20 L,Nodes
+CTV 20/5,None
+CTV 24,CTV
+CTV 25,CTV
+CTV 3,CTV
+CTV 3,None
+CTV 30,CTV
+CTV 30,None
+CTV 36,CTV
+CTV 4,None
+CTV 40,CTV
+CTV 44,CTV
+CTV 44/25 R,CTV
+CTV 45,CTV
+CTV 45/25 L,CTV
+CTV 45/25 R,CTV
+CTV 46,CTV
+CTV 46.75,CTV
+CTV 46/23,CTV
+CTV 46/23,None
+CTV 48,CTV
+CTV 48,None
+CTV 48 L,CTV
+CTV 48 R,CTV
+CTV 50,CTV
+CTV 50 ALL,CTV
+CTV 50.4,CTV
+CTV 50/20,CTV
+CTV 50/25,CTV
+CTV 50B,CTV
+CTV 52.5,CTV
+CTV 5250,CTV
+CTV 54,CTV
+CTV 54 L,CTV
+CTV 54 R,CTV
+CTV 55,CTV
+CTV 55/25,CTV
+CTV 5500,CTV
+CTV 56,CTV
+CTV 56 L,CTV
+CTV 56 R,CTV
+CTV 56 correct,None
+CTV 59.4,CTV
+CTV 60,CTV
+CTV 60 L,CTV
+CTV 60 R,CTV
+CTV 63,CTV
+CTV 63 L,CTV
+CTV 63 R,CTV
+CTV 64,CTV
+CTV 64 L,CTV
+CTV 64 R,CTV
+CTV 66,CTV
+CTV 66,Nodes
+CTV 66 L,CTV
+CTV 66 R,CTV
+CTV 66 new,Nodes
+CTV 66 orig,CTV
+CTV 68,CTV
+CTV 70,CTV
+CTV 70 ALL,CTV
+CTV 70 Gy,CTV
+CTV 70 ORIG,CTV
+CTV 70 new,CTV
+CTV 70 orig,CTV
+CTV 76,CTV
+CTV 76/38,CTV
+CTV ALL,CTV
+CTV BLAD,CTV
+CTV BOOS,CTV
+CTV Brain,CTV
+CTV CHWL,CTV
+CTV CHWR,CTV
+CTV Cavity,CTV
+CTV Cavity BRBL,CTV
+CTV Cavity BRBR,CTV
+CTV Cavity Eval,CTV
+CTV Cavity LT,CTV
+CTV Cavity ORIG,CTV
+CTV Cavity orig,CTV
+CTV ESOM,CTV
+CTV Ear,Nodes
+CTV INGL,CTV
+CTV INGR,CTV
+CTV Iliac,Nodes
+CTV L,CTV
+CTV LT,CTV
+CTV NECL,CTV
+CTV Nodes,Nodes
+CTV PARA,CTV
+CTV PARR,CTV
+CTV PROS,CTV
+CTV R,CTV
+CTV RT,CTV
+CTV SHOL,Nodes
+CTV SPIC,CTV
+CTV SPIT,CTV
+CTV SUM,CTV
+CTV Scalp,CTV
+CTV TOTAL,CTV
+CTV all,CTV
+CTV boos,CTV
+CTV iliac,None
+CTV int L,CTV
+CTV int R,CTV
+CTV low L,CTV
+CTV low R,CTV
+CTV low dose,PTV
+CTV new,CTV
+CTV orig,CTV
+CTV prim,CTV
+CTV primary,CTV
+CTV prostate,CTV
+CTV prostate,None
+CTV spine,CTV
+CTV suggest,Control
+CTV sum,CTV
+CTV vertebrae,None
+CTV-EARL,CTV
+CTV-NOSE,CTV
+CTV1,CTV
+CTV1-18/3,CTV
+CTV2,CTV
+CTV2,Nodes
+CTV2,None
+CTV2 24Gy,CTV
+CTV2-18/3,Nodes
+CTV20,CTV
+CTV20/5,CTV
+CTV24,CTV
+CTV3,CTV
+CTV30,CTV
+CTV30,Nodes
+CTV36,CTV
+CTV36,None
+CTV36/20,CTV
+CTV38Gy/19,Nodes
+CTV4,CTV
+CTV40,CTV
+CTV40,Nodes
+CTV40,None
+CTV40/15,None
+CTV45,CTV
+CTV45pelvis,CTV
+CTV46,CTV
+CTV46,Nodes
+CTV46/23,CTV
+CTV48,CTV
+CTV5,CTV
+CTV50,CTV
+CTV50,None
+CTV50,Treated Volume
+CTV50.4,CTV
+CTV50.4,Nodes
+CTV50.4,None
+CTV52.5,CTV
+CTV54,CTV
+CTV54,Nodes
+CTV54/30,None
+CTV55,Nodes
+CTV55,None
+CTV55/20,None
+CTV56,CTV
+CTV56 orig,CTV
+CTV59.4,CTV
+CTV59.4,Nodes
+CTV59.4,None
+CTV60,CTV
+CTV60,None
+CTV60/30,None
+CTV64,CTV
+CTV64 orig,CTV
+CTV66,CTV
+CTV66,None
+CTV66/33,CTV
+CTV68,CTV
+CTV70,CTV
+CTV70,Nodes
+CTV70,None
+CTV70,PTV
+CTV76,CTV
+CTVALL,CTV
+CTVLung,CTV
+CTVN,GTV
+CTVN,None
+CTVN BOOS,None
+CTVP,None
+CTV_1+2,CTV
+CTV_Cavity,PTV
+CTV_HR,CTV
+CTV_IR,CTV
+CTV_L,CTV
+CTV_Lump_L,CTV
+CTV_Lump_R,CTV
+CTV_R,CTV
+CTVall,CTV
+CTVboth,CTV
+CTVn,CTV
+CTVn,Nodes
+CTVn,None
+CTVn 63,CTV
+CTVn 70,CTV
+CTVn 70Gy,CTV
+CTVn boos,None
+CTVn1,CTV
+CTVn1L,CTV
+CTVn2,CTV
+CTVn56L,CTV
+CTVn56R,CTV
+CTVn66,CTV
+CTVn70,CTV
+CTVn_IMN_R,Avoidance
+CTVn_SCL_R,Nodes
+CTVoriginal,CTV
+CTVp,CTV
+CTVp,Nodes
+CTVp orig,CTV
+CTVp56,CTV
+CTVp66,CTV
+CTVp70,CTV
+Carotid L,None
+Cauda Equina,Organ
+Cavity,CTV
+Cavity,GTV
+Cavity BRBL,GTV
+Cavity BRBR,GTV
+Cavity BRER,GTV
+Cavity LT,GTV
+Cavity ORIG,GTV
+Cavity RT,GTV
+Cavity orig,GTV
+Cavity1,GTV
+Cavity2,Organ
+Celiac,Organ
+Celiac Artery,Organ
+Celiac trunk,Organ
+Cervix,Organ
+Chest Wall,Organ
+Chest Wall LT,Organ
+Chest Wall RT,Organ
+Clavicle L,Organ
+Clavicle_L,None
+Cochlea L,None
+Cochlea L,Organ
+Cochlea LT,Organ
+Cochlea R,None
+Cochlea R,Organ
+Cochlea RT,Organ
+Colon,Organ
+Constrictors,None
+Cricoid,None
+Digits,Organ
+Duodenum,Organ
+EVAL CTV 54,CTV
+EVAL CTV 59.4,CTV
+EVAL ITV 50,CTV
+EVAL ITV 60,CTV
+Ear Inner L,Organ
+Ear Inner R,Organ
+Ear L,Organ
+Ear Middle L,Organ
+Ear Middle R,Organ
+Ear R,Organ
+Edema,None
+Esophagus,None
+Esophagus,Organ
+Eval PTV Ear,None
+Eval PTV Scalp,PTV
+Eyes,Organ
+Femoral Head L,Organ
+Femoral Head R,Organ
+FemoralHead L,Organ
+FemoralHead R,Organ
+Femur L,None
+Femur L,Organ
+Femur R,None
+Femur R,Organ
+Femur_Heads,None
+Fibula L,Organ
+Fibula R,Organ
+GTV,CTV
+GTV,GTV
+GTV,Nodes
+GTV  1  27Gy,GTV
+GTV  2,None
+GTV  2  27Gy,GTV
+GTV  3 27Gy,GTV
+GTV  3xxGy,GTV
+GTV - Edema,GTV
+GTV 1,GTV
+GTV 1   27Gy,GTV
+GTV 1  27Gy,GTV
+GTV 1 15Gy/3#,GTV
+GTV 1 16Gy/3#,GTV
+GTV 1 18Gy,GTV
+GTV 1 18Gy/3#,GTV
+GTV 1 21Gy,GTV
+GTV 1 21Gy/3#,GTV
+GTV 1 24Gy,GTV
+GTV 1 24Gy/3,GTV
+GTV 1 24Gy/3#,GTV
+GTV 1 25Gy,GTV
+GTV 1 27.5Gy,GTV
+GTV 1 27Gy,GTV
+GTV 1 27Gy/3,GTV
+GTV 1 27Gy/3#,GTV
+GTV 1 30Gy,GTV
+GTV 1 30Gy/5,GTV
+GTV 1 30Gy/5#,GTV
+GTV 1 32.5Gy,GTV
+GTV 1 32.5Gy/5#,GTV
+GTV 1 35Gy,GTV
+GTV 1 AVE,GTV
+GTV 1 LLL,GTV
+GTV 1 TRAC,GTV
+GTV 10,GTV
+GTV 10 24Gy/3#,GTV
+GTV 11,GTV
+GTV 12,GTV
+GTV 13,GTV
+GTV 14,GTV
+GTV 15,GTV
+GTV 18/3,GTV
+GTV 18Gy/3#,GTV
+GTV 2,GTV
+GTV 2  27Gy,GTV
+GTV 2 18Gy,GTV
+GTV 2 20Gy,GTV
+GTV 2 21Gy,GTV
+GTV 2 21Gy/3#,GTV
+GTV 2 22.5Gy/5#,GTV
+GTV 2 24Gy,GTV
+GTV 2 24Gy/3,GTV
+GTV 2 24Gy/3#,GTV
+GTV 2 25Gy,GTV
+GTV 2 27.5Gy,GTV
+GTV 2 27Gy,GTV
+GTV 2 27Gy/3,GTV
+GTV 2 27Gy/3#,GTV
+GTV 2 30Gy,GTV
+GTV 2 30Gy/5#,GTV
+GTV 2 32.5Gy,GTV
+GTV 2 32.5Gy/5#,GTV
+GTV 2 RLL,GTV
+GTV 20/5,GTV
+GTV 25,Nodes
+GTV 3,GTV
+GTV 3 18Gy,GTV
+GTV 3 18Gy/3#,GTV
+GTV 3 21Gy/3#,GTV
+GTV 3 22.5Gy/5#,GTV
+GTV 3 24Gy/3#,GTV
+GTV 3 25Gy,GTV
+GTV 3 27Gy,GTV
+GTV 3 27Gy/3#,GTV
+GTV 3 30Gy,GTV
+GTV 3 30Gy/5#,GTV
+GTV 3 32.5Gy,GTV
+GTV 3 RLLat,GTV
+GTV 4,GTV
+GTV 4,None
+GTV 4 15Gy/3#,GTV
+GTV 4 18Gy,GTV
+GTV 4 21Gy/3#,GTV
+GTV 4 22.5Gy/5#,GTV
+GTV 4 24Gy/3#,GTV
+GTV 4 25Gy,GTV
+GTV 4 27Gy,GTV
+GTV 4 27Gy/3#,GTV
+GTV 4 30Gy,GTV
+GTV 4 30Gy/5#,GTV
+GTV 4 35Gy,GTV
+GTV 4D0,GTV
+GTV 4D10,GTV
+GTV 4D20,GTV
+GTV 4D30,GTV
+GTV 4D40,GTV
+GTV 4D50,GTV
+GTV 4D60,GTV
+GTV 4D70,GTV
+GTV 4D80,GTV
+GTV 4D90,GTV
+GTV 5,GTV
+GTV 5 15Gy/3#,GTV
+GTV 5 18Gy,GTV
+GTV 5 21Gy/3#,GTV
+GTV 5 22.5Gy/5#,GTV
+GTV 5 24Gy,GTV
+GTV 5 24Gy/3#,GTV
+GTV 5 25Gy,GTV
+GTV 5 27Gy,GTV
+GTV 5 27Gy/3#,GTV
+GTV 5 30Gy,GTV
+GTV 5 30Gy/5#,GTV
+GTV 6,GTV
+GTV 6 18 Gy,GTV
+GTV 6 21Gy/3#,GTV
+GTV 6 24Gy,GTV
+GTV 6 24Gy/3#,GTV
+GTV 6 27Gy,GTV
+GTV 6 27Gy/3#,GTV
+GTV 6 30Gy,GTV
+GTV 6 30Gy/5#,GTV
+GTV 7,GTV
+GTV 7 18Gy,GTV
+GTV 7 21 Gy,GTV
+GTV 7 21Gy/3#,GTV
+GTV 7 24Gy/3#,GTV
+GTV 7 27Gy,GTV
+GTV 7 27Gy/3#,GTV
+GTV 7 30Gy,GTV
+GTV 7 30Gy/5#,GTV
+GTV 8,GTV
+GTV 8  27Gy,GTV
+GTV 8 21Gy/3#,GTV
+GTV 8 24Gy/3#,GTV
+GTV 8 25Gy,GTV
+GTV 8 27Gy,GTV
+GTV 8 27Gy/3#,GTV
+GTV 9,GTV
+GTV 9 21Gy/3#,GTV
+GTV 9 24Gy/3#,GTV
+GTV 9 27Gy,GTV
+GTV 9 27Gy/3#,GTV
+GTV ALL,GTV
+GTV ALL,None
+GTV AVE,GTV
+GTV All,GTV
+GTV BOOS,GTV
+GTV CHWL,GTV
+GTV CHWR,GTV
+GTV ESOM,GTV
+GTV INGL,GTV
+GTV INGR,GTV
+GTV LT,GTV
+GTV LUNL,GTV
+GTV Lung,GTV
+GTV MIP,GTV
+GTV MIPINF,GTV
+GTV MIPL,GTV
+GTV MIPR,GTV
+GTV MIPSUP,GTV
+GTV MRI,GTV
+GTV MRI,None
+GTV NECL,GTV
+GTV ORIG,GTV
+GTV PARA,GTV
+GTV PARR,GTV
+GTV PET,GTV
+GTV PET,Nodes
+GTV PREOP,GTV
+GTV PROS,GTV
+GTV RIBL,GTV
+GTV RT,GTV
+GTV SACR,None
+GTV SHOL,Nodes
+GTV SHOR,GTV
+GTV SPIC,GTV
+GTV SPIT,GTV
+GTV T1,GTV
+GTV Total,GTV
+GTV Vagina,GTV
+GTV all,GTV
+GTV all,None
+GTV comb,GTV
+GTV node,GTV
+GTV node,None
+GTV orig,GTV
+GTV plus 7mm,None
+GTV suggest,None
+GTV total,GTV
+GTV+1cm,None
+GTV-DiagCT,Nodes
+GTV-New,None
+GTV-T,GTV
+GTV-Total,GTV
+GTV1,GTV
+GTV1 27Gy,GTV
+GTV1 4D0,GTV
+GTV1 4D50,GTV
+GTV1 AVE,GTV
+GTV1 MIP,GTV
+GTV1-18/3,GTV
+GTV2,GTV
+GTV2,None
+GTV2 27Gy,GTV
+GTV2 4D0,GTV
+GTV2 4D50,GTV
+GTV2 AVE,GTV
+GTV2 MIP,GTV
+GTV2-18/3,GTV
+GTV3,GTV
+GTV3 27Gy,GTV
+GTV4,GTV
+GTV4 27Gy,GTV
+GTVSkin,None
+GTV_PET,None
+GTV_RES,GTV
+GTVm,GTV
+GTVn,GTV
+GTVn,Nodes
+GTVn,None
+GTVn 70,Nodes
+GTVn L,Nodes
+GTVn ORIG,Nodes
+GTVn R,GTV
+GTVn R,Nodes
+GTVn new,GTV
+GTVn+.5,None
+GTVn-copy,Nodes
+GTVn1,GTV
+GTVn1L,GTV
+GTVn2,GTV
+GTVn3,GTV
+GTVnL,Nodes
+GTVntotal,Nodes
+GTVoriginal,GTV
+GTVp,GTV
+GTVp new,GTV
+GTVp56,GTV
+GTVp66,GTV
+GTVp70,GTV
+GTVpet,GTV
+GTVpreop,GTV
+GTVvertebrae,None
+Genitalia,None
+Genitalia,Organ
+Genitals,None
+Globe L,None
+Globe L,Organ
+Globe R,None
+Globe R,Organ
+Great Vessels,None
+HRV_CT,CTV
+HTV,CTV
+HTV,GTV
+HTV,None
+HTV 1 30Gy,GTV
+HTV 1 35Gy,GTV
+HTV+1cm,None
+HTV+3cm,None
+HTVn,Nodes
+HTVp,GTV
+Hand L,Organ
+Heart,Avoidance
+Heart,None
+Heart,Organ
+Heart1,None
+Hip L,Organ
+Hip R,Organ
+Hippo_L,Organ
+Hippo_R,Organ
+Hippocampi,Organ
+Humerus L,None
+Humerus L,Organ
+Humerus R,None
+Humorous L,Organ
+Humorous R,Organ
+IGTV,GTV
+IGTV 1 60Gy/15,GTV
+IGTV 2 60Gy/15,GTV
+IGTV 48/4,GTV
+IGTV 60/15,GTV
+IGTV 60Gy/8#,GTV
+IGTV L,GTV
+IGTV LT,GTV
+IGTV LUNR,GTV
+IGTV R,GTV
+IGTV RT,GTV
+IGTV suggest,GTV
+IGTV2,GTV
+IGTVINF,GTV
+IGTVSUP,GTV
+ITV,CTV
+ITV 1 60Gy/15,CTV
+ITV 1 LLL,CTV
+ITV 2,CTV
+ITV 2 60Gy/15,GTV
+ITV 2 RLL,None
+ITV 3,CTV
+ITV 3 RLLat,None
+ITV 37.5,CTV
+ITV L,CTV
+ITV LT,CTV
+ITV LUNR,CTV
+ITV R,CTV
+ITV RT,CTV
+ITV TRACH,CTV
+ITV Vagina,CTV
+ITV1,CTV
+ITV2,CTV
+ITVINF,CTV
+ITVSUP,CTV
+Iliac Vessels,CTV
+Iliac Vessels,Nodes
+Iliac Vessels B,CTV
+Iliac Vessels L,CTV
+Iliac Vessels R,CTV
+Iliac vessels,Nodes
+Iliac vessels L,Nodes
+Iliac vessels R,Nodes
+Jejunum,Organ
+Kidney B,Organ
+Kidney L,None
+Kidney L,Organ
+Kidney L1,Organ
+Kidney L2,Organ
+Kidney LT,None
+Kidney R,None
+Kidney R,Organ
+Kidney R1,Organ
+Kidney R2,Organ
+Kidney RT,None
+Kidney RT,Organ
+Kidney_L,Organ
+Kidney_R,Organ
+Kidneys,None
+LARYNX,Avoidance
+LUNG_B,Organ
+LUNG_L,Organ
+LUNG_R,Organ
+Lacrimal B,Organ
+Lacrimal L,None
+Lacrimal L,Organ
+Lacrimal R,None
+Lacrimal R,Organ
+LacrimalGland_L,Organ
+Large Bowel,Control
+Large Bowel,None
+Large Bowel,Organ
+LargeBowel,Organ
+Larynx,None
+Larynx,Organ
+Lens,None
+Lens L,None
+Lens L,Organ
+Lens R,None
+Lens R,Organ
+Lenses,GTV
+Lenses,Organ
+Lip,None
+Lips,None
+Lips,Organ
+Liver,Avoidance
+Liver,None
+Liver,Organ
+Liver-GTV,Avoidance
+Lung B,CTV
+Lung B,None
+Lung B,Organ
+Lung B1,None
+Lung L,None
+Lung L,Organ
+Lung L1,None
+Lung R,None
+Lung R,Organ
+Lung R1,None
+Lungs,None
+MANDIBLE,Organ
+Macula R,None
+Mandible,None
+Mandible,Organ
+MesentericA S,Organ
+MesoRectum,Organ
+Mesorectum,Control
+Mesorectum,None
+Musc_Sclmast_L,None
+Musc_Sclmast_R,None
+Node,Nodes
+Node,None
+Node Celiac,Nodes
+Node Gastric,Nodes
+Node Hepatic,Nodes
+Node Hepatoduod,Nodes
+Node Hepatogastr,Nodes
+Node Int iliac,Nodes
+Node Int iliac L,Nodes
+Node Int iliac R,Nodes
+Node L,Nodes
+Node Obturator,Nodes
+Node Pancreatic,Nodes
+Node Para-Aortic,Nodes
+Node Pyloric,Nodes
+Node R,Nodes
+Node Sacral,Nodes
+Node Splenic,Nodes
+Node Subpyloric,Nodes
+Node com iliac,Nodes
+Node com iliac L,Nodes
+Node com iliac R,Nodes
+Node ext iliac,Nodes
+Node ext iliac L,Nodes
+Node ext iliac R,Nodes
+Node iliac L,Nodes
+Node iliac R,Nodes
+NodeSmall,None
+Nodes,GTV
+Nodes,None
+Nodes Axilla 1,Nodes
+Nodes Axilla 2,Nodes
+Nodes Axilla 3,Nodes
+Nodes Axilla I,Nodes
+Nodes Axilla I,Organ
+Nodes Axilla II,Nodes
+Nodes Axilla II,Organ
+Nodes Axilla III,Nodes
+Nodes Axilla III,Organ
+Nodes AxillaIII,Nodes
+Nodes IMC,Nodes
+Nodes IMC,Reference
+NodesL,Nodes
+NodesR,Nodes
+Normal Tissue,Avoidance
+Normal Tissue,Control
+Normal Tissue,None
+Normal Tissue,Organ
+Normal Tissue,PTV
+Normal Tissue 46,Avoidance
+Normal Tissue 48,Avoidance
+Normal Tissue 50,Avoidance
+Normal Tissue2,Avoidance
+Normal tissue,Organ
+OPT PTV TOTAL,PTV
+Operative Bed,CTV
+Optic Chiasm,None
+OpticChiasm,None
+OpticChiasm,Organ
+OpticNerve L,None
+OpticNerve L,Organ
+OpticNerve R,None
+OpticNerve R,Organ
+Optics+BRSTM,None
+Oral Cavity,Organ
+OralCavity,None
+Ovary L,Organ
+Ovary R,Organ
+PRV 5BrainStem,Avoidance
+PRV CORD,Avoidance
+PRV Cord b+3mm,Avoidance
+PRV2 BrainStem,Avoidance
+PRV2 SpinalCanal,Avoidance
+PRV2 SpinalCord,Avoidance
+PRV3 Lenses,None
+PRV3 PLEXUS,Avoidance
+PRV3 Plexus,Avoidance
+PRV3mm Globes,Avoidance
+PRV4 Rectum,Avoidance
+PRV4 Rectum,None
+PRV5 Brain Stem,Avoidance
+PRV5 BrainStem,Avoidance
+PRV5 OpticNerve,Avoidance
+PRV5 Optics,Avoidance
+PRV5 Plexus,Organ
+PRV5 SpinalCanal,Avoidance
+PRV5mm Cord,None
+PRV8 SpinalCanal,Avoidance
+PTV,None
+PTV,PTV
+PTV  1  27Gy,PTV
+PTV  2,None
+PTV  2  27Gy,PTV
+PTV  36,PTV
+PTV  54,PTV
+PTV 1,PTV
+PTV 1   27Gy,PTV
+PTV 1  27Gy,PTV
+PTV 1 15Gy/3#,PTV
+PTV 1 16Gy/3#,PTV
+PTV 1 18Gy,PTV
+PTV 1 18Gy/3,PTV
+PTV 1 20Gy,PTV
+PTV 1 21Gy,PTV
+PTV 1 21Gy/3#,PTV
+PTV 1 24 Gy,PTV
+PTV 1 24Gy,PTV
+PTV 1 24Gy/3,PTV
+PTV 1 24Gy/3#,PTV
+PTV 1 25Gy,PTV
+PTV 1 27 Gy,PTV
+PTV 1 27.5Gy,PTV
+PTV 1 27Gy,PTV
+PTV 1 27Gy/3,PTV
+PTV 1 27Gy/3#,PTV
+PTV 1 30Gy,PTV
+PTV 1 30Gy/5,PTV
+PTV 1 30Gy/5#,PTV
+PTV 1 32.5Gy,PTV
+PTV 1 32.5Gy/5#,PTV
+PTV 1 35Gy,PTV
+PTV 1 60Gy/15,PTV
+PTV 1 LLL,None
+PTV 1 TRAC,PTV
+PTV 10 21Gy,PTV
+PTV 10 24Gy/3#,PTV
+PTV 10 27 Gy,PTV
+PTV 10mm,PTV
+PTV 11 21Gy,PTV
+PTV 11 27 Gy,PTV
+PTV 12 21Gy,PTV
+PTV 12 27 Gy,PTV
+PTV 13 27 Gy,PTV
+PTV 14 27 Gy,PTV
+PTV 15 27 Gy,PTV
+PTV 15mm,PTV
+PTV 16Gy,PTV
+PTV 18 Gy,PTV
+PTV 18/3,PTV
+PTV 18Gy,PTV
+PTV 18Gy/3#,PTV
+PTV 2,PTV
+PTV 2  27Gy,PTV
+PTV 2 18Gy,PTV
+PTV 2 20Gy,PTV
+PTV 2 21Gy,PTV
+PTV 2 21Gy/3#,PTV
+PTV 2 22.5Gy/5#,PTV
+PTV 2 24 Gy,PTV
+PTV 2 24Gy,PTV
+PTV 2 24Gy/3,PTV
+PTV 2 24Gy/3#,PTV
+PTV 2 25Gy,PTV
+PTV 2 27 Gy,PTV
+PTV 2 27.5Gy,PTV
+PTV 2 27Gy,PTV
+PTV 2 27Gy/3,PTV
+PTV 2 27Gy/3#,PTV
+PTV 2 30Gy,PTV
+PTV 2 30Gy/5#,PTV
+PTV 2 32.5Gy,PTV
+PTV 2 32.5Gy/5#,PTV
+PTV 2 35Gy,PTV
+PTV 2 60Gy/15,GTV
+PTV 2 NEW,PTV
+PTV 2 RLL,None
+PTV 2.0 Gy - new,None
+PTV 2.3 Gy - new,None
+PTV 2.6 Gy - new,None
+PTV 20,PTV
+PTV 20 Gy,PTV
+PTV 20 L,PTV
+PTV 20/5,PTV
+PTV 21,PTV
+PTV 21Gy,PTV
+PTV 24,PTV
+PTV 24Gy,PTV
+PTV 25,PTV
+PTV 25/5,PTV
+PTV 27 Gy,PTV
+PTV 27Gy,PTV
+PTV 3,PTV
+PTV 3 18Gy,PTV
+PTV 3 18Gy/3#,PTV
+PTV 3 21Gy,PTV
+PTV 3 21Gy/3#,PTV
+PTV 3 22.5Gy/5#,PTV
+PTV 3 24Gy,PTV
+PTV 3 24Gy/3#,PTV
+PTV 3 25Gy,PTV
+PTV 3 27Gy,PTV
+PTV 3 27Gy/3#,PTV
+PTV 3 30Gy,PTV
+PTV 3 30Gy/5#,PTV
+PTV 3 32.5Gy,PTV
+PTV 3 RLLat,None
+PTV 30,None
+PTV 30,PTV
+PTV 35 Gy,PTV
+PTV 36,PTV
+PTV 37.5,PTV
+PTV 38Gy/19#,PTV
+PTV 4,PTV
+PTV 4 15Gy/3#,PTV
+PTV 4 18Gy,PTV
+PTV 4 21Gy,PTV
+PTV 4 21Gy/3#,PTV
+PTV 4 22.5Gy/5#,PTV
+PTV 4 24Gy,PTV
+PTV 4 24Gy/3#,PTV
+PTV 4 25Gy,PTV
+PTV 4 27Gy,PTV
+PTV 4 27Gy/3#,PTV
+PTV 4 30Gy,PTV
+PTV 4 30Gy/5#,PTV
+PTV 4 35Gy,PTV
+PTV 4 NEW,PTV
+PTV 40,PTV
+PTV 44,PTV
+PTV 44/25 R,PTV
+PTV 45,PTV
+PTV 45 R,PTV
+PTV 45/25 L,PTV
+PTV 45/25 R,PTV
+PTV 46,PTV
+PTV 46.75,PTV
+PTV 46/23,PTV
+PTV 48,None
+PTV 48,PTV
+PTV 48 Gy,PTV
+PTV 48 L,PTV
+PTV 48 R,PTV
+PTV 48/4,PTV
+PTV 48Gy,PTV
+PTV 5,PTV
+PTV 5 15Gy/3#,PTV
+PTV 5 18Gy,PTV
+PTV 5 21Gy,PTV
+PTV 5 21Gy/3#,PTV
+PTV 5 22.5Gy/5#,PTV
+PTV 5 24Gy,PTV
+PTV 5 24Gy/3#,PTV
+PTV 5 25Gy,PTV
+PTV 5 27Gy,PTV
+PTV 5 27Gy/3#,PTV
+PTV 5 30Gy,PTV
+PTV 5 30Gy/5#,PTV
+PTV 5 NEW,PTV
+PTV 50,PTV
+PTV 50.4,PTV
+PTV 50.4 Gy,PTV
+PTV 50/20,PTV
+PTV 50/25,PTV
+PTV 50Gy,PTV
+PTV 52.5,PTV
+PTV 5250,PTV
+PTV 54,PTV
+PTV 54 L,PTV
+PTV 54 R,PTV
+PTV 55,PTV
+PTV 55 crop,PTV
+PTV 55/20,PTV
+PTV 55/25,PTV
+PTV 5500,PTV
+PTV 56,PTV
+PTV 56 Correct,None
+PTV 56 L,PTV
+PTV 56 R,PTV
+PTV 59.4,PTV
+PTV 6 18 Gy,PTV
+PTV 6 21Gy,PTV
+PTV 6 21Gy/3#,PTV
+PTV 6 24Gy,PTV
+PTV 6 24Gy/3#,PTV
+PTV 6 27 Gy,PTV
+PTV 6 27Gy,PTV
+PTV 6 27Gy/3#,PTV
+PTV 6 30Gy,PTV
+PTV 6 30Gy/5#,PTV
+PTV 60,PTV
+PTV 60 Gy,PTV
+PTV 60 L,PTV
+PTV 60/15,PTV
+PTV 60Gy/8#,PTV
+PTV 63,PTV
+PTV 63 Gy,PTV
+PTV 63 orig,PTV
+PTV 64,PTV
+PTV 64 L,PTV
+PTV 64 R,PTV
+PTV 66,PTV
+PTV 66 L,PTV
+PTV 66 R,PTV
+PTV 66 orig,PTV
+PTV 68,PTV
+PTV 7 18 Gy,PTV
+PTV 7 21Gy,PTV
+PTV 7 21Gy/3#,PTV
+PTV 7 24Gy/3#,PTV
+PTV 7 27 Gy,PTV
+PTV 7 27Gy,PTV
+PTV 7 27Gy/3#,PTV
+PTV 7 30Gy,PTV
+PTV 7 30Gy/5#,PTV
+PTV 70,PTV
+PTV 70 ALL,PTV
+PTV 70 ORIG,PTV
+PTV 70 new,PTV
+PTV 70 orig,PTV
+PTV 70-ALL,PTV
+PTV 70Gy,PTV
+PTV 76,PTV
+PTV 76/38,PTV
+PTV 8 21Gy,PTV
+PTV 8 21Gy/3#,PTV
+PTV 8 24Gy/3#,PTV
+PTV 8 25Gy,PTV
+PTV 8 27 Gy,PTV
+PTV 8 27Gy,PTV
+PTV 8 27Gy/3#,PTV
+PTV 9 21Gy,PTV
+PTV 9 21Gy/3#,PTV
+PTV 9 24Gy/3#,PTV
+PTV 9 27 Gy,PTV
+PTV 9 27Gy,PTV
+PTV 9 27Gy/3#,PTV
+PTV ALL,PTV
+PTV All,PTV
+PTV All LUNL,PTV
+PTV All eval,PTV
+PTV BOOS,PTV
+PTV BOTH,PTV
+PTV BOTH+20,Control
+PTV CHWL,PTV
+PTV CHWR,PTV
+PTV Cavity,PTV
+PTV Cavity BRBL,PTV
+PTV Cavity LT,None
+PTV Cavity LT,PTV
+PTV Cavity ORIG,PTV
+PTV Cavity RT,PTV
+PTV Cavity orig,PTV
+PTV ESOM,PTV
+PTV Ear,PTV
+PTV Eval,PTV
+PTV INF+20,Control
+PTV INGL,PTV
+PTV INGR,PTV
+PTV L,PTV
+PTV LT,PTV
+PTV LUNL,PTV
+PTV LUNR,PTV
+PTV NECL,PTV
+PTV NEW,PTV
+PTV Nodes,PTV
+PTV PARA,PTV
+PTV PARR,PTV
+PTV PROS,PTV
+PTV R,PTV
+PTV RIBL,PTV
+PTV RT,PTV
+PTV SBRT,PTV
+PTV SHOL,PTV
+PTV SPIC,PTV
+PTV SPIT,PTV
+PTV SUP+20,Control
+PTV TOTAL,PTV
+PTV Total,PTV
+PTV Total NEW,PTV
+PTV all,PTV
+PTV both,PTV
+PTV eval,None
+PTV eval,PTV
+PTV eval,Treated Volume
+PTV eval LT,None
+PTV eval LT,PTV
+PTV eval RT,PTV
+PTV int,PTV
+PTV int L,PTV
+PTV int R,PTV
+PTV low,PTV
+PTV low L,PTV
+PTV low R,PTV
+PTV mod,PTV
+PTV orig,PTV
+PTV primary,PTV
+PTV prostate,None
+PTV suggest,None
+PTV total,None
+PTV+15,Treated Volume
+PTV+20,Control
+PTV+4,Control
+PTV-ALL,None
+PTV-ALL,PTV
+PTV-Bladder,PTV
+PTV-CTV,None
+PTV-E,PTV
+PTV-EARL,PTV
+PTV-NOSE,PTV
+PTV-SKIN,PTV
+PTV-Total,PTV
+PTV1,PTV
+PTV1 18Gy,PTV
+PTV1 27Gy,PTV
+PTV1 upper+20,Control
+PTV1+20,Control
+PTV1-18/3,PTV
+PTV12/5,PTV
+PTV2,None
+PTV2,PTV
+PTV2 27Gy,PTV
+PTV2 lower+20,Control
+PTV2+20,Control
+PTV2-18/3,PTV
+PTV20,PTV
+PTV20/5,PTV
+PTV24,PTV
+PTV3,PTV
+PTV3 27Gy,PTV
+PTV30,None
+PTV30,PTV
+PTV30.8/28,PTV
+PTV36,PTV
+PTV36/20,PTV
+PTV4,PTV
+PTV4 27Gy,PTV
+PTV40,None
+PTV40,PTV
+PTV40/15,None
+PTV40/20,PTV
+PTV45-T,PTV
+PTV45pelvis,PTV
+PTV46,PTV
+PTV46/23,PTV
+PTV48,PTV
+PTV50,PTV
+PTV50.4,None
+PTV50/20,PTV
+PTV50_eval,None
+PTV52.5,PTV
+PTV54,PTV
+PTV54/30,None
+PTV55,None
+PTV55,Organ
+PTV55.8,PTV
+PTV55/20,None
+PTV56,PTV
+PTV56 orig,PTV
+PTV59.4,None
+PTV59.4,PTV
+PTV5mm,PTV
+PTV60,None
+PTV60,PTV
+PTV60/30,None
+PTV64,PTV
+PTV64 orig,PTV
+PTV66,None
+PTV66,PTV
+PTV66/33,PTV
+PTV68,PTV
+PTV70,None
+PTV70,PTV
+PTV76,PTV
+PTVEVAL,PTV
+PTVINF,PTV
+PTVLLL+2,Control
+PTVN,None
+PTVN BOOS,None
+PTVSUP,PTV
+PTVScalp,PTV
+PTV_50.4,PTV
+PTV_High,PTV
+PTV_Lump_L,PTV
+PTV_Lump_R,PTV
+PTV_eval,None
+PTV_eval,PTV
+PTVall,PTV
+PTVeval,PTV
+PTVmod,PTV
+PTVmod-canal,PTV
+PTVn,None
+PTVn,PTV
+PTVn 46Gy,PTV
+PTVn 63,PTV
+PTVn 70,PTV
+PTVn all,PTV
+PTVn eval,PTV
+PTVn1,PTV
+PTVn1-55.8Gy,PTV
+PTVn2,PTV
+PTVn2-59.4Gy,PTV
+PTVn3,PTV
+PTVn56 L,PTV
+PTVn56 R,PTV
+PTVn66,CTV
+PTVn66,PTV
+PTVn70,PTV
+PTVn_IMN_R,PTV
+PTVn_SCL_R,PTV
+PTVoriginal,PTV
+PTVp,PTV
+PTVp 70,PTV
+PTVp56,PTV
+PTVp66,PTV
+PTVp70,PTV
+Pancreas,Organ
+Parotid B,Organ
+Parotid L,None
+Parotid L,Organ
+Parotid R,None
+Parotid R,Organ
+Pec major/minor,Organ
+Pectoralis minor,Organ
+Pelvic Bones,Organ
+Penile  bulb,Organ
+PeritonealCavity,Organ
+Pharynx,Organ
+PharynxConst,Organ
+PharynxConstrict,None
+Pituitary,None
+Pituitary,Organ
+Portal Vein,Organ
+Portal vein,Nodes
+Presacral space,None
+Presacral space,Organ
+Prostate,CTV
+Prostate,Nodes
+Prostate,None
+Prostate,Organ
+Prostate + Semin,CTV
+Prox Bronc  Zone,Organ
+Prox Bronch Tree,Avoidance
+Prox Bronch Zone,Avoidance
+Prox Bronch Zone,Organ
+Prox bronch tree,None
+Prox bronch zone,None
+ProxBronchZone,Avoidance
+Pubic Symphysis,Organ
+Pulmonary Artery,None
+PulmonaryA,Organ
+PulmonaryArtery,Organ
+Radius L,Organ
+Radius R,Organ
+Rectosigmoid,None
+Rectum,Avoidance
+Rectum,None
+Rectum,Organ
+Renal hilum,Organ
+Ribs,Organ
+SVC,None
+Sacral plexus,Organ
+SacralPlexus,Organ
+Sacrum,None
+Sacrum,Organ
+Scapula Lt,Organ
+Seminal Ves,Organ
+Seminal Ves L,Organ
+Seminal Ves R,Organ
+Sigmoid,Organ
+Skin,Avoidance
+Skin,None
+Skin,Organ
+Skull,Organ
+Small Bowel,Organ
+Spinal Canal,Avoidance
+Spinal Canal,None
+Spinal Canal,Organ
+Spinal Canal1,Organ
+Spinal Canal2,Organ
+Spinal Canal3,Organ
+Spinal Canal5,Organ
+Spinal Cord,None
+Spinal Cord,Organ
+Spinal Cord L1,Organ
+Spinal cord,None
+SpinalCanal,None
+SpinalCanal,Organ
+SpinalCanal1,Organ
+SpinalCord,Organ
+Spleen,None
+Splenic Hilum,Organ
+Stomach,None
+Stomach,Organ
+Submandibular B,Organ
+Submandibular L,None
+Submandibular L,Organ
+Submandibular R,None
+Submandibular R,Organ
+Sup Mesenteric A,Organ
+Sup Mesnt Artery,Organ
+Temporal Lobes,Organ
+ThecalSac,Organ
+Thymus,None
+Thyroid,None
+Thyroid1,None
+Tibia L,Organ
+Tibia R,Organ
+Tongue,Organ
+Trachea,Nodes
+Trachea,None
+Trachea,Organ
+Ulna  L,Organ
+Ulna R,Organ
+Ureter,Organ
+Urethra,Organ
+Uterus,GTV
+Uterus,None
+Uterus,Organ
+Uterus +1.7cm,Organ
+Vagina,Organ
+Vagina Empty,Organ
+Vagina Full,Organ
+Vessels,GTV
+Vessels,Nodes
+Vessels,None
+Vessels L,CTV
+Vessels L,Nodes
+Vessels R,CTV
+Vessels R,Nodes
+Vessels+1,None
+Vessels+2,None
+brachiocephalic,None
+edema,None
+eval CTV,CTV
+eval CTV 54,CTV
+eval CTV 54,Nodes
+eval CTV 60,CTV
+eval CTV 66,CTV
+eval CTV crop,CTV
+eval ITV 60,CTV
+eval PTV,PTV
+eval PTV 1,PTV
+eval PTV 10mm,PTV
+eval PTV 15mm,PTV
+eval PTV 2,PTV
+eval PTV 36,None
+eval PTV 36,PTV
+eval PTV 39/13,PTV
+eval PTV 45,PTV
+eval PTV 46,PTV
+eval PTV 46/23,PTV
+eval PTV 48,PTV
+eval PTV 50,PTV
+eval PTV 50 NEW,PTV
+eval PTV 50.4,None
+eval PTV 5250,PTV
+eval PTV 54,None
+eval PTV 54,PTV
+eval PTV 54 a,PTV
+eval PTV 55.8Gy,PTV
+eval PTV 56,PTV
+eval PTV 59.4,PTV
+eval PTV 60,PTV
+eval PTV 63,PTV
+eval PTV 66,None
+eval PTV 66,PTV
+eval PTV 68,PTV
+eval PTV 70,PTV
+eval PTV 76,PTV
+eval PTV ALL,PTV
+eval PTV B,PTV
+eval PTV nodes,PTV
+eval PTV photon,PTV
+eval PTV36,Avoidance
+eval PTV45,PTV
+eval PTV46,PTV
+eval PTV48,PTV
+eval PTV54,PTV
+eval PTV56,PTV
+eval PTV59.4,PTV
+eval PTV60,PTV
+eval PTV68,PTV
+eval PTV70,PTV
+heart,None
+iliac crest L,Organ
+iliac crest R,Organ
+iliac vessels,Nodes
+lens L,None
+lens R,None
+mod PTV,PTV
+mod PTV SPIC,PTV
+opt Bladder,Avoidance
+opt Bladder,None
+opt Bladder,PTV
+opt Bone Marrow,Avoidance
+opt Bowel,Organ
+opt Bowel Space,Avoidance
+opt BowelBag,None
+opt Brain,Avoidance
+opt BrainStem,Avoidance
+opt CTV,CTV
+opt CTV 60,CTV
+opt CTV48,CTV
+opt GTV,GTV
+opt ITV 50,CTV
+opt LargeBowel,Avoidance
+opt Larynx,Avoidance
+opt Lung L,Avoidance
+opt Lung R,Control
+opt Optic Chiasm,Avoidance
+opt PRV Cord,Avoidance
+opt PTV,CTV
+opt PTV,None
+opt PTV,PTV
+opt PTV 1mm,PTV
+opt PTV 2,PTV
+opt PTV 20,PTV
+opt PTV 20 L,GTV
+opt PTV 24,PTV
+opt PTV 25,PTV
+opt PTV 2mm,PTV
+opt PTV 30,PTV
+opt PTV 36,PTV
+opt PTV 36 a,PTV
+opt PTV 36 b,PTV
+opt PTV 39 -2,PTV
+opt PTV 4 18Gy,PTV
+opt PTV 40,PTV
+opt PTV 40 a,PTV
+opt PTV 40/55 a,PTV
+opt PTV 40b,PTV
+opt PTV 44 L a,PTV
+opt PTV 44 L b,PTV
+opt PTV 44 R a,PTV
+opt PTV 44 R b,PTV
+opt PTV 45,PTV
+opt PTV 45 L a,PTV
+opt PTV 45 L b,PTV
+opt PTV 45 R a,PTV
+opt PTV 45 R b,PTV
+opt PTV 46,PTV
+opt PTV 46 R a,PTV
+opt PTV 46 R b,PTV
+opt PTV 48,PTV
+opt PTV 48 L a,PTV
+opt PTV 48 L b,PTV
+opt PTV 48 L c,PTV
+opt PTV 48 R a,PTV
+opt PTV 48 R b,PTV
+opt PTV 48 R c,PTV
+opt PTV 48 b,PTV
+opt PTV 48 c,PTV
+opt PTV 48a,PTV
+opt PTV 48b,PTV
+opt PTV 5.4,PTV
+opt PTV 50,PTV
+opt PTV 50 R a,PTV
+opt PTV 50 R b,PTV
+opt PTV 50.4,PTV
+opt PTV 5250,PTV
+opt PTV 54,None
+opt PTV 54,PTV
+opt PTV 54 L,PTV
+opt PTV 54 L a,PTV
+opt PTV 54 L b,PTV
+opt PTV 54 L c,PTV
+opt PTV 54 R,PTV
+opt PTV 54 R a,PTV
+opt PTV 54 R b,PTV
+opt PTV 54 R c,PTV
+opt PTV 54 a,PTV
+opt PTV 54 b,PTV
+opt PTV 55,PTV
+opt PTV 55 R a,PTV
+opt PTV 55 R b,PTV
+opt PTV 55.8 L a,PTV
+opt PTV 55.8 L b,PTV
+opt PTV 5500,PTV
+opt PTV 56,PTV
+opt PTV 56 L,PTV
+opt PTV 56 L a,PTV
+opt PTV 56 L b,PTV
+opt PTV 56 L c,PTV
+opt PTV 56 R,PTV
+opt PTV 56 R a,PTV
+opt PTV 56 R b,PTV
+opt PTV 56 R c,PTV
+opt PTV 56 a,PTV
+opt PTV 59.4,PTV
+opt PTV 59.4 R a,PTV
+opt PTV 59.4 R b,PTV
+opt PTV 60,PTV
+opt PTV 60 2MM,PTV
+opt PTV 60 a,PTV
+opt PTV 60 b,None
+opt PTV 60 b,PTV
+opt PTV 60a,None
+opt PTV 60a,PTV
+opt PTV 63,PTV
+opt PTV 63 L a,PTV
+opt PTV 63 L b,PTV
+opt PTV 63 R a,PTV
+opt PTV 63 R b,PTV
+opt PTV 63 a,PTV
+opt PTV 63 b,PTV
+opt PTV 63 c,PTV
+opt PTV 63b,PTV
+opt PTV 64,PTV
+opt PTV 64 R,PTV
+opt PTV 66,GTV
+opt PTV 66,PTV
+opt PTV 66 L,PTV
+opt PTV 66 R,PTV
+opt PTV 66 a,PTV
+opt PTV 66 b,PTV
+opt PTV 66a,PTV
+opt PTV 66b,PTV
+opt PTV 70,PTV
+opt PTV 70 b,PTV
+opt PTV 71.1,PTV
+opt PTV 76,PTV
+opt PTV 76.2,PTV
+opt PTV A,PTV
+opt PTV B,PTV
+opt PTV BOOS,PTV
+opt PTV CHWL,PTV
+opt PTV Ear,PTV
+opt PTV L,PTV
+opt PTV LT,PTV
+opt PTV LUNL,PTV
+opt PTV NECL,PTV
+opt PTV PARR,PTV
+opt PTV R,PTV
+opt PTV RLL,PTV
+opt PTV RT,Control
+opt PTV RT,PTV
+opt PTV SPICa,PTV
+opt PTV SPICb,PTV
+opt PTV a,PTV
+opt PTV all,PTV
+opt PTV b,PTV
+opt PTV c,PTV
+opt PTV eval,PTV
+opt PTV low L a,PTV
+opt PTV low L b,PTV
+opt PTV low L c,PTV
+opt PTV low R a,PTV
+opt PTV low R b,PTV
+opt PTV low R c,PTV
+opt PTV+2mm,PTV
+opt PTV-ALL+.1,None
+opt PTV-EARL,PTV
+opt PTV-ITV,PTV
+opt PTV-NOSE,PTV
+opt PTV1,Control
+opt PTV1,None
+opt PTV1,PTV
+opt PTV2,PTV
+opt PTV21Gy,PTV
+opt PTV2mm,PTV
+opt PTV3,PTV
+opt PTV30,PTV
+opt PTV36,PTV
+opt PTV40,PTV
+opt PTV40 b,Avoidance
+opt PTV45,PTV
+opt PTV45a,PTV
+opt PTV45b,PTV
+opt PTV45pelvis,PTV
+opt PTV46,PTV
+opt PTV46.75,PTV
+opt PTV46a,PTV
+opt PTV46b,PTV
+opt PTV48,PTV
+opt PTV48a,PTV
+opt PTV48b,PTV
+opt PTV48c,PTV
+opt PTV5.4a,PTV
+opt PTV5.4b,PTV
+opt PTV50,PTV
+opt PTV50.4,PTV
+opt PTV54,GTV
+opt PTV54,PTV
+opt PTV54a,PTV
+opt PTV54b,PTV
+opt PTV55,PTV
+opt PTV55a,PTV
+opt PTV55b,PTV
+opt PTV56,PTV
+opt PTV59.4,PTV
+opt PTV60,PTV
+opt PTV60a,PTV
+opt PTV60b,PTV
+opt PTV66,PTV
+opt PTV66a,PTV
+opt PTV66b,PTV
+opt PTV68,PTV
+opt PTV70 crop,PTV
+opt PTVa,None
+opt PTVa,PTV
+opt PTVall,PTV
+opt PTVall +0.1,PTV
+opt PTVb,None
+opt PTVb,PTV
+opt PTVc,PTV
+opt PTVl,PTV
+opt PTVn66,PTV
+opt Parotid L,Avoidance
+opt Parotid R,Avoidance
+opt Rectum,Avoidance
+opt Small Bowel,Organ
+opt SmallBowel,Avoidance
+opt Spinal Canal,Organ
+optCTV,CTV
+optCTV46,CTV
+optLung L,Avoidance
+optPTV,None
+optPTV,PTV
+optPTV ring,None
+optPTV1,PTV
+optPTV2,PTV
+optPTVcanal,PTV
+presacral space,Nodes
+small bowel,Organ
+subclavian Vein,None
+thyroid,None
+vessels,None
+vessels+1,None
+vessels+1.5,None
+0.3 cm Bolus,
+0.5 cm Bolus,
+0.5 cm bolus,
+0.5 cmBol Lt Gr,
+0.5Bolus,
+0.5cm  Bolus,
+0.5cm Bol Rt Gr,
+0.5cm Bolus,
+0.5cm Bolus LT,
+0.5cm Bolus RT,
+0.5cm bolus,
+0.5cmBol LtGroin,
+0.5cmBol RtGroin,
+1 cm Bol LtGroin,
+1 cm Bolus,
+1 cm LtGroin Bol,
+1 cm RtGroin Bol,
+1.0 Bolus,
+1.0 cm Bolus,
+1.0Bolus,
+1.0CM Bolus,
+1.0CM bolus,
+1.0cm Bolus,
+1.0cm Bolus40x40,Treated Volume
+1.0cm BolusSCPR,
+1.0cm EARL Bolus,
+1.0cm SCPR Bolus,
+1.0cmBol L Groin,
+1.0cmBol R Groin,
+1.5cm Bolus,
+1cm Bolus,
+1cm Bolus LGroin,
+1cm Bolus RGroin,
+1cm LtGroinBolus,
+1cm RtGroinBolus,
+1cm bolus,
+2.0cm Bolus,
+5MM Bolus,
+5mm Bolus,
+AIR,None
+AIR/CONTRAST,None
+ANAL MARKER,None
+AP BB,None
+Air,None
+Air/Contrast,None
+Anastomosis,None
+Avoid INNER,Control
+Avoid INNER NEW,Control
+Avoid MID,Control
+Avoid MID NEW,Control
+Avoid Normal,Control
+Avoid OUTER,Control
+Avoid OUTER NEW,Control
+Avoid Post,Control
+Avoid Post1,Control
+Avoid RT,Control
+Avoid Shoulder,Control
+Avoid X,Control
+Avoid a,Control
+Avoid a Rectum,Control
+Avoid b Rectum,Control
+AvoidCord a 20Gy,Control
+AvoidCord b 12Gy,Control
+BARTS Bolus,
+BARTSBolus,
+BBs,None
+BOB 1,Control
+BOB 104[%],Control
+BOB 105[%],Control
+BOB 105[%],Dose Region
+BOB 105[%]2,Control
+BOB 106[%],Control
+BOB 107.5%,Control
+BOB 5400[cGy]2,Dose Region
+BOB 5778[cGy]2,Control
+BOB 6000 OUT,Control
+BOB 6000cGy,Dose Region
+BOB 6000cGy IN,Dose Region
+BOB 95%,Dose Region
+BOB 95[%]2,Dose Region
+BOLUS PINK STUFF,None
+BULK AIR,None
+Beam Edge Guide,None
+Beam Edge Guide,PTV
+Beam Guide-Lt CW,None
+Beam edge guide,PTV
+Beam-edge guide,PTV
+Block Bolus0.5,
+Bolus,None
+Bolus Block EARL,
+Bowel avoidance,None
+Breast expander2,None
+CIED,Control
+CIED,None
+CIED PRV,Avoidance
+Contrast,Contrast Agent
+Contrast,None
+Contrast/Air,None
+Contrast/air,Organ
+CouchInterior,Support
+CouchInterior1,Support
+CouchRailLeft,Support
+CouchRailLeft1,Support
+CouchRailRight,Support
+CouchRailRight1,Support
+CouchSurface,Support
+CouchSurface1,Support
+D 50% AXIL,Dose Region
+D100[%],Control
+D105,Control
+D105,Dose Region
+D105,None
+D105 BOB,Control
+D105.5[%]-bob,Control
+D105[%],Control
+D105[%]-BOB,Control
+D105[%]-bob,Control
+D106,Control
+D106.5[%]-bob,Control
+D106[%]-bob,Control
+D107,Control
+D107,None
+D107.5[%]-BOB,Control
+D107.5[%]-bob,Control
+D107[%]-BOB,Control
+D107[%]-bob,Control
+D108.2,Control
+D108.5[%]-bob,Control
+D108[%]-bob,Control
+D108[%]-bob cerv,Control
+D108[%]-bob pelb,Control
+D110[%]-BOB1,Control
+D112[%]-bob,Control
+D338[cGy]-bob,Control
+D4560,None
+D4560 BOB,Control
+D4590[cGy]-BOB,Control
+D4650[cGy]-B,Control
+D4650[cGy]-bob,Control
+D4670[cGy]-BOB-A,Control
+D4670[cGy]-BOB-B,Control
+D4675[cGy]-1 bob,Control
+D4675[cGy]-2 bob,Control
+D4675[cGy]-bob,Control
+D4675[cGy]-bob2,Control
+D4725 bob,Control
+D4760[cGy]-bob,Control
+D50,Control
+D50%-LUNL,None
+D5000[cGy]-bob,Control
+D5000[cGy]-bob2,Control
+D5040,Control
+D5040,None
+D5040 BOB,Control
+D5040.2,Control
+D5040.2,None
+D50[%],Control
+D50[%] BRAI2,Control
+D50[%]- prev. C1,Control
+D50[%]-1350-C1,Control
+D50[%]-AXIR prev,Control
+D50[%]-BOOS,Control
+D50[%]-BOOS prev,Control
+D50[%]-BRER,Control
+D50[%]-BRER prev,Control
+D50[%]-C1-ABDO,Control
+D50[%]-C1-INGR,Control
+D50[%]-C2-RIBL,Control
+D50[%]-C2-RIBR,Control
+D50[%]-LUNR,Control
+D50[%]-prev C1,Control
+D5320 BOB,Control
+D7140,Control
+D7140,None
+D80 BOB,Control
+D90%-LUNL,None
+D90[%]-AXIR prev,Control
+D95,Control
+D95[%] BRAI2,Control
+D95[%]-2565-C1,Control
+D95[%]-LUNR,Control
+D95[%]-prev C1,Control
+D95[%]-prev. C1,Control
+DOSE 108 2,Control
+Dose 100 [%],Dose Region
+Dose 100 [%]2,Control
+Dose 100%,Control
+Dose 100%,Dose Region
+Dose 100(%),Control
+Dose 100[%],Control
+Dose 100[%],Dose Region
+Dose 100[%] BREL,Dose Region
+Dose 100[%] INF,Control
+Dose 100[%] L,Control
+Dose 100[%] LT,Control
+Dose 100[%] LUNR,Control
+Dose 100[%] RT,Control
+Dose 100[%] SUP,Dose Region
+Dose 100[%] T,Control
+Dose 100[%].,Dose Region
+Dose 100[%]0,Dose Region
+Dose 100[%]1,Control
+Dose 100[%]1 up,Control
+Dose 100[%]2 low,Dose Region
+Dose 100[%]60,Dose Region
+Dose 100[%]LUNL,Dose Region
+Dose 100[%]LUNR,Dose Region
+Dose 100[%]LUNR1,Dose Region
+Dose 100[%]LUNR2,Dose Region
+Dose 100[%]UTER,Control
+Dose 102[%],Control
+Dose 102[%],Dose Region
+Dose 102[%]2,Dose Region
+Dose 102[%]OUT,Dose Region
+Dose 103.5[%],Control
+Dose 103[%],Control
+Dose 103[%]2,Control
+Dose 104.5[%],Control
+Dose 104.5[%],Dose Region
+Dose 104.5[%]2,Control
+Dose 104.5[%]3,Control
+Dose 104[%],Control
+Dose 104[%],Dose Region
+Dose 104[%]-bob,Control
+Dose 104[%].,Dose Region
+Dose 104[%]2,Control
+Dose 104[%]2,Dose Region
+Dose 104[%]3,Control
+Dose 105 OUT,Dose Region
+Dose 105 [%],Dose Region
+Dose 105 [%]2,Control
+Dose 105%,Control
+Dose 105%,Dose Region
+Dose 105% BOB,Dose Region
+Dose 105% bob,Dose Region
+Dose 105% out,Dose Region
+Dose 105(%),Control
+Dose 105.5[%],Control
+Dose 105.5[%],Dose Region
+Dose 105[%],Control
+Dose 105[%],Dose Region
+Dose 105[%] BOB,Dose Region
+Dose 105[%] INF,Control
+Dose 105[%] LT,Control
+Dose 105[%] LUNR,Control
+Dose 105[%] RT,Control
+Dose 105[%] SUP,Dose Region
+Dose 105[%] bob,Dose Region
+Dose 105[%]-PTV,Dose Region
+Dose 105[%].,Dose Region
+Dose 105[%]0,Dose Region
+Dose 105[%]1,Control
+Dose 105[%]1,Dose Region
+Dose 105[%]1 up,Control
+Dose 105[%]2,Control
+Dose 105[%]2,Dose Region
+Dose 105[%]2 low,Control
+Dose 105[%]3,Control
+Dose 105[%]4,Control
+Dose 105[%]60,Dose Region
+Dose 105[%]BOB,Control
+Dose 105[%]BOB,Dose Region
+Dose 105[%]IM,Dose Region
+Dose 105[%]IN,Control
+Dose 105[%]LUNR,Dose Region
+Dose 105[%]LUNR1,Dose Region
+Dose 105[%]LUNR2,Dose Region
+Dose 105[%]OUT,Dose Region
+Dose 105[%]out,Dose Region
+Dose 106% BOB,Dose Region
+Dose 106% bob,Dose Region
+Dose 106.5[%],Control
+Dose 106.5[%],Dose Region
+Dose 106.5[%]1,Dose Region
+Dose 106.5[%]2,Control
+Dose 106.5[%]3,Control
+Dose 106[%],Control
+Dose 106[%],Dose Region
+Dose 106[%].,Dose Region
+Dose 106[%]2,Control
+Dose 106[%]2,Dose Region
+Dose 106[%]3,Control
+Dose 106[%]BOB,Control
+Dose 107% BOB,Dose Region
+Dose 107% bob,Dose Region
+Dose 107[%],Control
+Dose 107[%],Dose Region
+Dose 107[%] bob,Dose Region
+Dose 107[%]-BOB,Control
+Dose 107[%]-bob,Control
+Dose 107[%]2,Control
+Dose 107[%]3,Control
+Dose 107[%]4,Control
+Dose 107[%]BOB,Dose Region
+Dose 107[%]OUT,Control
+Dose 107[%]bob,Dose Region
+Dose 108.5[%],Control
+Dose 108[%],Control
+Dose 108[%],Dose Region
+Dose 108[%]-bob,Control
+Dose 108[%]2,Control
+Dose 108[%]3,Control
+Dose 109[%],Control
+Dose 109[%],Dose Region
+Dose 109[%]-bob,Control
+Dose 109[%]1,Control
+Dose 109[%]2,Control
+Dose 109[%]5,Control
+Dose 109[%]6,Control
+Dose 110[%],Control
+Dose 110[%],Dose Region
+Dose 110[%]2,Control
+Dose 112[%],Control
+Dose 112[%]2,Control
+Dose 113[%]-bob,Control
+Dose 115[%],Control
+Dose 115[%]2,Control
+Dose 115[%]4,Control
+Dose 120[%],Dose Region
+Dose 12Gy bob,Dose Region
+Dose 12GyBRAI,Dose Region
+Dose 13.5GyBRAI,Control
+Dose 13.5GyBRAI,Dose Region
+Dose 13.75GyBRAI,Dose Region
+Dose 1400[cGy],Control
+Dose 15Gy SUM,Dose Region
+Dose 18GyBRAI,Control
+Dose 2000[cGy],Control
+Dose 20Gy SUM,Dose Region
+Dose 20[Gy]C1+C2,Control
+Dose 2125cGyPREV,Control
+Dose 2150[cGy],Control
+Dose 24GyBRAI,Control
+Dose 25.65GyBRAI,Control
+Dose 25Gy SUM,Dose Region
+Dose 27.5Gy BRAI,Dose Region
+Dose 27GyBRAI,Control
+Dose 2800[cGy],Control
+Dose 28[Gy]C1+C2,Control
+Dose 30Gy SUM,Dose Region
+Dose 30GyLUNR2,Dose Region
+Dose 30[Gy]BRAI2,Control
+Dose 30[Gy]PREV,Dose Region
+Dose 35GyTONS,Dose Region
+Dose 4000cGy bob,Dose Region
+Dose 40Gy bob,Dose Region
+Dose 40[%],Control
+Dose 4500[cGy],Control
+Dose 4500[cGy],Dose Region
+Dose 4500[cGy]2,Dose Region
+Dose 4560[cGy],Dose Region
+Dose 4560[cGy]2,Dose Region
+Dose 4700[cGy],Control
+Dose 4760[cGy],Dose Region
+Dose 4800[cGy],Control
+Dose 4800[cGy],Dose Region
+Dose 4896[cGy],Control
+Dose 4900[cGy],Dose Region
+Dose 50 [%],Dose Region
+Dose 50 [%]2,Control
+Dose 50%,Control
+Dose 50%,Dose Region
+Dose 50% BREL,Control
+Dose 50% bob,Dose Region
+Dose 50(%),Control
+Dose 5000[cGy],Control
+Dose 5040 AL,Control
+Dose 5040[cGy],Control
+Dose 5040[cGy],Dose Region
+Dose 5040[cGy]1,Control
+Dose 5080[cGy],Dose Region
+Dose 50[%],Control
+Dose 50[%],Dose Region
+Dose 50[%] BRAI,Control
+Dose 50[%] BREL,Control
+Dose 50[%] INF,Control
+Dose 50[%] LT,Control
+Dose 50[%] LUNL,Control
+Dose 50[%] LUNR,Control
+Dose 50[%] LUNR,Dose Region
+Dose 50[%] RT,Control
+Dose 50[%] SPIT,Dose Region
+Dose 50[%] SUP,Dose Region
+Dose 50[%] bob,Dose Region
+Dose 50[%].,Control
+Dose 50[%]0,Dose Region
+Dose 50[%]1,Control
+Dose 50[%]1 up,Control
+Dose 50[%]2 low,Dose Region
+Dose 50[%]60,Dose Region
+Dose 50[%]BOB,Control
+Dose 50[%]BOB,Dose Region
+Dose 50[%]BRAI,Control
+Dose 50[%]BRAI2,Control
+Dose 50[%]BRAI3,Control
+Dose 50[%]BRER,Control
+Dose 50[%]CHKL,Control
+Dose 50[%]CHKR,Control
+Dose 50[%]HIPL,Dose Region
+Dose 50[%]LARY,Control
+Dose 50[%]LUNL,Control
+Dose 50[%]LUNL,Dose Region
+Dose 50[%]LUNR,Control
+Dose 50[%]LUNR1,Dose Region
+Dose 50[%]LUNR2,Dose Region
+Dose 50[%]ORAL,Control
+Dose 50[%]PARA,Control
+Dose 50[%]PELL,Control
+Dose 50[%]PROS,Dose Region
+Dose 50[%]RIBL,Control
+Dose 50[%]SCNB,Control
+Dose 50[%]SCPB,Control
+Dose 50[%]SPIT,Control
+Dose 50[%]SPIT2,Control
+Dose 50[%]SPTL,Control
+Dose 50[%]UTER,Control
+Dose 50[%]VAGI,Control
+Dose 50[%]vmat,Control
+Dose 5100[cGy],Dose Region
+Dose 5130[cGy],Dose Region
+Dose 5136[cGy],Dose Region
+Dose 5150[cGy],Control
+Dose 5225[cGy],Dose Region
+Dose 53.2GyTONS,Control
+Dose 5320[cGy],Dose Region
+Dose 5320cGy bob,Dose Region
+Dose 5400[cGy],Dose Region
+Dose 54Gy bob,Dose Region
+Dose 5525[cGy],Control
+Dose 5600[cGy],Control
+Dose 5670[cGy],Dose Region
+Dose 56Gy,None
+Dose 5700[cGy],Control
+Dose 5700[cGy],Dose Region
+Dose 5770[cGy],Dose Region
+Dose 5778[cGy],Dose Region
+Dose 5780[cGy],Dose Region
+Dose 5800[cGy],Control
+Dose 5850[cGy],Dose Region
+Dose 5900[cGy],Control
+Dose 5985[cGy],Dose Region
+Dose 5985cGy BOB,Dose Region
+Dose 5985cGy bob,Dose Region
+Dose 5992cGy,Dose Region
+Dose 5992cGy bob,Dose Region
+Dose 60 OUT,Dose Region
+Dose 6000[cGy],Control
+Dose 6000[cGy],Dose Region
+Dose 6000[cGy] 2,Dose Region
+Dose 6000[cGy]1,Control
+Dose 6000[cGy]2,Control
+Dose 6000[cGy]2,Dose Region
+Dose 6000[cGy]3,Control
+Dose 6000[cGy]3,Dose Region
+Dose 6000cGy out,Dose Region
+Dose 60Gy bob,Dose Region
+Dose 60GyLUNR2,Dose Region
+Dose 60[Gy]PREV,Dose Region
+Dose 6200[cGy],Dose Region
+Dose 6250[cGy],Dose Region
+Dose 6270[cGy],Dose Region
+Dose 6300[cGy],Dose Region
+Dose 6300[cGy].,Dose Region
+Dose 6400[cGy],Dose Region
+Dose 6420[cGy],Dose Region
+Dose 65Gy SUM,Control
+Dose 6650[cGy],Control
+Dose 70% bridge,Dose Region
+Dose 70Gy bob,Dose Region
+Dose 70[%],Control
+Dose 70[%],Dose Region
+Dose 70[%]-bob,Control
+Dose 7140 AL,Control
+Dose 7455[cGy],Control
+Dose 75[%],Dose Region
+Dose 80%,Dose Region
+Dose 80% bob,Dose Region
+Dose 8000[cGy]ps,Control
+Dose 80[%],Dose Region
+Dose 90[%],Control
+Dose 90[%],Dose Region
+Dose 90[%] BRAI,Control
+Dose 90[%] BRAI2,Dose Region
+Dose 90[%]BRAI,Control
+Dose 90[%]BRAI2,Control
+Dose 90[%]BRAI3,Control
+Dose 90[%]BRER,Control
+Dose 90[%]CHKL,Control
+Dose 90[%]CHKR,Control
+Dose 90[%]HIP,Dose Region
+Dose 90[%]LARY,Control
+Dose 90[%]LUNL,Control
+Dose 90[%]LUNR,Control
+Dose 90[%]ORAL,Control
+Dose 90[%]PARA,Control
+Dose 90[%]PELL,Control
+Dose 90[%]RIBL,Control
+Dose 90[%]SPTL,Control
+Dose 90[%]UTER,Control
+Dose 90[%]VAGI,Control
+Dose 95[%],Control
+Dose 95[%],Dose Region
+Dose 95[%] BOB,Dose Region
+Dose 95[%] LUNR,Dose Region
+Dose 95[%] bob,Dose Region
+Dose 95[%]-bob,Control
+Dose 95[%]2,Control
+Dose 95[%]2,Dose Region
+Dose 95[%]4,Control
+Dose 95[%]PROS,Control
+Dose 95[%]SCNB,Control
+Dose 98[%],Control
+Dose100%,Control
+Dose100[%],Control
+Dose105%,Control
+Dose105%-PTV,Dose Region
+Dose105%-PTV INF,Dose Region
+Dose105%-PTV RT,None
+Dose105%-PTV SUP,Dose Region
+Dose105%-PTV1upp,Dose Region
+Dose105%-PTV2low,Dose Region
+Dose105-PTV RT,Dose Region
+Dose105[%],Control
+Dose105[%]-PTV,Dose Region
+Dose105[%]-PTV L,Dose Region
+Dose105[%]-PTV1,Dose Region
+Dose105[%]-PTV2,Dose Region
+Dose105[%]-PTVLT,Dose Region
+Dose105[%]-PTVRT,Dose Region
+Dose105[%]2-PTV,Dose Region
+Dose1350[cGyBRAI,Control
+Dose2700[cGyBRAI,Control
+Dose50%,Control
+Dose50[%],Control
+Dose800[cGy]C1+2,Control
+Ear Avoid,None
+Edge Guide 1,PTV
+Edge Guide 2,PTV
+Esoph-Stomach,Organ
+Field,Treated Volume
+Field Edge Guide,PTV
+Field Guidance,None
+Field Guide All,None
+Field Guide Lung,PTV
+Field Guide Spne,PTV
+Field Margin,None
+FieldGuide,None
+Groin Bolus,None
+Hip prosthesis L,None
+Hip prosthesis R,None
+INF BB,None
+Implant,None
+Implant L 2,Organ
+LT 0.5cm Bolus,
+LT Prosthesis,Organ
+LT prosthesis,Organ
+Large Bowel Air,Organ
+Metal Rods,None
+MucosaAvoid,None
+Mucosaavoid,None
+MucosalAvoidance,None
+Nipple ring,None
+OVOID,None
+Oral Avoidance,Organ
+PREV 20Gy esoph,Dose Region
+PREV 23Gy,None
+PREV 25.8Gy,None
+PREV 35GY TONG,Dose Region
+PREV 35Gy NASO,Dose Region
+PREV 50 BRAI2,None
+PREV 50 BRAI3,None
+PREV 50 BRAI4,None
+PREV 50 BRAI5,None
+PREV 50% 27/3,Dose Region
+PREV 50% BRAI,Dose Region
+PREV 50% BREL,Dose Region
+PREV 50% BREL,None
+PREV 50% BRER BH,None
+PREV 50% FACR,Dose Region
+PREV 50% PARL,None
+PREV 50% SPIT,Dose Region
+PREV 50% TEML,Dose Region
+PREV 50IDL BRAI,None
+PREV 50IDL BRAI2,None
+PREV 66.5Gy NASO,Dose Region
+PREV 90 BRAI2,None
+PREV 90 BRAI3,None
+PREV 90 BRAI4,None
+PREV 90 BRAI5,None
+PREV 90% 27/3,Dose Region
+PREV 90% BRAI,Dose Region
+PREV 90% IDL,Dose Region
+PREV 90% SPIT,Dose Region
+PREV 90IDL BRAI,None
+PREV 90IDL BRAI2,None
+PREV50% SPIT,Dose Region
+PRV CIED,Avoidance
+Prosthesis,None
+Prosthesis L,None
+Prosthesis R,None
+R Prosthesis,Organ
+RT 0.5cm Bolus,
+RT Prosthesis,Organ
+RT prosthesis,Organ
+Rectal Air,None
+Ring 5,Avoidance
+Screws,None
+Staples,None
+Staples/bed,None
+Stoma,None
+Surgical Staples,None
+Wet Gauze,Avoidance
+Wet Gauze Bolus,None
+Wire,Control
+Wire,None
+Wire - Bottom,None
+Wire - Mid,None
+Wire - Top,None
+Wires,Avoidance
+Wires -EARL,Avoidance
+Wires -SCPR,None
+bob 105[%]2,Control
+d4675[cGy]-BOB,Control
+ovoid,None
+1 cm bolus,
+1.0cm Bolus post,
+3mm Bolus,
+Adjusted Bolus,None
+BB/TATTOO,Control
+BOB 104[%]3,Control
+BOB 105.5[%],Control
+BOB 105[%],PTV
+BOB 107[%],Control
+BOB 107[%],Dose Region
+BOB 109[%],Control
+BOB 109[%]2,Control
+BOB 109[%]NEW2,Control
+BOB 110[%],Control
+BOB 4500[cGy],Dose Region
+BOB 4536[cGy],Control
+BOB 4876[cGy],Dose Region
+BOB 50[%],Control
+BOB 95 OUT,Dose Region
+BOB 95[%],Control
+BOB 95[%]3,Control
+Bolus,PTV
+0.5CM Bolus,
+0.8cm Bolus,
+1.0cmBolus Lt Gr,
+1.0cmBolus Rt Gr,
+3D BolusfromCBCT,Treated Volume
+Airway,None
+BOB 104.5[%],Control
+BOB 104[%]2,Control
+BOB 105[%]3,Dose Region
+BOB 106.5[%],Control
+BOB 106[%],Dose Region
+BOB 106[%]2,Control
+BOB 107[%]2,Control
+BOB 108[%],Control
+BOB 111[%],Control
+BOB 112[%],Control
+BOB 4560[cGy],Dose Region
+BOB 4896[cGy]2,Dose Region
+BOB 5000[cGy],Dose Region
+BOB 5500[cGy],Dose Region
+BOB 57 OUT,Dose Region
+BOB 5700[cGy],Control
+BOB 5700[cGy],Dose Region
+BOB 60 OUT,Dose Region
+BOB 6000[cGy],Dose Region
+BOB 6000[cGy] 2,Dose Region
+BOB 6420[cGy],Dose Region
+BOB 6996[cGy]8,Control
+BOB 95[%],Dose Region
+BOB 95[%]2,Control
+Bolus,
+CiED-Pacemaker,None
+Contrast/Gas,None
+D104,Control
+D104.5[%]-BOB,Control
+D104.5[%]-bob,Control
+D105 RT,Control
+D1050[cGy]-bob,Control
+D105[%] BOB,Dose Region
+D105[%]B,Dose Region
+D106.5[%]-BOB,Control
+D1300[cGy]-bob,Control
+D25 Gy - C1 prev,Control
+D3150[cGy]-bob,Control
+D3210[cGy]-BOB,Control
+D4275,Control
+D4560,Control
+D4670[cGy]-bob,Control
+D4675[cGy]-BOB-A,Control
+D4675[cGy]-BOB-B,Control
+D4725,Control
+D50.5(Gy)-bob,Control
+D5060[cGy]-bob,Control
+D5225,Control
+D80,Control
+D80,None
+D80% LUNL,Control
+D80b,Control
+D95 PELB,Control
+Dose 1000[cGy],Control
+Dose 100[%] SPIL,Control
+Dose 100[%] SPIT,Dose Region
+Dose 100[%] TONS,Control
+Dose 100[%]2,Control
+Dose 104% bob,Dose Region
+Dose 105[%]3,Dose Region
+Dose 105[%]6,Control
+Dose 106[%] bob,Dose Region
+Dose 107%,Dose Region
+Dose 107.5[%],Dose Region
+Dose 107[%]2,Dose Region
+Dose 107[%]4 2,Control
+Dose 108[%] bob,Dose Region
+Dose 110[%]-BOB,Control
+Dose 112[%],Dose Region
+Dose 115[%],Dose Region
+Dose 12.5GyANUS,Dose Region
+Dose 1908[cGy],Control
+Dose 25GyANUS,Dose Region
+Dose 45Gy IDL,Control
+Dose 50% BOB,Dose Region
+Dose 5040[cGy]2,Dose Region
+Dose 50[%] 1,Control
+Dose 50[%] SPIL,Control
+Dose 50[%] TONS,Control
+Dose 50[%].,Dose Region
+Dose 50[%]2,Control
+Dose 50[%]MEDI,Control
+Dose 50[%]OROP,Control
+Dose 5320 bob,Dose Region
+Dose 55Gy sum,Control
+Dose 60 OUT IMRT,Dose Region
+Dose 60 OUT2,Dose Region
+Dose 60 OUT4,Dose Region
+Dose 60 out3,Dose Region
+Dose 6000[cGy]4,Dose Region
+Dose 75[%],Control
+Dose 80[%]2,Dose Region
+Dose 90[%] MEDI,Control
+Dose 95[%]3,Control
+Dose 95[%]5,Control
+Dose100%,Dose Region
+Dose100(%),Control
+Dose105(%),Control
+Dose60Gy,Avoidance
+Dose95[%]OROP,Control
+Fiducial Marker,None
+Fiducial Markers,None
+Field Guide,None
+FieldGuide_CLAL,None
+Hardware LT,None
+INF 1.0cm Bolus,
+LT 0.5cm bolus,
+LT PROSTHESIS,Organ
+LT Scar Wire,None
+LT-Scar Wire,None
+Lt Prosthesis,Organ
+Match points,
+Med BB,Treated Volume
+MetallicLock Bar,None
+MissingTissueBol,None
+Moustache avoid,None
+OralAvoidance,None
+RT PROSTHESIS,Organ
+RT Scar Wire,None
+RT-Scar Wire,None
+SUP 1.0cm Bolus,
+WET GAUZE,Bolus
+WIRE,None
+Wire / bb,None
+Wires,None
+bb,None
+bob 30[%],Control
+fiducial,None
+PREV 48Gy,None
+PREV 24Gy,None
+PREV 45.6Gy,None
+PREV 4.8Gy,None
+PREV 2.4Gy,None
+D4505[cGy]-bobnb,Control
+D4500[cGy]-bob3,Control
+Dose 105.5% BOB,Dose Region
+BOB 6000 IN,Dose Region
+Dose 106[%]1,Control

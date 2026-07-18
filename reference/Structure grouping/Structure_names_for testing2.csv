@@ -1,0 +1,2883 @@
+﻿StructureId,VolumeType
+GTV 4D0,GTV
+GTV 4D10,GTV
+GTV 4D20,GTV
+GTV 4D30,GTV
+GTV 4D40,GTV
+GTV 4D50,GTV
+GTV 4D60,GTV
+GTV 4D70,GTV
+GTV 4D80,GTV
+GTV 4D90,GTV
+GTV AVE,GTV
+GTV MIP,GTV
+IGTV,GTV
+ITV,CTV
+Node Subpyloric,Nodes
+Node Hepatoduod,Nodes
+Node Hepatogastr,Nodes
+Node Para-Aortic,Nodes
+Node Pancreatic,Nodes
+Node Celiac,Nodes
+Node Hepatic,Nodes
+Node Gastric,Nodes
+Node Pyloric,Nodes
+Node Splenic,Nodes
+Humorous R,Organ
+Humorous L,Organ
+Radius R,Organ
+Radius L,Organ
+Ulna R,Organ
+Ulna  L,Organ
+Body,BODY
+GTV,GTV
+CTV,CTV
+PTV,PTV
+GTVn,Nodes
+CTV 5250,CTV
+PTV 5250,PTV
+eval PTV 5250,PTV
+opt PTV 5250,PTV
+Avoid a Rectum,Control
+Avoid b Rectum,Control
+Bladder,Organ
+BowelBag,Organ
+Small Bowel,Organ
+Large Bowel,Organ
+Rectum,Organ
+opt Rectum,Avoidance
+Femoral Head R,Organ
+Femoral Head L,Organ
+Bladder wall,Organ
+Urethra,Organ
+CTV 66,CTV
+PTV 66,PTV
+eval PTV,PTV
+opt PTV 66,PTV
+Node Int iliac L,Nodes
+Node Int iliac R,Nodes
+Node ext iliac L,Nodes
+Node ext iliac R,Nodes
+Presacral space,Organ
+Bowel,Organ
+Duodenum,Organ
+Jejunum,Organ
+Colon,Organ
+MesentericA S,Organ
+BrainStem,Organ
+Brain,Organ
+Pituitary,Organ
+Temporal Lobes,Organ
+Hippocampi,Organ
+Hippo_R,Organ
+Hippo_L,Organ
+Breast L,Organ
+Breast R,Organ
+Nodes Axilla 1,Nodes
+Nodes Axilla 2,Nodes
+Nodes Axilla 3,Nodes
+Nodes IMC,Nodes
+Nodes SC,Nodes
+Cavity,GTV
+CTV Cavity,CTV
+CTVn,Nodes
+PTV Cavity,PTV
+PTVn,PTV
+Lung L,Organ
+Lung R,Organ
+Lung B,Organ
+SpinalCanal,Organ
+Heart,Organ
+Chest Wall,Organ
+Pectoralis minor,Organ
+Axillary vessels,Organ
+Nodes Axilla I,Nodes
+Nodes Axilla II,Nodes
+Nodes Axilla III,Nodes
+Liver,Organ
+Stomach,Organ
+Pancreas,Organ
+Celiac Artery,Organ
+Portal Vein,Organ
+Splenic Hilum,Organ
+PeritonealCavity,Organ
+BrachialPlex L,Organ
+BrachialPlex R,Organ
+Esophagus,Organ
+Ribs,Organ
+Brain-CTV,Control
+opt Brain,Avoidance
+PRV5 BrainStem,Avoidance
+Cochlea L,Organ
+Cochlea R,Organ
+Edema,None
+GTV T1,GTV
+Lens L,Organ
+Lens R,Organ
+OpticChiasm,Organ
+OpticNerve L,Organ
+OpticNerve R,Organ
+PRV5 OpticNerve,Avoidance
+Globe L,Organ
+Globe R,Organ
+opt PTV,PTV
+PRV5 SpinalCanal,Avoidance
+CTV int L,CTV
+CTV int R,CTV
+CTV low L,CTV
+CTV low R,CTV
+Operative Bed,CTV
+Ear L,Organ
+Ear R,Organ
+Ear Middle L,Organ
+Ear Middle R,Organ
+Ear Inner L,Organ
+Ear Inner R,Organ
+Celiac trunk,Organ
+Kidney L,Organ
+Kidney R,Organ
+Kidney B,Organ
+GTV PET,GTV
+Contrast,Contrast Agent
+Lacrimal B,Organ
+Lacrimal L,Organ
+Lacrimal R,Organ
+GTV Total,GTV
+PTV Total,PTV
+PTV+15,Treated Volume
+Skin,Organ
+PRV5 Optics,Avoidance
+Avoid INNER,Control
+Avoid MID,Control
+Avoid OUTER,Control
+GTV 1,GTV
+GTV 2,GTV
+GTV 3,GTV
+GTV 4,GTV
+GTV 5,GTV
+HTV,GTV
+GTV PREOP,GTV
+GTV MRI,GTV
+Bone Marrow,Organ
+Bowel Space,Organ
+CTV 45,CTV
+CTVp,CTV
+FemoralHead L,Organ
+FemoralHead R,Organ
+ITV Vagina,CTV
+opt Bladder,Avoidance
+opt Bone Marrow,Avoidance
+opt Bowel Space,Avoidance
+PTV 45,PTV
+PTVp,PTV
+Vagina Empty,Organ
+Vagina Full,Organ
+opt PTV 45,PTV
+Vagina,Organ
+BODY,BODY
+Cavity,CTV
+PTV 10mm,PTV
+eval PTV 10mm,PTV
+PTV 15mm,PTV
+eval PTV 15mm,PTV
+HRV_CT,CTV
+Sigmoid,Organ
+Lips,Organ
+GTV_RES,GTV
+CTV_HR,CTV
+CTV_IR,CTV
+Mandible,Organ
+Parotid L,Organ
+Parotid R,Organ
+Parotid B,Organ
+Submandibular B,Organ
+Submandibular L,Organ
+Submandibular R,Organ
+OAR1,None
+OAR2,None
+OAR3,None
+OAR4,None
+Avoid Post,Control
+Avoid Shoulder,Control
+PRV BR + op,Avoidance
+CTV 54 L,CTV
+CTV 54 R,CTV
+CTV 60 L,CTV
+CTV 60 R,CTV
+Larynx,Organ
+opt Larynx,Avoidance
+opt Parotid L,Avoidance
+opt Parotid R,Avoidance
+PTV 54,PTV
+eval PTV 54,PTV
+PTV 54 L,PTV
+opt PTV 54 L a,PTV
+opt PTV 54 L b,PTV
+opt PTV 54 L c,PTV
+PTV 54 R,PTV
+opt PTV 54 R a,PTV
+opt PTV 54 R b,PTV
+opt PTV 54 R c,PTV
+PTV 60,PTV
+opt PTV 60 a,PTV
+opt PTV 60 b,PTV
+eval PTV 60,PTV
+eval PTV 66,PTV
+PRV8 SpinalCanal,Avoidance
+CTV 56 L,CTV
+CTV 56 R,CTV
+CTV 63 L,CTV
+CTV 63 R,CTV
+CTV 70,CTV
+PTV 56,PTV
+eval PTV 56,PTV
+PTV 56 L,PTV
+opt PTV 56 L a,PTV
+opt PTV 56 L b,PTV
+opt PTV 56 L c,PTV
+PTV 56 R,PTV
+opt PTV 56 R a,PTV
+opt PTV 56 R b,PTV
+opt PTV 56 R c,PTV
+PTV 63,PTV
+opt PTV 63 a,PTV
+opt PTV 63 b,PTV
+eval PTV 63,PTV
+PTV 70,PTV
+eval PTV 70,PTV
+opt PTV 70,PTV
+Femur R,Organ
+Femur L,Organ
+Tibia R,Organ
+Tibia L,Organ
+Fibula R,Organ
+Fibula L,Organ
+Trachea,Organ
+BronchialTree,Organ
+Aorta,Organ
+PulmonaryA,Organ
+Prox Bronch Zone,Avoidance
+PTV+20,Control
+Body-PTV+20,Avoidance
+Dose105[%]-PTV,Dose Region
+Oral Cavity,Organ
+Tongue,Organ
+Pharynx,Organ
+CTV Brain,CTV
+PTV 1,PTV
+PTV 2,PTV
+PTV 3,PTV
+PTV All,PTV
+Cervix,Organ
+Uterus,Organ
+Ovary L,Organ
+Ovary R,Organ
+iliac crest L,Organ
+iliac crest R,Organ
+Hip L,Organ
+Hip R,Organ
+Pubic Symphysis,Organ
+Sacrum,Organ
+Genitalia,Organ
+Seminal Ves L,Organ
+Seminal Ves R,Organ
+Prostate,Organ
+Penile  bulb,Organ
+Node Sacral,Nodes
+Node Obturator,Nodes
+Node Int iliac,Nodes
+Node com iliac,Nodes
+Node com iliac L,Nodes
+Node com iliac R,Nodes
+Node ext iliac,Nodes
+Iliac Vessels L,CTV
+Iliac Vessels R,CTV
+CTV 76,CTV
+CTV 46,CTV
+PTV 76,PTV
+PTV 46,PTV
+opt PTV 76,PTV
+opt PTV 46,PTV
+eval PTV 76,PTV
+eval PTV 46,PTV
+CTV 68,CTV
+CTV 56,CTV
+CTV 48,CTV
+PTV 68,PTV
+PTV 48,PTV
+opt PTV 56,PTV
+opt PTV 48,PTV
+opt PTV 48a,PTV
+opt PTV 48b,PTV
+Normal Tissue,Avoidance
+eval PTV 68,PTV
+eval PTV 48,PTV
+PTV70,PTV
+PTV48,PTV
+PRV4 Rectum,Avoidance
+PTV+4,Control
+PTV 4,PTV
+PTV 5,PTV
+PTV int,PTV
+PTV int L,PTV
+PTV int R,PTV
+PTV low,PTV
+PTV low L,PTV
+opt PTV low L a,PTV
+opt PTV low L b,PTV
+opt PTV low L c,PTV
+PTV low R,PTV
+opt PTV low R a,PTV
+opt PTV low R b,PTV
+opt PTV low R c,PTV
+MesoRectum,Organ
+Renal hilum,Organ
+CTV 55,CTV
+CTV 60,CTV
+CTV 64,CTV
+PTV 55,PTV
+PTV 64,PTV
+Cauda Equina,Organ
+Sacral plexus,Organ
+SpinalCord,Organ
+PRV2 SpinalCord,Avoidance
+Liver-GTV,Avoidance
+PharynxConst,Organ
+ThecalSac,Organ
+PRV2 BrainStem,Avoidance
+Ureter,Organ
+CTV 36,CTV
+CTV 54,CTV
+PTV 36,PTV
+opt PTV 36,PTV
+opt PTV 54,PTV
+Body-PTV 36,Avoidance
+Body-Board,Avoidance
+PTV-Bladder,PTV
+opt PTV 59.4,PTV
+CTV 59.4,CTV
+PTV 59.4,PTV
+Anorectosigmoid,Organ
+Spinal Canal,Organ
+FieldGuide,None
+GTV 1  27Gy,GTV
+EVAL50,Treated Volume
+PTV 1  27Gy,PTV
+PREV 50% BRAI,Dose Region
+PREV 90% BRAI,Dose Region
+SpinalCanal,None
+Skin,None
+Optic Nerve R,None
+Optic Nerve L,None
+Optic Chiasm,None
+Lens R,None
+Lens L,None
+Globe R,None
+Globe L,None
+Cochlea R,None
+Cochlea L,None
+Brain,None
+GTV 1 32.5Gy,GTV
+PTV 1 32.5Gy,PTV
+BrachialPlexus R,Organ
+BrachialPlexus L,Organ
+PTV 48 Gy,PTV
+PulmonaryArtery,Organ
+Dose 50[%] LUNR,Dose Region
+Dose 50[%] LUNL,Control
+CouchSurface,Support
+CouchInterior,Support
+Dose 50[%],Dose Region
+Dose 100[%],Dose Region
+Dose 105[%],Dose Region
+D50[%]-1350-C1,Control
+D95[%]-2565-C1,Control
+D95[%] BRAI2,Control
+D50[%] BRAI2,Control
+GTV1 27Gy,GTV
+GTV2 27Gy,GTV
+GTV3 27Gy,GTV
+GTV4 27Gy,GTV
+opt BrainStem,Avoidance
+PTV1 27Gy,PTV
+PTV2 27Gy,PTV
+PTV3 27Gy,PTV
+PTV4 27Gy,PTV
+GTV 1 27Gy,GTV
+GTV 2 27Gy,GTV
+GTV 3 27Gy,GTV
+GTV 4 27Gy,GTV
+GTV 5 24Gy,GTV
+PTV 1 27Gy,PTV
+PTV 2 27Gy,PTV
+PTV 3 27Gy,PTV
+PTV 4 27Gy,PTV
+PTV 5 24Gy,PTV
+GTV 6 27Gy,GTV
+PTV 6 27Gy,PTV
+PTV 5 25Gy,PTV
+PTV 4 25Gy,PTV
+PTV 3 25Gy,PTV
+PTV 2 25Gy,PTV
+PTV 1 25Gy,PTV
+GTV 5 25Gy,GTV
+GTV 4 25Gy,GTV
+GTV 3 25Gy,GTV
+GTV 2 25Gy,GTV
+GTV 1 25Gy,GTV
+Dose bob,Dose Region
+PTV 1 30Gy,PTV
+Cochlea LT,Organ
+Cochlea RT,Organ
+Dose 107[%],Control
+Dose 106[%],Control
+Dose 106[%]2,Control
+Dose 105[%],Control
+Dose 106[%]3,Control
+Dose 105[%]2,Control
+Dose 105[%]3,Control
+Brain Stem,None
+Dose 13.5GyBRAI,Control
+Dose 18GyBRAI,Control
+Dose 27GyBRAI,Control
+GTV 1 27Gy/3#,GTV
+GTV 2 27Gy/3#,GTV
+PTV 1 27Gy/3#,PTV
+PTV 2 27Gy/3#,PTV
+GTV 2 24Gy/3,GTV
+GTV 1 24Gy/3,GTV
+PTV 1 24Gy/3,PTV
+PTV 2 24Gy/3,PTV
+Dose 50[%] BRAI,Control
+Dose 90[%] BRAI,Control
+GTV 1 27Gy/3,GTV
+GTV 2 27Gy/3,GTV
+PTV 1 27Gy/3,PTV
+PTV 2 27Gy/3,PTV
+Dose 50[%]BRAI,Control
+PREV MEDI D50,Control
+PREV MEDI2 D50,Control
+D105 BOB,Control
+GTV All,GTV
+D106,Control
+PET,None
+Bowel,None
+D50[%]- prev. C1,Control
+D95[%]-prev. C1,Control
+Conduit,None
+D108[%]-bob,Control
+opt PTV all,PTV
+opt PTV2,PTV
+opt PTV1,PTV
+Lacrimal L,None
+Lacrimal R,None
+Spinal Canal3,Organ
+GTV 8 27Gy,GTV
+GTV 7 27Gy,GTV
+PTV 5 27Gy,PTV
+PTV 3 18Gy,PTV
+GTV 5 27Gy,GTV
+GTV 3 18Gy,GTV
+PTV 7 27Gy,PTV
+PTV 8 27Gy,PTV
+GTV 9 27Gy,GTV
+PTV 9 27 Gy,PTV
+PRV 5BrainStem,Avoidance
+Dose 105[%]4,Control
+opt PTV 20,PTV
+Dose 90[%]BRAI,Control
+Dose 50[%] LUNR,Control
+Dose 100[%] LUNR,Control
+Dose 105[%] LUNR,Control
+PTV 3 30Gy,PTV
+PTV 2 30Gy,PTV
+GTV  3xxGy,GTV
+CTV 2,CTV
+CTV 3,CTV
+OPT PTV TOTAL,PTV
+opt PTV3,PTV
+PTV 1 27 Gy,PTV
+PTV 2 27 Gy,PTV
+Trachea,None
+Stomach,None
+Lung R,None
+Lung L,None
+Lung B,None
+Liver,None
+Heart,None
+CTV SPIT,CTV
+PTV SPIT,PTV
+GTV SPIT,GTV
+CTV ESOM,CTV
+GTV ESOM,GTV
+PTV ESOM,PTV
+opt PRV Cord,Avoidance
+BOB 105[%],Dose Region
+bob 105[%]2,Control
+opt Spinal Canal,Organ
+GTV 2 20Gy,GTV
+PTV 1 20Gy,PTV
+PTV 2 20Gy,PTV
+Dose 53.2GyTONS,Control
+Dose 35GyTONS,Dose Region
+GTV 4,None
+GTV ALL,None
+Avoid a,Control
+Dose 90[%]RIBL,Control
+Dose 50[%]RIBL,Control
+1.0cm Bolus40x40,Treated Volume
+Body - Bolus,Avoidance
+PTV 2 21Gy,PTV
+PTV 3 21Gy,PTV
+PTV 4 21Gy,PTV
+1.0CM bolus,
+OralCavity,None
+Submandibular L,None
+Submandibular R,None
+PREV 50% FACR,Dose Region
+opt CTV,CTV
+Dose 107% bob,Dose Region
+Dose 105% BOB,Dose Region
+Esophagus,None
+Larynx,None
+PRV5 Brain Stem,Avoidance
+PTV40/15,None
+GTVpreop,GTV
+Parotid_L preop,Organ
+Dose 50[%]CHKL,Control
+Dose 90[%]CHKL,Control
+Dose 50[%]CHKR,Control
+Dose 90[%]CHKR,Control
+Dose 95[%],Control
+Dose 5525[cGy],Control
+chkl/r 6500,Control
+CTV40/15,None
+CTV60/30,None
+PTV60/30,None
+CTV54/30,None
+PTV54/30,None
+Dose 105[%]1,Control
+Dose 2000[cGy],Control
+BrachialPlexus R,None
+BrachialPlexus L,None
+Lips,None
+PharynxConstrict,None
+Thyroid,None
+CTV 64 R,CTV
+ALL PTV,None
+MucosalAvoidance,None
+GTV+1cm,None
+PTV 48 R,PTV
+PTV 64 R,PTV
+CTV 48 R,CTV
+Wire,Control
+opt PTV 64 R,PTV
+opt PTV 48 R b,PTV
+opt PTV 48 R a,PTV
+1.0cm Bolus,
+Dose 4900[cGy],Dose Region
+Dose 106.5[%],Control
+Dose 5100[cGy],Dose Region
+Aorta,None
+IVC,None
+Body-PTV+.8,Avoidance
+Mandible,None
+Parotid L,None
+Parotid R,None
+Trachea,Nodes
+PTV30.8/28,PTV
+Eyes,Organ
+Lenses,Organ
+PREV LUNB 10Gy,Control
+D105,Control
+D95,Control
+PREV FEML 10Gy,Control
+D95[%]-LUNR,Control
+D50[%]-LUNR,Control
+opt PTVb,PTV
+opt PTVa,PTV
+Esoph+margin 1.5,None
+opt PTVc,PTV
+Esoph+margin3.0,None
+opt PTVa2,PTV
+opt PTVb2,PTV
+Dose2700[cGyBRAI,Control
+Dose1350[cGyBRAI,Control
+Dose 30[Gy]BRAI2,Control
+Dose 50[%]BRAI2,Control
+GTV 1 24Gy/3#,GTV
+GTV 2 21Gy/3#,GTV
+GTV 3 24Gy/3#,GTV
+GTV 4 24Gy/3#,GTV
+GTV 5 24Gy/3#,GTV
+PTV 1 24Gy/3#,PTV
+PTV 2 21Gy/3#,PTV
+PTV 3 24Gy/3#,PTV
+PTV 4 24Gy/3#,PTV
+PTV 5 24Gy/3#,PTV
+PREV ABDL 18Gy,Control
+Air,None
+CTV48,CTV
+CTV68,CTV
+opt PTV48,PTV
+opt PTV48a,PTV
+opt PTV48b,PTV
+PTV56,PTV
+PTV68,PTV
+opt PTV56,PTV
+Dose 105% bob,Dose Region
+Dose 80[%],Dose Region
+Dose 4560[cGy],Dose Region
+Dose 5040[cGy],Dose Region
+opt PTV48c,PTV
+GTV 1 24Gy,GTV
+GTV 2 24Gy,GTV
+PTV 1 24Gy,PTV
+PTV 2 24Gy,PTV
+50% BRAI,Control
+90% BRAI,Control
+50% BRAI2,Control
+90% BRAI2,Control
+50[%]BRAI3,Control
+90[%]BRAI3,Control
+Dose 110[%],Dose Region
+Dose 100[%],Control
+Body-PTV 1,Avoidance
+PTVTL20/5,PTV
+Dose800[cGy]C1+2,Control
+Dose 20[Gy]C1+C2,Control
+Dose 28[Gy]C1+C2,Control
+PTV20/5,PTV
+PTV12/5,PTV
+AvoidCord b 12Gy,Control
+AvoidCord a 20Gy,Control
+PRV Cord b+3mm,Avoidance
+Dose 105[%] bob,Dose Region
+PTV 1 18Gy,PTV
+PTV 2 18Gy,PTV
+PTV 4 18Gy,PTV
+PTV 5 21Gy,PTV
+PTV 6 21Gy,PTV
+GTV 7 21 Gy,GTV
+GTV 8,GTV
+GTV 9,GTV
+GTV 10,GTV
+GTV 11,GTV
+PTV 7 21Gy,PTV
+PTV 8 21Gy,PTV
+PTV 9 21Gy,PTV
+PTV 10 21Gy,PTV
+PTV 11 21Gy,PTV
+GTV 12,GTV
+PTV 12 21Gy,PTV
+Dose 50[%] bob,Dose Region
+Dose 50[%]LUNL,Dose Region
+Dose 100[%]LUNL,Dose Region
+Dose 50[%]SCNB,Control
+Dose 95[%]SCNB,Control
+BronchialTree,None
+Great Vessels,None
+Field Margin,None
+PTV 4 24Gy,PTV
+PTV mod,PTV
+PRV2 SpinalCanal,Avoidance
+Spinal Cord,None
+Dose 90[%] BRAI2,Dose Region
+Kidney L1,Organ
+Kidney R1,Organ
+Kidney R,None
+Kidney L,None
+AIR,None
+GTV 2 24Gy/3#,GTV
+Implant,None
+SVC,None
+Dose 90[%]LUNR,Control
+Dose 50[%]LUNR,Control
+PTV 16Gy,PTV
+1.0CM Bolus,
+Dose 90[%]BRAI3,Control
+Dose 50[%]BRAI3,Control
+GTV  3 27Gy,GTV
+GTV  2  27Gy,GTV
+GTV  1  27Gy,GTV
+PTV  1  27Gy,PTV
+PTV  2  27Gy,PTV
+Dose 90[%]BRAI2,Control
+Normal Tissue,None
+GTV 1   27Gy,GTV
+PTV 1   27Gy,PTV
+GTV 2  27Gy,GTV
+PTV 2  27Gy,PTV
+PTV 2 24Gy/3#,PTV
+GTV 1 35Gy,GTV
+PTV 1 35Gy,PTV
+PREV 50 BRAI2,None
+PREV 90 BRAI4,None
+PREV 50 BRAI4,None
+PREV 90 BRAI3,None
+PREV 50 BRAI3,None
+PREV 90 BRAI2,None
+PREV 50 BRAI5,None
+PREV 90 BRAI5,None
+Dose 15Gy SUM,Dose Region
+Dose 20Gy SUM,Dose Region
+Dose 25Gy SUM,Dose Region
+Dose 30Gy SUM,Dose Region
+opt PTV 60,PTV
+Normal Tissus,None
+Dose 50[%]SCPB,Control
+CTV 54 R2,CTV
+PTV 54 R2,PTV
+Dose 4500[cGy],Control
+CIED,None
+PTV1+20,Control
+ITV1,CTV
+GTV1 MIP,GTV
+GTV1 AVE,GTV
+GTV1 4D50,GTV
+GTV1 4D0,GTV
+Dose105[%]-PTV1,Dose Region
+Body-PTV1+20,Avoidance
+GTV2 AVE,GTV
+GTV2 MIP,GTV
+GTV2 4D0,GTV
+GTV2 4D50,GTV
+IGTV2,GTV
+ITV2,CTV
+PTV2,PTV
+PTV2+20,Control
+Body-PTV2+20,Avoidance
+Dose 50[%]LUNR2,Dose Region
+Dose 100[%]LUNR2,Dose Region
+Dose 105[%]LUNR2,Dose Region
+Dose 50[%]LUNR1,Dose Region
+Dose 100[%]LUNR1,Dose Region
+Dose 105[%]LUNR1,Dose Region
+Dose105[%]-PTV2,Dose Region
+Beam Edge Guide,None
+Beam Guide-Lt CW,None
+Dose 50[%]LARY,Control
+Dose 90[%]LARY,Control
+BrachialPlexus_L,Organ
+PTVmod,PTV
+Spinal Cord,Organ
+SacralPlexus,Organ
+R SacralPlexus,Organ
+Dose 105[%] BOB,Dose Region
+PTV eval,None
+Dose 107% BOB,Dose Region
+Dose 106.5[%],Dose Region
+Dose 50[%]SPIT2,Control
+Dose 50[%]SPIT,Control
+Dose 1400[cGy],Control
+Dose 2800[cGy],Control
+PTV 2 35Gy,PTV
+optPTVcanal,PTV
+Dose 50[%]LUNL,Control
+Dose 90[%]LUNL,Control
+PTVmod-canal,PTV
+Dose 110[%],Control
+Dose 110[%]2,Control
+Dose 106[%],Dose Region
+Dose 50[%],Control
+Dose 106[%]BOB,Control
+Dose 90[%],Dose Region
+PREV RIBL D50,Control
+PTV eval,PTV
+CTV Nodes,Nodes
+PTV Nodes,PTV
+sc ptv,None
+0.5cm Bolus,
+CIED PRV,Avoidance
+D4650[cGy]-bob,Control
+Dose 107[%]-BOB,Control
+Dose Region,Dose Region
+spill kd,Dose Region
+PTV 24,PTV
+Dose 50(%),Control
+Dose 100(%),Control
+Dose 105(%),Control
+Ring 5,Avoidance
+PTV LT,PTV
+opt PTV LT,PTV
+ITV LT,CTV
+IGTV LT,GTV
+opt PTV RT,PTV
+IGTV RT,GTV
+ITV RT,CTV
+PTV RT,PTV
+Dose 109[%],Control
+Dose 107[%],Dose Region
+PREV D50,Control
+Heart,Avoidance
+Nodes IMC,Reference
+PTV eval cavity,PTV
+Spinal Canal,Avoidance
+0.5cm bolus,
+CTV 63,CTV
+GTVn-copy,Nodes
+GTVp,GTV
+LN intermediate,PTV
+opt PTV 63 L a,PTV
+opt PTV 63 L b,PTV
+opt PTV 63 R b,PTV
+Dose 5985cGy bob,Dose Region
+Dose 106% bob,Dose Region
+D90[%]-AXIR prev,Control
+D50[%]-AXIR prev,Control
+D50[%]-C2-RIBL,Control
+D50[%]-C2-RIBR,Control
+Axillary vessels,None
+Humerus R,None
+Humerus L,None
+opt PTV b,PTV
+opt PTV a,PTV
+Body-PTV 54,Avoidance
+Contrast/air,Organ
+anal can+sphinct,None
+Presacral space,None
+Ischiorectal fos,None
+CTV prim,CTV
+Iliac Vessels,Nodes
+CTV Iliac,Nodes
+Int iliac ves,Nodes
+eval PTV 36,PTV
+Dose 105[%]BOB,Dose Region
+Dose 105[%]2,Dose Region
+Dose 105[%].,Dose Region
+Cricoid,None
+Body-PTV54+1,Avoidance
+CTV59.4,None
+CTVN,None
+Node,Nodes
+opt Bladder,PTV
+PTV59.4,None
+1cm RtGroinBolus,
+1cm LtGroinBolus,
+Body-PTV 36+1,Avoidance
+PET GT,None
+1cm Bolus RGroin,
+1cm Bolus LGroin,
+Lens,None
+GTV 1 30Gy/5#,GTV
+GTV 2 22.5Gy/5#,GTV
+GTV 3 22.5Gy/5#,GTV
+GTV 4 22.5Gy/5#,GTV
+GTV 5 22.5Gy/5#,GTV
+PTV 1 30Gy/5#,PTV
+PTV 2 22.5Gy/5#,PTV
+PTV 3 22.5Gy/5#,PTV
+PTV 4 22.5Gy/5#,PTV
+PTV 5 22.5Gy/5#,PTV
+CIED,Control
+Dose 98[%],Control
+CTV56,CTV
+Vessels,None
+Nodes,None
+D5320 BOB,Control
+D4560 BOB,Control
+BrachialPlexus_R,Organ
+CTVn1L,CTV
+CTVn70,CTV
+CTVnL70,CTV
+GTVn1L,GTV
+GTVnL,Nodes
+PTVn1L 70,PTV
+PTVn70,PTV
+PTVnL70,PTV
+Contrast,None
+Beam-edge guide,PTV
+Beam edge guide,PTV
+GTV 20/5,GTV
+PTV 20/5,PTV
+GTV 5 15Gy/3#,GTV
+PTV 5 15Gy/3#,PTV
+CTV CHWL,CTV
+CTV INGL,CTV
+GTV CHWL,GTV
+GTV INGL,GTV
+PTV CHWL,PTV
+PTV INGL,PTV
+opt PTV CHWL,PTV
+CTV 48 L,CTV
+CTV 64 L,CTV
+GTV-DiagCT,Nodes
+opt PTV 48 L a,PTV
+opt PTV 48 L b,PTV
+PTV 60 L eval,PTV
+PTV 48 L,PTV
+PTV 60 L,PTV
+PTV 64 L,PTV
+PREV 50% TEML,Dose Region
+Carotid L,None
+Wire,None
+Mucosaavoid,None
+opt PTV 64,PTV
+opt PTV 48 L c,PTV
+1.0 Bolus,
+Dose 106[%].,Dose Region
+0.5Bolus,
+Dose 105.5[%],Dose Region
+Dose 5136[cGy],Dose Region
+Surgical Bed,None
+PREV 25.8Gy,None
+Dose 104.5[%],Dose Region
+60Gy SUM bob,Dose Region
+Dose 5900[cGy],Control
+Dose 5800[cGy],Control
+PREV 23Gy,None
+Dose 104[%],Dose Region
+Dose 65Gy SUM,Control
+Dose 6250[cGy],Dose Region
+Hernia sac-bowel,Organ
+D5040 BOB,Control
+PTV66,PTV
+PTV46,PTV
+opt PTV46,PTV
+eval PTV46,PTV
+CTV66,CTV
+CTV46,CTV
+PROS D50,Control
+GTV comb,GTV
+PTV eval (abd),None
+0.5 cm Bolus,
+Wires,Avoidance
+opt Optic Chiasm,Avoidance
+PREV 90% IDL,Dose Region
+PTV 1 24 Gy,PTV
+PTV 2 24 Gy,PTV
+Metal Rods,None
+CTVn66,CTV
+PTVn66,PTV
+opt PTVn66,PTV
+Dose 95[%],Dose Region
+Avoid X,Control
+Dose 107[%]3,Control
+Dose 6000[cGy]3,Dose Region
+Dose 106.5[%]3,Control
+BOB 1,Control
+CTV 5500,CTV
+CTVN,GTV
+opt PTV 5500,PTV
+PTV 5500,PTV
+Prostate,None
+PRVBR + op,Avoidance
+CTV2,None
+PTV2,None
+optCTV,CTV
+PTV 55/20,PTV
+CTV_Node_14.4/8,CTV
+Vessels,Nodes
+Uterus_Vagina,Nodes
+PTV_Node_14.4/8,PTV
+opt PTV+2mm,PTV
+Dose 50[%]SPTL,Control
+Dose 90[%]SPTL,Control
+Wire - Top,None
+Wire - Mid,None
+Wire - Bottom,None
+Dose 104.5[%],Control
+Dose 104.5[%]3,Control
+D107[%]-BOB,Control
+PTV 1 21Gy,PTV
+All PTV,Organ
+eval PTV68,PTV
+eval PTV48,PTV
+PTV Nodes Eval,PTV
+Vessels R,Nodes
+Vessels L,Nodes
+Dose 6300[cGy],Dose Region
+Dose 5700[cGy],Dose Region
+Dose 6420[cGy],Dose Region
+D107.5[%]-BOB,Control
+PTV 50,PTV
+eval PTV 66,None
+eval PTV 50,PTV
+CTV70,PTV
+CTV 66,Nodes
+CTV 50,CTV
+BBs,None
+HTV+1cm,None
+eval PTV 50 NEW,PTV
+Cold spot boost,None
+brachiocephalic,None
+subclavian Vein,None
+PTVn_Ax_R,PTV
+PTV_Lump_EVA_R,PTV
+PTV_Lump_R,PTV
+PTVn_IMN_R,PTV
+CTVn_SCL_R,Nodes
+LUNG_R,Organ
+LUNG_L,Organ
+LUNG_B,Organ
+CTVn_Ax_R,Nodes
+CTV_Lump_R,CTV
+CTV_WB_R,CTV
+BREAST_L,None
+CTVn_IMN_R,Avoidance
+PTV_WB_R,PTV
+PTV_WB_EVA_R,PTV
+PTVn_SCL_R,PTV
+Node iliac R,Nodes
+Node iliac L,Nodes
+PTV30,PTV
+CTV30,CTV
+1cm bolus,
+CTV 20,CTV
+PREV 35GY TONG,Dose Region
+Anastomosis,None
+Dose 107[%]2,Control
+Dose 120[%],Dose Region
+Dose 108[%],Control
+CTVn 70,CTV
+PTV 63 Gy,PTV
+Dose 56Gy,None
+opt PTV 63,PTV
+Dose 6000[cGy],Control
+LtShoulderProsth,None
+Dose 6000[cGy]2,Dose Region
+Dose X,Dose Region
+Dose 6000[cGy]3,Control
+Air/Contrast,None
+Screws,None
+IGTV 60Gy/8#,GTV
+PTV 60Gy/8#,PTV
+Prox Bronch Zone,Organ
+Bronchial Tree,Organ
+D50[%]-BRER prev,Control
+D50[%]-BOOS prev,Control
+IGTV R,GTV
+ITV R,CTV
+IGTV L,GTV
+ITV L,CTV
+PTV L+20,Control
+Body-PTV L+20,Avoidance
+Dose105[%]-PTV L,Dose Region
+eval PTV 39/13,PTV
+opt PTV 39 -2,PTV
+PREV 50% SPIT,Dose Region
+PREV 90% SPIT,Dose Region
+PREV50% SPIT,Dose Region
+Dose 50[%] SPIT,Dose Region
+PREV 35Gy NASO,Dose Region
+PREV 66.5Gy NASO,Dose Region
+Dose 106% BOB,Dose Region
+Iliac Vessels B,CTV
+D4675[cGy]-bob,Control
+ProxBronchZone,Avoidance
+D5040,Control
+Prev Sup Border,None
+ApproxDose 50[%],Control
+opt PTV 54 L,PTV
+opt PTV 66 a,PTV
+opt PTV 66 b,PTV
+Dose 6270[cGy],Dose Region
+Dose 5130[cGy],Dose Region
+Dose 5770[cGy],Dose Region
+Dose 70[%],Dose Region
+1cm Bolus,
+Dose 108[%],Dose Region
+Dose 60Gy bob,Dose Region
+Dose 5320cGy bob,Dose Region
+Mesorectum,Control
+IRF_sphinct_2cm,Control
+0.5cm Bolus LT,
+0.5cm Bolus RT,
+Body-PTV 59.4,Avoidance
+eval PTV 59.4,PTV
+EVAL CTV 59.4,CTV
+GTV LUNL,GTV
+GTV node,GTV
+opt PTV LUNL,PTV
+Spinal Canal5,Organ
+nan,
+PREV LUNR D50,Control
+Dose 12GyBRAI,Dose Region
+Dose 24GyBRAI,Control
+Bladder,None
+Bone_Ilium,None
+BowelBag,None
+Femur L,None
+Femur R,None
+Femur_Heads,None
+LN_Pelvis,CTV
+Rectum,None
+Sacrum,None
+Collection,None
+PREV 50IDL BRAI,None
+PREV 90IDL BRAI2,None
+PREV 50IDL BRAI2,None
+PREV 90IDL BRAI,None
+Dose 90[%],Control
+Dose 108[%]-bob,Control
+spill kd,Control
+107 kd,Control
+Dose 105[%]1,Dose Region
+All PTV,None
+Dose 5040[cGy],Control
+CTV2,Nodes
+CTV52.5,CTV
+Avoid Normal,Control
+PTV52.5,PTV
+opt PTV 63 R a,PTV
+Dose 6000[cGy],Dose Region
+CTVNode_Ext_Il_L,Nodes
+Uterus/Vagina,CTV
+PTVNode_Ext_Il_L,None
+Vessel/Presacral,CTV
+Dose 104[%],Control
+Dose 104[%]2,Control
+Dose 104[%]3,Control
+Prosthesis R,None
+Prosthesis L,None
+Dose 102[%],Dose Region
+Dose 5080[cGy],Dose Region
+Dose 106.5[%]2,Control
+Dose 7140 AL,Control
+Dose 5040 AL,Control
+CTV50,CTV
+PTV50,PTV
+PTV50_eval,None
+GTV MRI T1,GTV
+GTV MRI T2,GTV
+PTV_eval,None
+GTV + edema,GTV
+Dose 106.5[%]1,Dose Region
+PTV-ALL,PTV
+Dose 4800[cGy],Control
+0.3 cm Bolus,
+opt PTV 40/55 a,PTV
+opt PTV 48 b,PTV
+opt PTV 48 c,PTV
+opt PTV 55 R a,PTV
+opt PTV 55 R b,PTV
+Oral Avoidance,Organ
+V2,None
+Macula R,None
+PTV 55 crop,PTV
+BOOL PTV 55 a/b,PTV
+RT OPTICS 40GY,None
+Dose 5225[cGy],Dose Region
+Thyroid1,None
+PTV_Lump_EVA_L,PTV
+PTV_WB_L,PTV
+PTV_WB_EVA_L,PTV
+PTV_Lump_L,PTV
+Lumpectomy_L,GTV
+CTV_WB_L,CTV
+CTV_Lump_L,CTV
+PTV 20,PTV
+opt PTV46.75,PTV
+PTV 46.75,PTV
+CTV 46.75,CTV
+opt PTV55,PTV
+PTV 4 21Gy/3#,PTV
+PTV 3 18Gy/3#,PTV
+PTV 1 21Gy/3#,PTV
+GTV 4 21Gy/3#,GTV
+GTV 3 18Gy/3#,GTV
+GTV 1 21Gy/3#,GTV
+Dose 70[%]-bob,Control
+Clavicle_L,None
+Breast L,None
+optRLUNG,Avoidance
+Genitals,None
+GTV+Edema,None
+edema,None
+Dose 30GyLUNR2,Dose Region
+Dose 60GyLUNR2,Dose Region
+Dose 105.5[%],Control
+Wet Gauze,Avoidance
+PTVeval 36,PTV
+Ano-Rectum,Organ
+Large Bowel,Control
+PTVeval 54,PTV
+1 cm RtGroin Bol,
+1 cm LtGroin Bol,
+PTV ALL,PTV
+Heart1,None
+PREV LUNL2 D50,Control
+GTVntotal,Nodes
+Cavity ORIG,GTV
+CTV_Cavity,PTV
+PREV 50% 27/3,Dose Region
+PREV 90% 27/3,Dose Region
+PTV1 18Gy,PTV
+PTV SHOL,PTV
+PTV NECL,PTV
+opt PTV NECL,PTV
+GTV SHOL,Nodes
+GTV NECL,GTV
+CTV SHOL,Nodes
+CTV NECL,CTV
+Iliac vessels,Nodes
+Anal canal,Nodes
+old IGTV,None
+presacral space,Nodes
+iliac vessels,Nodes
+CTV5,CTV
+CTV3,CTV
+CTV4,CTV
+Margin,PTV
+Dose 95[%] LUNR,Dose Region
+Dose 115[%],Control
+Dose 115[%]2,Control
+PTV L3,PTV
+CT both,GTV
+PTV both,PTV
+CTV L3,CTV
+CTV T12,CTV
+PTV T12,PTV
+PTV 1 18Gy/3,PTV
+GTV 1 18Gy/3#,GTV
+BrainStem opt,Organ
+GTV 1 30Gy/5,GTV
+PTV 1 30Gy/5,PTV
+Dose 50[%]BOB,Dose Region
+PTV SPIC,PTV
+GTV SPIC,GTV
+CTV SPIC,CTV
+PTV PARR,PTV
+GTV PARR,GTV
+mod PTV SPIC,PTV
+CTV PARR,CTV
+opt PTV SPICb,PTV
+opt PTV SPICa,PTV
+opt PTV PARR,PTV
+Dose 102[%],Control
+Hip prosthesis L,None
+Hip prosthesis R,None
+D107[%]-bob,Control
+GTVn2,GTV
+PTVn2,PTV
+GTVn1,GTV
+CTVn1,CTV
+presacral,None
+CervParaUt+2,None
+CervParaUt,CTV
+IUD,None
+CTVn2,CTV
+PTVn1,PTV
+CTV ALL,CTV
+CTV2,CTV
+GTV2,GTV
+GTV all,GTV
+CTV all,CTV
+PTV1,PTV
+GTV1,GTV
+CTV1,CTV
+Dose 107[%]BOB,Dose Region
+Dose 25.65GyBRAI,Control
+Dose 13.5GyBRAI,Dose Region
+Body-PTV2low+20,Avoidance
+Dose105%-PTV2low,Dose Region
+PTV 2 (lower),GTV
+ITV 2 (lower),GTV
+IGTV 2 (lower),GTV
+IGTV 1 (upper),GTV
+ITV 1 (upper),CTV
+PTV 1  (upper),PTV
+PTV2 lower+20,Control
+PTV1 upper+20,Control
+Dose105%-PTV1upp,Dose Region
+Body-PTV1upp+20,Avoidance
+Dose 50[%]1 up,Control
+Dose 100[%]1 up,Control
+Dose 105[%]1 up,Control
+Dose 50[%]2 low,Dose Region
+Dose 100[%]2 low,Dose Region
+Dose 105[%]2 low,Control
+CTV PROS,CTV
+PTV PROS,PTV
+CTV PARA,CTV
+GTV PARA,GTV
+PTV PARA,PTV
+CTVn,CTV
+GTV PROS,GTV
+PRV CORD,Avoidance
+Lung L1,None
+Lung R1,None
+Dose 12Gy bob,Dose Region
+heart,None
+D106[%]-bob,Control
+opt PTV40 b,Avoidance
+opt PTV 40 a,PTV
+Neural PRV5mm,Avoidance
+105[%],Dose Region
+PTV 66 orig,PTV
+PTV 54 R orig,PTV
+CTV 66 orig,CTV
+CTV 54 R orig,CTV
+Dose 107[%]bob,Dose Region
+D112[%]-bob,Control
+Dose 70% bridge,Dose Region
+GTV2,None
+Esophagu,None
+PTV,None
+Margin,None
+D105[%]-BOB,Control
+CTV 4,None
+PTV 6 30Gy/5#,PTV
+PTV 5 30Gy/5#,PTV
+PTV 4 30Gy/5#,PTV
+PTV 3 30Gy/5#,PTV
+PTV 2 30Gy/5#,PTV
+GTV 6 30Gy/5#,GTV
+GTV 5 30Gy/5#,GTV
+GTV 4 30Gy/5#,GTV
+GTV 3 30Gy/5#,GTV
+GTV 2 30Gy/5#,GTV
+Surgical Staples,None
+GTV 7 30Gy/5#,GTV
+PTV 7 30Gy/5#,PTV
+PTV Total NEW,PTV
+PTV 2 NEW,PTV
+PTV 4 NEW,PTV
+PTV 5 NEW,PTV
+EVAL50 NEW,Treated Volume
+Avoid OUTER NEW,Control
+Avoid MID NEW,Control
+Avoid INNER NEW,Control
+opt BrainNEW,Avoidance
+Dose 95[%]2,Control
+Vagina/Uterus,CTV
+Vessels,GTV
+Dose 109[%]5,Control
+Dose 109[%]6,Control
+CTV 40,CTV
+opt PTV 40,PTV
+PTV 40,PTV
+CTV45,CTV
+CTV50.4,CTV
+PTV_50.4,PTV
+opt PTV 50.4,PTV
+D80 BOB,Control
+Liver,Avoidance
+GTV 5 18Gy,GTV
+GTV 6 18 Gy,GTV
+PTV 5 18Gy,PTV
+GTV 7 18Gy,GTV
+PTV 6 18 Gy,PTV
+PTV 7 18 Gy,PTV
+Lung B,CTV
+PRV5mm Cord,None
+PTVINF,PTV
+ITVINF,CTV
+IGTVSUP,GTV
+PTV INF+20,Control
+PTVSUP,PTV
+ITVSUP,CTV
+IGTVINF,GTV
+GTV MIPSUP,GTV
+Dose105%-PTV INF,Dose Region
+Body-PTV INF+20,Avoidance
+GTV MIPINF,GTV
+Body-PTV SUP+20,Avoidance
+Dose105%-PTV SUP,Dose Region
+PTV SUP+20,Control
+PTV BOTH,PTV
+PTV BOTH+20,Control
+Body-PTV BOTH+20,Avoidance
+Dose 50[%] INF,Control
+Dose 100[%] INF,Control
+Dose 105[%] INF,Control
+Dose 50[%] SUP,Dose Region
+Dose 100[%] SUP,Dose Region
+Dose 105[%] SUP,Dose Region
+PREV LUNR 30Gy,Control
+D108.2,Control
+IGTV suggest,GTV
+Dose 112[%],Control
+GTV,Nodes
+CouchSurface1,Support
+CouchInterior1,Support
+Dose 107[%]-bob,Control
+Dose 95[%]-bob,Control
+D95[%]-prev C1,Control
+D50[%]-prev C1,Control
+PREV 50% BREL,Dose Region
+CTV 56 L new,None
+CTV 56 R new,None
+PTV 56 L new,None
+PTV 56 R new,None
+CTV 70 new,CTV
+GTVp new,GTV
+PTV 70 new,PTV
+GTVn new,GTV
+CTV 56 L ORIG,CTV
+CTV 56 R ORIG,CTV
+CTV 70 ORIG,CTV
+GTV ORIG,GTV
+GTVn ORIG,Nodes
+PTV 56 L ORIG,PTV
+PTV 56 R ORIG,PTV
+PTV 70 ORIG,PTV
+BOB 95%,Dose Region
+BOB 107.5%,Control
+BOB 6000cGy IN,Dose Region
+BOB 6000 OUT,Control
+BOB 106[%],Control
+BOB 6000cGy,Dose Region
+PTV60,PTV
+CTV60,CTV
+Field Guidance,None
+Node,None
+PREV CHWL/AXIL,Control
+D7140,Control
+PREV LUNL D50,Control
+GTVn R,GTV
+opt PTV 66 L,PTV
+opt PTV 66 R,PTV
+opt PTV 54 a,PTV
+opt PTV 54 b,PTV
+CTV L 66,CTV
+PTV 66 L,PTV
+CTV 66 R,CTV
+PTV 66 R,PTV
+Dose 5780[cGy],Dose Region
+PTV_eval,PTV
+Humerus L,Organ
+Dose 113[%]-bob,Control
+Dose 109[%]-bob,Control
+D108.5[%]-bob,Control
+Dose 104[%]-bob,Control
+GTV1-18/3,GTV
+PTV2-18/3,PTV
+PTV1-18/3,PTV
+CTV2-18/3,Nodes
+CTV1-18/3,CTV
+GTV2-18/3,GTV
+eval PTV 54,None
+Large Bowel Air,Organ
+IRF,Nodes
+eval PTV 50.4,None
+eval PTV 36,None
+IRF,None
+Body-PTV 50.4,Avoidance
+opt BowelBag,None
+Body-PTV 54,None
+opt Bladder,None
+opt PTV 54,None
+CTV50.4,Nodes
+PTV 50.4,PTV
+1.0cmBol R Groin,
+1.0cmBol L Groin,
+BONE,Organ
+0.5 cm bolus,
+opt PTV 56 L,PTV
+1.0 cm Bolus,
+0.5cm  Bolus,
+D106.5[%]-bob,Control
+GTV 6,GTV
+GTV 7,GTV
+GTV 13,GTV
+GTV 14,GTV
+GTV 15,GTV
+PTV 7 27 Gy,PTV
+PTV 8 27 Gy,PTV
+PTV 10 27 Gy,PTV
+PTV 11 27 Gy,PTV
+PTV 12 27 Gy,PTV
+PTV 13 27 Gy,PTV
+PTV 14 27 Gy,PTV
+PTV 15 27 Gy,PTV
+PTV 6 27 Gy,PTV
+PREV SPLS 4Gy,Control
+PREV SPIL 4Gy,Control
+Dose 50[%]UTER,Control
+Dose 90[%]UTER,Control
+Dose 50[%]VAGI,Control
+Dose 90[%]VAGI,Control
+Dose 50[%]PARA,Control
+Dose 90[%]PARA,Control
+CTV 66 new,Nodes
+Dose 50[%]ORAL,Control
+Dose 90[%]ORAL,Control
+Dose 8000[cGy]ps,Control
+Anal Canal,None
+ITV 37.5,CTV
+PTV 37.5,PTV
+Constrictors,None
+Brachial_plexusR,None
+Dose 5320[cGy],Dose Region
+60GY BOB,Dose Region
+Field Edge Guide,PTV
+Dose 106[%]2,Dose Region
+GTV ALL,GTV
+CTV sum,CTV
+ALARA,Control
+ALARA2,Control
+GTV SHOR,GTV
+PTV SHOR 800cGy,PTV
+GTV 1 30Gy,GTV
+GTV 2 30Gy,GTV
+GTV 3 30Gy,GTV
+GTV 4 30Gy,GTV
+GTV 5 30Gy,GTV
+GTV 8 25Gy,GTV
+PTV 4 30Gy,PTV
+PTV 5 30Gy,PTV
+PTV 6 30Gy,PTV
+GTV 6 30Gy,GTV
+GTV 7 30Gy,GTV
+PTV 7 30Gy,PTV
+PTV 8 25Gy,PTV
+PTV TOTAL,PTV
+PREV BREL D50,Control
+Prostate + Semin,CTV
+Sup Mesenteric A,Organ
+D105[%]-bob,Control
+PTV 21,PTV
+CTV,PTV
+HTV,CTV
+Dose 50[%]BOB,Control
+Dose 105[%]out,Dose Region
+GTV MIPL,GTV
+Chest Wall RT,Organ
+PTV RT+20,Control
+Body-PTV RT+20,Avoidance
+Dose105[%]-PTVRT,Dose Region
+PTV L,PTV
+PTV R,PTV
+GTV MIPR,GTV
+GTV PET1,GTV
+Body-PTV LT+20,Avoidance
+Dose105[%]-PTVLT,Dose Region
+PTV LT+20,Control
+Chest Wall LT,Organ
+Dose 100[%] LT,Control
+Dose 105[%] LT,Control
+Dose 50[%] LT,Control
+Dose 105[%] RT,Control
+Dose 100[%] RT,Control
+Dose 50[%] RT,Control
+CTV50,None
+D50,Control
+RT Prosthesis,Organ
+5MM Bolus,
+PTV  2,None
+GTV  2,None
+D105.5[%]-bob,Control
+GTV all,None
+1.5cm Bolus,
+PTV 25/5,PTV
+Rect/large bowel,Organ
+D50[%]-BOOS,Control
+D50[%]-BRER,Control
+Pituitary,None
+CTV vertebrae,None
+CTV 20/5,None
+GTVvertebrae,None
+GTV Lung,GTV
+CTVLung,CTV
+optPTV,PTV
+Globes PRV2mm,None
+Optics+BRSTM,None
+PTV 3 27Gy/3#,PTV
+GTV 3 27Gy/3#,GTV
+opt PTV2mm,PTV
+PTV 18/3,PTV
+GTV 18/3,GTV
+opt PTV A,PTV
+opt PTV B,PTV
+CouchRailLeft,Support
+CouchRailRight,Support
+AP BB,None
+CTV20/5,CTV
+Normal Tissue,Organ
+GTV total,GTV
+R Prosthesis,Organ
+PTV all,PTV
+Dose 4700[cGy],Control
+Field,Treated Volume
+Dose 105[%]60,Dose Region
+Dose 100[%]60,Dose Region
+Dose 50[%]60,Dose Region
+opt PTV 2mm,PTV
+optPTV1,PTV
+optPTV2,PTV
+Dose50[%],Control
+D100[%],Control
+Dose105[%],Control
+VagUtCx,CTV
+VagUtCx+2,None
+BULK AIR,None
+Dose 60 OUT,Dose Region
+Dose 7455[cGy],Control
+CTV46/23,CTV
+PTV46/23,PTV
+Bowel Bag,None
+Small Bowel PROS,Organ
+Large Bowel PROS,Organ
+PTV 50/25,PTV
+opt PTV 50,PTV
+opt PTV 45 R b,PTV
+opt PTV 45 R a,PTV
+opt PTV 45 L b,PTV
+PTV 45/25 R,PTV
+opt PTV 45 L a,PTV
+eval PTV 45,PTV
+CTV 50/25,CTV
+CTV 45/25 R,CTV
+CTV 45/25 L,CTV
+PTV 45/25 L,PTV
+LM - D60,Control
+LM - D105,Control
+eval PTV56,PTV
+PTV76,PTV
+CTV76,CTV
+Dose 107[%]OUT,Control
+CTV spine,CTV
+Field Guide Spne,PTV
+Field Guide Lung,PTV
+Field Guide All,None
+Dose 100[%]LUNR,Dose Region
+Dose 105[%]LUNR,Dose Region
+D4590[cGy]-BOB,Control
+PTV-ALL,None
+Nodes,GTV
+PMH D50,Control
+D105[%],Control
+D50[%],Control
+BOB Dose 110[%],Control
+BOB Dose106.5[%],Control
+CTV64,CTV
+PTV64 orig,PTV
+CTV64 orig,CTV
+CTVp70,CTV
+opt PTV 56p a,PTV
+PTVp70,PTV
+GTVp70,GTV
+GTVp66,GTV
+GTVp56,GTV
+CTVp66,CTV
+CTVp56,CTV
+PTVp66,PTV
+PTVp56,PTV
+CTV70,CTV
+PTVn66,CTV
+PRV NEURAL 5mm,Avoidance
+PRV3mm- Globes,Avoidance
+opt PTV 54p c,Avoidance
+opt PTV 54p a,PTV
+opt PTV 54p b,PTV
+eval PTV54,PTV
+BOB Dose 106%,Control
+IGTV 2 60Gy/15,GTV
+ITV 2 60Gy/15,GTV
+PTV 2 60Gy/15,GTV
+IGTV 1 60Gy/15,GTV
+ITV 1 60Gy/15,CTV
+PTV 1 60Gy/15,PTV
+opt PTV1,Control
+Musc_Sclmast_L,None
+Musc_Sclmast_R,None
+CTV 44/25 R,CTV
+CTV 55/25,CTV
+PTV 44/25 R,PTV
+opt PTV 44 R a,PTV
+opt PTV 44 R b,PTV
+PTV 55/25,PTV
+opt PTV 55,PTV
+GTVn+.5,None
+GTV + 2,None
+PTV59.4,PTV
+Body-PTV54,Avoidance
+CTV59.4,Nodes
+0.5cm Bol Rt Gr,
+0.5 cmBol Lt Gr,
+PTV20,PTV
+CTV30,Nodes
+CTV20,CTV
+IVC,Organ
+Iliac R Common,CTV
+opt LargeBowel,Avoidance
+opt SmallBowel,Avoidance
+Dose 70[%],Control
+eval CTV 60,CTV
+eval CTV 54,CTV
+Dose 54Gy bob,Dose Region
+Dose 105[%]BOB,Control
+PRV5 Spinal FIX,Avoidance
+C1 SACR D50,Control
+T5,None
+T12,None
+Iliac Vessels,CTV
+Dose 4560[cGy]2,Dose Region
+Dose 4760[cGy],Dose Region
+Dose 4896[cGy],Control
+PTV 1 27.5Gy,PTV
+Dose 27.5Gy BRAI,Dose Region
+Dose 13.75GyBRAI,Dose Region
+Skin,Avoidance
+DOSE 108 2,Control
+Aorta,Avoidance
+HTV 1 30Gy,GTV
+Dose 50% bob,Dose Region
+CTV  45,CTV
+Portal vein,Nodes
+Aorta,Nodes
+PJ,Nodes
+Pre-op TumorVol,Nodes
+Sup Mesnt Artery,Organ
+CTV 50.4,CTV
+BREL 50 IDL,Dose Region
+GT PET Rt,None
+GT PET Lt,None
+Kidney LT,None
+Spleen,None
+Kidney RT,Organ
+Dose105%-PTV RT,None
+opt PTV54,GTV
+Dose 4500[cGy],Dose Region
+CTV TOTAL,CTV
+Dose 5670[cGy],Dose Region
+opt PTV54,PTV
+opt PTV60,PTV
+CervVagUt,Organ
+CervVagUtx2,None
+Vessels+2,None
+vessels,None
+OVOID,None
+GTV 1 32.5Gy/5#,GTV
+PTV 1 32.5Gy/5#,PTV
+PTVn3,PTV
+PTVn all,PTV
+UtCervPara,Organ
+GTVn3,GTV
+ovoid,None
+Dose 40[%],Control
+HTVp,GTV
+HTVn,Nodes
+opt PTV 66 NB,PTV
+Dose 5778[cGy],Dose Region
+Dose 5400[cGy],Dose Region
+CTV70,Nodes
+PTV54,PTV
+MucosaAvoid,None
+CTV54,CTV
+opt PTV 66b,PTV
+opt PTV 66a,PTV
+opt PTV 66a crop,PTV
+opt PTV70 crop,PTV
+opt PTV 70 b,PTV
+opt PTV 66 b2,PTV
+opt PTV66 b crop,PTV
+LargeBowel,Organ
+D5040.2,Control
+BOB 105[%],Control
+BOB 104[%],Control
+Nipple ring,None
+lens L,None
+lens R,None
+Bones,Organ
+opt PTV c,PTV
+D107,Control
+Dose 6000[cGy]2,Control
+Dose 108[%]2,Control
+Dose 108[%]3,Control
+Dose50%,Control
+Dose100%,Control
+Dose105%,Control
+Dose105%-PTV,Dose Region
+D90%-LUNL,None
+D50%-LUNL,None
+Dose 50%,Control
+Dose 105%,Control
+Dose 100%,Control
+GTV 4 27Gy/3#,GTV
+GTV 5 27Gy/3#,GTV
+GTV 6 27Gy/3#,GTV
+PTV 4 27Gy/3#,PTV
+PTV 5 27Gy/3#,PTV
+PTV 6 27Gy/3#,PTV
+PTV 7 24Gy/3#,PTV
+GTV 7 24Gy/3#,GTV
+Dose 80%,Dose Region
+Bladder,PTV
+PRV CIED,Avoidance
+opt PTV40,PTV
+Dose 60[Gy]PREV,Dose Region
+Dose 30[Gy]PREV,Dose Region
+HTV,None
+HTV+3cm,None
+Bones,None
+2.0cm Bolus,
+D4675[cGy]-bob2,Control
+Vess Lt,None
+Vess Rt,None
+PTV24,PTV
+CTV24,CTV
+opt PTV L,PTV
+eval PTV ALL,PTV
+eval CTV,CTV
+GTVn L,Nodes
+CTV L,CTV
+CTV R,CTV
+GTVn R,Nodes
+opt PTV R,PTV
+Dose 80% bob,Dose Region
+opt PTV 30,PTV
+Dose 5700[cGy],Control
+Dose105[%]2-PTV,Dose Region
+Dose 50 [%]2,Control
+Dose 100 [%]2,Control
+Dose 105 [%]2,Control
+Dose 50 [%],Dose Region
+Dose 100 [%],Dose Region
+Dose 105 [%],Dose Region
+30Gy PREV Sum,Dose Region
+20Gy PREV Sum,Dose Region
+10Gy PREV Sum,Dose Region
+GTV 5 21Gy/3#,GTV
+PTV 5 21Gy/3#,PTV
+GTV 4 15Gy/3#,GTV
+GTV 3 21Gy/3#,GTV
+GTV 1 15Gy/3#,GTV
+PTV 4 15Gy/3#,PTV
+PTV 3 21Gy/3#,PTV
+PTV 1 15Gy/3#,PTV
+PTV 6 21Gy/3#,PTV
+PTV 9 21Gy/3#,PTV
+PTV 8 21Gy/3#,PTV
+PTV 7 21Gy/3#,PTV
+GTV 9 21Gy/3#,GTV
+GTV 8 21Gy/3#,GTV
+GTV 7 21Gy/3#,GTV
+GTV 6 21Gy/3#,GTV
+Dose 50[%]BRER,Control
+Dose 90[%]BRER,Control
+Dose 5000[cGy],Control
+ANAL MARKER,None
+Body-PTV54+0.8cm,None
+Cold PTV ant rt,Control
+CTVn,None
+Dose 109[%]1,Control
+eval PTV 54 a,PTV
+opt PTV lat ant,PTV
+opt PTV lat post,PTV
+Wet Gauze Bolus,None
+1 cm Bol LtGroin,
+Dose 102[%]OUT,Dose Region
+D107,None
+Pelvic Bones,Organ
+Prosthesis,None
+opt GTV,GTV
+opt PTV 40b,PTV
+Staples/bed,None
+PTV 9 27Gy,PTV
+GTV 6 24Gy,GTV
+PTV 6 24Gy,PTV
+Rectal Air,None
+GTVn,None
+0.5cmBol RtGroin,
+0.5cmBol LtGroin,
+Breast expander2,None
+PTV node_eval,None
+Implant L 2,Organ
+D338[cGy]-bob,Control
+Dose 100[%]1,Control
+Dose 50[%]1,Control
+Contrast/Air,None
+T6,None
+PRV3 PLEXUS,Avoidance
+eval ITV 60,CTV
+opt ITV 50,CTV
+opt PTV 60 2MM,PTV
+GTV pre op,GTV
+PTV 27 Gy,PTV
+Normal Tissue,PTV
+CTVoriginal,CTV
+GTVoriginal,GTV
+PTVoriginal,PTV
+Rectum,Avoidance
+Bladder,Avoidance
+Dose 50[%]PROS,Dose Region
+Dose 95[%]PROS,Control
+CouchRailLeft1,Support
+CouchRailRight1,Support
+Dose 104.5[%]2,Control
+Eval PTV Ear,None
+Wires -EARL,Avoidance
+PTV Ear,PTV
+PTVScalp,PTV
+Eval PTV Scalp,PTV
+CTV Scalp,CTV
+CTV Ear,Nodes
+Wires -SCPR,None
+1.0cm EARL Bolus,
+1.0cm SCPR Bolus,
+Bolus Block EARL,
+Block Bolus0.5,
+Dose 50[%]vmat,Control
+opt PTV Ear,PTV
+opt PTV 56 L d,PTV
+opt PTV 56 R d,PTV
+opt PTV 63b,PTV
+Dose 95[%] BOB,Dose Region
+Dose 5985cGy BOB,Dose Region
+opt PTV 63 c,PTV
+Dose 5985[cGy],Dose Region
+Dose 4800[cGy],Dose Region
+Avoid RT,Control
+PTV SBRT,PTV
+opt PTV45b,PTV
+opt PTV45a,PTV
+opt PTV5.4b,PTV
+CTV50.4,None
+opt PTV 5.4,PTV
+D108[%]-bob pelb,Control
+D108[%]-bob cerv,Control
+opt PTV5.4a,PTV
+PTV50.4,None
+Dose 109[%],Dose Region
+PTVn eval,PTV
+CTV 56 L orig,CTV
+CTV 70 orig,CTV
+PTV 56 L orig,PTV
+PTV 70 orig,PTV
+BOLUS PINK STUFF,None
+5mm Bolus,
+Dose 70Gy bob,Dose Region
+Dose 5992cGy,Dose Region
+Dose 4000cGy bob,Dose Region
+PTV 52.5,PTV
+CTV 52.5,CTV
+D5040,None
+D7140,None
+GTV 1 TRAC,GTV
+PTV 1 TRAC,PTV
+PTV All LUNL,PTV
+ITV TRACH,CTV
+ITV 2,CTV
+ITV 3,CTV
+eval PTV 60 RO,PTV
+PTV 60 skin crop,PTV
+opt PTV (orbit),PTV
+eval CTV (orbit),CTV
+GTVpet,GTV
+RT 0.5cm Bolus,
+LT 0.5cm Bolus,
+Dose 105 OUT,Dose Region
+Dose 105[%]IN,Control
+PETn,None
+PTVN,None
+PTVN BOOS,None
+CTVN BOOS,None
+PTV orig,PTV
+CTV orig,CTV
+Kidney L2,Organ
+Kidney R2,Organ
+Stoma,None
+PTV eval (RO),None
+PTV 60/15,PTV
+IGTV 60/15,GTV
+EVAL ITV 50,CTV
+EVAL ITV 60,CTV
+Dose 75[%],Dose Region
+Vessels R,CTV
+Vessels L,CTV
+CTVNodes 55,Organ
+LT Prosthesis,Organ
+PTVNodes 55,None
+D4725 bob,Control
+CTV 48,None
+PTV 48,None
+Ear Avoid,None
+CTV 1 21Gy,CTV
+GTV 1 21Gy,GTV
+CTV2 24Gy,CTV
+Dose105-PTV RT,Dose Region
+opt PTV RT,Control
+ITV LT PET,CTV
+AIR/CONTRAST,None
+GTV N,None
+PTV66/33,PTV
+CTV66/33,CTV
+Dose 95[%]2,Dose Region
+D5000[cGy]-bob,Control
+D5000[cGy]-bob2,Control
+Dose 103.5[%],Control
+L4,None
+T7,None
+1 cm Bolus,
+PTV4,PTV
+opt PTV 4 18Gy,PTV
+GTV4,GTV
+PTV3,PTV
+GTV 1 18Gy,GTV
+GTV 2 18Gy,GTV
+GTV 4 18Gy,GTV
+PTV total,None
+CTV 30,CTV
+PTV36,PTV
+CTV36,None
+CTV40,None
+PTV40,None
+PTV 30,PTV
+eval CTV 66,CTV
+Dose 95[%] bob,Dose Region
+Dose 40Gy bob,Dose Region
+45 Gy IDL,Control
+opt PTV L1,PTV
+PTV L1 27Gy,PTV
+Spinal Cord L1,Organ
+CTV T11 27,CTV
+GTV T11 27,GTV
+PTV T11 27,PTV
+MOD PTV L1,PTV
+MOD PTV T11,PTV
+opt PTV T11,PTV
+Dose 100[%] T,Control
+Dose 100[%] L,Control
+D4560,None
+PTV36/20,PTV
+CTV36/20,CTV
+RT prosthesis,Organ
+LT prosthesis,Organ
+L2,None
+Large Bowel,None
+D50[%]-C1-INGR,Control
+D107.5[%]-bob,Control
+Scapula Lt,Organ
+Clavicle L,Organ
+d4675[cGy]-BOB,Control
+D4650[cGy]-B,Control
+Dose100[%],Control
+Normal tissue,Organ
+PRV3 LLens,Organ
+PRV3 RLens,Organ
+GTV 1 AVE,GTV
+Surgical Clips,None
+GTV node,None
+Normal Tissue 46,Avoidance
+Dose 105[%]OUT,Dose Region
+Dose 105% out,Dose Region
+Normal Tissue 50,Avoidance
+Dose 107[%] bob,Dose Region
+Dose 5992cGy bob,Dose Region
+45GyIDL,Dose Region
+Spinal Canal,None
+eval PTV photon,PTV
+1.0Bolus,
+BARTS Bolus,
+BARTSBolus,
+Brain,CTV
+CTV50,Treated Volume
+PTV66,None
+PTV60,None
+CTV66,None
+opt PTV66,PTV
+PTVeval 60,PTV
+PTVeval 50,PTV
+PTVeval 66,PTV
+PTVeval All,PTV
+opt PTV50,PTV
+D110[%]-BOB1,Control
+opt PTV 60a,PTV
+opt PTV60b,PTV
+opt CTV 60,CTV
+GTV - Edema,GTV
+eval CTV 54,Nodes
+Dose 100[%] BREL,Dose Region
+Dose 50[%] BREL,Control
+Dose 50[%]0,Dose Region
+Dose 100[%]0,Dose Region
+Dose 105[%]0,Dose Region
+NodesR,Nodes
+NodesL,Nodes
+Cavity2,Organ
+PREV 50% PARL,None
+BOB D 5800[cGy],Dose Region
+BOB D 107[%]3,Control
+Dose 4500[cGy]2,Dose Region
+Dose 5600[cGy],Control
+Spinal Canal1,Organ
+opt PTV 66,GTV
+PTV 18Gy/3#,PTV
+GTV 18Gy/3#,GTV
+PTV_eval Nodes,None
+New Cavity,None
+Lenses,GTV
+Dose 5850[cGy],Dose Region
+CTVp,Nodes
+Cavity BRBL,GTV
+CTV Cavity BRBL,CTV
+PTV Cavity BRBL,PTV
+PTV eval BRBL,PTV
+Cavity LT BREL,GTV
+CTV Cav LT BREL,CTV
+PTV Cavi LT BREL,PTV
+PTV eval LT BREL,PTV
+PTV eval LT,PTV
+PTV Cavity LT,PTV
+CTV Cavity LT,CTV
+Cavity LT,GTV
+Cavity RT,GTV
+Edge Guide 1,PTV
+Edge Guide 2,PTV
+Staples,None
+Dose 50[%].,Control
+Dose 100[%].,Dose Region
+Dose 112[%]2,Control
+Dose 115[%]4,Control
+Dose 103[%],Control
+Dose 109[%]2,Control
+Dose 103[%]2,Control
+Dose 90[%]HIP,Dose Region
+Dose 50[%]HIPL,Dose Region
+Dose 90[%]PELL,Control
+Dose 50[%]PELL,Control
+PREV PROS D50,Control
+PREV PELB D50,Control
+Bowel avoidance,None
+Dose 6000cGy out,Dose Region
+Dose 6650[cGy],Control
+CTV46,Nodes
+INF BB,None
+D4675[cGy]-1 bob,Control
+D4675[cGy]-2 bob,Control
+PTV 9 27Gy/3#,PTV
+PTV 8 24Gy/3#,PTV
+PTV 7 27Gy/3#,PTV
+PTV 6 24Gy/3#,PTV
+GTV 9 27Gy/3#,GTV
+GTV 8 24Gy/3#,GTV
+GTV 7 27Gy/3#,GTV
+GTV 6 24Gy/3#,GTV
+GTV 10 24Gy/3#,GTV
+PTV 10 24Gy/3#,PTV
+Dose 50% BREL,Control
+thyroid,None
+Dose 108.5[%],Control
+Avoid Post1,Control
+BOB 105[%]2,Control
+BOB 5400[cGy]2,Dose Region
+BOB 5778[cGy]2,Control
+BOB 95[%]2,Dose Region
+D50[%]-C1-ABDO,Control
+IGTV 48/4,GTV
+PTV 48/4,PTV
+PTV 1 16Gy/3#,PTV
+GTV 1 16Gy/3#,GTV
+Beam Edge Guide,PTV
+PREV LUNR D50,Dose Region
+GTV DI CT Dec22,GTV
+D105,Dose Region
+Esoph-Stomach,Organ
+Dose 6000[cGy]1,Control
+PTV 70-ALL,PTV
+PTVp 70,PTV
+CTVn 63,CTV
+PTVn 70,PTV
+PTVn 63,PTV
+GTVn 70,Nodes
+CTV L 70,CTV
+PTV L 70,PTV
+GTV 8  27Gy,GTV
+GTV SACR,None
+Bolus,None
+PTV Wh Brn 12/3,PTV
+PTV Total 21,PTV
+Dose 2150[cGy],Control
+PTV CHWR,PTV
+GTV CHWR,GTV
+CTV CHWR,CTV
+1.0cm BolusSCPR,
+CTV INGR,CTV
+GTV INGR,GTV
+PTV INGR,PTV
+Dose 102[%]2,Dose Region
+opt PTV45,PTV
+D105,None
+PREV 50% BRER BH,None
+GTV 8 27Gy/3#,GTV
+GTV 9 24Gy/3#,GTV
+PTV 8 27Gy/3#,PTV
+PTV 9 24Gy/3#,PTV
+75% bob,Dose Region
+1cm RT groin,
+1cm LT groin,
+1cm post,
+Prothesis hip R,None
+D4760[cGy]-bob,Control
+PTV55/20,None
+CTV55/20,None
+PTV 50/20,PTV
+opt PTV 50 R b,PTV
+opt PTV 50 R a,PTV
+CTV 50/20,CTV
+PREV 20Gy esoph,Dose Region
+65Gy bob sum,Dose Region
+Dose 6200[cGy],Dose Region
+eval CTV crop,CTV
+CTV low dose,PTV
+Dose 105[%]IM,Dose Region
+Dose 6400[cGy],Dose Region
+Dose 6300[cGy].,Dose Region
+PTV NEW,PTV
+CTV new,CTV
+CTV38Gy/19,Nodes
+PTV 38Gy/19#,PTV
+Lung B new,Organ
+Dose 104[%]2,Dose Region
+Dose 104[%].,Dose Region
+Ectopic Kidney L,Organ
+Vesseks,Organ
+CTV56 orig,CTV
+PTV56 orig,PTV
+CTV 56 correct,None
+PTV 56 Correct,None
+CTV P,None
+Dose 50%,Dose Region
+Dose 100%,Dose Region
+Dose 105%,Dose Region
+Iliac L,Nodes
+Iliac R,Nodes
+Seminal Ves,Organ
+D5040.2,None
+Genitalia,None
+GTV PET,Nodes
+CHWL2+AXIL2 prev,None
+CTV SUM,CTV
+PTV sum 21 Gy,PTV
+CTV54,Nodes
+CTV59.4,CTV
+Groin Bolus,None
+Body-PTV 45,Avoidance
+Body-Bolus,Avoidance
+eval PTV59.4,PTV
+eval PTV45,PTV
+opt PTV59.4,PTV
+Body-PTV59.4,Avoidance
+Dose 5040[cGy]1,Control
+PREV LUNL D50,Dose Region
+Dose 105[%]-PTV,Dose Region
+PREV 50% BREL,None
+ext iliac L,Nodes
+ext iliac R,Nodes
+Anal canal,None
+PRV8,Avoidance
+CTV 66 L,CTV
+Dose 2125cGyPREV,Control
+D 50% AXIL,Dose Region
+Dose 5150[cGy],Control
+opt PTV 20 L,GTV
+CTV 20 L,Nodes
+PTV 20 L,PTV
+Cavity1,GTV
+Dose 100[%]UTER,Control
+optCTV46,CTV
+PTV-Total,PTV
+GTV-Total,GTV
+Normal Tissue,Control
+PRV canal,Avoidance
+D4670[cGy]-BOB-A,Control
+D4670[cGy]-BOB-B,Control
+Dose 6000[cGy] 2,Dose Region
+Dose 107[%]4,Control
+Dose 95[%]4,Control
+Dose 6000[cGy]4,Dose Region
+Dose 60 OUT4,Dose Region
+Dose 60 OUT2,Dose Region
+Dose 95[%]3,Control
+Dose 107[%]4 2,Control
+Dose 60 out3,Dose Region
+Dose 60 OUT IMRT,Dose Region
+D80,Control
+D25 Gy - C1 prev,Control
+Nodes Axilla I,Organ
+Nodes Axilla II,Organ
+Nodes Axilla III,Organ
+Nodes SC,Organ
+eval PTV36,Avoidance
+Mesorectum,None
+PTV  54,PTV
+PTV  36,PTV
+GTVn,GTV
+50gy bob,Dose Region
+Dose 110[%]-BOB,Control
+Body-Bolus,None
+D4560,Control
+CTVall,CTV
+PRV Brach Plex,None
+opt PTV 1mm,PTV
+opt PTV eval,PTV
+Lungs,None
+Iliac vessels L,Nodes
+Iliac vessels R,Nodes
+T2TSE nodes,None
+PET nodes,None
+CTV 44,CTV
+opt PTV 44 L a,PTV
+opt PTV 44 L b,PTV
+PTV 44,PTV
+Dose 1908[cGy],Control
+LAD,None
+D4670[cGy]-bob,Control
+Med BB,Treated Volume
+Nodes Level III,Nodes
+D4675[cGy]-BOB-A,Control
+D4675[cGy]-BOB-B,Control
+? Tumour bed,None
+Wires,None
+Body-Arm,None
+Digits,Organ
+PTV64,PTV
+BB/TATTOO,Control
+opt PTV54b,PTV
+opt PTV54a,PTV
+Dose 50[%] 1,Control
+Spinal Canal out,Organ
+Bone,Organ
+Dose 50[%]2,Control
+Dose 100[%]2,Control
+BOB 110[%],Control
+small bowel,Organ
+3mm Bolus,
+CTV LT,CTV
+GTV LT,GTV
+GTV RT,GTV
+CTV RT,CTV
+RT PROSTHESIS,Organ
+LT PROSTHESIS,Organ
+Pec major/minor,Organ
+CTV 63 L orig,CTV
+CTV 56 R orig,CTV
+CTV 63 R orig,CTV
+PTV 56 R orig,PTV
+PTV 63 orig,PTV
+Dose 107[%]2,Dose Region
+GTV 2 32.5Gy/5#,GTV
+PTV 2 32.5Gy/5#,PTV
+BOB 107[%],Control
+RT LUNG + FLUID,None
+Dose 100[%] SPIT,Dose Region
+Dose 100[%] SPIL,Control
+Dose 50[%] SPIL,Control
+Nodes AxillaIII,Nodes
+vessels+1.5,None
+CTV36,CTV
+CTV40,CTV
+PTV40,PTV
+opt PTV 36 a,PTV
+opt PTV 36 b,PTV
+BOB 95 OUT,Dose Region
+BOB 95[%],Control
+BOB 95[%]3,Control
+BOB 104[%]3,Control
+CTV BLAD,CTV
+Prostate,Nodes
+Body-PTVLLL+2,Avoidance
+PTV 3 RLLat,None
+PTV 2 RLL,None
+PTV 1 LLL,None
+ITV 1 LLL,CTV
+GTV 1 LLL,GTV
+GTV 2 RLL,GTV
+GTV 3 RLLat,GTV
+GTV PET 3 RLLat,GTV
+GTV PET 2 RLL,GTV
+GTV PET 1 LLL,GTV
+PTVLLL+2,Control
+ITV 2 RLL,None
+ITV 3 RLLat,None
+PTV RLL All,None
+opt PTV RLL,PTV
+D105 RT,Control
+ITV RLL All,None
+GTVm,GTV
+PTV 20 Gy,PTV
+PTV 18 Gy,PTV
+PTVn 46Gy,PTV
+PTV 50Gy,PTV
+opt PTV 46 R a,PTV
+opt PTV 46 R b,PTV
+BOB 4876[cGy],Dose Region
+BOB 105.5[%],Control
+PRV3 Lenses,None
+Dose100%,Dose Region
+PREV BRER D50%,Control
+PREV BREL D50%,Control
+LT Cavity,CTV
+LT CTV Cavity,CTV
+LT PTV Cavity,PTV
+LT PTV eval,PTV
+LT Scar Wire,None
+RT Cavity,CTV
+RT CTV Cavity,CTV
+RT PTV Cavity,PTV
+RT PTV eval,PTV
+RT Scar Wire,None
+LT 0.5cm bolus,
+LT-Cavity,CTV
+LT-CTV Cavity,CTV
+LT-PTV Cavity,PTV
+LT-PTV eval,PTV
+LT-Scar Wire,None
+RT-Cavity,CTV
+RT-CTV Cavity,CTV
+RT-PTV Cavity,PTV
+RT-PTV eval,PTV
+RT-Scar Wire,None
+GTV_PET,None
+Dose 107%,Dose Region
+Dose 106[%] bob,Dose Region
+BOB 50[%],Control
+Adjusted Bolus,None
+MetallicLock Bar,None
+GTV 2 21Gy,GTV
+Brain,Avoidance
+CTV 1,CTV
+D1300[cGy]-bob,Control
+D1050[cGy]-bob,Control
+BOB 105[%],PTV
+BOB 109[%],Control
+BOB 107[%],Dose Region
+1.0cm Bolus post,
+Normal Tissue 48,Avoidance
+Left LENS,Organ
+R LENS,Organ
+PTV eval,Treated Volume
+bb,None
+PTV Cavity LT,None
+PTV Cavity RT,PTV
+PTV eval LT,None
+PTV eval RT,PTV
+OralAvoidance,None
+Dose 5320 bob,Dose Region
+PTV55,None
+CTV55,None
+D4725,Control
+D5225,Control
+D4275,Control
+PRV5 CE,Avoidance
+Dose 75[%],Control
+Dose 90[%] MEDI,Control
+Dose 50[%]MEDI,Control
+BRAIN,Avoidance
+LARYNX,Avoidance
+MANDIBLE,Organ
+Dose 50[%] TONS,Control
+BOB 4500[cGy],Dose Region
+CTV BOOS,CTV
+GTV BOOS,GTV
+Dose 100[%] TONS,Control
+BOB 4536[cGy],Control
+BOB 109[%]2,Control
+PTV 45 R,PTV
+BOB 109[%]NEW2,Control
+PTV 3 24Gy,PTV
+bob 30[%],Control
+Dose 107.5[%],Dose Region
+opt PTVall +0.1,PTV
+eval PTV 1,PTV
+eval PTV 2,PTV
+PTV All eval,PTV
+GTV3,GTV
+PTV 35 Gy,PTV
+Fiducial Marker,None
+PRV4 Rectum,None
+LacrimalGland_L,Organ
+Dose 50[%].,Dose Region
+Kidneys,None
+Hardware LT,None
+D50.5(Gy)-bob,Control
+D5060[cGy]-bob,Control
+PTV 70Gy,PTV
+CTV 70 Gy,CTV
+CTVn 70Gy,CTV
+CTVn56R,CTV
+CTVn56L,CTV
+PTVn56 R,PTV
+PTVn56 L,PTV
+PTV 70 ALL,PTV
+CTV 70 ALL,CTV
+iliac R,Nodes
+iliac L,Nodes
+Spinal Canal2,Organ
+Kidney Pelvic,Organ
+Bolus,PTV
+1 cm bolus,
+PTV5mm,PTV
+GTV 25,Nodes
+CTV 25,CTV
+PTV 25,PTV
+BOB 5700[cGy],Dose Region
+GTV MRI,None
+CTV 50B,CTV
+PTV 60 SKIN CROP,PTV
+PTV 50 SKIN CROP,PTV
+NEURO OAR 54,None
+CTV 50 ALL,CTV
+CTV 60 SKIN CROP,CTV
+EVAL CTV 54,CTV
+opt PTV,None
+Spinal cord,None
+PTV 27Gy,PTV
+SpinalCanal1,Organ
+Uterus,GTV
+Cervix/Vagina,CTV
+CTV55,Nodes
+PTV55,Organ
+Uterus +1.7cm,Organ
+Cervix/Vag +1.3,None
+PTV-EARL,PTV
+CTV-EARL,CTV
+CTV-NOSE,CTV
+PTV-NOSE,PTV
+opt PTV-NOSE,PTV
+opt PTV-EARL,PTV
+Moustache avoid,None
+opt PTV-ALL+.1,None
+Body-PTV 30,Avoidance
+1.0cmBolus Lt Gr,
+1.0cmBolus Rt Gr,
+PREV BRER D50,Control
+opt PTV1,None
+PET Original,None
+PTV C7T4 20/5,PTV
+PTV T6-8 8/1,PTV
+CTV C7T4 20/5,CTV
+CTV T6-8 8/1,CTV
+CiED-Pacemaker,None
+PTV Eval,PTV
+opt PTVbl,PTV
+opt PTVal,PTV
+opt PTVh,PTV
+opt PTVl,PTV
+opt PTVbh,PTV
+opt PTVah,PTV
+opt PTV 25,PTV
+Lt Prosthesis,Organ
+Dose 25GyANUS,Dose Region
+Dose 12.5GyANUS,Dose Region
+3D BolusfromCBCT,Treated Volume
+Body+Mask,Avoidance
+Dose95[%]OROP,Control
+Dose 50[%]OROP,Control
+ESOPH,None
+D95 PELB,Control
+opt Small Bowel,Organ
+opt PTV66a,PTV
+opt PTV60a,PTV
+opt PTV46b,PTV
+opt PTV46a,PTV
+opt PTV66b,PTV
+WET GAUZE,Bolus
+PTV 18Gy,PTV
+eval PTV B,PTV
+GTV orig,GTV
+opt PTV-ITV,PTV
+Neural PRV5mm,None
+GTV 2 32.5Gy,GTV
+GTV 3 32.5Gy,GTV
+GTV 4 35Gy,GTV
+GTV Rt PreOp,GTV
+PTV 2 32.5Gy,PTV
+PTV 3 32.5Gy,PTV
+PTV 4 35Gy,PTV
+CTV 1,None
+CTV 3,None
+meso + 10,None
+CTV iliac,None
+MesoRect+presacr,Organ
+Iliac vess L,Nodes
+Iliac vess R,Nodes
+Anus,None
+node + 10,None
+BOB 105[%]3,Dose Region
+PTV BOOS,PTV
+opt PTV BOOS,PTV
+BOB 104[%]2,Control
+BOB 95[%]2,Control
+PTV-SKIN,PTV
+PTV eval BRBR,PTV
+PTV Cavity2,PTV
+Cavity BRBR,GTV
+PTV eval BRER,PTV
+PTV Cavity1,PTV
+CTV Cavity BRBR,CTV
+Cavity BRER,GTV
+CTVboost14.4/8,Nodes
+Uterus/Cervix,GTV
+PTVboost14.4/8,None
+CTV prostate,CTV
+D80,None
+D80b,Control
+GTV plus 7mm,None
+Pre-op Tumor CT,None
+Pre-op Tumor MRI,None
+Pre-op Tumor+2cm,None
+CTV 2.0 Gy - new,CTV
+opt PTV 76.2,PTV
+opt PTV 71.1,PTV
+GTV-New,None
+Postop Tumor MRI,None
+CTV 2.6 Gy - new,None
+PTV 2.0 Gy - new,None
+PTV 2.6 Gy - new,None
+CTV 2.3 Gy - new,None
+PTV 2.3 Gy - new,None
+BOB 5700[cGy],Control
+BOB 104.5[%],Control
+BOB 5500[cGy],Dose Region
+Celiac,Organ
+Match points,
+D106.5[%]-BOB,Control
+D104.5[%]-BOB,Control
+CTV 30,None
+PTV 30,None
+opt PTVall,PTV
+opt PTVa40,PTV
+opt PTVb30,PTV
+opt PTVc 30-40,PTV
+opt PTVc2-30-40,PTV
+D3210[cGy]-BOB,Control
+D3150[cGy]-bob,Control
+PTV 24Gy,PTV
+Dose 115[%],Dose Region
+BOB 111[%],Control
+Bolus,
+PTV50/20,PTV
+opt PTVb,None
+opt PTVa,None
+PTV40/20,PTV
+PTV eval orig,PTV
+Lung B1,None
+PTV Cavity orig,PTV
+CTV Cavity orig,CTV
+Cavity orig,GTV
+BOB 95[%],Dose Region
+Dose 45Gy IDL,Control
+PTV 48Gy,PTV
+PTV nodes + IMC,PTV
+opt PTV 54 R,PTV
+BOB 60 OUT,Dose Region
+BOB X,Dose Region
+BOB 6000[cGy],Dose Region
+BOB 6000[cGy] 2,Dose Region
+BOB 108[%],Control
+BOB 106.5[%],Control
+BOB 57 OUT,Dose Region
+PTV-CTV,None
+PTV 46/23,PTV
+CTV 46/23,None
+opt Lung L,Avoidance
+opt Lung R,Control
+mod PTV,PTV
+Bowel bag,Organ
+Airway,None
+opt PTV68,PTV
+opt CTV48,CTV
+BOB 4896[cGy]2,Dose Region
+BrachialPlexsR,None
+BrachialPlexsL,None
+GTVSkin,None
+PTV3.3Gy/Frac,None
+CTV3.3Gy/Frac,None
+opt PTV 48 R c,PTV
+opt PTV 60a,None
+opt PTV 60 b,None
+BOB 6996[cGy]8,Control
+BOB 6420[cGy],Dose Region
+eval PTV70,PTV
+eval PTV60,PTV
+Skull,Organ
+0.8cm Bolus,
+Dose 108[%] bob,Dose Region
+Prostate,CTV
+PTV46-CTV46,None
+PTV66-CTV66,None
+PTV60-CTV60,None
+5040 bob,Dose Region
+Cricoid level,None
+CTV Cavity ORIG,CTV
+PTV eval ORIG,PTV
+PTV Cavity ORIG,PTV
+PTVall,PTV
+CTV 1 35gy,CTV
+HTV 1 35Gy,GTV
+optPTV ring,None
+opt PTV,CTV
+CA,None
+SC+0.5,None
+Contrast/Gas,None
+Vessels+1,None
+PTV45pelvis,PTV
+CTV45pelvis,CTV
+opt PTV45pelvis,PTV
+opt PTV50.4,PTV
+Dose 112[%],Dose Region
+WIRE,None
+PTV 60 Gy,PTV
+BOB 106[%]2,Control
+PRV Lenses 3mm,Control
+PRV3mm Globes,Avoidance
+Pros,CTV
+Dose 5040[cGy]2,Dose Region
+CTV 76/38,CTV
+PTV 76/38,PTV
+CTV 46/23,CTV
+eval PTV 46/23,PTV
+PTV_High,PTV
+FieldGuide_CLAL,None
+Field Guide,None
+CTV suggest,Control
+Pre-op GTV,None
+GTV suggest,None
+PTV suggest,None
+PTV skin crop,PTV
+Pulmonary Artery,None
+PRV3 Plexus,Avoidance
+D104.5[%]-bob,Control
+0.5CM Bolus,
+Wire / bb,None
+GroinRIGHT,None
+groin LEFT,None
+Anus,Organ
+GTV Vagina,GTV
+PTV55.8,PTV
+BOWEL OVERLAP,None
+Dose100(%),Control
+Dose105(%),Control
+CTV prostate,None
+Dose 55Gy sum,Control
+Dose 104% bob,Dose Region
+Fiducial Markers,None
+fiducial,None
+PTVeval,PTV
+Dose 105[%]3,Dose Region
+CTVn boos,None
+CTV boos,CTV
+PTV boos comb,None
+CTV boos comb,None
+AxillaryNerves R,None
+CTV70,None
+CTV60,None
+NodeSmall,None
+PTV70,None
+Bladder.,None
+Rectum.,None
+CTVP,None
+CTVp orig,CTV
+CTVALL,CTV
+Dose 80[%]2,Dose Region
+PTV prostate,None
+D104,Control
+GTV 2 27.5Gy,GTV
+GTV 1 27.5Gy,GTV
+PTV 2 27.5Gy,PTV
+opt PTV 2,PTV
+Node L,Nodes
+Node R,Nodes
+Rectosigmoid,None
+PTVn,None
+D105[%] BOB,Dose Region
+D105[%]B,Dose Region
+CTV 1 32.5Gy/5#,CTV
+Dose 50% BOB,Dose Region
+Pros,None
+opt PTV55b,PTV
+opt PTV55a,PTV
+Kidney_R,Organ
+Kidney_L,Organ
+PTVEVAL,PTV
+Dose 95[%]5,Control
+Dose 105[%]6,Control
+PTV_R_Node14.4,PTV
+PTV_L_Node14.4,PTV
+Uterus,None
+BOB 106[%],Dose Region
+optLung L,Avoidance
+GTV,CTV
+PTV LUNL,PTV
+PTV RIBL,PTV
+GTV RIBL,GTV
+D80% LUNL,Control
+Dose 1000[cGy],Control
+opt Bowel,Organ
+BOB 107[%]2,Control
+opt PTV 56 R,PTV
+ITV-T-LR,CTV
+PTV-E,PTV
+PTV45-T,PTV
+LR full,None
+LR-empty,None
+CTV-T LRFull,CTV
+GTV-T,GTV
+CTV-LR-Empty,CTV
+vessels+1,None
+PTVn1-55.8Gy,PTV
+PTVn2-59.4Gy,PTV
+eval PTV 55.8Gy,PTV
+opt PTV 55.8 L a,PTV
+opt PTV 55.8 L b,PTV
+opt PTV 59.4 R a,PTV
+opt PTV 59.4 R b,PTV
+OARs,Organ
+CTV primary,CTV
+eval PTV nodes,PTV
+PTV primary,PTV
+MissingTissueBol,None
+PTV 50.4 Gy,PTV
+RACOUSTIC,Organ
+LACOUSTIC,Organ
+Body-PTV+0.8,None
+CTV Cavity Eval,CTV
+PTV30,None
+Bone,None
+opt PTV36,PTV
+opt PTV30,PTV
+Normal Tissue2,Avoidance
+BOB 112[%],Control
+CTVboth,CTV
+BOB 4560[cGy],Dose Region
+BOB 5000[cGy],Dose Region
+Hand L,Organ
+PTV50-CTV50,PTV
+Body-Bolus,Control
+optPTV,None
+Prox Bronch Tree,Avoidance
+Prox Bronc  Zone,Organ
+CTV 24,CTV
+opt PTV 24,PTV
+SUP 1.0cm Bolus,
+INF 1.0cm Bolus,
+BrainStem,None
+OpticChiasm,None
+OpticNerve L,None
+OpticNerve R,None
+MesoRect+Presacr,Organ
+GTVn_Rt_II,Nodes
+GTVn_Rt_IVB,GTV
+Dose60Gy,Avoidance
+Prox bronch zone,None
+Prox bronch tree,None
+BRAIN,Organ
+PREV 48Gy,None
+PREV 24Gy,None
+PREV 45.6Gy,None
+PREV 4.8Gy,None
+PREV 2.4Gy,None
+CTV40,Nodes
+D4505[cGy]-bobnb,Control
+D4500[cGy]-bob3,Control
+Kidney RT,None
+Vagina FullORIG,Organ
+Dose 105.5% BOB,Dose Region
+Lip,None
+opt PTV 56 a,PTV
+BOB 6000 IN,Dose Region
+IGTV LUNR,GTV
+ITV LUNR,CTV
+PTV LUNR,PTV
+PRV5 Plexus,Organ
+CTV_1+2,CTV
+SP PRV,Avoidance
+CTV_R,CTV
+CTV_L,CTV
+opt PTV21Gy,PTV
+PTV 21Gy,PTV
+Thymus,None
+Dose 106[%]1,Control
