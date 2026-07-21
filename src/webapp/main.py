@@ -128,8 +128,20 @@ class FolderScanResponse(BaseModel):
     files: List[FolderScanFileEntry]
 
 
+class FolderBrowserDirectoryEntry(BaseModel):
+    name: str
+    path: str
+
+
+class FolderBrowserResponse(BaseModel):
+    current_path: str
+    parent_path: Optional[str] = None
+    directories: List[FolderBrowserDirectoryEntry]
+
+
 class NetworkFileLoadRequest(BaseModel):
     file_path: str
+    root_path: Optional[str] = None
 
 
 class PreviewResponse(BaseModel):
@@ -312,16 +324,36 @@ def _get_folder_scan_settings() -> dict:
     """Return the configured folder-scan settings with defaults applied."""
     settings = _load_webapp_settings()
     folder_scan = settings.get('folder_scan', settings.get('folder_scan_settings', {}))
-    root_path_value = folder_scan.get('root_path', './Test Data/Anonymized Cases')
+    root_path_value = str(folder_scan.get('root_path', '')).strip()
     include_subdirectories = _coerce_bool(
         folder_scan.get('include_subdirectories', True),
         default=True,
     )
-    root_path = _resolve_config_path(root_path_value)
+    root_path = _resolve_config_path(root_path_value) if root_path_value else None
     return {
-        'root_path': str(root_path),
+        'root_path': str(root_path) if root_path is not None else '',
         'include_subdirectories': include_subdirectories,
     }
+
+
+def _resolve_scan_root_path(root_path_override: Optional[str] = None) -> Path:
+    """Resolve and validate the root path used for folder scanning."""
+    folder_scan = _get_folder_scan_settings()
+    configured_root = str(folder_scan.get('root_path', '')).strip()
+    requested_root = str(root_path_override or configured_root).strip()
+    if not requested_root:
+        raise HTTPException(
+            status_code=400,
+            detail='Scan folder is not configured in webapp_settings.json',
+        )
+
+    root_path = _resolve_config_path(requested_root)
+    if not root_path.exists() or not root_path.is_dir():
+        raise HTTPException(
+            status_code=404,
+            detail=f'Scan folder not found: {root_path}',
+        )
+    return root_path
 
 
 def _build_structure_file_info(struct_file: Path) -> dict:
@@ -901,24 +933,61 @@ async def get_webapp_settings():
     return FolderScanSettingsResponse(**folder_scan)
 
 
+@app.get('/api/network/folders', response_model=FolderBrowserResponse)
+async def list_network_folders(path: Optional[str] = None):
+    """List immediate subfolders for folder-browsing in the web UI."""
+    try:
+        current_path = _resolve_scan_root_path(path)
+
+        parent_path: Optional[str] = None
+        parent_candidate = current_path.parent
+        if parent_candidate != current_path:
+            parent_path = str(parent_candidate)
+
+        directories: List[FolderBrowserDirectoryEntry] = []
+        try:
+            for child in current_path.iterdir():
+                if child.is_dir():
+                    directories.append(
+                        FolderBrowserDirectoryEntry(name=child.name, path=str(child))
+                    )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail=f'Permission denied reading folders under: {current_path}',
+            ) from exc
+
+        directories.sort(key=lambda entry: entry.name.lower())
+        return FolderBrowserResponse(
+            current_path=str(current_path),
+            parent_path=parent_path,
+            directories=directories,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception('Failed to list network folders: %s', exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f'Failed to list network folders: {exc}',
+        ) from exc
+
+
 @app.get('/api/network/structure-files', response_model=FolderScanResponse)
-async def scan_network_structure_files(include_subdirectories: Optional[bool] = None):
+async def scan_network_structure_files(
+    include_subdirectories: Optional[bool] = None,
+    root_path: Optional[str] = None,
+):
     """Scan the configured folder for RT Structure files."""
     try:
         folder_scan = _get_folder_scan_settings()
-        root_path = Path(folder_scan['root_path'])
+        resolved_root_path = _resolve_scan_root_path(root_path)
         if include_subdirectories is None:
             include_subdirectories = folder_scan['include_subdirectories']
 
-        if not root_path.exists() or not root_path.is_dir():
-            raise HTTPException(
-                status_code=404,
-                detail=f'Scan folder not found: {root_path}',
-            )
-
-        scanned_files = _scan_structure_files(root_path, include_subdirectories)
+        scanned_files = _scan_structure_files(resolved_root_path, include_subdirectories)
         return FolderScanResponse(
-            root_path=str(root_path),
+            root_path=str(resolved_root_path),
             include_subdirectories=include_subdirectories,
             files=[
                 FolderScanFileEntry(
@@ -992,8 +1061,7 @@ async def upload_dicom(file: UploadFile = File(...)):
 @app.post('/api/network/load', response_model=UploadResponse)
 async def load_network_dicom(request: NetworkFileLoadRequest):
     """Create a session for a DICOM file already present on a shared path."""
-    folder_scan = _get_folder_scan_settings()
-    root_path = Path(folder_scan['root_path'])
+    root_path = _resolve_scan_root_path(request.root_path)
     file_path = _resolve_config_path(request.file_path)
 
     if not file_path.exists() or not file_path.is_file():

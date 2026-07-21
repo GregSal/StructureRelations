@@ -53,6 +53,21 @@
                             <span class="folder-scan-label">Starting folder</span>
                             <span class="folder-scan-path" id="networkFolderPath">Loading...</span>
                         </div>
+                        <div class="button-group folder-scan-path-actions">
+                            <button class="btn btn-secondary" id="browseNetworkFolderBtn" type="button">Browse Folders</button>
+                        </div>
+                        <div class="folder-scan-manual-path">
+                            <label for="networkFolderManualPath">Alternate UNC path</label>
+                            <div class="folder-scan-manual-path-controls">
+                                <input
+                                    type="text"
+                                    id="networkFolderManualPath"
+                                    placeholder="\\\\server\\share\\folder"
+                                    spellcheck="false"
+                                >
+                                <button class="btn btn-secondary" id="applyNetworkFolderPathBtn" type="button">Use Path</button>
+                            </div>
+                        </div>
                         <label class="toggle-label folder-scan-toggle">
                             <input type="checkbox" id="includeSubdirectoriesToggle" checked>
                             <span>Include subdirectories</span>
@@ -67,6 +82,27 @@
                 </div>
                 <div class="disk-warning" id="diskWarning" style="display: none;">
                     <p>⚠️ Session storage usage is high. Older sessions may be automatically deleted.</p>
+                </div>
+
+                <div id="networkFolderBrowserModal" class="diagram-structure-modal" style="display: none;">
+                    <div class="diagram-structure-modal-backdrop" id="networkFolderBrowserBackdrop"></div>
+                    <div class="diagram-structure-modal-dialog network-folder-browser-dialog" role="dialog" aria-modal="true" aria-labelledby="networkFolderBrowserTitle">
+                        <div class="diagram-structure-modal-header">
+                            <h3 id="networkFolderBrowserTitle">Browse Alternate Starting Folder</h3>
+                            <button type="button" class="btn btn-secondary btn-sm" id="networkFolderBrowserCloseBtn">Close</button>
+                        </div>
+                        <div class="network-folder-browser-current" id="networkFolderBrowserCurrentPath"></div>
+                        <div class="button-group network-folder-browser-controls">
+                            <button class="btn btn-secondary btn-sm" id="networkFolderBrowserUpBtn" type="button">Up One Level</button>
+                            <button class="btn btn-secondary btn-sm" id="networkFolderBrowserRefreshBtn" type="button">Refresh</button>
+                        </div>
+                        <p class="upload-status" id="networkFolderBrowserStatus" aria-live="polite"></p>
+                        <div class="network-folder-browser-list" id="networkFolderBrowserList"></div>
+                        <div class="button-group">
+                            <button class="btn btn-secondary" id="networkFolderBrowserCancelBtn" type="button">Cancel</button>
+                            <button class="btn btn-primary" id="networkFolderBrowserUseBtn" type="button">Use This Folder</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
