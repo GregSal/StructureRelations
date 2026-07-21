@@ -458,11 +458,19 @@ def parse_structure_metadata(
         note_failures=note_failures,
         drop_blanks=drop_blanks,
     )
-    parsed.index.rename(structure_column, inplace=True)
+    # Clean up the expansion columns before merging with the metadata
+    #parsed.index.rename(structure_column, inplace=True)
+    cleaned_parse = _collapse_expansion_columns(parsed)
+    relevant_parsed = cleaned_parse.dropna(axis=1, how='all')
 
-    metadata_indexed = metadata.copy().set_index(structure_column)
-    merged = parsed.merge(metadata_indexed, how='left', left_index=True, right_index=True)
-    return _collapse_expansion_columns(merged)
+    # jOIN the relevant parsed columns with the selected metadata columns
+    selected_columns = ['Structure ID', 'DICOM Type', 'Structure Code',
+                        'Coding Scheme', 'Code Meaning']
+    selected_metadata = metadata[selected_columns].copy()
+    metadata_indexed = selected_metadata.set_index(structure_column)
+    merged = relevant_parsed.merge(metadata_indexed, how='left',
+                                   left_index=True, right_index=True)
+    return merged
 
 
 __all__ = [
