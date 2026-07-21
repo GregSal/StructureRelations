@@ -372,7 +372,18 @@ def build_structure_id_regex() -> re.Pattern[str]:
 
 
 def merge_priority_columns(df: pd.DataFrame, columns: list[str]) -> pd.Series:
-    '''Return the first non-empty value across a set of columns.'''
+    '''Return first non-empty value across columns (left to right) for each row.
+
+    ags:
+        df (pd.DataFrame): The DataFrame containing the columns to merge.
+        columns (list[str]): A list of column names to merge. The order of the
+            columns in the list determines the priority of the values
+            (leftmost column has highest priority).
+
+    returns:
+        pd.Series: A Series containing the first non-empty value for each row
+            across the specified columns.
+    '''
     if not columns:
         raise ValueError('columns must contain at least one column name')
 
