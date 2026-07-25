@@ -20,6 +20,11 @@ from matplotlib.lines import Line2D
 import networkx as nx
 import pandas as pd
 
+from structure_grouping import (
+    build_structure_grouping_table,
+    default_structure_group_definition_set,
+)
+
 
 VIS_TO_MPL_MARKER = {
     'ellipse': 'o',
@@ -601,8 +606,9 @@ def render_template_diagram(structure_set,
     Args:
         structure_set: StructureSet instance with ``summary()`` and
             ``relationship_graph``.
-        structures_df (pd.DataFrame): Parsed structure metadata indexed by name,
-            containing ``h_grouping`` and ``v_grouping`` columns.
+        structures_df (pd.DataFrame): Parsed structure metadata or a
+            precomputed placement table. When placement columns are absent,
+            grouping is derived from the default class-based grouping policy.
         diagram_settings_path (str | Path): Path to diagram settings JSON.
         hide_logical_edges (bool): Whether to hide logical/inferred edges.
         horizontal_spacing (float): Distance between horizontal groups.
@@ -656,6 +662,20 @@ def render_template_diagram(structure_set,
     summary_df = structure_set.summary().copy()
     node_color_map = get_node_color_map(structure_set, default_color=node_fill_color)
 
+    vertical_order_value = vertical_order or DEFAULT_VERTICAL_ORDER
+    grouping_df = structures_df.copy()
+    if 'h_index' not in grouping_df.columns or 'v_index' not in grouping_df.columns:
+        # Accept either a precomputed placement table or raw metadata.
+        # If placement columns are missing we derive them with the default
+        # class-based grouping policy so rendering always has deterministic
+        # horizontal/vertical coordinates.
+        grouping_df = build_structure_grouping_table(
+            structures_df=grouping_df,
+            grouping_definition_set=default_structure_group_definition_set(
+                vertical_order=vertical_order_value,
+            ),
+        )
+
     dicom_type_summary_col = None
     for candidate in ['DICOM Type', 'DICOM_Type']:
         if candidate in summary_df.columns:
@@ -664,63 +684,71 @@ def render_template_diagram(structure_set,
 
     plot_nodes = summary_df[['ROI', 'Name']].copy()
     plot_nodes['Name'] = plot_nodes['Name'].astype(str)
-    plot_nodes = plot_nodes.merge(
-        structures_df[['h_grouping', 'v_grouping']],
-        left_on='Name',
-        right_index=True,
-        how='left',
-    )
 
-    if dicom_type_summary_col is not None:
-        plot_nodes['DICOM Type'] = summary_df[dicom_type_summary_col].astype(str)
-    elif 'DICOM Type' in structures_df.columns:
+    grouping_columns = [
+        column
+        for column in [
+            'ROINumber',
+            'Structure ID',
+            'DICOM Type',
+            'h_grouping',
+            'v_grouping',
+            'h_key',
+            'v_key',
+            'h_index',
+            'v_index',
+            'v_dup_index',
+            'placement_order',
+            'is_unique_slot',
+        ]
+        if column in grouping_df.columns
+    ]
+    if 'ROINumber' in grouping_columns:
+        # Preferred merge: grouping table indexed by ROI number. Using
+        # right_index avoids duplicating the ROI key and aligns with
+        # structure_grouping's canonical ROI index.
         plot_nodes = plot_nodes.merge(
-            structures_df[['DICOM Type']],
-            left_on='Name',
+            grouping_df[grouping_columns],
+            left_on='ROI',
             right_index=True,
             how='left',
         )
+    elif 'ROINumber' in grouping_df.index.names:
+        # Compatibility fallback for grouping tables that index by ROI number.
+        plot_nodes = plot_nodes.merge(
+            grouping_df[grouping_columns],
+            left_on='ROI',
+            right_index=True,
+            how='left',
+        )
+    else:
+        # Compatibility fallback for dataframes that only expose Structure ID.
+        # This path supports older notebook flows and ad-hoc metadata tables.
+        plot_nodes = plot_nodes.merge(
+            grouping_df[grouping_columns],
+            left_on='Name',
+            right_on='Structure ID',
+            how='left',
+        )
+
+    if dicom_type_summary_col is not None:
+        plot_nodes['DICOM Type'] = summary_df[dicom_type_summary_col].astype(str)
+    elif 'DICOM Type' in plot_nodes.columns:
         plot_nodes['DICOM Type'] = plot_nodes['DICOM Type'].fillna('Unknown').astype(str)
     else:
         plot_nodes['DICOM Type'] = 'Unknown'
 
-    vertical_order_value = vertical_order or DEFAULT_VERTICAL_ORDER
-    vertical_order_index = {
-        name: idx for idx, name in enumerate(vertical_order_value)
-    }
-
-    plot_nodes['h_grouping'] = plot_nodes['h_grouping'].apply(_coerce_horizontal_group)
-    plot_nodes['v_grouping'] = plot_nodes['v_grouping'].fillna('(ungrouped)').astype(str)
-
-    h_order = sorted(plot_nodes['h_grouping'].unique(), key=_horizontal_sort_key)
-    h_index_map = {group_name: idx for idx, group_name in enumerate(h_order)}
-    plot_nodes['h_index'] = plot_nodes['h_grouping'].map(h_index_map)
-    plot_nodes['v_sort_key'] = plot_nodes['v_grouping'].map(
-        lambda val: _vertical_sort_key(val, vertical_order_index)
-    )
-
-    plot_nodes = plot_nodes.sort_values(
-        by=['h_index', 'v_sort_key', 'Name', 'ROI']
-    ).reset_index(drop=True)
-
-    vertical_index_map = {}
-    for h_group, group_rows in plot_nodes.groupby('h_grouping', sort=False):
-        v_order = (
-            group_rows[['v_grouping', 'v_sort_key']]
-            .drop_duplicates()
-            .sort_values(by='v_sort_key')
-        )
-        vertical_index_map[h_group] = {
-            group_name: idx
-            for idx, group_name in enumerate(v_order['v_grouping'].tolist())
-        }
-
-    plot_nodes['v_index'] = plot_nodes.apply(
-        lambda row: vertical_index_map[row['h_grouping']][row['v_grouping']],
-        axis=1,
-    ).astype(int)
-    plot_nodes['v_dup_index'] = plot_nodes.groupby(['h_grouping', 'v_grouping']).cumcount()
-    plot_nodes = plot_nodes.drop(columns=['v_sort_key'])
+    plot_nodes['h_grouping'] = plot_nodes['h_grouping'].fillna('missing').astype(str)
+    plot_nodes['v_grouping'] = plot_nodes['v_grouping'].fillna('missing').astype(str)
+    plot_nodes['h_index'] = plot_nodes['h_index'].fillna(0).astype(int)
+    plot_nodes['v_index'] = plot_nodes['v_index'].fillna(0).astype(int)
+    plot_nodes['v_dup_index'] = plot_nodes['v_dup_index'].fillna(0).astype(int)
+    sort_columns = [
+        column
+        for column in ['placement_order', 'h_index', 'v_index', 'Name', 'ROI']
+        if column in plot_nodes.columns
+    ]
+    plot_nodes = plot_nodes.sort_values(by=sort_columns).reset_index(drop=True)
 
     plot_nodes['vis_shape'] = plot_nodes['DICOM Type'].str.upper().map(shape_map)
     plot_nodes['vis_shape'] = plot_nodes['vis_shape'].fillna(default_vis_shape)

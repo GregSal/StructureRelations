@@ -160,6 +160,8 @@ def build_target_classifier_fragment() -> str:
     return ''.join([
         r'(?:',
         fr'(?P<Classifier>{_alternation(TARGET_CLASSIFIERS)})',
+        # Do not match if followed by another letter, which prevents partial
+        # captures from words (e.g. classifier 'n' inside 'neck').
         r'(?![A-Za-z])',
         r')?',
     ])
