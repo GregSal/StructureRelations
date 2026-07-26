@@ -2,6 +2,7 @@
 '''
 # %% Imports
 from typing import Callable, Dict, List, Optional
+import copy
 import logging
 import re
 from pathlib import Path
@@ -114,6 +115,9 @@ class StructureSet:
         self._relationship_matrix_cache: Optional[pd.DataFrame] = None
         self._summary_cache: Optional[pd.DataFrame] = None
         self.slice_relationship_records: Dict[str, List[dict]] = {}
+        self.structure_metadata = pd.DataFrame()
+        self.structure_filter_report = pd.DataFrame()
+        self.structure_filter_config_path: Optional[Path] = None
 
         # Prioritize dicom_structure_file over slice_data
         if dicom_structure_file is not None:
@@ -188,6 +192,7 @@ class StructureSet:
         When building from DICOM, the unit is set to 'cm' because DICOM
         coordinates (in mm) are converted to cm during parsing.
         '''
+        self._capture_structure_metadata()
         if not self.dicom_structure_file.contour_points:
             logger.warning("No contour points found in DicomStructureFile")
             return
@@ -197,6 +202,23 @@ class StructureSet:
         logger.info("Building StructureSet from %d contour points (unit: %s)",
                     len(self.dicom_structure_file.contour_points), self.unit)
         self.build_from_slice_data(self.dicom_structure_file.contour_points)
+
+    def _capture_structure_metadata(self) -> None:
+        '''Store independent structure metadata and filter-report snapshots.'''
+        self.structure_metadata = (
+            self.dicom_structure_file.get_structure_filter_metadata().copy(
+                deep=True,
+            )
+        )
+
+        filter_report = self.dicom_structure_file.structure_filter_report
+        if filter_report.empty:
+            filter_report = self.dicom_structure_file.evaluate_structure_filters()
+
+        self.structure_filter_report = copy.deepcopy(filter_report)
+        self.structure_filter_config_path = (
+            self.dicom_structure_file.structure_filter_config_path
+        )
 
     def build_from_slice_data(self, slice_data: List) -> None:
         '''Build structures from slice data following the StructureSet process.

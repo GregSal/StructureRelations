@@ -20,10 +20,7 @@ from matplotlib.lines import Line2D
 import networkx as nx
 import pandas as pd
 
-from structure_grouping import (
-    build_structure_grouping_table,
-    default_structure_group_definition_set,
-)
+from diagram_layout import LayoutTemplate, apply_layout_template
 
 
 VIS_TO_MPL_MARKER = {
@@ -39,15 +36,6 @@ VIS_TO_MPL_MARKER = {
 }
 
 
-DEFAULT_VERTICAL_ORDER = [
-    'GTV',
-    'CTV',
-    'PTV',
-    'TREATED VOLUME',
-    'SHELL',
-]
-
-
 @dataclass
 class DiagramRenderResult:
     '''Container for diagram rendering outputs.
@@ -61,6 +49,9 @@ class DiagramRenderResult:
         plot_nodes (pd.DataFrame): Node table with grouping/sort metadata.
         relationship_counts (pd.Series): Count of each relation type displayed.
         figure_background (str): Background color currently applied.
+        layout_template_name (str): Name of the applied layout template.
+        display_report (pd.DataFrame): Template-derived visibility report.
+        layout_graph (nx.Graph): Relationship graph used for node placement.
     '''
 
     fig: plt.Figure
@@ -71,6 +62,9 @@ class DiagramRenderResult:
     plot_nodes: pd.DataFrame
     relationship_counts: pd.Series
     figure_background: str
+    layout_template_name: str
+    display_report: pd.DataFrame
+    layout_graph: nx.Graph
 
 
 def vis_shape_to_marker(vis_shape: str) -> str:
@@ -205,72 +199,6 @@ def normalize_edge_style(style: dict[str, Any],
         'dashes': bool(style.get('dashes', fallback.get('dashes', False))),
         'arrows': style.get('arrows', fallback.get('arrows', None)),
     }
-
-
-def _coerce_horizontal_group(raw_value: Any) -> str:
-    '''Normalize horizontal group values for predictable ordering.'''
-    if pd.isna(raw_value):
-        return 'missing'
-    text_value = str(raw_value).strip()
-    if text_value == '':
-        return 'blank'
-
-    lowered = text_value.lower()
-    if lowered == 'none':
-        return 'None'
-    if lowered in {'(ungrouped)', 'ungrouped', 'missing'}:
-        return 'missing'
-
-    return text_value
-
-
-def _is_numeric_group(group_value: Any) -> bool:
-    '''Return whether group text can be interpreted as a number.'''
-    try:
-        float(str(group_value).strip())
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
-def _horizontal_sort_key(group_value: str) -> tuple[int, float, str]:
-    '''Build deterministic left-to-right ordering key.
-
-    Ordering policy:
-    1) numeric groups, 2) text groups, 3) ``None``, 4) blank, 5) missing.
-    '''
-    if group_value == 'None':
-        return (2, 0.0, '')
-    if group_value == 'blank':
-        return (3, 0.0, '')
-    if group_value == 'missing':
-        return (4, 0.0, '')
-    if _is_numeric_group(group_value):
-        return (0, float(str(group_value).strip()), '')
-    return (1, 0.0, str(group_value).lower())
-
-
-def _vertical_order_name(group_value: Any) -> str:
-    '''Map vertical group text to normalized category names.'''
-    upper_value = str(group_value).strip().upper().replace('_', ' ')
-    if upper_value.startswith('GTV'):
-        return 'GTV'
-    if upper_value.startswith('CTV'):
-        return 'CTV'
-    if upper_value.startswith('PTV'):
-        return 'PTV'
-    if upper_value in {'TREATED VOLUME', 'TREATED_VOLUME'}:
-        return 'TREATED VOLUME'
-    if upper_value.startswith('SHELL'):
-        return 'SHELL'
-    return upper_value
-
-
-def _vertical_sort_key(group_value: str,
-                       vertical_order_index: dict[str, int]) -> tuple[int, str]:
-    '''Build deterministic top-to-bottom ordering key.'''
-    normalized = _vertical_order_name(group_value)
-    return (vertical_order_index.get(normalized, len(vertical_order_index)), normalized)
 
 
 def _extract_shaft_vertices(edge_item: dict[str, Any],
@@ -592,32 +520,20 @@ def apply_crossing_heavy_label_offsets(result: DiagramRenderResult,
 
 
 def render_template_diagram(structure_set,
-                            structures_df: pd.DataFrame,
+                            layout_template: LayoutTemplate,
                             diagram_settings_path: str | Path,
                             hide_logical_edges: bool = True,
-                            horizontal_spacing: float = 3.3,
-                            vertical_spacing: float = 1.2,
-                            duplicate_vertical_spread: float = 0.35,
                             node_fill_color: str = '#b7bec8',
-                            vertical_order: list[str] | None = None,
                             show_plot: bool = True) -> DiagramRenderResult:
-    '''Render a relationship diagram using template-based grouping.
+    '''Render a relationship diagram using a required layout template.
 
     Args:
         structure_set: StructureSet instance with ``summary()`` and
             ``relationship_graph``.
-        structures_df (pd.DataFrame): Parsed structure metadata or a
-            precomputed placement table. When placement columns are absent,
-            grouping is derived from the default class-based grouping policy.
+        layout_template: Metadata display, grouping, and positioning policy.
         diagram_settings_path (str | Path): Path to diagram settings JSON.
         hide_logical_edges (bool): Whether to hide logical/inferred edges.
-        horizontal_spacing (float): Distance between horizontal groups.
-        vertical_spacing (float): Distance between vertical groups.
-        duplicate_vertical_spread (float): Offset for duplicate entries in the
-            same vertical group.
         node_fill_color (str): Fallback node color.
-        vertical_order (list[str] | None): Optional override for canonical
-            top-to-bottom category order.
         show_plot (bool): Whether to call ``plt.show()``.
 
     Returns:
@@ -659,96 +575,17 @@ def render_template_diagram(structure_set,
         .get('color', '#FFFFFF')
     )
 
-    summary_df = structure_set.summary().copy()
     node_color_map = get_node_color_map(structure_set, default_color=node_fill_color)
-
-    vertical_order_value = vertical_order or DEFAULT_VERTICAL_ORDER
-    grouping_df = structures_df.copy()
-    if 'h_index' not in grouping_df.columns or 'v_index' not in grouping_df.columns:
-        # Accept either a precomputed placement table or raw metadata.
-        # If placement columns are missing we derive them with the default
-        # class-based grouping policy so rendering always has deterministic
-        # horizontal/vertical coordinates.
-        grouping_df = build_structure_grouping_table(
-            structures_df=grouping_df,
-            grouping_definition_set=default_structure_group_definition_set(
-                vertical_order=vertical_order_value,
-            ),
+    layout_result = apply_layout_template(structure_set, layout_template)
+    plot_nodes = layout_result.plot_nodes.copy()
+    if plot_nodes.empty:
+        raise ValueError(
+            f'Layout template {layout_template.name!r} displayed no nodes',
         )
-
-    dicom_type_summary_col = None
-    for candidate in ['DICOM Type', 'DICOM_Type']:
-        if candidate in summary_df.columns:
-            dicom_type_summary_col = candidate
-            break
-
-    plot_nodes = summary_df[['ROI', 'Name']].copy()
     plot_nodes['Name'] = plot_nodes['Name'].astype(str)
-
-    grouping_columns = [
-        column
-        for column in [
-            'ROINumber',
-            'Structure ID',
-            'DICOM Type',
-            'h_grouping',
-            'v_grouping',
-            'h_key',
-            'v_key',
-            'h_index',
-            'v_index',
-            'v_dup_index',
-            'placement_order',
-            'is_unique_slot',
-        ]
-        if column in grouping_df.columns
-    ]
-    if 'ROINumber' in grouping_columns:
-        # Preferred merge: grouping table indexed by ROI number. Using
-        # right_index avoids duplicating the ROI key and aligns with
-        # structure_grouping's canonical ROI index.
-        plot_nodes = plot_nodes.merge(
-            grouping_df[grouping_columns],
-            left_on='ROI',
-            right_index=True,
-            how='left',
-        )
-    elif 'ROINumber' in grouping_df.index.names:
-        # Compatibility fallback for grouping tables that index by ROI number.
-        plot_nodes = plot_nodes.merge(
-            grouping_df[grouping_columns],
-            left_on='ROI',
-            right_index=True,
-            how='left',
-        )
-    else:
-        # Compatibility fallback for dataframes that only expose Structure ID.
-        # This path supports older notebook flows and ad-hoc metadata tables.
-        plot_nodes = plot_nodes.merge(
-            grouping_df[grouping_columns],
-            left_on='Name',
-            right_on='Structure ID',
-            how='left',
-        )
-
-    if dicom_type_summary_col is not None:
-        plot_nodes['DICOM Type'] = summary_df[dicom_type_summary_col].astype(str)
-    elif 'DICOM Type' in plot_nodes.columns:
-        plot_nodes['DICOM Type'] = plot_nodes['DICOM Type'].fillna('Unknown').astype(str)
-    else:
-        plot_nodes['DICOM Type'] = 'Unknown'
-
-    plot_nodes['h_grouping'] = plot_nodes['h_grouping'].fillna('missing').astype(str)
-    plot_nodes['v_grouping'] = plot_nodes['v_grouping'].fillna('missing').astype(str)
-    plot_nodes['h_index'] = plot_nodes['h_index'].fillna(0).astype(int)
-    plot_nodes['v_index'] = plot_nodes['v_index'].fillna(0).astype(int)
-    plot_nodes['v_dup_index'] = plot_nodes['v_dup_index'].fillna(0).astype(int)
-    sort_columns = [
-        column
-        for column in ['placement_order', 'h_index', 'v_index', 'Name', 'ROI']
-        if column in plot_nodes.columns
-    ]
-    plot_nodes = plot_nodes.sort_values(by=sort_columns).reset_index(drop=True)
+    plot_nodes['DICOM Type'] = (
+        plot_nodes['DICOM Type'].fillna('Unknown').astype(str)
+    )
 
     plot_nodes['vis_shape'] = plot_nodes['DICOM Type'].str.upper().map(shape_map)
     plot_nodes['vis_shape'] = plot_nodes['vis_shape'].fillna(default_vis_shape)
@@ -773,11 +610,11 @@ def render_template_diagram(structure_set,
                 dark_color=font_dark_color,
                 light_color=font_light_color,
             ),
-            subset=int(row['h_index']),
-            h_grouping=row['h_grouping'],
-            v_grouping=row['v_grouping'],
-            v_index=int(row['v_index']),
-            v_dup_index=int(row['v_dup_index']),
+            subset=int(row.get('h_index', 0)),
+            h_grouping=row.get('h_grouping', ''),
+            v_grouping=row.get('v_grouping', ''),
+            v_index=int(row.get('v_index', 0)),
+            v_dup_index=int(row.get('v_dup_index', 0)),
         )
 
     fallback_style = relationship_styles_cfg.get('UNKNOWN', {})
@@ -819,14 +656,7 @@ def render_template_diagram(structure_set,
     if relationship_graph.number_of_nodes() == 0:
         raise ValueError('No nodes available for plotting')
 
-    positions = {}
-    for roi, node_data in relationship_graph.nodes(data=True):
-        x_coord = node_data['subset'] * horizontal_spacing
-        y_coord = -(
-            node_data['v_index'] * vertical_spacing
-            + node_data['v_dup_index'] * duplicate_vertical_spread
-        )
-        positions[roi] = (x_coord, y_coord)
+    positions = layout_result.positions
 
     fig, axis = plt.subplots(figsize=(16, 10))
     axis.set_facecolor(figure_background)
@@ -988,7 +818,7 @@ def render_template_diagram(structure_set,
 
     axis.set_title(
         'Target Structure Relationships\n'
-        'Horizontal: h_grouping | Vertical: v_grouping'
+        f'Layout template: {layout_result.template_name}'
     )
     axis.axis('off')
     plt.tight_layout()
@@ -1011,4 +841,7 @@ def render_template_diagram(structure_set,
         plot_nodes=plot_nodes,
         relationship_counts=count_series,
         figure_background=figure_background,
+        layout_template_name=layout_result.template_name,
+        display_report=layout_result.display_report,
+        layout_graph=layout_result.layout_graph,
     )

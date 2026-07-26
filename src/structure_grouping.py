@@ -287,6 +287,21 @@ def load_structure_grouping_source(
         )
         metadata = metadata.loc[selection].copy()
 
+    return prepare_structure_grouping_source(metadata)
+
+
+def prepare_structure_grouping_source(metadata: pd.DataFrame) -> pd.DataFrame:
+    '''Prepare an ROI-indexed metadata snapshot for grouping analysis.
+
+    Args:
+        metadata: Per-ROI structure metadata containing ``Structure ID``.
+
+    Returns:
+        pd.DataFrame: Parsed metadata indexed by ROI when available.
+    '''
+    if metadata.empty:
+        return metadata.copy()
+
     parsed = parse_structure_metadata(metadata)
     if parsed.empty:
         result = metadata.copy()
@@ -297,15 +312,14 @@ def load_structure_grouping_source(
             result.set_index('ROINumber', inplace=True, drop=False)
         return result
 
-    metadata_by_structure = metadata.set_index('Structure ID', drop=False)
-    extra_columns = [
+    parsed_columns = [
         column
-        for column in metadata_by_structure.columns
-        if column not in parsed.columns
+        for column in parsed.columns
+        if column not in metadata.columns
     ]
-    merged = parsed.merge(
-        metadata_by_structure[extra_columns],
-        left_index=True,
+    merged = metadata.merge(
+        parsed[parsed_columns],
+        left_on='Structure ID',
         right_index=True,
         how='left',
     )
@@ -488,4 +502,5 @@ __all__ = [
     'build_structure_grouping_table',
     'default_structure_group_definition_set',
     'load_structure_grouping_source',
+    'prepare_structure_grouping_source',
 ]
