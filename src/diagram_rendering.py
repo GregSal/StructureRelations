@@ -96,6 +96,58 @@ def vis_shape_to_boxstyle(vis_shape: str) -> str:
     return 'round,pad=0.28,rounding_size=0.2'
 
 
+def _widen_figure_for_node_labels(
+    fig: plt.Figure,
+    axis: plt.Axes,
+    node_text_artists: dict[int, Any],
+    positions: dict[int, tuple[float, float]],
+    minimum_gap_px: float = 8.0,
+) -> None:
+    '''Widen a figure until adjacent node labels on each row do not overlap.'''
+    rows: dict[float, list[int]] = {}
+    for roi, (_, y_coord) in positions.items():
+        rows.setdefault(round(float(y_coord), 9), []).append(roi)
+
+    for _ in range(3):
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        required_scale = 1.0
+
+        for row_rois in rows.values():
+            ordered_rois = sorted(
+                row_rois,
+                key=lambda roi: positions[roi][0],
+            )
+            for left_roi, right_roi in zip(ordered_rois, ordered_rois[1:]):
+                left_x = axis.transData.transform(positions[left_roi])[0]
+                right_x = axis.transData.transform(positions[right_roi])[0]
+                center_distance = float(right_x - left_x)
+                if center_distance <= 0:
+                    continue
+
+                left_box = node_text_artists[left_roi].get_window_extent(renderer)
+                right_box = node_text_artists[right_roi].get_window_extent(renderer)
+                required_distance = (
+                    left_box.width / 2
+                    + right_box.width / 2
+                    + minimum_gap_px
+                )
+                required_scale = max(
+                    required_scale,
+                    required_distance / center_distance,
+                )
+
+        if required_scale <= 1.0:
+            return
+
+        fig.set_size_inches(
+            fig.get_figwidth() * required_scale * 1.02,
+            fig.get_figheight(),
+            forward=True,
+        )
+        fig.tight_layout()
+
+
 def darken_color(hex_color: str) -> str:
     '''Return a darkened version of an RGB hex color.
 
@@ -710,9 +762,10 @@ def render_template_diagram(structure_set,
         })
 
     # Draw nodes as labeled annotation boxes so shape/style can track config.
+    node_text_artists = {}
     for roi, node_data in relationship_graph.nodes(data=True):
         x_coord, y_coord = positions[roi]
-        axis.text(
+        node_text_artists[roi] = axis.text(
             x_coord,
             y_coord,
             node_data['label'],
@@ -822,6 +875,12 @@ def render_template_diagram(structure_set,
     )
     axis.axis('off')
     plt.tight_layout()
+    _widen_figure_for_node_labels(
+        fig,
+        axis,
+        node_text_artists,
+        positions,
+    )
 
     if show_plot:
         plt.show()

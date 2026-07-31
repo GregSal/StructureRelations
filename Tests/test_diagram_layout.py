@@ -175,6 +175,27 @@ def test_apply_layout_template_filters_nodes_and_positions() -> None:
     assert not bool(result.display_report.loc[2, 'DisplayedByDefault'])
 
 
+def test_grouped_grid_template_hides_x_prefixed_targets() -> None:
+    '''Resident contours should remain hidden even when target rules match.'''
+    metadata = pd.DataFrame([
+        {
+            'ROINumber': 1,
+            'Structure ID': 'x PTV56',
+            'DICOM Type': 'PTV',
+            'SelectedByDefault': False,
+            'DisplayedByDefault': False,
+        },
+    ]).set_index('ROINumber', drop=False)
+
+    result = evaluate_template_display_rules(
+        metadata,
+        default_grouped_grid_template(),
+    )
+
+    assert not bool(result.loc[1, 'DisplayedByDefault'])
+    assert result.loc[1, 'TemplateFinalMatch'] == 'resident-contours'
+
+
 def test_apply_layout_template_preserves_unparsed_visible_structures() -> None:
     '''Grouping preparation should not drop non-target metadata rows.'''
     template = LayoutTemplate(

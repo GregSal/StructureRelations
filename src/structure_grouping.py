@@ -26,6 +26,7 @@ DEFAULT_VERTICAL_ORDER = (
     'SHELL',
 )
 _EMPTY_GROUP_VALUES = {'missing', 'blank'}
+_EMPTY_HIERARCHY_VALUES = {*_EMPTY_GROUP_VALUES, 'None'}
 
 
 def _normalize_group_value(
@@ -62,13 +63,64 @@ def _parse_numeric_value(value: str) -> float | None:
         return None
 
 
+def _trim_horizontal_path(values: tuple[str, ...]) -> tuple[str, ...]:
+    '''Remove trailing empty levels from one horizontal hierarchy path.'''
+    path_length = len(values)
+    while (
+        path_length > 0
+        and values[path_length - 1] in _EMPTY_HIERARCHY_VALUES
+    ):
+        path_length -= 1
+    return values[:path_length]
+
+
+def _centered_horizontal_indices(
+    rows: pd.DataFrame,
+    horizontal_columns: list[str],
+) -> list[float]:
+    '''Center parent paths over evenly spaced terminal descendants.'''
+    if not horizontal_columns:
+        return [0.0] * len(rows)
+
+    row_paths = [
+        _trim_horizontal_path(tuple(row[column] for column in horizontal_columns))
+        for _, row in rows.iterrows()
+    ]
+    unique_paths = list(dict.fromkeys(row_paths))
+    leaf_paths = [
+        path
+        for path in unique_paths
+        if not any(
+            len(candidate) > len(path)
+            and candidate[:len(path)] == path
+            for candidate in unique_paths
+        )
+    ]
+    leaf_positions = {
+        path: float(index)
+        for index, path in enumerate(leaf_paths)
+    }
+    path_positions = {}
+    for path in unique_paths:
+        descendant_positions = [
+            position
+            for leaf_path, position in leaf_positions.items()
+            if leaf_path[:len(path)] == path
+        ]
+        path_positions[path] = (
+            sum(descendant_positions) / len(descendant_positions)
+        )
+
+    return [path_positions[path] for path in row_paths]
+
+
 @dataclass(frozen=True)
 class GroupFieldDefinition:
     '''Define one grouping field and its sort behavior.
 
     Attributes:
         axis: Whether the grouping is horizontal or vertical.
-        hierarchy_rank: Order within the axis refinement sequence.
+        hierarchy_rank: Order within the global refinement sequence.
         source_columns: One or more parsed or metadata columns used to derive
             the grouping value.
         level_name: Human-readable name for this hierarchy level.
@@ -189,14 +241,22 @@ class GroupDefinitionSet:
     name: str
     field_definitions: tuple[GroupFieldDefinition, ...]
 
+    def definitions_in_hierarchy_order(
+        self,
+    ) -> tuple[GroupFieldDefinition, ...]:
+        '''Return definitions ordered by rank, then declaration order.'''
+        return tuple(sorted(
+            self.field_definitions,
+            key=lambda definition: definition.hierarchy_rank,
+        ))
+
     def definitions_for_axis(self, axis: GroupAxis) -> tuple[GroupFieldDefinition, ...]:
         '''Return field definitions for one axis ordered by hierarchy rank.'''
-        axis_definitions = [
+        return tuple(
             definition
-            for definition in self.field_definitions
+            for definition in self.definitions_in_hierarchy_order()
             if definition.axis == axis
-        ]
-        return tuple(sorted(axis_definitions, key=lambda definition: definition.hierarchy_rank))
+        )
 
 
 def default_structure_group_definition_set(
@@ -210,7 +270,7 @@ def default_structure_group_definition_set(
             GroupFieldDefinition(
                 axis='horizontal',
                 hierarchy_rank=1,
-                level_name='Target Bucket',
+                level_name='Target Groups',
                 source_columns=(
                     'TargetNumber',
                     'TargetDose',
@@ -232,15 +292,8 @@ def default_structure_group_definition_set(
             ),
             GroupFieldDefinition(
                 axis='vertical',
-                hierarchy_rank=1,
-                level_name='Mod',
-                source_columns=('Mod',),
-                sort_mode='alphabetical',
-            ),
-            GroupFieldDefinition(
-                axis='vertical',
-                hierarchy_rank=2,
-                level_name='Vertical Family',
+                hierarchy_rank=3,
+                level_name='Target Type',
                 source_columns=(
                     'DICOM Type',
                     'TargetType',
@@ -252,7 +305,14 @@ def default_structure_group_definition_set(
             ),
             GroupFieldDefinition(
                 axis='vertical',
-                hierarchy_rank=3,
+                hierarchy_rank=2,
+                level_name='Target Mods',
+                source_columns=('Mod',),
+                sort_mode='alphabetical',
+            ),
+            GroupFieldDefinition(
+                axis='horizontal',
+                hierarchy_rank=2,
                 level_name='Target Subgroup',
                 source_columns=('TargetSubGroup',),
                 sort_mode='alphabetical',
@@ -365,18 +425,23 @@ def build_structure_grouping_table(
     # already the index name. Keeping both in this table makes merge targets
     # ambiguous in pandas (index level + column label with the same name).
 
-    axis_group_columns: dict[str, list[str]] = {'horizontal': [], 'vertical': []}
-    axis_sort_columns: dict[str, list[str]] = {'horizontal': [], 'vertical': []}
+    axis_group_columns: dict[GroupAxis, list[str]] = {
+        'horizontal': [],
+        'vertical': [],
+    }
+    definition_columns: list[
+        tuple[GroupFieldDefinition, str, str]
+    ] = []
 
-    for axis, prefix in (('horizontal', 'h'), ('vertical', 'v')):
-        definitions = grouping_set.definitions_for_axis(axis)
-        for level_index, definition in enumerate(definitions, start=1):
-            group_column = f'{prefix}_group_{level_index}'
-            sort_column = f'_{group_column}_sort_key'
-            result[group_column] = result.apply(definition.build_group_value, axis=1)
-            result[sort_column] = result[group_column].map(definition.sort_key)
-            axis_group_columns[axis].append(group_column)
-            axis_sort_columns[axis].append(sort_column)
+    for definition in grouping_set.definitions_in_hierarchy_order():
+        prefix = 'h' if definition.axis == 'horizontal' else 'v'
+        level_index = len(axis_group_columns[definition.axis]) + 1
+        group_column = f'{prefix}_group_{level_index}'
+        sort_column = f'_{group_column}_sort_key'
+        result[group_column] = result.apply(definition.build_group_value, axis=1)
+        result[sort_column] = result[group_column].map(definition.sort_key)
+        axis_group_columns[definition.axis].append(group_column)
+        definition_columns.append((definition, group_column, sort_column))
 
     horizontal_columns = axis_group_columns['horizontal']
     vertical_columns = axis_group_columns['vertical']
@@ -398,19 +463,16 @@ def build_structure_grouping_table(
 
     sort_records = []
     for row_index, row in result.iterrows():
-        horizontal_sort = tuple(
-            row[column] for column in axis_sort_columns['horizontal']
-        )
-        vertical_sort = tuple(
-            row[column] for column in axis_sort_columns['vertical']
+        hierarchy_sort = tuple(
+            row[sort_column]
+            for _, _, sort_column in definition_columns
         )
         # Tie-break on ROI to keep ordering stable across runs even when two
         # structures share identical grouping and sort keys.
         roi_number = row.get('ROINumber', row_index)
         sort_records.append((
             row_index,
-            horizontal_sort,
-            vertical_sort,
+            hierarchy_sort,
             str(row.get('Structure ID', '')),
             str(roi_number),
         ))
@@ -419,7 +481,7 @@ def build_structure_grouping_table(
         row_index
         for row_index, *_ in sorted(
             sort_records,
-            key=lambda item: (item[1], item[2], item[3], item[4]),
+            key=lambda item: (item[1], item[2], item[3]),
         )
     ]
     result = result.loc[ordered_index].copy()
@@ -447,20 +509,41 @@ def build_structure_grouping_table(
     result['v_slot_key'] = v_slot_keys
     result['slot_key'] = list(zip(result['h_key'], result['v_slot_key']))
 
-    horizontal_index_map: dict[tuple[str, ...], int] = {}
     vertical_index_maps: dict[tuple[str, ...], dict[tuple[str, ...], int]] = {}
-    horizontal_indices = []
+    horizontal_indices = _centered_horizontal_indices(
+        result,
+        horizontal_columns,
+    )
     vertical_indices = []
 
+    vertical_definitions = [
+        definition
+        for definition, _, _ in definition_columns
+        if definition.axis == 'vertical'
+    ]
+    if vertical_definitions:
+        vertical_rank = min(
+            definition.hierarchy_rank
+            for definition in vertical_definitions
+        )
+        vertical_parent_columns = [
+            group_column
+            for definition, group_column, _ in definition_columns
+            if definition.hierarchy_rank < vertical_rank
+        ]
+    else:
+        vertical_parent_columns = horizontal_columns
+
     for _, row in result.iterrows():
-        horizontal_key = row['h_key']
         vertical_key = row['v_slot_key']
+        vertical_parent_key = tuple(
+            row[column] for column in vertical_parent_columns
+        )
 
-        if horizontal_key not in horizontal_index_map:
-            horizontal_index_map[horizontal_key] = len(horizontal_index_map)
-        horizontal_indices.append(horizontal_index_map[horizontal_key])
-
-        vertical_index_map = vertical_index_maps.setdefault(horizontal_key, {})
+        vertical_index_map = vertical_index_maps.setdefault(
+            vertical_parent_key,
+            {},
+        )
         if vertical_key not in vertical_index_map:
             vertical_index_map[vertical_key] = len(vertical_index_map)
         vertical_indices.append(vertical_index_map[vertical_key])
@@ -470,10 +553,13 @@ def build_structure_grouping_table(
     result['v_dup_index'] = 0
     result['is_unique_slot'] = ~result['slot_key'].duplicated(keep=False)
 
-    for sort_columns in axis_sort_columns.values():
-        drop_columns = [column for column in sort_columns if column in result.columns]
-        if drop_columns:
-            result.drop(columns=drop_columns, inplace=True)
+    sort_columns = [
+        sort_column
+        for _, _, sort_column in definition_columns
+        if sort_column in result.columns
+    ]
+    if sort_columns:
+        result.drop(columns=sort_columns, inplace=True)
 
     return result
 

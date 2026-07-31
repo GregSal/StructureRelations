@@ -514,6 +514,15 @@ def default_grouped_grid_template() -> LayoutTemplate:
                     value=r'[GCP]TV',
                 ),
             ),
+            MetadataDisplayRule(
+                rule_id='resident-contours',
+                action='hide',
+                condition=MetadataCondition(
+                    field='Structure ID',
+                    match_type='prefix',
+                    value='x',
+                ),
+            ),
         ),
         grouping_definition_set=default_structure_group_definition_set(),
         algorithm=GroupedGridLayout(),
