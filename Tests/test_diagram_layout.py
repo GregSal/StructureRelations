@@ -18,6 +18,8 @@ from diagram_layout import (
     PrincipleTargetSelectorConfig,
     RelationshipGraphPlanBuilder,
     SpringLayout,
+    TargetOARBipartiteLayout,
+    TargetOARBipartiteLayoutConfig,
     apply_layout_template,
     default_grouped_grid_template,
     evaluate_template_display_rules,
@@ -25,6 +27,7 @@ from diagram_layout import (
     principle_targets_template,
     relationship_spring_template,
     register_layout_template,
+    target_oar_template,
 )
 from diagram_rendering import render_template_diagram
 from structure_grouping import default_structure_group_definition_set
@@ -520,3 +523,224 @@ def test_grouped_grid_template_still_exposes_original_rules() -> None:
     )
 
     assert set(result.plot_nodes['ROI']) == {1, 2, 3, 4, 5, 6, 7}
+
+
+class FakeRelationshipType:
+    '''Minimal relationship-type contract for Target-OAR tests.'''
+
+    def __init__(self, relation_type: str, category: str, label: str) -> None:
+        self.relation_type = relation_type
+        self.category = category
+        self.label = label
+
+
+class FakeRelationship:
+    '''Minimal relationship wrapper for graph edge metadata.'''
+
+    def __init__(self, relation_type: str, category: str, label: str) -> None:
+        self.relationship_type = FakeRelationshipType(
+            relation_type=relation_type,
+            category=category,
+            label=label,
+        )
+
+
+class FakeTargetOARStructureSet:
+    '''StructureSet with targets, OARs, and opt OARs for template tests.'''
+
+    def __init__(self) -> None:
+        self.structure_metadata = pd.DataFrame()
+        self.structure_filter_report = pd.DataFrame([
+            {
+                'ROINumber': 1,
+                'Structure ID': 'eval PTV 56',
+                'DICOM Type': 'PTV',
+                'TargetDose': '56',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': 'eval',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 2,
+                'Structure ID': 'PTV 70',
+                'DICOM Type': 'PTV',
+                'TargetDose': '70',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': '',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 10,
+                'Structure ID': 'Parotid L',
+                'DICOM Type': 'ORGAN',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 11,
+                'Structure ID': 'Mandible',
+                'DICOM Type': 'ORGAN',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 12,
+                'Structure ID': 'Larynx',
+                'DICOM Type': 'ORGAN',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 13,
+                'Structure ID': 'SpinalCord',
+                'DICOM Type': 'ORGAN',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 20,
+                'Structure ID': 'opt Parotid L',
+                'DICOM Type': 'AVOIDANCE',
+                'Mod': 'opt',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 21,
+                'Structure ID': 'opt Larynx',
+                'DICOM Type': 'AVOIDANCE',
+                'Mod': 'opt',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+        ]).set_index('ROINumber', drop=False)
+        self.relationship_graph = nx.DiGraph()
+        self.relationship_graph.add_edge(
+            1,
+            10,
+            relationship=FakeRelationship('OVERLAPS', 'Shared', 'Overlaps with'),
+        )
+        self.relationship_graph.add_edge(
+            2,
+            11,
+            relationship=FakeRelationship('OVERLAPS', 'Shared', 'Overlaps with'),
+        )
+        self.relationship_graph.add_edge(
+            2,
+            12,
+            relationship=FakeRelationship('BORDERS', 'Adjoining', 'Borders'),
+        )
+        self.relationship_graph.add_edge(
+            20,
+            10,
+            relationship=FakeRelationship('PARTITIONED', 'Adjoining', 'is Partitioned by'),
+        )
+        self.relationship_graph.add_edge(
+            21,
+            12,
+            relationship=FakeRelationship('PARTITIONED', 'Adjoining', 'is Partitioned by'),
+        )
+        self.relationship_graph.add_edge(
+            1,
+            21,
+            relationship=FakeRelationship('BORDERS', 'Adjoining', 'Borders'),
+        )
+        self.relationship_graph.add_edge(
+            2,
+            21,
+            relationship=FakeRelationship('OVERLAPS', 'Shared', 'Overlaps with'),
+        )
+
+    def summary(self) -> pd.DataFrame:
+        '''Return rows needed by Target-OAR template planning.'''
+        return pd.DataFrame([
+            {'ROI': 1, 'Name': 'eval PTV 56', 'Physical_Volume': 18.0},
+            {'ROI': 2, 'Name': 'PTV 70', 'Physical_Volume': 25.0},
+            {'ROI': 10, 'Name': 'Parotid L', 'Physical_Volume': 8.0},
+            {'ROI': 11, 'Name': 'Mandible', 'Physical_Volume': 14.0},
+            {'ROI': 12, 'Name': 'Larynx', 'Physical_Volume': 7.0},
+            {'ROI': 13, 'Name': 'SpinalCord', 'Physical_Volume': 6.0},
+            {'ROI': 20, 'Name': 'opt Parotid L', 'Physical_Volume': 4.0},
+            {'ROI': 21, 'Name': 'opt Larynx', 'Physical_Volume': 3.0},
+        ])
+
+
+def test_target_oar_template_is_registered() -> None:
+    '''The Target-OAR template should be retrievable by name.'''
+    template = get_layout_template('target_oar')
+
+    assert template.name == 'target_oar'
+
+
+def test_target_oar_template_selects_targets_oars_and_opt_nodes() -> None:
+    '''Template should select principle targets, ranked OARs, and matched opt nodes.'''
+    result = apply_layout_template(
+        FakeTargetOARStructureSet(),
+        target_oar_template(),
+    )
+
+    nodes = result.plot_nodes.set_index('ROI')
+
+    assert set(nodes.index) == {1, 2, 10, 11, 12, 20, 21}
+    assert nodes.loc[1, 'node_side'] == 'target'
+    assert nodes.loc[2, 'node_side'] == 'target'
+    assert nodes.loc[10, 'node_side'] == 'oar'
+    assert nodes.loc[20, 'node_side'] == 'opt'
+    assert 13 not in nodes.index
+    assert nodes.loc[10, 'weighted_oar_score'] == pytest.approx(-1.0)
+    assert nodes.loc[11, 'weighted_oar_score'] == pytest.approx(1.0)
+    assert nodes.loc[12, 'weighted_oar_score'] == pytest.approx(0.5)
+
+
+def test_target_oar_bipartite_layout_positions_columns_and_midpoints() -> None:
+    '''Target-OAR layout should place columns and opt-node midpoints deterministically.'''
+    result = apply_layout_template(
+        FakeTargetOARStructureSet(),
+        target_oar_template(),
+    )
+
+    positions = result.positions
+
+    assert positions[1][0] == pytest.approx(TargetOARBipartiteLayoutConfig().target_x)
+    assert positions[2][0] == pytest.approx(TargetOARBipartiteLayoutConfig().target_x)
+    assert positions[10][0] == pytest.approx(TargetOARBipartiteLayoutConfig().oar_x)
+    assert positions[20][0] == pytest.approx(TargetOARBipartiteLayoutConfig().opt_x)
+    assert positions[20][1] == pytest.approx(
+        (positions[10][1] + positions[12][1]) / 2.0,
+    )
+
+
+def test_renderer_accepts_target_oar_template() -> None:
+    '''Renderer should draw the Target-OAR template without special-case logic.'''
+    settings_path = (
+        Path(__file__).parents[1]
+        / 'src'
+        / 'webapp'
+        / 'config'
+        / 'diagram_settings.json'
+    )
+
+    result = render_template_diagram(
+        structure_set=FakeTargetOARStructureSet(),
+        layout_template=target_oar_template(),
+        diagram_settings_path=settings_path,
+        show_plot=False,
+    )
+
+    assert result.layout_template_name == 'target_oar'
+    assert set(result.positions) == {1, 2, 10, 11, 12, 20, 21}
+    result.fig.clear()

@@ -56,6 +56,40 @@ class PrincipleTargetSelectorConfig:
 
 
 @dataclass(frozen=True)
+class TargetOARPlanConfig:
+    '''Configuration for selecting and ranking Target-OAR layout nodes.'''
+
+    selector_config: PrincipleTargetSelectorConfig = field(
+        default_factory=PrincipleTargetSelectorConfig,
+    )
+    oar_dicom_type: str = 'ORGAN'
+    opt_prefix: str = 'opt'
+
+
+@dataclass(frozen=True)
+class TargetOARBipartiteLayoutConfig:
+    '''Column and spacing configuration for the Target-OAR template.'''
+
+    target_x: float = 0.0
+    opt_x: float = 4.35
+    oar_x: float = 5.8
+    vertical_spacing: float = 1.0
+    opt_midpoint_jitter: float = 0.07
+    opt_fallback_offset: float = 0.32
+
+    def __post_init__(self) -> None:
+        '''Validate column ordering and spacing values.'''
+        if self.vertical_spacing <= 0:
+            raise ValueError('vertical_spacing must be greater than zero')
+        if not self.target_x < self.opt_x < self.oar_x:
+            raise ValueError('Expected target_x < opt_x < oar_x')
+        if self.opt_midpoint_jitter < 0:
+            raise ValueError('opt_midpoint_jitter must be non-negative')
+        if self.opt_fallback_offset < 0:
+            raise ValueError('opt_fallback_offset must be non-negative')
+
+
+@dataclass(frozen=True)
 class MetadataCondition:
     '''Define one metadata value comparison.'''
 
@@ -338,6 +372,327 @@ def _select_principle_targets(
     return _sort_candidates_stably(selected_table)
 
 
+def _relationship_edge_data_between(
+    relationship_graph: nx.Graph,
+    first_roi: int,
+    second_roi: int,
+) -> dict[str, Any] | None:
+    '''Return edge metadata between two ROIs in either graph direction.'''
+    if relationship_graph.has_edge(first_roi, second_roi):
+        edge_data = relationship_graph.get_edge_data(first_roi, second_roi)
+        if edge_data is not None:
+            return edge_data
+    if relationship_graph.has_edge(second_roi, first_roi):
+        edge_data = relationship_graph.get_edge_data(second_roi, first_roi)
+        if edge_data is not None:
+            return edge_data
+    return None
+
+
+def _relationship_category_name(edge_data: dict[str, Any] | None) -> str:
+    '''Return the relationship category text stored on one graph edge.'''
+    if edge_data is None:
+        return ''
+    relationship = edge_data.get('relationship')
+    relationship_type = getattr(relationship, 'relationship_type', None)
+    category = getattr(relationship_type, 'category', None)
+    if category is None:
+        return ''
+    return str(category)
+
+
+def _relationship_category_rank(category: str) -> float:
+    '''Return the Target-OAR ranking weight for one category label.'''
+    category_ranks = {
+        'shared': 1.0,
+        'adjoining': 0.5,
+        'separate': 0.0,
+    }
+    return category_ranks.get(category.strip().lower(), 0.0)
+
+
+def _build_target_rank_values(num_targets: int) -> list[int]:
+    '''Return centered target-rank values matching notebook behavior.'''
+    if num_targets <= 0:
+        return []
+    if num_targets % 2 == 0:
+        return [
+            rank
+            for rank in range(-(num_targets // 2), (num_targets // 2) + 1)
+            if rank != 0
+        ]
+    return [
+        rank
+        for rank in range(-(num_targets // 2), (num_targets // 2) + 1)
+    ]
+
+
+def _prepare_target_oar_nodes(
+    summary: pd.DataFrame,
+    visible_metadata: pd.DataFrame,
+    grouping_definition_set: GroupDefinitionSet,
+) -> pd.DataFrame:
+    '''Merge summary, metadata, and grouping data for Target-OAR planning.'''
+    metadata = visible_metadata.copy()
+    for column in ('Structure Code', 'Coding Scheme', 'Code Meaning'):
+        if column not in metadata.columns:
+            metadata[column] = ''
+    if 'ROINumber' in metadata.columns:
+        metadata.reset_index(drop=True, inplace=True)
+    else:
+        metadata['ROINumber'] = metadata.index
+        metadata.reset_index(drop=True, inplace=True)
+
+    grouping_source = prepare_structure_grouping_source(metadata)
+    grouping_table = build_structure_grouping_table(
+        structures_df=grouping_source,
+        grouping_definition_set=grouping_definition_set,
+    )
+    nodes = summary.merge(
+        metadata,
+        left_on='ROI',
+        right_on='ROINumber',
+        how='inner',
+    )
+    nodes = nodes.merge(
+        grouping_table,
+        left_on='ROI',
+        right_index=True,
+        how='left',
+    )
+    canonical_columns = (
+        'Structure ID',
+        'DICOM Type',
+        'Structure Code',
+        'Coding Scheme',
+        'Code Meaning',
+        'TargetDose',
+        'TargetType',
+        'TargetLaterality',
+        'TargetSubGroup',
+        'Mod',
+    )
+    for column in canonical_columns:
+        if column in nodes.columns:
+            continue
+        for candidate in (f'{column}_x', f'{column}_y'):
+            if candidate in nodes.columns:
+                nodes[column] = nodes[candidate]
+                break
+    return nodes
+
+
+def _related_oar_rows_for_opt(
+    opt_roi: int,
+    oar_rows: pd.DataFrame,
+    relationship_graph: nx.Graph,
+) -> pd.DataFrame:
+    '''Return OAR rows that have a non-separate relation to one opt ROI.'''
+    related_rows: list[pd.Series] = []
+    for _, oar_row in oar_rows.iterrows():
+        edge_data = _relationship_edge_data_between(
+            relationship_graph,
+            opt_roi,
+            int(oar_row['ROI']),
+        )
+        category = _relationship_category_name(edge_data)
+        if category and category.strip().lower() != 'separate':
+            related_rows.append(oar_row)
+    if not related_rows:
+        return oar_rows.iloc[0:0].copy()
+    return pd.DataFrame(related_rows).reset_index(drop=True)
+
+
+@dataclass(frozen=True)
+class TargetOARPlanBuilder:
+    '''Prepare principle targets, related OARs, and matched opt structures.'''
+
+    grouping_definition_set: GroupDefinitionSet
+    plan_config: TargetOARPlanConfig = field(
+        default_factory=TargetOARPlanConfig,
+    )
+
+    def build_plan(
+        self,
+        summary: pd.DataFrame,
+        visible_metadata: pd.DataFrame,
+        relationship_graph: nx.Graph,
+    ) -> DiagramNodePlan:
+        '''Build one deterministic Target-OAR node plan.'''
+        nodes = _prepare_target_oar_nodes(
+            summary=summary,
+            visible_metadata=visible_metadata,
+            grouping_definition_set=self.grouping_definition_set,
+        )
+        selected_targets = _select_principle_targets(
+            nodes=nodes,
+            config=self.plan_config.selector_config,
+        )
+        if selected_targets.empty:
+            return DiagramNodePlan(
+                nodes=selected_targets.copy(),
+                relationship_graph=relationship_graph.__class__(),
+            )
+
+        selected_targets = selected_targets.copy().reset_index(drop=True)
+        selected_targets['target_rank'] = _build_target_rank_values(
+            len(selected_targets),
+        )
+        selected_targets['node_side'] = 'target'
+        selected_targets['display_order'] = range(len(selected_targets))
+
+        oar_rows = nodes.loc[
+            nodes['DICOM Type'].fillna('').astype(str).str.upper()
+            == self.plan_config.oar_dicom_type.upper()
+        ].copy()
+        weighted_rows: list[pd.Series] = []
+        for _, oar_row in oar_rows.iterrows():
+            weighted_sum = 0.0
+            has_non_separate = False
+            for target_row in selected_targets.itertuples(index=False):
+                edge_data = _relationship_edge_data_between(
+                    relationship_graph,
+                    int(oar_row['ROI']),
+                    int(target_row.ROI),
+                )
+                category = _relationship_category_name(edge_data)
+                category_rank = _relationship_category_rank(category)
+                if category_rank > 0:
+                    has_non_separate = True
+                weighted_sum += category_rank * float(target_row.target_rank)
+            if not has_non_separate:
+                continue
+            enriched_row = oar_row.copy()
+            enriched_row['weighted_oar_score'] = weighted_sum
+            weighted_rows.append(enriched_row)
+
+        if weighted_rows:
+            selected_oars = pd.DataFrame(weighted_rows)
+            selected_oars.sort_values(
+                ['weighted_oar_score', 'placement_order', 'ROI'],
+                ascending=[False, True, True],
+                kind='stable',
+                inplace=True,
+            )
+            selected_oars.reset_index(drop=True, inplace=True)
+        else:
+            selected_oars = oar_rows.iloc[0:0].copy()
+
+        selected_oars['node_side'] = 'oar'
+        selected_oars['display_order'] = range(len(selected_oars))
+        selected_oars['oar_rank'] = selected_oars['display_order']
+
+        oar_structure_ids = selected_oars['Structure ID'].astype(str).tolist()
+        oar_order_by_id = {
+            str(row['Structure ID']): int(row['display_order'])
+            for _, row in selected_oars.iterrows()
+        }
+
+        opt_candidates = nodes.loc[
+            nodes['Structure ID']
+            .fillna('')
+            .astype(str)
+            .str.lower()
+            .str.startswith(self.plan_config.opt_prefix.lower())
+        ].copy()
+
+        matched_opt_rows: list[pd.Series] = []
+        placement_count: dict[tuple[int, int | None], int] = {}
+        oar_order_to_roi = {
+            int(row['display_order']): int(row['ROI'])
+            for _, row in selected_oars.iterrows()
+        }
+
+        for _, opt_row in opt_candidates.iterrows():
+            opt_structure_id = str(opt_row['Structure ID'])
+            matched_ids = [
+                oar_id
+                for oar_id in oar_structure_ids
+                if oar_id in opt_structure_id
+            ]
+            if not matched_ids:
+                continue
+
+            anchor_id = matched_ids[0]
+            anchor_order = oar_order_by_id[anchor_id]
+            anchor_roi = oar_order_to_roi[anchor_order]
+
+            related_oars = _related_oar_rows_for_opt(
+                opt_roi=int(opt_row['ROI']),
+                oar_rows=selected_oars,
+                relationship_graph=relationship_graph,
+            )
+            related_orders = [
+                int(row['display_order'])
+                for _, row in related_oars.iterrows()
+                if int(row['ROI']) != anchor_roi
+            ]
+            prefer_upper = True
+            if related_orders:
+                prefer_upper = (
+                    sum(related_orders) / len(related_orders)
+                    < float(anchor_order)
+                )
+
+            neighbor_order: int | None = None
+            if prefer_upper and anchor_order > 0:
+                neighbor_order = anchor_order - 1
+            elif (not prefer_upper) and anchor_order < len(selected_oars) - 1:
+                neighbor_order = anchor_order + 1
+            elif anchor_order > 0:
+                neighbor_order = anchor_order - 1
+            elif anchor_order < len(selected_oars) - 1:
+                neighbor_order = anchor_order + 1
+
+            neighbor_roi = (
+                oar_order_to_roi.get(neighbor_order)
+                if neighbor_order is not None
+                else None
+            )
+            slot_key = (anchor_roi, neighbor_roi)
+            slot_index = placement_count.get(slot_key, 0)
+            placement_count[slot_key] = slot_index + 1
+
+            enriched_row = opt_row.copy()
+            enriched_row['node_side'] = 'opt'
+            enriched_row['display_order'] = float(anchor_order) + 0.5
+            enriched_row['anchor_oar_roi'] = anchor_roi
+            enriched_row['opt_neighbor_oar_roi'] = neighbor_roi
+            enriched_row['opt_slot_index'] = slot_index
+            enriched_row['prefer_upper_neighbor'] = prefer_upper
+            matched_opt_rows.append(enriched_row)
+
+        if matched_opt_rows:
+            matched_opts = pd.DataFrame(matched_opt_rows)
+            matched_opts.sort_values(
+                ['display_order', 'Structure ID', 'ROI'],
+                kind='stable',
+                inplace=True,
+            )
+            matched_opts.reset_index(drop=True, inplace=True)
+        else:
+            matched_opts = opt_candidates.iloc[0:0].copy()
+
+        selected_node_frames = [selected_targets, selected_oars, matched_opts]
+        selected_nodes = pd.concat(selected_node_frames, ignore_index=True, sort=False)
+        selected_nodes.sort_values(
+            ['display_order', 'node_side', 'ROI'],
+            kind='stable',
+            inplace=True,
+        )
+        selected_nodes.reset_index(drop=True, inplace=True)
+
+        selected_rois = {
+            int(roi)
+            for roi in selected_nodes['ROI'].tolist()
+        }
+        selected_graph = relationship_graph.subgraph(selected_rois).copy()
+        return DiagramNodePlan(
+            nodes=selected_nodes,
+            relationship_graph=selected_graph,
+        )
+
+
 @dataclass(frozen=True)
 class PrincipleTargetPlanBuilder:
     '''Prepare grouped nodes but keep one selected principle target per group.'''
@@ -509,6 +864,82 @@ class GroupedGridLayout:
                     * self.config.duplicate_vertical_spread
                 ),
             )
+        return positions
+
+
+def _optional_int(value: object) -> int | None:
+    '''Return one optional integer value from possibly-missing metadata.'''
+    if pd.isna(value):
+        return None
+    return int(value)
+
+
+@dataclass(frozen=True)
+class TargetOARBipartiteLayout:
+    '''Position principle targets, matched opt structures, and OARs in columns.'''
+
+    config: TargetOARBipartiteLayoutConfig = field(
+        default_factory=TargetOARBipartiteLayoutConfig,
+    )
+
+    def compute_positions(
+        self,
+        nodes: pd.DataFrame,
+        relationship_graph: nx.Graph,
+    ) -> dict[int, tuple[float, float]]:
+        '''Compute deterministic left-middle-right Target-OAR positions.'''
+        del relationship_graph
+        required_columns = {'ROI', 'node_side', 'display_order'}
+        missing_columns = required_columns.difference(nodes.columns)
+        if missing_columns:
+            missing_text = ', '.join(sorted(missing_columns))
+            raise KeyError(f'Missing Target-OAR columns: {missing_text}')
+
+        positions: dict[int, tuple[float, float]] = {}
+
+        target_rows = nodes.loc[nodes['node_side'] == 'target'].copy()
+        target_rows.sort_values(['display_order', 'ROI'], kind='stable', inplace=True)
+        for _, row in target_rows.iterrows():
+            positions[int(row['ROI'])] = (
+                self.config.target_x,
+                -float(row['display_order']) * self.config.vertical_spacing,
+            )
+
+        oar_rows = nodes.loc[nodes['node_side'] == 'oar'].copy()
+        oar_rows.sort_values(['display_order', 'ROI'], kind='stable', inplace=True)
+        for _, row in oar_rows.iterrows():
+            positions[int(row['ROI'])] = (
+                self.config.oar_x,
+                -float(row['display_order']) * self.config.vertical_spacing,
+            )
+
+        opt_rows = nodes.loc[nodes['node_side'] == 'opt'].copy()
+        opt_rows.sort_values(['display_order', 'ROI'], kind='stable', inplace=True)
+        for _, row in opt_rows.iterrows():
+            roi = int(row['ROI'])
+            anchor_roi = _optional_int(row.get('anchor_oar_roi'))
+            neighbor_roi = _optional_int(row.get('opt_neighbor_oar_roi'))
+            slot_index = _optional_int(row.get('opt_slot_index')) or 0
+            prefer_upper = bool(row.get('prefer_upper_neighbor', True))
+
+            if anchor_roi is None or anchor_roi not in positions:
+                positions[roi] = (self.config.opt_x, 0.0)
+                continue
+
+            anchor_y = positions[anchor_roi][1]
+            if neighbor_roi is not None and neighbor_roi in positions:
+                neighbor_y = positions[neighbor_roi][1]
+                base_y = (anchor_y + neighbor_y) / 2.0
+                direction = 1.0 if base_y >= anchor_y else -1.0
+            else:
+                direction = 1.0 if prefer_upper else -1.0
+                base_y = anchor_y + (direction * self.config.opt_fallback_offset)
+
+            positions[roi] = (
+                self.config.opt_x,
+                base_y + (direction * self.config.opt_midpoint_jitter * slot_index),
+            )
+
         return positions
 
 
@@ -733,6 +1164,48 @@ def principle_targets_template(
     )
 
 
+def target_oar_template(
+    plan_config: TargetOARPlanConfig | None = None,
+    layout_config: TargetOARBipartiteLayoutConfig | None = None,
+) -> LayoutTemplate:
+    '''Return a bipartite principle-target/OAR layout template.'''
+    resolved_plan_config = plan_config or TargetOARPlanConfig()
+    resolved_layout_config = layout_config or TargetOARBipartiteLayoutConfig()
+    display_rules = (
+        *default_grouped_grid_template().display_rules,
+        MetadataDisplayRule(
+            rule_id='target-oar-organs',
+            action='display',
+            condition=MetadataCondition(
+                field='DICOM Type',
+                match_type='exact',
+                value=resolved_plan_config.oar_dicom_type,
+            ),
+        ),
+        MetadataDisplayRule(
+            rule_id='target-oar-opt-prefix',
+            action='display',
+            condition=MetadataCondition(
+                field='Structure ID',
+                match_type='prefix',
+                value=resolved_plan_config.opt_prefix,
+            ),
+        ),
+    )
+    grouping_definition_set = default_structure_group_definition_set()
+    return LayoutTemplate(
+        name='target_oar',
+        display_by_default=False,
+        display_rules=display_rules,
+        grouping_definition_set=grouping_definition_set,
+        algorithm=TargetOARBipartiteLayout(resolved_layout_config),
+        plan_builder=TargetOARPlanBuilder(
+            grouping_definition_set=grouping_definition_set,
+            plan_config=resolved_plan_config,
+        ),
+    )
+
+
 def relationship_spring_template(
     relationship_types: tuple[str, ...] = (),
 ) -> LayoutTemplate:
@@ -770,6 +1243,7 @@ def get_layout_template(name: str) -> LayoutTemplate:
 register_layout_template(default_grouped_grid_template())
 register_layout_template(relationship_spring_template())
 register_layout_template(principle_targets_template())
+register_layout_template(target_oar_template())
 
 
 __all__ = [
@@ -788,6 +1262,10 @@ __all__ = [
     'RelationshipGraphPlanBuilder',
     'SpringLayout',
     'SpringLayoutConfig',
+    'TargetOARBipartiteLayout',
+    'TargetOARBipartiteLayoutConfig',
+    'TargetOARPlanBuilder',
+    'TargetOARPlanConfig',
     'apply_layout_template',
     'default_grouped_grid_template',
     'evaluate_template_display_rules',
@@ -795,4 +1273,5 @@ __all__ = [
     'principle_targets_template',
     'relationship_spring_template',
     'register_layout_template',
+    'target_oar_template',
 ]
