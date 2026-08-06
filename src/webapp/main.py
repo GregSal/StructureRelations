@@ -857,6 +857,7 @@ async def get_symbol_config():
             rel_type = rel.get('relation_type')
             if rel_type:
                 relationships[rel_type] = {
+                    'category': rel.get('category', 'UNKNOWN'),
                     'symbol': rel.get('symbol', '?'),
                     'label': rel.get('label', rel_type),
                     'description': rel.get('description', ''),

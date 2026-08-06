@@ -20,6 +20,7 @@ class RelationshipType:
 
     Attributes:
         relation_type: Unique identifier (e.g., 'CONTAINS', 'OVERLAPS')
+        category: Metric and diagram grouping for the relationship
         label: Human-readable label (e.g., 'Contains', 'Overlaps')
         symbol: Unicode symbol for relationship (e.g., '⊃', '∩')
         color: Hex color code for visualization (e.g., '#FF0000')
@@ -35,6 +36,7 @@ class RelationshipType:
         examples: List of example scenarios
     '''
     relation_type: str
+    category: str
     label: str
     symbol: str
     color: str

@@ -7,6 +7,7 @@
     "Relationships": [
         {
             "relation_type": "EQUAL",
+            "category": "Shared",
             "label": "is Equal to",
             "symbol": "=",
             "pattern": "T*F*T*F**\t*********\t*********",
@@ -22,6 +23,7 @@
         },
         {
             "relation_type": "CONTAINS",
+            "category": "Shared",
             "label": "Contains",
             "symbol": "⊂",
             "pattern": "T*T*F*F**\t*********\t*********",
@@ -39,6 +41,7 @@
         },
         {
             "relation_type": "WITHIN",
+            "category": "Shared",
             "label": "is Within",
             "symbol": "⊂",
             "pattern": "T*F*F*T**\t*********\t*********",
@@ -51,6 +54,7 @@
         },
         {
             "relation_type": "PARTITIONED",
+            "category": "Shared",
             "label": "is Partitioned by",
             "symbol": "⊕",
             "pattern": "T*T*T*F**\t*********\t*********",
@@ -70,6 +74,7 @@
         },
         {
             "relation_type": "PARTITIONS",
+            "category": "Shared",
             "label": "Partitions",
             "symbol": "⊗",
             "pattern": "T*F*T*T**\t*********\t*********",
@@ -83,6 +88,7 @@
         },
         {
             "relation_type": "OVERLAPS",
+            "category": "Shared",
             "label": "Overlaps with",
             "symbol": "∩",
             "pattern": "T*T***T**\t*********\t*********",
@@ -102,6 +108,7 @@
         },
         {
             "relation_type": "BORDERS",
+            "category": "Adjoining",
             "label": "Borders",
             "symbol": "|",
             "pattern": "F***T****\tF*T***T**\t*********",
@@ -118,6 +125,7 @@
         },
         {
             "relation_type": "CONFINES",
+            "category": "Adjoining",
             "label": "Confines",
             "symbol": "⊏",
             "pattern": "F*T*T*T**\tT*T***F**\t*********",
@@ -136,6 +144,7 @@
         },
         {
             "relation_type": "CONFINED",
+            "category": "Adjoining",
             "label": "is Confined by",
             "symbol": "⊏",
             "pattern": "F*T*T*T**\tT*F***T**\t*********",
@@ -149,6 +158,7 @@
         },
         {
             "relation_type": "SURROUNDS",
+            "category": "Separate",
             "label": "Surrounds",
             "symbol": "○",
             "pattern": "F*T*F*T**\tT*T***F**\t*********",
@@ -166,6 +176,7 @@
         },
         {
             "relation_type": "ENCLOSED",
+            "category": "Separate",
             "label": "is Enclosed by",
             "symbol": "○",
             "pattern": "F*T*F*T**\tT*F***T**\t*********",
@@ -178,6 +189,7 @@
         },
         {
             "relation_type": "SHELTERS",
+            "category": "Separate",
             "label": "Shelters",
             "symbol": "△",
             "pattern": "F*T*F*T**\tF********\tT*T***F**",
@@ -194,6 +206,7 @@
         },
         {
             "relation_type": "SHELTERED",
+            "category": "Separate",
             "label": "is Sheltered by",
             "symbol": "△",
             "pattern": "F*T*F*T**\tF********\tT*F***T**",
@@ -206,6 +219,7 @@
         },
         {
             "relation_type": "DISJOINT",
+            "category": "Separate",
             "label": "is Disjoint from",
             "symbol": "∅",
             "pattern": "F*T*F*T**\t**T***T**\t**T***T**",
@@ -221,6 +235,7 @@
         },
         {
             "relation_type": "UNKNOWN",
+            "category": "UNKNOWN",
             "label": "has an Unknown relationship with",
             "symbol": "?",
             "reversed_arrow": false,

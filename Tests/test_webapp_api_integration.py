@@ -254,6 +254,10 @@ def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
     assert 'shape_map' in payload['node_shapes']
     assert payload['node_shapes'].get('default_shape')
     assert 'CONTAINS' in payload['relationship_styles']
+    assert payload['relationships']['CONTAINS']['category'] == 'Shared'
+    assert payload['relationships']['BORDERS']['category'] == 'Adjoining'
+    assert payload['relationships']['DISJOINT']['category'] == 'Separate'
+    assert payload['relationships']['UNKNOWN']['category'] == 'UNKNOWN'
     assert payload['relationship_display_defaults'].get('show_edge_labels') is True
     assert payload['diagram_options'].get('interaction', {}).get('tooltip_delay') == 100
     diagram_layout = payload['diagram_options'].get('diagram_layout', {})

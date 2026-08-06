@@ -100,9 +100,11 @@ except ImportError:
 JSON_FILE = Path(__file__).parent / 'relationship_definitions.json'
 
 REQUIRED_FIELDS = [
-    'relation_type', 'label', 'symbol',
+    'relation_type', 'category', 'label', 'symbol',
     'complementary_relation', 'symmetric', 'transitive'
 ]
+
+RELATIONSHIP_CATEGORIES = {'Shared', 'Adjoining', 'Separate', 'UNKNOWN'}
 
 
 # %% Helper Functions
@@ -1268,6 +1270,18 @@ def check_field_types(
             continue
 
         relation_type = defn['relation_type']
+
+        category = defn.get('category')
+        if not isinstance(category, str):
+            errors.append(
+                f'{relation_type}: category must be string, '
+                f'got {type(category).__name__}'
+            )
+        elif category not in RELATIONSHIP_CATEGORIES:
+            errors.append(
+                f'{relation_type}: category must be one of '
+                f'{sorted(RELATIONSHIP_CATEGORIES)}, got {category!r}'
+            )
 
         # Check boolean fields
         for field in ['symmetric', 'transitive']:

@@ -12,6 +12,34 @@ from region_slice import RegionSlice
 from relations import DE9IM, DE27IM, RELATIONSHIP_TYPES
 
 
+EXPECTED_RELATIONSHIP_CATEGORIES = {
+    'Shared': {
+        'EQUAL', 'CONTAINS', 'WITHIN', 'PARTITIONED', 'PARTITIONS',
+        'OVERLAPS',
+    },
+    'Adjoining': {'BORDERS', 'CONFINES', 'CONFINED'},
+    'Separate': {
+        'DISJOINT', 'SURROUNDS', 'ENCLOSED', 'SHELTERS', 'SHELTERED',
+    },
+    'UNKNOWN': {'UNKNOWN'},
+}
+
+
+def test_relationship_categories():
+    '''Verify every runtime relationship has its intended category.'''
+    categorized = {
+        category: {
+            relation.relation_type
+            for relation in RELATIONSHIP_TYPES.values()
+            if relation.category == category
+        }
+        for category in EXPECTED_RELATIONSHIP_CATEGORIES
+    }
+
+    assert categorized == EXPECTED_RELATIONSHIP_CATEGORIES
+    assert sum(map(len, categorized.values())) == len(RELATIONSHIP_TYPES)
+
+
 def build_region_slice(roi=1, radius=2):
     '''Builds a RegionSlice with three contours and their matches.
 
