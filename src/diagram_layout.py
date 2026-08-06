@@ -20,6 +20,39 @@ from structure_grouping import (
 DisplayAction = Literal['hide', 'display']
 MatchType = Literal['exact', 'prefix', 'suffix', 'regex', 'structure list']
 RuleValue = str | tuple[str, ...]
+MissingPTVMode = Literal['ignore_group', 'fallback_to_ctv_then_gtv']
+
+
+def _normalize_metadata_text(value: object) -> str:
+    '''Normalize optional metadata values to stripped lowercase text.'''
+    if pd.isna(value):
+        return ''
+    return str(value).strip().lower()
+
+
+def _is_missing_group_value(value: object) -> bool:
+    '''Return whether one grouping/text value should be treated as missing.'''
+    return _normalize_metadata_text(value) in {'', 'missing', 'blank', 'none'}
+
+
+def _resolve_target_type(row: pd.Series) -> str:
+    '''Resolve one row's target type using parsed and DICOM fallback fields.'''
+    for column in ('TargetType', 'DICOM Type', 'Structure ID'):
+        if column not in row.index:
+            continue
+        text = str(row[column]).strip().upper()
+        for target_type in ('PTV', 'CTV', 'GTV'):
+            if target_type in text:
+                return target_type
+    return ''
+
+
+@dataclass(frozen=True)
+class PrincipleTargetSelectorConfig:
+    '''Configuration for selecting one principle target per target group.'''
+
+    missing_ptv_mode: MissingPTVMode = 'ignore_group'
+    volume_field: str = 'Physical_Volume'
 
 
 @dataclass(frozen=True)
@@ -198,6 +231,158 @@ class MetadataGroupingPlanBuilder:
         return DiagramNodePlan(
             nodes=nodes,
             relationship_graph=relationship_graph.copy(),
+        )
+
+
+def _sort_candidates_stably(candidates: pd.DataFrame) -> pd.DataFrame:
+    '''Sort candidate rows deterministically using existing grouping order.'''
+    sort_columns = [
+        column
+        for column in ['placement_order', 'ROI']
+        if column in candidates.columns
+    ]
+    if not sort_columns:
+        return candidates.copy()
+    return candidates.sort_values(sort_columns, kind='stable').copy()
+
+
+def _apply_principle_target_tiebreaks(
+    candidates: pd.DataFrame,
+    config: PrincipleTargetSelectorConfig,
+) -> pd.DataFrame:
+    '''Apply tie-break rules after group/type filtering.'''
+    remaining = candidates.copy()
+
+    if 'Mod' in remaining.columns:
+        eval_index = remaining['Mod'].map(_normalize_metadata_text) == 'eval'
+        if bool(eval_index.any()):
+            remaining = remaining.loc[eval_index].copy()
+
+    if 'TargetSubGroup' in remaining.columns:
+        no_subgroup_index = remaining['TargetSubGroup'].map(_is_missing_group_value)
+        if bool(no_subgroup_index.any()):
+            remaining = remaining.loc[no_subgroup_index].copy()
+
+    if 'TargetLaterality' in remaining.columns:
+        no_laterality_index = remaining['TargetLaterality'].map(
+            _is_missing_group_value,
+        )
+        if bool(no_laterality_index.any()):
+            remaining = remaining.loc[no_laterality_index].copy()
+
+    if 'Mod' in remaining.columns:
+        mod_series = remaining['Mod'].map(_normalize_metadata_text)
+        has_opt = bool((mod_series == 'opt').any())
+        has_non_opt = bool((mod_series != 'opt').any())
+        if has_opt and has_non_opt and config.volume_field in remaining.columns:
+            numeric_volume = pd.to_numeric(
+                remaining[config.volume_field],
+                errors='coerce',
+            )
+            minimum_volume = numeric_volume.min(skipna=True)
+            if pd.notna(minimum_volume):
+                remaining = remaining.loc[numeric_volume == minimum_volume].copy()
+
+    return _sort_candidates_stably(remaining)
+
+
+def _select_group_principle_target(
+    group_rows: pd.DataFrame,
+    config: PrincipleTargetSelectorConfig,
+) -> pd.Series | None:
+    '''Select one principle target row from one target group.'''
+    candidates = group_rows.copy()
+    candidates['__target_type'] = candidates.apply(_resolve_target_type, axis=1)
+
+    ptv_candidates = candidates.loc[candidates['__target_type'] == 'PTV']
+    if not ptv_candidates.empty:
+        filtered = ptv_candidates
+    elif config.missing_ptv_mode == 'fallback_to_ctv_then_gtv':
+        ctv_candidates = candidates.loc[candidates['__target_type'] == 'CTV']
+        if not ctv_candidates.empty:
+            filtered = ctv_candidates
+        else:
+            gtv_candidates = candidates.loc[candidates['__target_type'] == 'GTV']
+            if gtv_candidates.empty:
+                return None
+            filtered = gtv_candidates
+    else:
+        return None
+
+    ranked = _apply_principle_target_tiebreaks(filtered, config)
+    if ranked.empty:
+        return None
+    return ranked.iloc[0]
+
+
+def _select_principle_targets(
+    nodes: pd.DataFrame,
+    config: PrincipleTargetSelectorConfig,
+) -> pd.DataFrame:
+    '''Select exactly one principle target per horizontal target group.'''
+    if nodes.empty:
+        return nodes.copy()
+    if 'h_grouping' not in nodes.columns:
+        raise KeyError('Missing grouped-grid column: h_grouping')
+
+    selected_rows: list[pd.Series] = []
+    for _, group_rows in nodes.groupby('h_grouping', sort=False):
+        selected = _select_group_principle_target(group_rows, config)
+        if selected is not None:
+            selected_rows.append(selected)
+
+    if not selected_rows:
+        return nodes.iloc[0:0].copy()
+
+    selected_table = pd.DataFrame(selected_rows).reset_index(drop=True)
+    return _sort_candidates_stably(selected_table)
+
+
+@dataclass(frozen=True)
+class PrincipleTargetPlanBuilder:
+    '''Prepare grouped nodes but keep one selected principle target per group.'''
+
+    grouping_definition_set: GroupDefinitionSet
+    selector_config: PrincipleTargetSelectorConfig = field(
+        default_factory=PrincipleTargetSelectorConfig,
+    )
+
+    def build_plan(
+        self,
+        summary: pd.DataFrame,
+        visible_metadata: pd.DataFrame,
+        relationship_graph: nx.Graph,
+    ) -> DiagramNodePlan:
+        '''Build grouped nodes and reduce to principle targets only.'''
+        grouping_source = prepare_structure_grouping_source(visible_metadata)
+        grouping_table = build_structure_grouping_table(
+            structures_df=grouping_source,
+            grouping_definition_set=self.grouping_definition_set,
+        )
+
+        summary_columns = [
+            column
+            for column in ['ROI', 'Name', self.selector_config.volume_field]
+            if column in summary.columns
+        ]
+        nodes = summary[summary_columns].merge(
+            grouping_table,
+            left_on='ROI',
+            right_index=True,
+            how='inner',
+        )
+        selected_nodes = _select_principle_targets(
+            nodes=nodes,
+            config=self.selector_config,
+        )
+        selected_rois = {
+            int(roi)
+            for roi in selected_nodes['ROI'].tolist()
+        }
+        selected_graph = relationship_graph.subgraph(selected_rois).copy()
+        return DiagramNodePlan(
+            nodes=selected_nodes,
+            relationship_graph=selected_graph,
         )
 
 
@@ -492,40 +677,59 @@ def apply_layout_template(
 
 def default_grouped_grid_template() -> LayoutTemplate:
     '''Return the initial target-focused grouped-grid template.'''
+    target_display_rules = (
+        MetadataDisplayRule(
+            rule_id='target-label',
+            action='display',
+            condition=MetadataCondition(
+                field='Structure ID',
+                match_type='regex',
+                value=r'.*[GCPIH]+TV.*',
+            ),
+        ),
+        MetadataDisplayRule(
+            rule_id='target-type',
+            action='display',
+            condition=MetadataCondition(
+                field='DICOM Type',
+                match_type='regex',
+                value=r'[GCP]TV',
+            ),
+        ),
+        MetadataDisplayRule(
+            rule_id='resident-contours',
+            action='hide',
+            condition=MetadataCondition(
+                field='Structure ID',
+                match_type='prefix',
+                value='x',
+            ),
+        ),
+    )
     return LayoutTemplate(
         name='grouped_grid',
         display_by_default=False,
-        display_rules=(
-            MetadataDisplayRule(
-                rule_id='target-label',
-                action='display',
-                condition=MetadataCondition(
-                    field='Structure ID',
-                    match_type='regex',
-                    value=r'.*[GCPIH]+TV.*',
-                ),
-            ),
-            MetadataDisplayRule(
-                rule_id='target-type',
-                action='display',
-                condition=MetadataCondition(
-                    field='DICOM Type',
-                    match_type='regex',
-                    value=r'[GCP]TV',
-                ),
-            ),
-            MetadataDisplayRule(
-                rule_id='resident-contours',
-                action='hide',
-                condition=MetadataCondition(
-                    field='Structure ID',
-                    match_type='prefix',
-                    value='x',
-                ),
-            ),
-        ),
+        display_rules=target_display_rules,
         grouping_definition_set=default_structure_group_definition_set(),
         algorithm=GroupedGridLayout(),
+    )
+
+
+def principle_targets_template(
+    selector_config: PrincipleTargetSelectorConfig | None = None,
+) -> LayoutTemplate:
+    '''Return a grouped-grid template with one principle target per group.'''
+    config = selector_config or PrincipleTargetSelectorConfig()
+    return LayoutTemplate(
+        name='principle_targets',
+        display_by_default=False,
+        display_rules=default_grouped_grid_template().display_rules,
+        grouping_definition_set=default_structure_group_definition_set(),
+        algorithm=GroupedGridLayout(),
+        plan_builder=PrincipleTargetPlanBuilder(
+            grouping_definition_set=default_structure_group_definition_set(),
+            selector_config=config,
+        ),
     )
 
 
@@ -565,6 +769,7 @@ def get_layout_template(name: str) -> LayoutTemplate:
 
 register_layout_template(default_grouped_grid_template())
 register_layout_template(relationship_spring_template())
+register_layout_template(principle_targets_template())
 
 
 __all__ = [
@@ -578,6 +783,8 @@ __all__ = [
     'MetadataGroupingPlanBuilder',
     'MetadataCondition',
     'MetadataDisplayRule',
+    'PrincipleTargetPlanBuilder',
+    'PrincipleTargetSelectorConfig',
     'RelationshipGraphPlanBuilder',
     'SpringLayout',
     'SpringLayoutConfig',
@@ -585,6 +792,7 @@ __all__ = [
     'default_grouped_grid_template',
     'evaluate_template_display_rules',
     'get_layout_template',
+    'principle_targets_template',
     'relationship_spring_template',
     'register_layout_template',
 ]

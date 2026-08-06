@@ -15,12 +15,14 @@ from diagram_layout import (
     LayoutTemplate,
     MetadataCondition,
     MetadataDisplayRule,
+    PrincipleTargetSelectorConfig,
     RelationshipGraphPlanBuilder,
     SpringLayout,
     apply_layout_template,
     default_grouped_grid_template,
     evaluate_template_display_rules,
     get_layout_template,
+    principle_targets_template,
     relationship_spring_template,
     register_layout_template,
 )
@@ -273,6 +275,140 @@ class FakeRelationshipStructureSet(FakeStructureSet):
         ])
 
 
+class FakePrincipleTargetStructureSet:
+    '''StructureSet with grouped targets for principle-target selection tests.'''
+
+    def __init__(self) -> None:
+        self.structure_metadata = pd.DataFrame()
+        self.structure_filter_report = pd.DataFrame([
+            {
+                'ROINumber': 1,
+                'Structure ID': 'PTV 56',
+                'DICOM Type': 'PTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '56',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': '',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 2,
+                'Structure ID': 'eval PTV 56 L a',
+                'DICOM Type': 'PTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '56',
+                'TargetType': 'PTV',
+                'TargetLaterality': 'L',
+                'TargetSubGroup': 'a',
+                'Mod': 'eval',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 3,
+                'Structure ID': 'opt PTV 56',
+                'DICOM Type': 'PTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '56',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': 'opt',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 4,
+                'Structure ID': 'CTV 66',
+                'DICOM Type': 'CTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '66',
+                'TargetType': 'CTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': '',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 5,
+                'Structure ID': 'GTV 66',
+                'DICOM Type': 'GTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '66',
+                'TargetType': 'GTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': '',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 6,
+                'Structure ID': 'PTV 70',
+                'DICOM Type': 'PTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '70',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': '',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+            {
+                'ROINumber': 7,
+                'Structure ID': 'opt PTV 70',
+                'DICOM Type': 'PTV',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'TargetDose': '70',
+                'TargetType': 'PTV',
+                'TargetLaterality': '',
+                'TargetSubGroup': '',
+                'Mod': 'opt',
+                'SelectedByDefault': True,
+                'DisplayedByDefault': True,
+                'IsFiltered': False,
+            },
+        ]).set_index('ROINumber', drop=False)
+        self.relationship_graph = nx.DiGraph()
+
+    def summary(self) -> pd.DataFrame:
+        '''Return target rows with explicit physical volumes for tie breaks.'''
+        return pd.DataFrame([
+            {'ROI': 1, 'Name': 'PTV 56', 'Physical_Volume': 25.0},
+            {'ROI': 2, 'Name': 'eval PTV 56 L a', 'Physical_Volume': 20.0},
+            {'ROI': 3, 'Name': 'opt PTV 56', 'Physical_Volume': 19.0},
+            {'ROI': 4, 'Name': 'CTV 66', 'Physical_Volume': 15.0},
+            {'ROI': 5, 'Name': 'GTV 66', 'Physical_Volume': 12.0},
+            {'ROI': 6, 'Name': 'PTV 70', 'Physical_Volume': 24.0},
+            {'ROI': 7, 'Name': 'opt PTV 70', 'Physical_Volume': 10.0},
+        ])
+
+
 def test_relationship_spring_template_uses_graph_in_layout_plan() -> None:
     '''Relationship plans should expose graph features and stable positions.'''
     structure_set = FakeRelationshipStructureSet()
@@ -333,3 +469,54 @@ def test_renderer_accepts_relationship_plan_without_grid_columns() -> None:
     assert set(result.positions) == {1, 2, 3}
     assert 'h_index' not in result.plot_nodes.columns
     result.fig.clear()
+
+
+def test_principle_targets_template_is_registered() -> None:
+    '''The principle target template should be retrievable by name.'''
+    template = get_layout_template('principle_targets')
+
+    assert template.name == 'principle_targets'
+
+
+def test_principle_targets_template_selects_one_per_group() -> None:
+    '''One principle target should be selected per horizontal target group.'''
+    structure_set = FakePrincipleTargetStructureSet()
+
+    result = apply_layout_template(
+        structure_set,
+        principle_targets_template(),
+    )
+
+    selected = result.plot_nodes.set_index('ROI')
+
+    assert set(selected.index) == {1, 6}
+    assert selected.loc[1, 'Name'] == 'PTV 56'
+    assert selected.loc[6, 'Name'] == 'PTV 70'
+    assert selected['h_grouping'].tolist() == ['56', '70']
+
+
+def test_principle_targets_template_uses_ctv_fallback_when_enabled() -> None:
+    '''Fallback mode should pick CTV when a group has no PTV.'''
+    structure_set = FakePrincipleTargetStructureSet()
+    config = PrincipleTargetSelectorConfig(
+        missing_ptv_mode='fallback_to_ctv_then_gtv',
+    )
+
+    result = apply_layout_template(
+        structure_set,
+        principle_targets_template(selector_config=config),
+    )
+
+    selected = result.plot_nodes.set_index('ROI')
+    assert set(selected.index) == {1, 4, 6}
+    assert selected.loc[4, 'Name'] == 'CTV 66'
+
+
+def test_grouped_grid_template_still_exposes_original_rules() -> None:
+    '''Grouped-grid display behavior should remain backward compatible.'''
+    result = apply_layout_template(
+        FakePrincipleTargetStructureSet(),
+        default_grouped_grid_template(),
+    )
+
+    assert set(result.plot_nodes['ROI']) == {1, 2, 3, 4, 5, 6, 7}
