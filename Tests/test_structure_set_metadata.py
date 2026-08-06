@@ -1,5 +1,6 @@
 '''Tests for StructureSet metadata ownership.'''
 
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -89,3 +90,20 @@ def test_non_dicom_structure_set_has_empty_metadata_tables() -> None:
     assert structure_set.structure_metadata.empty
     assert structure_set.structure_filter_report.empty
     assert structure_set.structure_filter_config_path is None
+
+
+def test_structure_set_logging_can_be_disabled(caplog) -> None:
+    '''Logging should be suppressible for one StructureSet instance.'''
+    enabled = StructureSet(include_structures=['Included'])
+    disabled = StructureSet(
+        include_structures=['Included'],
+        logging_enabled=False,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger='structure_set'):
+        assert not enabled._should_include_structure('Excluded enabled')
+        assert not disabled._should_include_structure('Excluded disabled')
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any('Excluded enabled' in message for message in messages)
+    assert all('Excluded disabled' not in message for message in messages)

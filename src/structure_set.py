@@ -29,11 +29,8 @@ from metrics.data_structures import (
 )
 
 
-# %% Configure logging if not already configured
-#logging.basicConfig(level=logging.INFO)
-logging.basicConfig(level=logging.DEBUG)
+# %% Configure module logging
 logger = logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
 
 
 # %% Class Definition
@@ -52,6 +49,7 @@ class StructureSet:
         tolerance (float): Tolerance value for structure relationships.
         unit (str): Unit of measurement for coordinates and distances.
             Defaults to 'cm'.
+        logging_enabled (bool): Whether this StructureSet emits log records.
     '''
 
     def __init__(self,
@@ -62,7 +60,8 @@ class StructureSet:
                  auto_calculate_relationships: bool = True,
                  auto_calculate_logical_flags: bool = True,
                  include_structures: Optional[List[str]] = None,
-                 exclude_structures: Optional[List[str]] = None):
+                 exclude_structures: Optional[List[str]] = None,
+                 logging_enabled: bool = True):
         '''Initialize the StructureSet.
 
         Args:
@@ -93,7 +92,10 @@ class StructureSet:
                 patterns to exclude. A structure is excluded if its name
                 exactly matches or matches via regex any pattern in this list.
                 Exclusion takes precedence over inclusion.
+            logging_enabled (bool): Whether this StructureSet emits log records.
+                Defaults to True.
         '''
+        self.logging_enabled = logging_enabled
         self.structures = {}
         self.slice_sequence = None
         self.relationship_graph = nx.DiGraph()
@@ -125,6 +127,11 @@ class StructureSet:
         elif slice_data is not None:
             self.build_from_slice_data(slice_data)
 
+    def _log(self, level: int, message: str, *args: object) -> None:
+        '''Emit a log record when logging is enabled for this structure set.'''
+        if self.logging_enabled:
+            logger.log(level, message, *args)
+
     def _should_include_structure(self, structure_name: str) -> bool:
         '''Check if a structure should be included based on filter patterns.
 
@@ -144,41 +151,48 @@ class StructureSet:
             for pattern in self.exclude_structures:
                 # Try exact match first
                 if structure_name == pattern:
-                    logger.debug('Structure %s excluded by exact match: %s',
-                                 structure_name, pattern)
+                    self._log(logging.DEBUG,
+                              'Structure %s excluded by exact match: %s',
+                              structure_name, pattern)
                     return False
                 # Try regex match
                 try:
                     if re.search(pattern, structure_name):
-                        logger.debug('Structure %s excluded by regex match: %s',
-                                     structure_name, pattern)
+                        self._log(logging.DEBUG,
+                                  'Structure %s excluded by regex match: %s',
+                                  structure_name, pattern)
                         return False
                 except re.error:
                     # Invalid regex, skip
-                    logger.debug('Invalid regex pattern in exclude_structures: %s',
-                                 pattern)
+                    self._log(logging.DEBUG,
+                              'Invalid regex pattern in exclude_structures: %s',
+                              pattern)
 
         # Check inclusion patterns
         if self.include_structures:
             for pattern in self.include_structures:
                 # Try exact match first
                 if structure_name == pattern:
-                    logger.debug('Structure %s included by exact match: %s',
-                                 structure_name, pattern)
+                    self._log(logging.DEBUG,
+                              'Structure %s included by exact match: %s',
+                              structure_name, pattern)
                     return True
                 # Try regex match
                 try:
                     if re.search(pattern, structure_name):
-                        logger.debug('Structure %s included by regex match: %s',
-                                     structure_name, pattern)
+                        self._log(logging.DEBUG,
+                                  'Structure %s included by regex match: %s',
+                                  structure_name, pattern)
                         return True
                 except re.error:
                     # Invalid regex, skip
-                    logger.debug('Invalid regex pattern in include_structures: %s',
-                                 pattern)
+                    self._log(logging.DEBUG,
+                              'Invalid regex pattern in include_structures: %s',
+                              pattern)
             # No match found in include list, exclude
-            logger.debug('Structure %s not matched by any include pattern',
-                         structure_name)
+            self._log(logging.DEBUG,
+                      'Structure %s not matched by any include pattern',
+                      structure_name)
             return False
 
         # No include_structures filter specified, include by default
@@ -194,13 +208,15 @@ class StructureSet:
         '''
         self._capture_structure_metadata()
         if not self.dicom_structure_file.contour_points:
-            logger.warning("No contour points found in DicomStructureFile")
+            self._log(logging.WARNING,
+                      'No contour points found in DicomStructureFile')
             return
         self.tolerance = self.dicom_structure_file.resolution
         # DICOM coordinates are converted from mm to cm, so unit is always 'cm'
         self.unit = 'cm'
-        logger.info("Building StructureSet from %d contour points (unit: %s)",
-                    len(self.dicom_structure_file.contour_points), self.unit)
+        self._log(logging.INFO,
+              'Building StructureSet from %d contour points (unit: %s)',
+              len(self.dicom_structure_file.contour_points), self.unit)
         self.build_from_slice_data(self.dicom_structure_file.contour_points)
 
     def _capture_structure_metadata(self) -> None:
@@ -236,27 +252,36 @@ class StructureSet:
         structure_names_dict = {}
         if self.dicom_structure_file and hasattr(self.dicom_structure_file, 'structure_names'):
             structure_names_dict = self.dicom_structure_file.structure_names
-            logger.debug("Using structure names from DicomStructureFile: %s", structure_names_dict)
+            self._log(logging.DEBUG,
+                      'Using structure names from DicomStructureFile: %s',
+                      structure_names_dict)
 
         # 2. For each ROI in the contour_table:
         for roi in unique_rois:
             # 2.1. Create a StructureShape object from the contour table
-            logger.debug('Building structure for ROI: %s', roi)
+            self._log(logging.DEBUG, 'Building structure for ROI: %s', roi)
 
             # Use meaningful name from DICOM file if available, otherwise use generic name
             if roi in structure_names_dict:
                 structure_name = structure_names_dict[roi]
-                logger.debug('Using DICOM structure name for ROI %s: %s', roi, structure_name)
+                self._log(logging.DEBUG,
+                          'Using DICOM structure name for ROI %s: %s',
+                          roi, structure_name)
             else:
                 structure_name = f'Structure_{roi}'
-                logger.debug('Using generic name for ROI %s: %s', roi, structure_name)
+                self._log(logging.DEBUG,
+                          'Using generic name for ROI %s: %s',
+                          roi, structure_name)
 
             # Check if structure should be included based on filters
             if not self._should_include_structure(structure_name):
-                logger.info('Skipping structure %s (%s) due to filters', structure_name, roi)
+                self._log(logging.INFO,
+                          'Skipping structure %s (%s) due to filters',
+                          structure_name, roi)
                 continue
 
-            logger.info('Adding structure %s (%s)', structure_name, roi)
+            self._log(logging.INFO, 'Adding structure %s (%s)',
+                      structure_name, roi)
             structure = StructureShape(roi=roi, name=structure_name)
             self.slice_sequence = structure.add_contour_graph(
                 contour_table,
@@ -273,7 +298,8 @@ class StructureSet:
 
         # 2.3 & 2.4. Use the SliceSequence to add interpolated contours and generate RegionSlices
         for structure in self.structures.values():
-            logger.debug('Finalizing structure %s (%s)', structure.name, structure.roi)
+            self._log(logging.DEBUG, 'Finalizing structure %s (%s)',
+                      structure.name, structure.roi)
             structure.finalize(self.slice_sequence)
         self.finalize(
             calculate_relationships=self.auto_calculate_relationships,
@@ -352,20 +378,26 @@ class StructureSet:
         })
         if self.relationship_graph.number_of_edges() >= expected_edges:
             if not force:
-                logger.debug('Relationships already calculated, skipping recalculation')
+                self._log(
+                    logging.DEBUG,
+                    'Relationships already calculated, skipping recalculation',
+                )
                 self.relationship_progress.update({
                     'status': 'already calculated',
                     'percent_complete': 100.0 if expected_edges else 0.0,
                 })
                 return
-            logger.debug('Force recalculation enabled, recalculating relationships')
+            self._log(
+                logging.DEBUG,
+                'Force recalculation enabled, recalculating relationships',
+            )
             # Clear existing edges but keep nodes for recalculation
             self.relationship_graph.clear_edges()
         self._invalidate_caches()
         self.slice_relationship_records = {}
 
-        logger.info('Calculating relationships for %d structures',
-                    len(structure_rois))
+        self._log(logging.INFO, 'Calculating relationships for %d structures',
+              len(structure_rois))
         completed_pairs = 0
         total_pairs = expected_edges
 
@@ -460,7 +492,7 @@ class StructureSet:
                     f'(ROI {structure_a.roi}) and {structure_b.name} '
                     f'(ROI {structure_b.roi}) as: {relation_type.label}'
                 )
-                logger.info(status_message)
+                self._log(logging.INFO, status_message)
                 # Create StructureRelationship object
                 relationship = StructureRelationship(
                     de27im=de27im_relationship,
@@ -500,11 +532,18 @@ class StructureSet:
 
                 try:
                     rel_type = relationship.relationship_type
-                    logger.debug('Calculated relationship between ROI %s and ROI %s: %s',
-                                 structure_a.name, structure_b.name, rel_type)
+                    self._log(
+                        logging.DEBUG,
+                        'Calculated relationship between ROI %s and ROI %s: %s',
+                        structure_a.name, structure_b.name, rel_type,
+                    )
                 except (AttributeError, KeyError) as e:
-                    logger.debug('Calculated relationship between ROI %s and ROI %s (error accessing type: %s)',
-                                 structure_a.name, structure_b.name, str(e))
+                    self._log(
+                        logging.DEBUG,
+                        'Calculated relationship between ROI %s and ROI %s '
+                        '(error accessing type: %s)',
+                        structure_a.name, structure_b.name, str(e),
+                    )
 
         self.relationship_progress.update({
             'status': 'complete',
@@ -521,14 +560,18 @@ class StructureSet:
         try:
             from tqdm import tqdm  # type: ignore[import-not-found]
         except ImportError:
-            logger.info('tqdm not available; using logging-based progress output')
+            self._log(
+                logging.INFO,
+                'tqdm not available; using logging-based progress output',
+            )
 
             def log_progress(completed_pairs: int, total_pairs: int) -> None:
                 if total_pairs <= 0:
                     percent = 100.0
                 else:
                     percent = completed_pairs * 100.0 / total_pairs
-                logger.info(
+                self._log(
+                    logging.INFO,
                     'Relationship progress: %d/%d pairs (%.1f%%)',
                     completed_pairs,
                     total_pairs,
@@ -772,7 +815,7 @@ class StructureSet:
            - Extract ROIs from longest path as intermediate structures
         3. Handle EQUAL relationships: mark downstream edges as logical
         '''
-        logger.info('Calculating logical flags for relationships')
+        self._log(logging.INFO, 'Calculating logical flags for relationships')
 
         # Recompute logical annotations from scratch each time.
         for _, _, edge_data in self.relationship_graph.edges(data=True):
@@ -810,7 +853,8 @@ class StructureSet:
                 ]
                 relationship.is_logical = True
                 relationship.intermediate_structures = intermediate_structures
-                logger.debug(
+                self._log(
+                    logging.DEBUG,
                     'Identified logical relationship: ROI %d -> ROI %d '
                     '(intermediates: %s)',
                     roi_a, roi_b, intermediate_structures
@@ -856,7 +900,8 @@ class StructureSet:
                 ]
                 relationship.is_logical = True
                 relationship.intermediate_structures = intermediate_structures
-                logger.debug(
+                self._log(
+                    logging.DEBUG,
                     'Identified implied logical relationship: ROI %d -> '
                     'ROI %d (intermediates: %s)',
                     roi_a, roi_b, intermediate_structures
@@ -993,7 +1038,8 @@ class StructureSet:
                         ROI_Type(canonical_roi),
                         *existing_intermediates,
                     ]
-                    logger.debug(
+                    self._log(
+                        logging.DEBUG,
                         'Identified EQUAL-derived logical relationship: '
                         'ROI %d <-> ROI %d (via canonical ROI %d)',
                         member_roi, external_roi, canonical_roi
@@ -1012,7 +1058,7 @@ class StructureSet:
             if not relationship.is_logical:
                 relationship.intermediate_structures = []
 
-        logger.info('Logical flag calculation complete')
+        self._log(logging.INFO, 'Logical flag calculation complete')
 
     def get_relationship(self, roi_a: ROI_Type, roi_b: ROI_Type) -> Optional[StructureRelationship]:
         '''Get the relationship between two structures.
@@ -1092,7 +1138,8 @@ class StructureSet:
         relationship = self.get_relationship(roi_a, roi_b)
         if relationship is None:
             # Need to calculate relationship first
-            logger.debug(
+            self._log(
+                logging.DEBUG,
                 'Relationship between %d and %d not found, calculating...',
                 roi_a, roi_b
             )
@@ -1108,7 +1155,8 @@ class StructureSet:
                 roi_a, roi_b,
                 relationship=relationship
             )
-            logger.debug(
+            self._log(
+                logging.DEBUG,
                 'Created and stored new relationship between %d and %d in graph',
                 roi_a, roi_b
             )
@@ -1126,7 +1174,8 @@ class StructureSet:
 
         # Check if metric is applicable
         if not calculator.is_applicable(relationship):
-            logger.warning(
+            self._log(
+                logging.WARNING,
                 '%s metric is not applicable to %s relationship between '
                 'structures %d and %d',
                 metric_name,
@@ -1138,7 +1187,8 @@ class StructureSet:
             return calculator.calculate(structure_a, structure_b, relationship)
 
         # Calculate metric
-        logger.debug(
+        self._log(
+            logging.DEBUG,
             'Calculating %s for structures %d (%s) and %d (%s)',
             metric_name,
             roi_a,
@@ -1175,7 +1225,8 @@ class StructureSet:
         elif isinstance(result, GeometryMetrics):
             relationship.metrics.geometry = result
         else:
-            logger.warning(
+            self._log(
+                logging.WARNING,
                 'Unknown metric type %s for metric %s',
                 type(result).__name__,
                 metric_name
@@ -1183,7 +1234,8 @@ class StructureSet:
 
         # Note: No need to update graph - relationship object is stored by reference
         # Changes to relationship.metrics are automatically reflected in the graph
-        logger.debug(
+        self._log(
+            logging.DEBUG,
             'Stored %s (%s) in relationship for structures %d and %d',
             metric_name,
             type(result).__name__,
