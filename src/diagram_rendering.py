@@ -712,6 +712,8 @@ def render_template_diagram(structure_set,
 
     fig, axis = plt.subplots(figsize=(16, 10))
     axis.set_facecolor(figure_background)
+    # Preserve relative layout coordinates by keeping x/y units identical.
+    axis.set_aspect('equal', adjustable='box')
 
     edge_render_items: list[dict[str, Any]] = []
 

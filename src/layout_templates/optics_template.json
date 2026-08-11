@@ -1,0 +1,41 @@
+{
+    "template_name": "Optics_JSON",
+    "template_description": "Relationship between the optic structures including the eyes and related PRV structures",
+    "template_version": "1.0",
+    "template_author": "Greg's Test",
+    "template_date": "2024-06-01",
+    "template_layout": {
+        "OpticChiasm": {
+            "x": 0,
+            "y": 0
+        },
+        "Globe L": {
+            "x": -1,
+            "y": 0
+        },
+        "Globe R": {
+            "x": 1,
+            "y": 0
+        },
+        "Lens L": {
+            "x": -1,
+            "y": -1
+        },
+        "Lens R": {
+            "x": 1,
+            "y": -1
+        },
+        "OpticNerve L": {
+            "x": -1,
+            "y": 1
+        },
+        "OpticNerve R": {
+            "x": 1,
+            "y": 1
+        },
+        "PRV5 Optics": {
+            "x": 0,
+            "y": -1
+        }
+    }
+}

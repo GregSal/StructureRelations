@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
+from pathlib import Path
 import re
 from typing import Any, Literal, Protocol
 
@@ -1222,6 +1224,159 @@ def relationship_spring_template(
     )
 
 
+@dataclass(frozen=True)
+class CustomDiagramLayoutDefinition:
+    '''Definition of a custom diagram layout loaded from a dictionary or JSON.'''
+
+    template_name: str
+    template_description: str
+    template_version: str
+    template_author: str
+    template_date: str
+    template_layout: dict[str, tuple[float, float]]
+
+
+@dataclass(frozen=True)
+class CustomLayoutPlanBuilder:
+    '''Build a plan by matching template Structure IDs to available ROIs.'''
+
+    definition: CustomDiagramLayoutDefinition
+
+    def build_plan(
+        self,
+        summary: pd.DataFrame,
+        visible_metadata: pd.DataFrame,
+        relationship_graph: nx.Graph,
+    ) -> DiagramNodePlan:
+        '''Return nodes and graph restricted to structures named in the template.'''
+        metadata = visible_metadata.copy()
+        if 'ROINumber' in metadata.columns:
+            metadata.reset_index(drop=True, inplace=True)
+        else:
+            metadata['ROINumber'] = metadata.index
+            metadata.reset_index(drop=True, inplace=True)
+        if 'Structure ID' not in metadata.columns:
+            raise KeyError(
+                'visible_metadata is missing required column: Structure ID',
+            )
+        nodes = summary[['ROI', 'Name']].merge(
+            metadata,
+            left_on='ROI',
+            right_on='ROINumber',
+            how='inner',
+        )
+        layout = self.definition.template_layout
+        nodes = nodes[nodes['Structure ID'].isin(layout)].copy()
+        nodes['custom_x'] = nodes['Structure ID'].map(
+            lambda sid: layout[sid][0],
+        )
+        nodes['custom_y'] = nodes['Structure ID'].map(
+            lambda sid: layout[sid][1],
+        )
+        nodes.reset_index(drop=True, inplace=True)
+        selected_rois = {int(roi) for roi in nodes['ROI']}
+        return DiagramNodePlan(
+            nodes=nodes,
+            relationship_graph=relationship_graph.subgraph(selected_rois).copy(),
+        )
+
+
+@dataclass(frozen=True)
+class CustomLayoutAlgorithm:
+    '''Position nodes using x/y coordinates stored in plan node columns.'''
+
+    def compute_positions(
+        self,
+        nodes: pd.DataFrame,
+        relationship_graph: nx.Graph,
+    ) -> dict[int, tuple[float, float]]:
+        '''Return positions from the custom_x and custom_y node columns.'''
+        del relationship_graph
+        missing = {'custom_x', 'custom_y'}.difference(nodes.columns)
+        if missing:
+            raise KeyError(
+                f'Missing custom layout columns: {", ".join(sorted(missing))}',
+            )
+        return {
+            int(row['ROI']): (float(row['custom_x']), float(row['custom_y']))
+            for _, row in nodes.iterrows()
+        }
+
+
+def _validate_custom_layout_dict(template_dict: dict) -> None:
+    '''Raise ValueError/TypeError when template_dict is not a valid layout definition.'''
+    if not isinstance(template_dict, dict):
+        raise TypeError('Template definition must be a dictionary')
+    name = template_dict.get('template_name', '')
+    if not str(name).strip():
+        raise ValueError('template_name must not be blank')
+    layout = template_dict.get('template_layout')
+    if not isinstance(layout, dict):
+        raise ValueError('template_layout must be a dictionary')
+    if not layout:
+        raise ValueError('template_layout must not be empty')
+    for structure_id, position in layout.items():
+        if not isinstance(structure_id, str) or not structure_id.strip():
+            raise ValueError('template_layout keys must be non-empty strings')
+        if not isinstance(position, dict):
+            raise ValueError(
+                f'Position for {structure_id!r} must be a dictionary',
+            )
+        for axis in ('x', 'y'):
+            if axis not in position:
+                raise ValueError(
+                    f'Position for {structure_id!r} must have an {axis!r} key',
+                )
+            try:
+                float(position[axis])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f'Position {axis!r} for {structure_id!r} must be numeric',
+                ) from exc
+
+
+def _build_custom_layout_definition(
+    template_dict: dict,
+) -> CustomDiagramLayoutDefinition:
+    '''Convert a validated template dictionary to a CustomDiagramLayoutDefinition.'''
+    layout = {
+        str(sid): (float(pos['x']), float(pos['y']))
+        for sid, pos in template_dict['template_layout'].items()
+    }
+    return CustomDiagramLayoutDefinition(
+        template_name=str(template_dict.get('template_name', '')),
+        template_description=str(template_dict.get('template_description', '')),
+        template_version=str(template_dict.get('template_version', '')),
+        template_author=str(template_dict.get('template_author', '')),
+        template_date=str(template_dict.get('template_date', '')),
+        template_layout=layout,
+    )
+
+
+def add_custom_layout_template(template_dict: dict) -> LayoutTemplate:
+    '''Validate, register and return a LayoutTemplate from a definition dict.'''
+    _validate_custom_layout_dict(template_dict)
+    definition = _build_custom_layout_definition(template_dict)
+    template = LayoutTemplate(
+        name=definition.template_name,
+        display_by_default=True,
+        display_rules=(),
+        grouping_definition_set=None,
+        algorithm=CustomLayoutAlgorithm(),
+        plan_builder=CustomLayoutPlanBuilder(definition=definition),
+    )
+    register_layout_template(template)
+    return template
+
+
+def load_custom_template_from_file(file_path: str | Path) -> LayoutTemplate:
+    '''Load a custom layout template from a JSON file and register it.'''
+    path = Path(file_path)
+    with open(path, 'r', encoding='utf-8') as template_file:
+        template_dict = json.load(template_file)
+    return add_custom_layout_template(template_dict)
+
+
 _LAYOUT_TEMPLATES: dict[str, LayoutTemplate] = {}
 
 
@@ -1266,10 +1421,15 @@ __all__ = [
     'TargetOARBipartiteLayoutConfig',
     'TargetOARPlanBuilder',
     'TargetOARPlanConfig',
+    'add_custom_layout_template',
     'apply_layout_template',
+    'CustomDiagramLayoutDefinition',
+    'CustomLayoutAlgorithm',
+    'CustomLayoutPlanBuilder',
     'default_grouped_grid_template',
     'evaluate_template_display_rules',
     'get_layout_template',
+    'load_custom_template_from_file',
     'principle_targets_template',
     'relationship_spring_template',
     'register_layout_template',

@@ -580,6 +580,26 @@ def analyze_structure_grouping(
     )
 
 
+def load_grouping_table(dicom_file: DicomStructureFile,
+                        apply_filter: bool = False) -> pd.DataFrame:
+    '''
+    Build a structure grouping table directly from a DICOM file.
+
+    Args:
+        dicom_file (DicomStructureFile): The DICOM structure file.
+        apply_filter (bool): Whether to apply configured structure filtering.
+            Default is False.
+
+    Returns:
+        pd.DataFrame: ROI-indexed table containing grouping hierarchy and
+            placement columns.
+    '''
+    return analyze_structure_grouping(
+        dicom_file=dicom_file,
+        apply_filter=apply_filter,
+    )
+
+
 __all__ = [
     'DEFAULT_VERTICAL_ORDER',
     'GroupDefinitionSet',
@@ -588,5 +608,6 @@ __all__ = [
     'build_structure_grouping_table',
     'default_structure_group_definition_set',
     'load_structure_grouping_source',
+    'load_grouping_table',
     'prepare_structure_grouping_source',
 ]
