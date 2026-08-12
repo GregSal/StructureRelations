@@ -116,6 +116,9 @@ class WebAppClient {
         this.networkFolderResults = [];
         this.selectedNetworkFilePath = '';
         this.networkFolderScanInProgress = false;
+        this.networkFolderBrowserOpen = false;
+        this.networkFolderBrowserPath = '';
+        this.networkFolderBrowserParentPath = '';
         this.plotImageCache = new Map();
         this.maxPlotCacheEntries = 48;
         this.plotDebounceTimer = null;
@@ -417,6 +420,74 @@ class WebAppClient {
             });
         }
 
+        const browseNetworkFolderBtn = document.getElementById('browseNetworkFolderBtn');
+        if (browseNetworkFolderBtn) {
+            browseNetworkFolderBtn.addEventListener('click', () => {
+                this.openNetworkFolderBrowser();
+            });
+        }
+
+        const applyNetworkFolderPathBtn = document.getElementById('applyNetworkFolderPathBtn');
+        if (applyNetworkFolderPathBtn) {
+            applyNetworkFolderPathBtn.addEventListener('click', () => {
+                this.applyManualNetworkFolderPath();
+            });
+        }
+
+        const networkFolderManualPath = document.getElementById('networkFolderManualPath');
+        if (networkFolderManualPath) {
+            networkFolderManualPath.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    this.applyManualNetworkFolderPath();
+                }
+            });
+        }
+
+        const networkFolderBrowserBackdrop = document.getElementById('networkFolderBrowserBackdrop');
+        if (networkFolderBrowserBackdrop) {
+            networkFolderBrowserBackdrop.addEventListener('click', () => {
+                this.closeNetworkFolderBrowser();
+            });
+        }
+
+        const networkFolderBrowserCloseBtn = document.getElementById('networkFolderBrowserCloseBtn');
+        if (networkFolderBrowserCloseBtn) {
+            networkFolderBrowserCloseBtn.addEventListener('click', () => {
+                this.closeNetworkFolderBrowser();
+            });
+        }
+
+        const networkFolderBrowserCancelBtn = document.getElementById('networkFolderBrowserCancelBtn');
+        if (networkFolderBrowserCancelBtn) {
+            networkFolderBrowserCancelBtn.addEventListener('click', () => {
+                this.closeNetworkFolderBrowser();
+            });
+        }
+
+        const networkFolderBrowserUseBtn = document.getElementById('networkFolderBrowserUseBtn');
+        if (networkFolderBrowserUseBtn) {
+            networkFolderBrowserUseBtn.addEventListener('click', () => {
+                this.useNetworkFolderBrowserSelection();
+            });
+        }
+
+        const networkFolderBrowserUpBtn = document.getElementById('networkFolderBrowserUpBtn');
+        if (networkFolderBrowserUpBtn) {
+            networkFolderBrowserUpBtn.addEventListener('click', () => {
+                if (this.networkFolderBrowserParentPath) {
+                    this.loadNetworkFolderBrowser(this.networkFolderBrowserParentPath);
+                }
+            });
+        }
+
+        const networkFolderBrowserRefreshBtn = document.getElementById('networkFolderBrowserRefreshBtn');
+        if (networkFolderBrowserRefreshBtn) {
+            networkFolderBrowserRefreshBtn.addEventListener('click', () => {
+                this.loadNetworkFolderBrowser(this.networkFolderBrowserPath || this.networkFolderConfig.root_path);
+            });
+        }
+
         const includeSubdirectoriesToggle = document.getElementById('includeSubdirectoriesToggle');
         if (includeSubdirectoriesToggle) {
             includeSubdirectoriesToggle.addEventListener('change', () => {
@@ -524,6 +595,9 @@ class WebAppClient {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.diagramSelectionModalOpen) {
                 this.closeDiagramStructureModal(true);
+            }
+            if (e.key === 'Escape' && this.networkFolderBrowserOpen) {
+                this.closeNetworkFolderBrowser();
             }
         });
 
@@ -692,11 +766,7 @@ class WebAppClient {
                 root_path: data.root_path || '',
                 include_subdirectories: data.include_subdirectories !== false,
             };
-
-            const rootPathElement = document.getElementById('networkFolderPath');
-            if (rootPathElement) {
-                rootPathElement.textContent = this.networkFolderConfig.root_path || 'Not configured';
-            }
+            this.updateNetworkFolderPathDisplay();
 
             const includeToggle = document.getElementById('includeSubdirectoriesToggle');
             if (includeToggle) {
@@ -705,6 +775,148 @@ class WebAppClient {
         } catch (error) {
             console.error('Error loading webapp settings:', error);
         }
+    }
+
+    updateNetworkFolderPathDisplay() {
+        const rootPathElement = document.getElementById('networkFolderPath');
+        if (rootPathElement) {
+            rootPathElement.textContent = this.networkFolderConfig.root_path || 'Not configured';
+        }
+
+        const manualPathInput = document.getElementById('networkFolderManualPath');
+        if (manualPathInput) {
+            manualPathInput.value = this.networkFolderConfig.root_path || '';
+        }
+    }
+
+    applyManualNetworkFolderPath() {
+        const manualPathInput = document.getElementById('networkFolderManualPath');
+        if (!manualPathInput) {
+            return;
+        }
+
+        const enteredPath = (manualPathInput.value || '').trim();
+        if (!enteredPath) {
+            this.setNetworkFolderStatus('Enter a UNC path before applying.', true);
+            return;
+        }
+
+        this.networkFolderConfig.root_path = enteredPath;
+        this.updateNetworkFolderPathDisplay();
+        this.selectedNetworkFilePath = '';
+        this.networkFolderResults = [];
+        this.renderNetworkFolderResults([]);
+        this.updateNetworkFolderLoadButton();
+        this.setNetworkFolderStatus('Alternate starting folder set. Click Scan Folder.', false);
+    }
+
+    setNetworkFolderBrowserStatus(message, isError = false) {
+        const statusElement = document.getElementById('networkFolderBrowserStatus');
+        if (!statusElement) {
+            return;
+        }
+        statusElement.textContent = message || '';
+        statusElement.style.color = isError ? 'var(--error-color)' : 'var(--primary-color)';
+    }
+
+    openNetworkFolderBrowser() {
+        const modal = document.getElementById('networkFolderBrowserModal');
+        if (!modal) {
+            return;
+        }
+
+        this.networkFolderBrowserOpen = true;
+        modal.style.display = 'block';
+        this.loadNetworkFolderBrowser(this.networkFolderConfig.root_path);
+    }
+
+    closeNetworkFolderBrowser() {
+        const modal = document.getElementById('networkFolderBrowserModal');
+        if (!modal) {
+            return;
+        }
+
+        this.networkFolderBrowserOpen = false;
+        modal.style.display = 'none';
+    }
+
+    async loadNetworkFolderBrowser(path) {
+        const currentPathElement = document.getElementById('networkFolderBrowserCurrentPath');
+        const listElement = document.getElementById('networkFolderBrowserList');
+        const upButton = document.getElementById('networkFolderBrowserUpBtn');
+
+        if (!currentPathElement || !listElement) {
+            return;
+        }
+
+        listElement.innerHTML = '<div class="network-folder-browser-empty">Loading folders...</div>';
+        this.setNetworkFolderBrowserStatus('Loading folders...', false);
+
+        try {
+            const params = new URLSearchParams();
+            if (path && String(path).trim()) {
+                params.set('path', String(path).trim());
+            }
+
+            const response = await fetch(`/api/network/folders?${params.toString()}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to browse folders');
+            }
+
+            const data = await response.json();
+            this.networkFolderBrowserPath = data.current_path || '';
+            this.networkFolderBrowserParentPath = data.parent_path || '';
+            currentPathElement.textContent = this.networkFolderBrowserPath || 'No folder selected';
+            if (upButton) {
+                upButton.disabled = !this.networkFolderBrowserParentPath;
+            }
+
+            const directories = Array.isArray(data.directories) ? data.directories : [];
+            listElement.innerHTML = '';
+            if (directories.length === 0) {
+                listElement.innerHTML = '<div class="network-folder-browser-empty">No subfolders found.</div>';
+            } else {
+                directories.forEach((entry) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'network-folder-browser-item';
+                    button.textContent = entry.name;
+                    button.addEventListener('click', () => {
+                        this.loadNetworkFolderBrowser(entry.path);
+                    });
+                    listElement.appendChild(button);
+                });
+            }
+
+            this.setNetworkFolderBrowserStatus('Click a folder to open it, then choose Use This Folder.', false);
+        } catch (error) {
+            console.error('Network folder browser error:', error);
+            this.networkFolderBrowserPath = '';
+            this.networkFolderBrowserParentPath = '';
+            currentPathElement.textContent = 'Unable to load folders';
+            listElement.innerHTML = '<div class="network-folder-browser-empty">Unable to load folders.</div>';
+            if (upButton) {
+                upButton.disabled = true;
+            }
+            this.setNetworkFolderBrowserStatus('Failed to browse folders. Check path access.', true);
+        }
+    }
+
+    useNetworkFolderBrowserSelection() {
+        if (!this.networkFolderBrowserPath) {
+            this.setNetworkFolderBrowserStatus('No folder selected.', true);
+            return;
+        }
+
+        this.networkFolderConfig.root_path = this.networkFolderBrowserPath;
+        this.updateNetworkFolderPathDisplay();
+        this.selectedNetworkFilePath = '';
+        this.networkFolderResults = [];
+        this.renderNetworkFolderResults([]);
+        this.updateNetworkFolderLoadButton();
+        this.setNetworkFolderStatus('Alternate starting folder selected. Click Scan Folder.', false);
+        this.closeNetworkFolderBrowser();
     }
 
     setNetworkFolderStatus(message, isError = false) {
@@ -812,9 +1024,13 @@ class WebAppClient {
         );
 
         try {
-            const response = await fetch(
-                `/api/network/structure-files?include_subdirectories=${includeSubdirectories}`
-            );
+            const params = new URLSearchParams({
+                include_subdirectories: includeSubdirectories ? 'true' : 'false',
+            });
+            if (this.networkFolderConfig.root_path) {
+                params.set('root_path', this.networkFolderConfig.root_path);
+            }
+            const response = await fetch(`/api/network/structure-files?${params.toString()}`);
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(errorText || 'Scan failed');
@@ -823,11 +1039,7 @@ class WebAppClient {
             const data = await response.json();
             this.networkFolderConfig.root_path = data.root_path || this.networkFolderConfig.root_path;
             this.networkFolderConfig.include_subdirectories = data.include_subdirectories !== false;
-
-            const rootPathElement = document.getElementById('networkFolderPath');
-            if (rootPathElement) {
-                rootPathElement.textContent = this.networkFolderConfig.root_path || 'Not configured';
-            }
+            this.updateNetworkFolderPathDisplay();
 
             this.selectedNetworkFilePath = '';
             this.networkFolderResults = Array.isArray(data.files) ? data.files : [];
@@ -934,6 +1146,7 @@ class WebAppClient {
                 },
                 body: JSON.stringify({
                     file_path: this.selectedNetworkFilePath,
+                    root_path: this.networkFolderConfig.root_path || null,
                 })
             });
 

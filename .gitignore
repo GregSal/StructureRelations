@@ -188,3 +188,4 @@ webapp_sessions/
 layout_tuner_output/
 layout_tuner_output_cola/
 TEMP/
+/src/webapp/config/webapp_settings.json

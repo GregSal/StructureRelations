@@ -208,6 +208,40 @@ header h1 {
     gap: 0.65rem;
 }
 
+.folder-scan-path-actions {
+    margin-top: -0.25rem;
+}
+
+.folder-scan-manual-path {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.folder-scan-manual-path label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.folder-scan-manual-path-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.folder-scan-manual-path input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.84rem;
+    color: var(--text-primary);
+    background: #fff;
+}
+
 .folder-scan-actions {
     display: flex;
     flex-wrap: wrap;
@@ -277,6 +311,59 @@ header h1 {
     font-size: 0.8rem;
     color: var(--primary-color);
     word-break: break-word;
+}
+
+.network-folder-browser-dialog {
+    max-width: 760px;
+}
+
+.network-folder-browser-current {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    background: #f8fafc;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    word-break: break-word;
+}
+
+.network-folder-browser-controls {
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.network-folder-browser-list {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    max-height: 320px;
+    overflow-y: auto;
+    margin-bottom: 0.75rem;
+}
+
+.network-folder-browser-item {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    border-bottom: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-primary);
+    padding: 0.7rem 0.9rem;
+    cursor: pointer;
+}
+
+.network-folder-browser-item:last-child {
+    border-bottom: 0;
+}
+
+.network-folder-browser-item:hover {
+    background: #eff6ff;
+}
+
+.network-folder-browser-empty {
+    padding: 0.9rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .disk-warning {
