@@ -22,6 +22,16 @@ import io
 import networkx as nx
 import pydicom
 
+# Add parent directory to path for imports before loading project modules.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from diagram_layout import (
+    apply_layout_template,
+    get_layout_template,
+    list_layout_templates,
+    load_custom_template_from_file,
+)
+
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
@@ -31,9 +41,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use('Agg')  # Use non-interactive backend
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dicom import DicomStructureFile, clean_uploaded_file_name
 from structure_set import StructureSet
@@ -53,6 +60,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     '''Manage application startup and shutdown lifecycle.'''
     logger.info('Starting StructureRelations web application')
+    template_dir = Path(__file__).resolve().parent.parent / 'layout_templates'
+    scan_layout_templates(template_dir)
     cleanup_task = asyncio.create_task(periodic_cleanup())
     try:
         yield
@@ -166,6 +175,7 @@ class MatrixRequest(BaseModel):
     session_id: str
     row_rois: Optional[List[int]] = None
     col_rois: Optional[List[int]] = None
+    layout_template_name: Optional[str] = 'relationship_spring'
     use_symbols: bool = True
     show_disjoint: bool = False
     show_unknown: bool = False
@@ -203,6 +213,10 @@ class DiagramNode(BaseModel):
     side_tag: Optional[str] = None  # 'L', 'R', 'B', or None for layout constraint
     opt_group_key: Optional[str] = None  # Normalized key for opt-prefix grouping
     target_group_key: Optional[str] = None  # Normalized key for target dose-level grouping
+    x: Optional[float] = None
+    y: Optional[float] = None
+    layout_fixed: bool = False
+    layout_source: Optional[str] = None
 
 
 class DiagramEdge(BaseModel):
@@ -224,10 +238,85 @@ class DiagramEdge(BaseModel):
 class DiagramResponse(BaseModel):
     nodes: List[DiagramNode]
     edges: List[DiagramEdge]
+    layout_template_name: Optional[str] = None
+
+
+class LayoutTemplateInfo(BaseModel):
+    name: str
+
+
+class LayoutTemplatesResponse(BaseModel):
+    templates: List[LayoutTemplateInfo]
+
+
+@app.get('/api/diagram/templates', response_model=LayoutTemplatesResponse)
+async def get_diagram_templates() -> LayoutTemplatesResponse:
+    '''Return all built-in and custom layout templates available to the UI.'''
+    return LayoutTemplatesResponse(templates=list_layout_templates())
 
 
 _diagram_settings_state = {'data': {}, 'mtime': None}
 _relationship_definitions_state = {'data': {}, 'mtime': None}
+
+
+def scan_layout_templates(layout_dir: str | Path) -> dict[str, str]:
+    '''Scan a template directory in timestamp order and return discovered JSON files.
+
+    Files are processed newest-first so the most recently modified template wins
+    when duplicate names are found. Invalid JSON files are skipped with logging and
+    do not break startup. Only the first file with a given template name is kept.
+    '''
+    template_dir = Path(layout_dir)
+    if not template_dir.exists():
+        logger.warning('Layout template directory not found: %s', template_dir)
+        return {}
+
+    discovered: dict[str, str] = {}
+    registered_names = {
+        item['name'] for item in list_layout_templates()
+    }
+    template_files = [
+        path for path in template_dir.iterdir()
+        if path.is_file() and path.suffix.lower() == '.json'
+    ]
+
+    template_files.sort(key=lambda path: (-path.stat().st_mtime, path.name))
+
+    for template_path in template_files:
+        try:
+            with open(template_path, 'r', encoding='utf-8') as template_file:
+                template_dict = json.load(template_file)
+            template_name = str(template_dict.get('template_name', '')).strip()
+            if not template_name:
+                raise ValueError('template_name must not be blank')
+
+            if template_name in discovered:
+                logger.warning(
+                    'layout template duplicate ignored: %s from %s (first wins; already loaded from %s)',
+                    template_name,
+                    template_path,
+                    discovered[template_name],
+                )
+                continue
+
+            if template_name in registered_names:
+                logger.warning(
+                    'layout template duplicate ignored: %s from %s (first wins; already loaded from %s)',
+                    template_name,
+                    template_path,
+                    '<registered template>',
+                )
+                continue
+
+            template = load_custom_template_from_file(template_path)
+        except Exception as exc:
+            logger.warning('layout template load skipped: %s (%s)', template_path, exc)
+            continue
+
+        discovered[template.name] = str(template_path)
+        logger.info('layout template loaded: %s from %s', template.name, template_path)
+
+    return discovered
 
 # Micro-timing log control: log only when total_ms exceeds threshold,
 # or once every N requests (0 = threshold-only, no sampling).
@@ -2317,6 +2406,26 @@ async def get_diagram_data(request: MatrixRequest):
         nodes = []
         node_build_start = time.perf_counter()
         roi_to_name = {}
+        layout_positions: dict[int, tuple[float, float]] = {}
+        selected_template_name = request.layout_template_name
+        if selected_template_name:
+            try:
+                selected_template = get_layout_template(selected_template_name)
+                layout_result = apply_layout_template(
+                    structure_set,
+                    selected_template,
+                )
+                layout_positions = {
+                    int(roi): (float(position[0]), float(position[1]))
+                    for roi, position in layout_result.positions.items()
+                }
+            except Exception as exc:
+                logger.warning(
+                    'Diagram layout template %s could not be applied: %s',
+                    selected_template_name,
+                    exc,
+                )
+                layout_positions = {}
         for _, row in summary_df.iterrows():
             roi = int(row['ROI'])
 
@@ -2353,6 +2462,7 @@ async def get_diagram_data(request: MatrixRequest):
             side_tag = parse_side_tag(name)
             opt_group_key = extract_opt_group_key(name)
             target_group_key = extract_target_group_key(name)
+            position = layout_positions.get(roi)
 
             nodes.append(DiagramNode(
                 id=roi,
@@ -2362,7 +2472,11 @@ async def get_diagram_data(request: MatrixRequest):
                 title=tooltip,
                 side_tag=side_tag,
                 opt_group_key=opt_group_key,
-                target_group_key=target_group_key
+                target_group_key=target_group_key,
+                x=position[0] if position else None,
+                y=position[1] if position else None,
+                layout_fixed=position is not None,
+                layout_source=selected_template_name if position else None,
             ))
             roi_to_name[roi] = name
         node_build_ms = round((time.perf_counter() - node_build_start) * 1000.0)
@@ -2730,7 +2844,11 @@ async def get_diagram_data(request: MatrixRequest):
                 len(edges),
             )
         logger.info(f'Diagram response: {len(nodes)} nodes, {len(edges)} edges (mode={request.logical_relations_mode})')
-        return DiagramResponse(nodes=nodes, edges=edges)
+        return DiagramResponse(
+            nodes=nodes,
+            edges=edges,
+            layout_template_name=selected_template_name,
+        )
 
     except HTTPException:
         raise

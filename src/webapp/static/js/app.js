@@ -23,6 +23,9 @@ class WebAppClient {
         this.plotAbortController = null;  // Track current plot request
         this.diagramLogicalRelationsMode = 'limited';  // Default: limited mode
         this.diagramLogicalRelationsModeApplied = 'limited';
+        this.diagramLayoutTemplateName = 'relationship_spring';
+        this.diagramLayoutTemplateNameApplied = 'relationship_spring';
+        this.diagramTemplateNeedsFreshLayout = false;
         this.diagramShowDisjointApplied = false;
         this.diagramShowLabelsApplied = true;
         this.diagramShowUnknownApplied = false;
@@ -147,6 +150,43 @@ class WebAppClient {
             }
         } catch (error) {
             console.error('Error loading symbol config:', error);
+        }
+    }
+
+    async loadDiagramTemplates() {
+        const selector = document.getElementById('diagramLayoutTemplate');
+        if (!selector) return;
+
+        try {
+            const response = await fetch('/api/diagram/templates');
+            if (!response.ok) {
+                throw new Error('Failed to load diagram templates');
+            }
+            const payload = await response.json();
+            const templates = Array.isArray(payload.templates) ? payload.templates : [];
+            const availableNames = templates
+                .map(template => String(template.name || '').trim())
+                .filter(Boolean);
+            selector.innerHTML = '';
+            availableNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                selector.appendChild(option);
+            });
+
+            const selectedName = availableNames.includes(this.diagramLayoutTemplateName)
+                ? this.diagramLayoutTemplateName
+                : (availableNames.includes('relationship_spring')
+                    ? 'relationship_spring'
+                    : availableNames[0]);
+            if (selectedName) {
+                this.diagramLayoutTemplateName = selectedName;
+                this.diagramLayoutTemplateNameApplied = selectedName;
+                selector.value = selectedName;
+            }
+        } catch (error) {
+            console.warn('Unable to load diagram templates:', error);
         }
     }
 
@@ -622,6 +662,10 @@ class WebAppClient {
             console.log('Diagram logical relations mode changed to:', e.target.value);
             this.ensureManualLayoutForDiagramChanges();
             this.diagramLogicalRelationsMode = e.target.value;
+            this.updateDiagramPendingState();
+        });
+        document.getElementById('diagramLayoutTemplate').addEventListener('change', (e) => {
+            this.diagramLayoutTemplateName = e.target.value;
             this.updateDiagramPendingState();
         });
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
@@ -1555,6 +1599,8 @@ class WebAppClient {
             runViewBuildStep('Configuring diagram selection', 88.0, () => {
                 this.initializeDiagramSelection(data);
             });
+
+            await this.loadDiagramTemplates();
 
             this.updateProgress('rendering_results', 90.0, 'Requesting relationship diagram...', '');
             this.appendStatusLogLine('frontend', 'Requesting relationship diagram...');
@@ -3562,6 +3608,9 @@ class WebAppClient {
     }
 
     applyDiagramSelection() {
+        const templateChanged = (
+            this.diagramLayoutTemplateName !== this.diagramLayoutTemplateNameApplied
+        );
         this.ensureManualLayoutForDiagramChanges();
         this.diagramAppliedSelection = new Set(this.diagramSelection);
         this.hiddenNodes = new Set(
@@ -3572,6 +3621,8 @@ class WebAppClient {
         this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
         this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
         this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
+        this.diagramLayoutTemplateNameApplied = this.diagramLayoutTemplateName;
+        this.diagramTemplateNeedsFreshLayout = templateChanged;
         this.updateDiagramPendingState();
         return this.refreshDiagram();
     }
@@ -3599,8 +3650,12 @@ class WebAppClient {
             showLabels !== this.diagramShowLabelsApplied;
         const logicalChanged =
             this.diagramLogicalRelationsMode !== this.diagramLogicalRelationsModeApplied;
+        const templateChanged =
+            this.diagramLayoutTemplateName !== this.diagramLayoutTemplateNameApplied;
 
-        this.setDiagramPending(selectionChanged || togglesChanged || logicalChanged);
+        this.setDiagramPending(
+            selectionChanged || togglesChanged || logicalChanged || templateChanged
+        );
     }
 
     getDiagramAppliedRois() {
@@ -3630,7 +3685,10 @@ class WebAppClient {
             return;
         }
 
-        const positionSnapshot = this._captureDiagramPositionSnapshot();
+        const positionSnapshot = this.diagramTemplateNeedsFreshLayout
+            ? null
+            : this._captureDiagramPositionSnapshot();
+        this.diagramTemplateNeedsFreshLayout = false;
 
         try {
             const selectedRois = this.getDiagramAppliedRois();
@@ -3647,7 +3705,8 @@ class WebAppClient {
                 col_rois: selectedRois,
                 show_disjoint: showDisjoint,
                 show_unknown: this.diagramShowUnknownApplied,
-                logical_relations_mode: this.diagramLogicalRelationsModeApplied
+                logical_relations_mode: this.diagramLogicalRelationsModeApplied,
+                layout_template_name: this.diagramLayoutTemplateNameApplied
             };
             console.log('Sending diagram request:', diagramRequest);
 
@@ -4904,12 +4963,75 @@ class WebAppClient {
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
-        // Compute pre-layout positions if not using manual snapshot
-        let preLayoutPositions = null;
-        if (!positionSnapshot) {
-            const layoutRules = this.diagramOptions?.layout?.layout_rules;
-            preLayoutPositions = this.computeDeterministicLayout(data.nodes, data.edges, layoutRules);
+        // Preserve user positions first, then use backend template anchors for
+        // any remaining nodes. Only unanchored nodes enter the layout engine.
+        const anchorPositions = {};
+        const addAnchor = (id, x, y) => {
+            if (x === null || x === undefined || y === null || y === undefined) {
+                return;
+            }
+            const numericX = Number(x);
+            const numericY = Number(y);
+            if (Number.isFinite(numericX) && Number.isFinite(numericY)) {
+                anchorPositions[String(id)] = { x: numericX, y: numericY };
+            }
+        };
+
+        if (positionSnapshot?.positions) {
+            Object.entries(positionSnapshot.positions).forEach(([id, position]) => {
+                addAnchor(id, position?.x, position?.y);
+            });
         }
+
+        data.nodes.forEach(node => {
+            const id = String(node.id);
+            if (!Object.prototype.hasOwnProperty.call(anchorPositions, id)) {
+                addAnchor(id, node.x, node.y);
+            }
+        });
+
+        const anchoredNodeIds = new Set(Object.keys(anchorPositions));
+        const unanchoredNodes = data.nodes.filter(
+            node => !anchoredNodeIds.has(String(node.id))
+        );
+        const unanchoredNodeIds = new Set(
+            unanchoredNodes.map(node => String(node.id))
+        );
+        const unanchoredEdges = data.edges.filter(edge => (
+            edge.layout_candidate !== false
+            && unanchoredNodeIds.has(String(edge.from_node))
+            && unanchoredNodeIds.has(String(edge.to_node))
+        ));
+        const layoutRules = this.diagramOptions?.layout?.layout_rules;
+        let computedPositions = {};
+        if (unanchoredNodes.length > 0) {
+            if (anchoredNodeIds.size === 0) {
+                computedPositions = this.computeDeterministicLayout(
+                    data.nodes,
+                    data.edges,
+                    layoutRules,
+                ) || {};
+            } else {
+                computedPositions = this.computeDeterministicLayout(
+                    unanchoredNodes,
+                    unanchoredEdges,
+                    layoutRules,
+                ) || {};
+            }
+
+            if (Object.keys(computedPositions).length === 0) {
+                computedPositions = this.applyCycleLayout(
+                    unanchoredNodes,
+                    unanchoredEdges,
+                    layoutRules,
+                );
+            }
+        }
+
+        const preLayoutPositions = { ...computedPositions };
+        Object.entries(anchorPositions).forEach(([id, position]) => {
+            preLayoutPositions[id] = position;
+        });
 
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => {
@@ -4917,7 +5039,11 @@ class WebAppClient {
             const originalLabel = node.label;
             const labelHidden = this.hiddenLabels.has(roi);
             const isHidden = this.hiddenNodes.has(roi);
-            const isPhysicsFixed = this.fixedNodes.has(roi);
+            const hasLayoutPosition = Object.prototype.hasOwnProperty.call(
+                preLayoutPositions,
+                String(roi),
+            );
+            const isPhysicsFixed = this.fixedNodes.has(roi) || hasLayoutPosition;
 
             // Apply pre-layout position if available
             const preLayoutPos = preLayoutPositions?.[String(roi)];
@@ -5022,7 +5148,10 @@ class WebAppClient {
 
         // Disable physics when we have preLayout from crossing minimization
         // The deterministic layout is optimized and physics would undo the work
-        if (positionSnapshot || preLayoutPositions) {
+        const allNodesPositioned = data.nodes.every(node => (
+            Object.prototype.hasOwnProperty.call(preLayoutPositions, String(node.id))
+        ));
+        if (positionSnapshot || allNodesPositioned) {
             options.physics.enabled = false;
         }
 

@@ -24,6 +24,8 @@ from diagram_layout import (
     default_grouped_grid_template,
     evaluate_template_display_rules,
     get_layout_template,
+    list_layout_templates,
+    load_custom_template_from_file,
     principle_targets_template,
     relationship_spring_template,
     register_layout_template,
@@ -115,6 +117,34 @@ def test_default_template_is_available_by_registered_name() -> None:
     template = get_layout_template('grouped_grid')
 
     assert template.name == default_grouped_grid_template().name
+
+
+def test_list_layout_templates_returns_registered_names() -> None:
+    '''The template catalog should expose built-in templates by stable name.'''
+    template_names = [item['name'] for item in list_layout_templates()]
+
+    assert template_names[:4] == [
+        'grouped_grid',
+        'relationship_spring',
+        'principle_targets',
+        'target_oar',
+    ]
+
+
+def test_load_optics_json_template_registers_and_lists_template() -> None:
+    '''The shipped JSON template should load through the public loader.'''
+    template_path = (
+        Path(__file__).parents[1]
+        / 'src'
+        / 'layout_templates'
+        / 'optics_template.json'
+    )
+
+    template = load_custom_template_from_file(template_path)
+
+    assert template.name == 'Optics_JSON'
+    assert get_layout_template('Optics_JSON') is template
+    assert {'name': 'Optics_JSON'} in list_layout_templates()
 
 
 def test_register_layout_template_rejects_duplicate_name() -> None:

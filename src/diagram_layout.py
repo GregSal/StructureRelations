@@ -1395,6 +1395,14 @@ def get_layout_template(name: str) -> LayoutTemplate:
         raise KeyError(f'Unknown layout template: {name}') from exc
 
 
+def list_layout_templates() -> list[dict[str, str]]:
+    '''Return registered layout templates in stable registration order.'''
+    return [
+        {'name': template.name}
+        for template in _LAYOUT_TEMPLATES.values()
+    ]
+
+
 register_layout_template(default_grouped_grid_template())
 register_layout_template(relationship_spring_template())
 register_layout_template(principle_targets_template())
@@ -1430,6 +1438,7 @@ __all__ = [
     'evaluate_template_display_rules',
     'get_layout_template',
     'load_custom_template_from_file',
+    'list_layout_templates',
     'principle_targets_template',
     'relationship_spring_template',
     'register_layout_template',

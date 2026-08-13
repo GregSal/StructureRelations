@@ -57,10 +57,18 @@ class FakeDiagramStructureSet:
     def summary(self):
         return self._summary_df
 
+    def calculate_logical_flags(self):
+        '''Match the StructureSet method used before diagram generation.'''
+        return None
+
     def get_relationship(self, from_roi, to_roi):
         if from_roi == 1 and to_roi == 2:
             return self._relationship
         return None
+
+    def get_structures_by_volume(self):
+        '''Return volume-ordered ROI stubs used by diagram edge deduplication.'''
+        return [SimpleNamespace(roi=1), SimpleNamespace(roi=2)]
 
 
 def _make_fake_structure_set(tolerance: float = 0.1):
@@ -114,6 +122,52 @@ def _create_session(manager: SessionManager, session_id: str):
     manager.save_session(
         session_id,
         SessionData(dicom_file_path='dummy.dcm', structure_set=None),
+    )
+
+
+def test_scan_layout_templates_loads_valid_json_and_ignores_conflicts(tmp_path, caplog):
+    '''Valid templates should be loaded newest-first, with duplicate names logged and ignored.'''
+    latest_file = tmp_path / 'latest_template.json'
+    latest_file.write_text(json.dumps({
+        'template_name': 'Alpha Template',
+        'template_layout': {'A': {'x': 0, 'y': 0}, 'B': {'x': 1, 'y': 1}},
+    }), encoding='utf-8')
+
+    duplicate_file = tmp_path / 'older_duplicate.json'
+    duplicate_file.write_text(json.dumps({
+        'template_name': 'Alpha Template',
+        'template_layout': {'C': {'x': 2, 'y': 2}},
+    }), encoding='utf-8')
+
+    bad_file = tmp_path / 'broken_template.json'
+    bad_file.write_text('{ not valid json', encoding='utf-8')
+
+    later_file = tmp_path / 'beta_template.json'
+    later_file.write_text(json.dumps({
+        'template_name': 'Beta Template',
+        'template_layout': {'D': {'x': 3, 'y': 3}},
+    }), encoding='utf-8')
+
+    newest_time = time.time() - 30
+    older_time = newest_time - 60
+    later_time = newest_time - 10
+
+    for path, mtime in ((latest_file, newest_time), (duplicate_file, older_time), (later_file, later_time)):
+        os.utime(path, (mtime, mtime))
+
+    with caplog.at_level('INFO'):
+        loaded = web_main.scan_layout_templates(tmp_path)
+
+    assert set(loaded) == {'Alpha Template', 'Beta Template'}
+    assert loaded['Alpha Template'] == str(latest_file)
+    assert loaded['Beta Template'] == str(later_file)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert f'layout template loaded: Alpha Template from {latest_file}' in messages
+    assert f'layout template duplicate ignored: Alpha Template from {duplicate_file} (first wins; already loaded from {latest_file})' in messages
+    assert any(
+        message.startswith(f'layout template load skipped: {bad_file} (')
+        for message in messages
     )
 
 
@@ -290,6 +344,64 @@ def test_diagram_endpoint_uses_human_relationship_label(monkeypatch, tmp_path):
     edge = payload['edges'][0]
     assert edge['relation_type'] == 'CONTAINS'
     assert edge['label'] == 'Contains'
+
+
+def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_path):
+    '''The template catalog endpoint should expose built-ins and loaded templates.'''
+    client, _ = _prepare_client(monkeypatch, tmp_path)
+
+    response = client.get('/api/diagram/templates')
+
+    assert response.status_code == 200
+    names = [template['name'] for template in response.json()['templates']]
+    assert names[:4] == [
+        'grouped_grid',
+        'relationship_spring',
+        'principle_targets',
+        'target_oar',
+    ]
+
+
+def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_path):
+    '''Template anchors should be optional so unpositioned selected nodes remain visible.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-partial-template-positions'
+    fake_set = _make_fake_diagram_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    monkeypatch.setattr(web_main, 'get_layout_template', lambda name: name)
+    monkeypatch.setattr(
+        web_main,
+        'apply_layout_template',
+        lambda structure_set, template: SimpleNamespace(
+            positions={1: (12.5, -4.0)},
+        ),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'layout_template_name': 'test_template',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['layout_template_name'] == 'test_template'
+    nodes = {node['id']: node for node in payload['nodes']}
+    assert nodes[1]['x'] == 12.5
+    assert nodes[1]['y'] == -4.0
+    assert nodes[1]['layout_fixed'] is True
+    assert nodes[1]['layout_source'] == 'test_template'
+    assert nodes[2]['x'] is None
+    assert nodes[2]['y'] is None
+    assert nodes[2]['layout_fixed'] is False
+    assert nodes[2]['layout_source'] is None
 
 
 def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_path):
