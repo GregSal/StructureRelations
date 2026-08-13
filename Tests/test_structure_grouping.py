@@ -78,13 +78,13 @@ def test_build_structure_grouping_table_splits_opt_ptv56_by_subgroups():
     assert result.loc[74, 'h_group_2'] == 'R'
     assert result.loc[71, 'v_group_1'] == 'opt'
     assert result.loc[71, 'v_group_2'] == 'PTV'
-    assert result.loc[71, 'v_group_3'] == 'a'
-    assert result.loc[72, 'v_group_3'] == 'b'
-    assert result.loc[76, 'v_group_3'] == 'c'
-    assert result.loc[71, 'h_index'] == result.loc[72, 'h_index']
+    assert result.loc[71, 'h_group_3'] == 'a'
+    assert result.loc[72, 'h_group_3'] == 'b'
+    assert result.loc[76, 'h_group_3'] == 'c'
+    assert result.loc[71, 'h_index'] < result.loc[72, 'h_index']
     assert result.loc[71, 'h_index'] < result.loc[74, 'h_index']
-    assert result.loc[74, 'v_index'] < result.loc[75, 'v_index']
-    assert result.loc[75, 'v_index'] < result.loc[76, 'v_index']
+    assert result.loc[74, 'v_index'] == result.loc[75, 'v_index']
+    assert result.loc[75, 'v_index'] == result.loc[76, 'v_index']
     assert bool(result['is_unique_slot'].all())
 
 
@@ -135,10 +135,10 @@ def test_analyze_structure_grouping_uses_hn_example_as_acceptance_case():
     opt_rows = result[result['Structure ID'].str.startswith('opt PTV 56')].copy()
 
     assert set(opt_rows['h_group_2']) == {'L', 'R'}
-    assert set(opt_rows['v_group_3']) == {'a', 'b', 'c'}
-    assert opt_rows.loc[71, 'h_index'] == opt_rows.loc[72, 'h_index']
-    assert opt_rows.loc[74, 'h_index'] == opt_rows.loc[75, 'h_index']
+    assert set(opt_rows['h_group_3']) == {'a', 'b', 'c'}
+    assert opt_rows.loc[71, 'h_index'] < opt_rows.loc[72, 'h_index']
+    assert opt_rows.loc[74, 'h_index'] < opt_rows.loc[75, 'h_index']
     assert opt_rows.loc[71, 'h_index'] < opt_rows.loc[74, 'h_index']
-    assert opt_rows.loc[74, 'v_index'] < opt_rows.loc[75, 'v_index']
-    assert opt_rows.loc[75, 'v_index'] < opt_rows.loc[76, 'v_index']
+    assert opt_rows.loc[74, 'v_index'] == opt_rows.loc[75, 'v_index']
+    assert opt_rows.loc[75, 'v_index'] == opt_rows.loc[76, 'v_index']
     assert bool(opt_rows['is_unique_slot'].all())

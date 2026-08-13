@@ -1169,7 +1169,7 @@ def principle_targets_template(
 def target_oar_template(
     plan_config: TargetOARPlanConfig | None = None,
     layout_config: TargetOARBipartiteLayoutConfig | None = None,
-) -> LayoutTemplate:
+    ) -> LayoutTemplate:
     '''Return a bipartite principle-target/OAR layout template.'''
     resolved_plan_config = plan_config or TargetOARPlanConfig()
     resolved_layout_config = layout_config or TargetOARBipartiteLayoutConfig()
@@ -1405,7 +1405,6 @@ def list_layout_templates() -> list[dict[str, str]]:
 
 register_layout_template(default_grouped_grid_template())
 register_layout_template(relationship_spring_template())
-register_layout_template(principle_targets_template())
 register_layout_template(target_oar_template())
 
 
@@ -1439,7 +1438,6 @@ __all__ = [
     'get_layout_template',
     'load_custom_template_from_file',
     'list_layout_templates',
-    'principle_targets_template',
     'relationship_spring_template',
     'register_layout_template',
     'target_oar_template',

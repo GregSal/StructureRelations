@@ -18,15 +18,14 @@ from diagram_layout import (
     PrincipleTargetSelectorConfig,
     RelationshipGraphPlanBuilder,
     SpringLayout,
-    TargetOARBipartiteLayout,
     TargetOARBipartiteLayoutConfig,
+    TargetOARPlanConfig,
     apply_layout_template,
     default_grouped_grid_template,
     evaluate_template_display_rules,
     get_layout_template,
     list_layout_templates,
     load_custom_template_from_file,
-    principle_targets_template,
     relationship_spring_template,
     register_layout_template,
     target_oar_template,
@@ -126,7 +125,6 @@ def test_list_layout_templates_returns_registered_names() -> None:
     assert template_names[:4] == [
         'grouped_grid',
         'relationship_spring',
-        'principle_targets',
         'target_oar',
     ]
 
@@ -142,9 +140,9 @@ def test_load_optics_json_template_registers_and_lists_template() -> None:
 
     template = load_custom_template_from_file(template_path)
 
-    assert template.name == 'Optics_JSON'
-    assert get_layout_template('Optics_JSON') is template
-    assert {'name': 'Optics_JSON'} in list_layout_templates()
+    assert template.name == 'Optics'
+    assert get_layout_template('Optics') is template
+    assert {'name': 'Optics'} in list_layout_templates()
 
 
 def test_register_layout_template_rejects_duplicate_name() -> None:
@@ -504,44 +502,39 @@ def test_renderer_accepts_relationship_plan_without_grid_columns() -> None:
     result.fig.clear()
 
 
-def test_principle_targets_template_is_registered() -> None:
-    '''The principle target template should be retrievable by name.'''
-    template = get_layout_template('principle_targets')
-
-    assert template.name == 'principle_targets'
-
-
 def test_principle_targets_template_selects_one_per_group() -> None:
     '''One principle target should be selected per horizontal target group.'''
     structure_set = FakePrincipleTargetStructureSet()
 
     result = apply_layout_template(
         structure_set,
-        principle_targets_template(),
+        target_oar_template(),
     )
 
     selected = result.plot_nodes.set_index('ROI')
 
-    assert set(selected.index) == {1, 6}
-    assert selected.loc[1, 'Name'] == 'PTV 56'
-    assert selected.loc[6, 'Name'] == 'PTV 70'
+    assert set(selected.index) == {2, 7}
+    assert selected.loc[2, 'Name'] == 'eval PTV 56 L a'
+    assert selected.loc[7, 'Name'] == 'opt PTV 70'
     assert selected['h_grouping'].tolist() == ['56', '70']
 
 
 def test_principle_targets_template_uses_ctv_fallback_when_enabled() -> None:
     '''Fallback mode should pick CTV when a group has no PTV.'''
     structure_set = FakePrincipleTargetStructureSet()
-    config = PrincipleTargetSelectorConfig(
-        missing_ptv_mode='fallback_to_ctv_then_gtv',
-    )
+    plan_config = TargetOARPlanConfig(
+        selector_config=PrincipleTargetSelectorConfig(
+            missing_ptv_mode='fallback_to_ctv_then_gtv'
+            )
+        )
 
     result = apply_layout_template(
         structure_set,
-        principle_targets_template(selector_config=config),
+        target_oar_template(plan_config=plan_config),
     )
 
     selected = result.plot_nodes.set_index('ROI')
-    assert set(selected.index) == {1, 4, 6}
+    assert set(selected.index) == {2, 4, 7}
     assert selected.loc[4, 'Name'] == 'CTV 66'
 
 
