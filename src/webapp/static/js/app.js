@@ -1,5 +1,8 @@
 class WebAppClient {
     constructor() {
+        this.backendLayoutPositionScale = 100;
+        this.backendLayoutYDirection = -1;
+        this.backendLayoutTargetAspectRatio = 2.3;
         this.sessionId = null;
         this.websocket = null;
         this.previewFilterPath = new URLSearchParams(window.location.search).get('filter_path');
@@ -2978,15 +2981,18 @@ class WebAppClient {
         if (!nodeIds.length) return;
 
         const positions = this.network.getPositions(nodeIds);
-        const pinnedNodes = nodeIds.map((id) => {
-            const pos = positions[id] || { x: 0, y: 0 };
+        const pinnedNodes = nodeIds.flatMap((id) => {
+            const pos = positions[id];
+            if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+                return [];
+            }
             this.fixedNodes.add(Number(id));
-            return {
+            return [{
                 id,
                 x: pos.x,
                 y: pos.y,
                 physics: false,
-            };
+            }];
         });
 
         this.manualLayoutActive = true;
@@ -3008,10 +3014,18 @@ class WebAppClient {
         this.fixedNodes.clear();
         this.manualLayoutActive = false;
         this._dragFrozen = [];
-        this.renderDiagram(this.latestDiagramData);
+        this.renderDiagram(this.latestDiagramData, null, {
+            useBackendAnchors: false,
+        });
 
         if (this.network) {
             this.network.fit();
+            this.network.setOptions({
+                physics: {
+                    ...this.getPhysicsFromInfluence(),
+                    enabled: true,
+                },
+            });
             this.network.startSimulation();
         }
 
@@ -3691,8 +3705,10 @@ class WebAppClient {
         this.diagramTemplateNeedsFreshLayout = false;
 
         try {
+            const templateName = this.diagramLayoutTemplateNameApplied;
+            const templateControlsSelection = Boolean(templateName);
             const selectedRois = this.getDiagramAppliedRois();
-            if (selectedRois.length === 0) {
+            if (!templateControlsSelection && selectedRois.length === 0) {
                 alert('Please select at least one structure for the diagram');
                 return;
             }
@@ -3701,12 +3717,12 @@ class WebAppClient {
 
             const diagramRequest = {
                 session_id: this.sessionId,
-                row_rois: selectedRois,
-                col_rois: selectedRois,
+                row_rois: templateControlsSelection ? null : selectedRois,
+                col_rois: templateControlsSelection ? null : selectedRois,
                 show_disjoint: showDisjoint,
                 show_unknown: this.diagramShowUnknownApplied,
                 logical_relations_mode: this.diagramLogicalRelationsModeApplied,
-                layout_template_name: this.diagramLayoutTemplateNameApplied
+                layout_template_name: templateName
             };
             console.log('Sending diagram request:', diagramRequest);
 
@@ -3725,6 +3741,7 @@ class WebAppClient {
             }
 
             const data = await response.json();
+            this.syncDiagramSelectionFromTemplate(data);
             const diagramFetchMs = Math.round(performance.now() - diagramFetchStart);
             console.log('Diagram response received:', { nodes: data.nodes.length, edges: data.edges.length });
             console.log('Diagram edges:', data.edges.map(e => `(${e.from_node}->${e.to_node}): ${e.label}`));
@@ -3763,6 +3780,24 @@ class WebAppClient {
             positions,
             hiddenNodeIds,
         };
+    }
+
+    syncDiagramSelectionFromTemplate(data) {
+        if (!Array.isArray(data?.template_displayed_rois)) return;
+
+        const displayed = new Set(
+            data.template_displayed_rois.map(roi => Number(roi))
+        );
+        this.diagramSelection = new Set(displayed);
+        this.diagramAppliedSelection = new Set(displayed);
+        this.hiddenNodes = new Set(
+            this.structureItems
+                .map(item => Number(item.roi))
+                .filter(roi => !displayed.has(roi))
+        );
+        this.syncDiagramCheckboxes();
+        this.updateStructureSetBadge();
+        this.updateDiagramPendingState();
     }
 
     _restoreDiagramCoordinates(positionSnapshot) {
@@ -4929,7 +4964,7 @@ class WebAppClient {
         return edgeCurvatureMap;
     }
 
-    renderDiagram(data, positionSnapshot = null) {
+    renderDiagram(data, positionSnapshot = null, renderOptions = {}) {
         const container = document.getElementById('networkDiagram');
         const showLabels = this.diagramShowLabelsApplied;
         const nodeFont = this.diagramOptions.font || {};
@@ -4938,6 +4973,7 @@ class WebAppClient {
         const edgeLabelBackground = background.color || '#ffffff';
         const layoutSettings = this.diagramOptions.layout || {};
         this.latestDiagramData = data;
+        this._diagramAnchorPositions = {};
 
         if (background.color) {
             container.style.backgroundColor = background.color;
@@ -4966,14 +5002,39 @@ class WebAppClient {
         // Preserve user positions first, then use backend template anchors for
         // any remaining nodes. Only unanchored nodes enter the layout engine.
         const anchorPositions = {};
-        const addAnchor = (id, x, y) => {
+        const backendCoordinates = data.nodes
+            .filter(node => node.x !== null && node.x !== undefined
+                && node.y !== null && node.y !== undefined)
+            .map(node => ({ x: Number(node.x), y: Number(node.y) }))
+            .filter(position => Number.isFinite(position.x)
+                && Number.isFinite(position.y));
+        const backendXValues = backendCoordinates.map(position => position.x);
+        const backendYValues = backendCoordinates.map(position => position.y);
+        const backendXSpan = backendXValues.length > 1
+            ? Math.max(...backendXValues) - Math.min(...backendXValues)
+            : 1;
+        const backendYSpan = backendYValues.length > 1
+            ? Math.max(...backendYValues) - Math.min(...backendYValues)
+            : 1;
+        const backendYAspectScale = backendYSpan > 0
+            ? Math.max(
+                1,
+                backendXSpan
+                    / backendYSpan
+                    / this.backendLayoutTargetAspectRatio,
+            )
+            : 1;
+        const addAnchor = (id, x, y, xScale = 1, yScale = xScale) => {
             if (x === null || x === undefined || y === null || y === undefined) {
                 return;
             }
             const numericX = Number(x);
             const numericY = Number(y);
             if (Number.isFinite(numericX) && Number.isFinite(numericY)) {
-                anchorPositions[String(id)] = { x: numericX, y: numericY };
+                anchorPositions[String(id)] = {
+                    x: numericX * xScale,
+                    y: numericY * yScale * this.backendLayoutYDirection,
+                };
             }
         };
 
@@ -4983,12 +5044,20 @@ class WebAppClient {
             });
         }
 
-        data.nodes.forEach(node => {
+        if (renderOptions.useBackendAnchors !== false) {
+            data.nodes.forEach(node => {
             const id = String(node.id);
             if (!Object.prototype.hasOwnProperty.call(anchorPositions, id)) {
-                addAnchor(id, node.x, node.y);
+                addAnchor(
+                    id,
+                    node.x,
+                    node.y,
+                    this.backendLayoutPositionScale,
+                    this.backendLayoutPositionScale * backendYAspectScale,
+                );
             }
-        });
+            });
+        }
 
         const anchoredNodeIds = new Set(Object.keys(anchorPositions));
         const unanchoredNodes = data.nodes.filter(
@@ -5032,6 +5101,7 @@ class WebAppClient {
         Object.entries(anchorPositions).forEach(([id, position]) => {
             preLayoutPositions[id] = position;
         });
+        this._diagramAnchorPositions = { ...anchorPositions };
 
         // Prepare nodes for vis-network
         const nodes = data.nodes.map(node => {
@@ -5039,17 +5109,23 @@ class WebAppClient {
             const originalLabel = node.label;
             const labelHidden = this.hiddenLabels.has(roi);
             const isHidden = this.hiddenNodes.has(roi);
-            const hasLayoutPosition = Object.prototype.hasOwnProperty.call(
-                preLayoutPositions,
+            const hasAnchorPosition = Object.prototype.hasOwnProperty.call(
+                anchorPositions,
                 String(roi),
             );
-            const isPhysicsFixed = this.fixedNodes.has(roi) || hasLayoutPosition;
+            const isPhysicsFixed = this.fixedNodes.has(roi) || hasAnchorPosition;
 
             // Apply pre-layout position if available
             const preLayoutPos = preLayoutPositions?.[String(roi)];
 
             return {
                 id: roi,
+                _layoutFixed: Object.prototype.hasOwnProperty.call(
+                    anchorPositions,
+                    String(roi),
+                ),
+                _layoutX: anchorPositions[String(roi)]?.x,
+                _layoutY: anchorPositions[String(roi)]?.y,
                 _originalLabel: originalLabel,
                 label: labelHidden ? '' : originalLabel,
                 ...(preLayoutPos && { x: preLayoutPos.x, y: preLayoutPos.y }),
@@ -5141,7 +5217,8 @@ class WebAppClient {
                 keyboard: interaction.keyboard !== false
             },
             layout: {
-                improvedLayout: layoutSettings.improvedLayout !== false,
+                improvedLayout: Object.keys(anchorPositions).length === 0
+                    && layoutSettings.improvedLayout !== false,
                 hierarchical: layoutSettings.hierarchical === true
             }
         };
@@ -5223,10 +5300,23 @@ class WebAppClient {
         });
 
         // Drag-end: unfreeze nodes that were only frozen for this drag
-        this.network.on('dragEnd', () => {
+        this.network.on('dragEnd', (params) => {
+            (params.nodes || []).forEach(id => {
+                const pos = this.network.getPositions([id])[id];
+                if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+                    this._diagramAnchorPositions[String(id)] = {
+                        x: pos.x,
+                        y: pos.y,
+                    };
+                }
+            });
             if (!this._dragFrozen || this._dragFrozen.length === 0) return;
             const toThaw = this._dragFrozen
-                .filter(id => !this.fixedNodes.has(id))
+                .filter(id => {
+                    if (this.fixedNodes.has(id)) return false;
+                    const node = this.network.body.data.nodes.get(id);
+                    return !node?._layoutFixed;
+                })
                 .map(id => {
                     const pos = this.network.getPositions([id])[id];
                     return { id, x: pos.x, y: pos.y, physics: true };
@@ -5366,13 +5456,13 @@ class WebAppClient {
             this.fixedNodes.delete(roi);
             const pos = this.network.getPositions([roi])[roi];
             this.network.body.data.nodes.update([
-                { id: roi, x: pos.x, y: pos.y, physics: true },
+                { id: roi, x: pos.x, y: pos.y, physics: true, _layoutFixed: false },
             ]);
         } else {
             this.fixedNodes.add(roi);
             const pos = this.network.getPositions([roi])[roi];
             this.network.body.data.nodes.update([
-                { id: roi, x: pos.x, y: pos.y, physics: false },
+                { id: roi, x: pos.x, y: pos.y, physics: false, _layoutFixed: true },
             ]);
         }
 
@@ -5436,15 +5526,24 @@ class WebAppClient {
         const nodeUpdates = nodesDataSet.get().map((node) => {
             const roi = Number(node.id);
             const isHidden = hiddenNodeIds.has(roi);
-            const isFixed = this.fixedNodes.has(roi);
+            const isFixed = this.fixedNodes.has(roi) || node._layoutFixed === true;
             const pos = nodePositions[roi] || {};
-            return {
+            const preservedPosition = this._diagramAnchorPositions[String(roi)];
+            const preservedX = preservedPosition?.x;
+            const preservedY = preservedPosition?.y;
+            const update = {
                 id: roi,
                 hidden: isHidden,
                 physics: isHidden ? false : !isFixed,
-                x: pos.x,
-                y: pos.y,
             };
+            if (Number.isFinite(preservedX) && Number.isFinite(preservedY)) {
+                update.x = preservedX;
+                update.y = preservedY;
+            } else if (Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+                update.x = pos.x;
+                update.y = pos.y;
+            }
+            return update;
         });
         if (nodeUpdates.length > 0) {
             nodesDataSet.update(nodeUpdates);
@@ -6537,6 +6636,13 @@ class WebAppClient {
         this.structureItemsByRoi = new Map();
         this.diagramSelection.clear();
         this.diagramAppliedSelection.clear();
+        this.diagramLayoutTemplateName = 'relationship_spring';
+        this.diagramLayoutTemplateNameApplied = 'relationship_spring';
+        this.diagramTemplateNeedsFreshLayout = false;
+        const layoutTemplateSelector = document.getElementById('diagramLayoutTemplate');
+        if (layoutTemplateSelector) {
+            layoutTemplateSelector.value = 'relationship_spring';
+        }
         this.diagramSelectionModalOpen = false;
         this.sortableListsInitialized = false;
         this.sortableInitScheduled = false;
@@ -6575,6 +6681,7 @@ class WebAppClient {
             this.network.destroy();
             this.network = null;
         }
+        this._diagramAnchorPositions = {};
         this.clearUploadAcknowledgement();
         this.setNetworkFolderStatus('');
         this.updateNetworkFolderLoadButton();

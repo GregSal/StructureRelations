@@ -239,6 +239,7 @@ class DiagramResponse(BaseModel):
     nodes: List[DiagramNode]
     edges: List[DiagramEdge]
     layout_template_name: Optional[str] = None
+    template_displayed_rois: Optional[List[int]] = None
 
 
 class LayoutTemplateInfo(BaseModel):
@@ -2349,6 +2350,38 @@ async def get_diagram_data(request: MatrixRequest):
         summary_df = structure_set.summary()
         summary_ms = round((time.perf_counter() - summary_start) * 1000.0)
 
+        selected_template_name = request.layout_template_name
+        selected_template = None
+        layout_result = None
+        layout_positions: dict[int, tuple[float, float]] = {}
+        template_displayed_rois: Optional[List[int]] = None
+        if selected_template_name:
+            try:
+                selected_template = get_layout_template(selected_template_name)
+                layout_result = apply_layout_template(
+                    structure_set,
+                    selected_template,
+                )
+                layout_positions = {
+                    int(roi): (float(position[0]), float(position[1]))
+                    for roi, position in layout_result.positions.items()
+                }
+                plot_nodes = getattr(layout_result, 'plot_nodes', None)
+                template_rois = set()
+                if plot_nodes is not None and 'ROI' in plot_nodes.columns:
+                    template_rois = {
+                        int(roi) for roi in plot_nodes['ROI']
+                    }
+                if template_rois:
+                    template_displayed_rois = sorted(template_rois)
+            except Exception as exc:
+                logger.warning(
+                    'Diagram layout template %s could not be applied: %s',
+                    selected_template_name,
+                    exc,
+                )
+                layout_result = None
+
         # Extract colors from DICOM file
         color_start = time.perf_counter()
         colors = {}
@@ -2366,6 +2399,10 @@ async def get_diagram_data(request: MatrixRequest):
         edges = []
         row_rois = request.row_rois if request.row_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
         col_rois = request.col_rois if request.col_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+
+        if template_displayed_rois:
+            row_rois = template_displayed_rois.copy()
+            col_rois = template_displayed_rois.copy()
 
         # Get union of all ROIs that should be displayed
         visible_rois = set(row_rois) | set(col_rois)
@@ -2406,26 +2443,6 @@ async def get_diagram_data(request: MatrixRequest):
         nodes = []
         node_build_start = time.perf_counter()
         roi_to_name = {}
-        layout_positions: dict[int, tuple[float, float]] = {}
-        selected_template_name = request.layout_template_name
-        if selected_template_name:
-            try:
-                selected_template = get_layout_template(selected_template_name)
-                layout_result = apply_layout_template(
-                    structure_set,
-                    selected_template,
-                )
-                layout_positions = {
-                    int(roi): (float(position[0]), float(position[1]))
-                    for roi, position in layout_result.positions.items()
-                }
-            except Exception as exc:
-                logger.warning(
-                    'Diagram layout template %s could not be applied: %s',
-                    selected_template_name,
-                    exc,
-                )
-                layout_positions = {}
         for _, row in summary_df.iterrows():
             roi = int(row['ROI'])
 
@@ -2848,6 +2865,7 @@ async def get_diagram_data(request: MatrixRequest):
             nodes=nodes,
             edges=edges,
             layout_template_name=selected_template_name,
+            template_displayed_rois=template_displayed_rois,
         )
 
     except HTTPException:

@@ -1,0 +1,45 @@
+{
+    "template_name": "Salivary Glands",
+    "template_description": "Parotid and submandibular glands layout template",
+    "template_version": "1.0",
+    "template_author": "Greg's Test",
+    "template_date": "2024-06-01",
+    "template_layout": {
+        "Mandible": {
+            "x": 0,
+            "y": 0
+        },
+        "Parotid B": {
+            "x": -2,
+            "y": 0.75
+        },
+        "Parotid R": {
+            "x": -3,
+            "y": -0.75
+        },
+        "Parotid L": {
+            "x": -1,
+            "y": -0.75
+        },
+        "Submandibular B": {
+            "x": 2,
+            "y": 0.75
+        },
+        "Submandibular R": {
+            "x": 1,
+            "y": -0.75
+        },
+        "Submandibular L": {
+            "x": 3,
+            "y": -0.75
+        },
+        "opt Parotid R": {
+            "x": -3,
+            "y": 0.1
+        },
+        "opt Parotid L": {
+            "x": -1,
+            "y": -0.1
+        }
+    }
+}

@@ -404,6 +404,43 @@ def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_pat
     assert nodes[2]['layout_source'] is None
 
 
+def test_diagram_template_selection_controls_rendered_rois(monkeypatch, tmp_path):
+    '''The selected template should determine which structures reach the diagram.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-template-selected-rois'
+    fake_set = _make_fake_diagram_structure_set()
+    manager.save_session(
+        session_id,
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    monkeypatch.setattr(web_main, 'get_layout_template', lambda name: name)
+    monkeypatch.setattr(
+        web_main,
+        'apply_layout_template',
+        lambda structure_set, template: SimpleNamespace(
+            positions={1: (12.5, -4.0)},
+            plot_nodes=pd.DataFrame([{'ROI': 1}]),
+        ),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'row_rois': [2],
+            'col_rois': [2],
+            'layout_template_name': 'template_only_alpha',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [node['id'] for node in payload['nodes']] == [1]
+    assert payload['template_displayed_rois'] == [1]
+
+
 def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_path):
     '''Verify preview metadata strips the temporary upload prefix from file names.'''
     client, manager = _prepare_client(monkeypatch, tmp_path)
