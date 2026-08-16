@@ -950,7 +950,7 @@ class SpringLayoutConfig:
     '''Configuration for deterministic relationship-driven spring layout.'''
 
     seed: int = 42
-    scale: float = 1.0
+    scale: float = 8.0
     iterations: int = 50
     optimal_distance: float | None = None
 
@@ -1140,7 +1140,7 @@ def default_grouped_grid_template() -> LayoutTemplate:
         ),
     )
     return LayoutTemplate(
-        name='grouped_grid',
+        name='Target Relations',
         display_by_default=False,
         display_rules=target_display_rules,
         grouping_definition_set=default_structure_group_definition_set(),
@@ -1196,7 +1196,7 @@ def target_oar_template(
     )
     grouping_definition_set = default_structure_group_definition_set()
     return LayoutTemplate(
-        name='target_oar',
+        name='Targets vs OARs',
         display_by_default=False,
         display_rules=display_rules,
         grouping_definition_set=grouping_definition_set,
@@ -1213,7 +1213,7 @@ def relationship_spring_template(
 ) -> LayoutTemplate:
     '''Return a relationship-driven deterministic spring template.'''
     return LayoutTemplate(
-        name='relationship_spring',
+        name='All Structures',
         display_by_default=True,
         display_rules=(),
         grouping_definition_set=None,

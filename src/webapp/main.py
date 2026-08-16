@@ -175,7 +175,7 @@ class MatrixRequest(BaseModel):
     session_id: str
     row_rois: Optional[List[int]] = None
     col_rois: Optional[List[int]] = None
-    layout_template_name: Optional[str] = 'relationship_spring'
+    layout_template_name: Optional[str] = 'Target Relations'
     use_symbols: bool = True
     show_disjoint: bool = False
     show_unknown: bool = False
@@ -2397,10 +2397,13 @@ async def get_diagram_data(request: MatrixRequest):
 
         # Build edges from relationship matrix
         edges = []
-        row_rois = request.row_rois if request.row_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
-        col_rois = request.col_rois if request.col_rois else [int(roi) for roi in summary_df['ROI'].tolist()]
+        has_explicit_selection = (
+            request.row_rois is not None or request.col_rois is not None
+        )
+        row_rois = request.row_rois if request.row_rois is not None else [int(roi) for roi in summary_df['ROI'].tolist()]
+        col_rois = request.col_rois if request.col_rois is not None else [int(roi) for roi in summary_df['ROI'].tolist()]
 
-        if template_displayed_rois:
+        if template_displayed_rois and not has_explicit_selection:
             row_rois = template_displayed_rois.copy()
             col_rois = template_displayed_rois.copy()
 
@@ -2865,7 +2868,9 @@ async def get_diagram_data(request: MatrixRequest):
             nodes=nodes,
             edges=edges,
             layout_template_name=selected_template_name,
-            template_displayed_rois=template_displayed_rois,
+            template_displayed_rois=(
+                None if has_explicit_selection else template_displayed_rois
+            ),
         )
 
     except HTTPException:

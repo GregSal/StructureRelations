@@ -355,11 +355,18 @@ def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_
     assert response.status_code == 200
     names = [template['name'] for template in response.json()['templates']]
     assert names[:4] == [
-        'grouped_grid',
-        'relationship_spring',
+        'Target Relations',
+        'All Structures',
         'principle_targets',
-        'target_oar',
+        'Targets vs OARs',
     ]
+
+
+def test_matrix_request_defaults_to_target_relations_template() -> None:
+    '''New structure-set requests should default to Target Relations.'''
+    request = web_main.MatrixRequest(session_id='default-template')
+
+    assert request.layout_template_name == 'Target Relations'
 
 
 def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_path):
@@ -380,6 +387,20 @@ def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_pat
             positions={1: (12.5, -4.0)},
         ),
     )
+
+    default_response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'layout_template_name': 'template_only_alpha',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert default_response.status_code == 200
+    default_payload = default_response.json()
+    assert [node['id'] for node in default_payload['nodes']] == [1]
+    assert default_payload['template_displayed_rois'] == [1]
 
     response = client.post(
         '/api/diagram',
@@ -404,8 +425,8 @@ def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_pat
     assert nodes[2]['layout_source'] is None
 
 
-def test_diagram_template_selection_controls_rendered_rois(monkeypatch, tmp_path):
-    '''The selected template should determine which structures reach the diagram.'''
+def test_explicit_diagram_selection_overrides_template_rois(monkeypatch, tmp_path):
+    '''User-selected structures should override the template's default filter.'''
     client, manager = _prepare_client(monkeypatch, tmp_path)
     session_id = 'diagram-template-selected-rois'
     fake_set = _make_fake_diagram_structure_set()
@@ -437,8 +458,8 @@ def test_diagram_template_selection_controls_rendered_rois(monkeypatch, tmp_path
 
     assert response.status_code == 200
     payload = response.json()
-    assert [node['id'] for node in payload['nodes']] == [1]
-    assert payload['template_displayed_rois'] == [1]
+    assert [node['id'] for node in payload['nodes']] == [2]
+    assert payload['template_displayed_rois'] is None
 
 
 def test_preview_hides_uploaded_session_prefix_in_file_name(monkeypatch, tmp_path):

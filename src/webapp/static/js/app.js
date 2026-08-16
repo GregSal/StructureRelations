@@ -26,8 +26,8 @@ class WebAppClient {
         this.plotAbortController = null;  // Track current plot request
         this.diagramLogicalRelationsMode = 'limited';  // Default: limited mode
         this.diagramLogicalRelationsModeApplied = 'limited';
-        this.diagramLayoutTemplateName = 'relationship_spring';
-        this.diagramLayoutTemplateNameApplied = 'relationship_spring';
+        this.diagramLayoutTemplateName = 'Target Relations';
+        this.diagramLayoutTemplateNameApplied = 'Target Relations';
         this.diagramTemplateNeedsFreshLayout = false;
         this.diagramShowDisjointApplied = false;
         this.diagramShowLabelsApplied = true;
@@ -180,8 +180,8 @@ class WebAppClient {
 
             const selectedName = availableNames.includes(this.diagramLayoutTemplateName)
                 ? this.diagramLayoutTemplateName
-                : (availableNames.includes('relationship_spring')
-                    ? 'relationship_spring'
+                : (availableNames.includes('Target Relations')
+                    ? 'Target Relations'
                     : availableNames[0]);
             if (selectedName) {
                 this.diagramLayoutTemplateName = selectedName;
@@ -3706,9 +3706,8 @@ class WebAppClient {
 
         try {
             const templateName = this.diagramLayoutTemplateNameApplied;
-            const templateControlsSelection = Boolean(templateName);
             const selectedRois = this.getDiagramAppliedRois();
-            if (!templateControlsSelection && selectedRois.length === 0) {
+            if (selectedRois.length === 0) {
                 alert('Please select at least one structure for the diagram');
                 return;
             }
@@ -3717,8 +3716,8 @@ class WebAppClient {
 
             const diagramRequest = {
                 session_id: this.sessionId,
-                row_rois: templateControlsSelection ? null : selectedRois,
-                col_rois: templateControlsSelection ? null : selectedRois,
+                row_rois: selectedRois,
+                col_rois: selectedRois,
                 show_disjoint: showDisjoint,
                 show_unknown: this.diagramShowUnknownApplied,
                 logical_relations_mode: this.diagramLogicalRelationsModeApplied,
@@ -6636,12 +6635,12 @@ class WebAppClient {
         this.structureItemsByRoi = new Map();
         this.diagramSelection.clear();
         this.diagramAppliedSelection.clear();
-        this.diagramLayoutTemplateName = 'relationship_spring';
-        this.diagramLayoutTemplateNameApplied = 'relationship_spring';
+        this.diagramLayoutTemplateName = 'Target Relations';
+        this.diagramLayoutTemplateNameApplied = 'Target Relations';
         this.diagramTemplateNeedsFreshLayout = false;
         const layoutTemplateSelector = document.getElementById('diagramLayoutTemplate');
         if (layoutTemplateSelector) {
-            layoutTemplateSelector.value = 'relationship_spring';
+            layoutTemplateSelector.value = 'Target Relations';
         }
         this.diagramSelectionModalOpen = false;
         this.sortableListsInitialized = false;

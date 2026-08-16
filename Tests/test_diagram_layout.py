@@ -1,5 +1,7 @@
 '''Tests for metadata-driven diagram layout templates.'''
 
+from itertools import combinations
+from math import dist
 from pathlib import Path
 
 import matplotlib
@@ -113,7 +115,7 @@ def test_grouped_grid_layout_computes_expected_positions() -> None:
 
 def test_default_template_is_available_by_registered_name() -> None:
     '''The built-in grouped grid should support stable name lookup.'''
-    template = get_layout_template('grouped_grid')
+    template = get_layout_template('Target Relations')
 
     assert template.name == default_grouped_grid_template().name
 
@@ -123,9 +125,9 @@ def test_list_layout_templates_returns_registered_names() -> None:
     template_names = [item['name'] for item in list_layout_templates()]
 
     assert template_names[:4] == [
-        'grouped_grid',
-        'relationship_spring',
-        'target_oar',
+        'Target Relations',
+        'All Structures',
+        'Targets vs OARs',
     ]
 
 
@@ -201,7 +203,7 @@ def test_apply_layout_template_filters_nodes_and_positions() -> None:
         default_grouped_grid_template(),
     )
 
-    assert result.template_name == 'grouped_grid'
+    assert result.template_name == 'Target Relations'
     assert result.plot_nodes['ROI'].tolist() == [1]
     assert result.positions == {1: (0.0, -0.0)}
     assert bool(result.display_report.loc[1, 'DisplayedByDefault'])
@@ -262,7 +264,7 @@ def test_renderer_uses_required_layout_template() -> None:
         show_plot=False,
     )
 
-    assert result.layout_template_name == 'grouped_grid'
+    assert result.layout_template_name == 'Target Relations'
     assert set(result.relationship_graph.nodes) == {1}
     assert result.positions == {1: (0.0, -0.0)}
     assert result.plot_nodes['ROI'].tolist() == [1]
@@ -455,6 +457,11 @@ def test_relationship_spring_template_uses_graph_in_layout_plan() -> None:
     assert nodes.loc[1, 'relationship_types'] == ('CONTAINS', 'OVERLAPS')
     assert first_result.positions == second_result.positions
     assert set(first_result.positions) == {1, 2, 3}
+    pair_distances = [
+        dist(first_result.positions[first], first_result.positions[second])
+        for first, second in combinations(first_result.positions, 2)
+    ]
+    assert min(pair_distances) > 4.0
 
 
 def test_relationship_plan_can_filter_layout_edges_by_type() -> None:
@@ -495,7 +502,7 @@ def test_renderer_accepts_relationship_plan_without_grid_columns() -> None:
         show_plot=False,
     )
 
-    assert result.layout_template_name == 'relationship_spring'
+    assert result.layout_template_name == 'All Structures'
     assert set(result.layout_graph.edges) == {(1, 2), (3, 1)}
     assert set(result.positions) == {1, 2, 3}
     assert 'h_index' not in result.plot_nodes.columns
@@ -704,9 +711,9 @@ class FakeTargetOARStructureSet:
 
 def test_target_oar_template_is_registered() -> None:
     '''The Target-OAR template should be retrievable by name.'''
-    template = get_layout_template('target_oar')
+    template = get_layout_template('Targets vs OARs')
 
-    assert template.name == 'target_oar'
+    assert template.name == 'Targets vs OARs'
 
 
 def test_target_oar_template_selects_targets_oars_and_opt_nodes() -> None:
@@ -764,6 +771,6 @@ def test_renderer_accepts_target_oar_template() -> None:
         show_plot=False,
     )
 
-    assert result.layout_template_name == 'target_oar'
+    assert result.layout_template_name == 'Targets vs OARs'
     assert set(result.positions) == {1, 2, 10, 11, 12, 20, 21}
     result.fig.clear()
