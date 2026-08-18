@@ -709,6 +709,143 @@ class TestWebAppWorkflow:
             # Note: Can't easily verify download in headless mode
             # In production, would check download folder
 
+class TestDiagramStructureSelection:
+        """Test staged diagram structure-selection actions."""
+
+        def test_selection_actions_preserve_and_restore_positions(
+            self,
+            chrome_headless_driver,
+            test_dicom_file,
+        ):
+            """Cancel, Add, and Apply should commit their respective selections."""
+            helper = WebAppTestHelper(chrome_headless_driver)
+            helper.navigate_home()
+            helper.upload_dicom(test_dicom_file)
+
+            structures = helper.get_structure_list()
+            if len(structures) < 2:
+                pytest.skip('Diagram selection test requires at least two structures')
+
+            selected_rois = [structure['roi'] for structure in structures[:2]]
+            helper.select_structures(selected_rois)
+            helper.start_processing()
+            assert helper.wait_for_processing(timeout=240)
+            helper.switch_tab('diagram')
+
+            helper.wait.until(
+                lambda d: d.execute_script(
+                    'return Boolean(window.app.network);'
+                )
+            )
+
+            assert not helper.driver.find_elements(
+                By.ID, 'diagramAddToCurrentSelection'
+            )
+            assert helper.driver.find_element(By.ID, 'diagramStructureModalAddBtn')
+            assert helper.driver.find_element(By.ID, 'diagramStructureModalApplyBtn')
+            assert helper.driver.find_element(By.ID, 'diagramStructureModalCancelBtn')
+
+            applied_before_cancel = helper.driver.execute_script(
+                'return Array.from(window.app.diagramAppliedSelection).sort();'
+            )
+            helper.driver.execute_script('window.app.openDiagramStructureModal();')
+            helper.driver.execute_script(
+                'window.app.syncDiagramSelection(new Set());'
+            )
+            helper.driver.execute_script(
+                "document.getElementById('diagramStructureModalCancelBtn').click();"
+            )
+            assert helper.driver.execute_script(
+                'return Array.from(window.app.diagramAppliedSelection).sort();'
+            ) == applied_before_cancel
+
+            retained_rois = selected_rois[:1]
+            restored_roi = selected_rois[1]
+            helper.driver.execute_script('window.app.openDiagramStructureModal();')
+            helper.driver.execute_script(
+                'window.app.syncDiagramSelection(new Set(arguments[0]));',
+                retained_rois,
+            )
+            helper.driver.execute_script(
+                "document.getElementById('diagramStructureModalApplyBtn').click();"
+            )
+            helper.wait.until(
+                lambda d: d.execute_script(
+                    "return window.app.diagramAppliedSelection.size === 1 "
+                    "&& !window.app.network.body.data.nodes.getIds().includes("
+                    "arguments[0]);",
+                    restored_roi,
+                )
+            )
+            cached_position = helper.driver.execute_script(
+                "return window.app.diagramPositionCache.get(String(arguments[0]));",
+                restored_roi,
+            )
+            assert cached_position is not None
+
+            helper.driver.execute_script('window.app.openDiagramStructureModal();')
+            helper.driver.execute_script(
+                'window.app.syncDiagramSelection(new Set(arguments[0]));',
+                [restored_roi],
+            )
+            helper.driver.execute_script(
+                "document.getElementById('diagramStructureModalAddBtn').click();"
+            )
+            helper.wait.until(
+                lambda d: d.execute_script(
+                    "return window.app.diagramAppliedSelection.size === 2 "
+                    "&& window.app.network.body.data.nodes.getIds().includes("
+                    "arguments[0]);",
+                    restored_roi,
+                )
+            )
+
+            restored_position = helper.driver.execute_script(
+                'return window.app.network.getPositions([arguments[0]])[arguments[0]];',
+                restored_roi,
+            )
+            assert restored_position['x'] == pytest.approx(cached_position['x'])
+            assert restored_position['y'] == pytest.approx(cached_position['y'])
+
+            helper.driver.execute_script('window.app.openDiagramStructureModal();')
+            helper.driver.execute_script(
+                'window.app.syncDiagramSelection(new Set(arguments[0]));',
+                retained_rois,
+            )
+            helper.driver.execute_script(
+                "document.getElementById('diagramStructureModalApplyBtn').click();"
+            )
+            helper.wait.until(
+                lambda d: d.execute_script(
+                    "return window.app.diagramAppliedSelection.size === 1 "
+                    "&& !window.app.network.body.data.nodes.getIds().includes("
+                    "arguments[0]);",
+                    restored_roi,
+                )
+            )
+
+            helper.driver.execute_script('window.app.openDiagramStructureModal();')
+            helper.driver.execute_script(
+                'window.app.syncDiagramSelection(new Set(arguments[0]));',
+                [restored_roi],
+            )
+            helper.driver.execute_script(
+                "document.getElementById('diagramStructureModalApplyBtn').click();"
+            )
+            helper.wait.until(
+                lambda d: d.execute_script(
+                    "return window.app.diagramAppliedSelection.size === 1 "
+                    "&& window.app.network.body.data.nodes.getIds().includes("
+                    "arguments[0]);",
+                    restored_roi,
+                )
+            )
+            applied_position = helper.driver.execute_script(
+                'return window.app.network.getPositions([arguments[0]])[arguments[0]];',
+                restored_roi,
+            )
+            assert applied_position['x'] == pytest.approx(cached_position['x'])
+            assert applied_position['y'] == pytest.approx(cached_position['y'])
 
 class TestSessionManagement:
     """Test session persistence and disk management."""

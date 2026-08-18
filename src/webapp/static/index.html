@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=41">
+    <link rel="stylesheet" href="static/css/styles.css?v=42">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -267,10 +267,6 @@
                                         <label for="diagramStructureTextFilter">Structure ID contains:</label>
                                         <input type="text" id="diagramStructureTextFilter" placeholder="Case-sensitive name text">
                                     </div>
-                                    <label class="diagram-selection-add-mode" for="diagramAddToCurrentSelection">
-                                        <input type="checkbox" id="diagramAddToCurrentSelection">
-                                        <span>Add to current selection</span>
-                                    </label>
                                 </div>
                                 <div class="diagram-structure-list" id="diagramStructureList"></div>
                                 <div class="diagram-config-controls">
@@ -279,7 +275,8 @@
                                     </div>
                                     <div class="button-group">
                                         <button class="btn btn-secondary" id="diagramStructureModalCancelBtn">Cancel</button>
-                                        <button class="btn btn-primary" id="diagramStructureModalApplyBtn">Apply Selection</button>
+                                        <button class="btn btn-secondary" id="diagramStructureModalAddBtn">Add to current</button>
+                                        <button class="btn btn-primary" id="diagramStructureModalApplyBtn">Apply</button>
                                     </div>
                                 </div>
                             </div>
@@ -546,7 +543,7 @@
         </footer>
     </div>
 
-                    <script src="static/js/app.js?v=149"></script>
+                    <script src="static/js/app.js?v=151"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>

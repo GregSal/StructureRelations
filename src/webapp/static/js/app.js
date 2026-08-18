@@ -35,11 +35,11 @@ class WebAppClient {
         this.diagramShowUnknownApplied = false;
         this.diagramSelection = new Set();
         this.diagramAppliedSelection = new Set();
+        this.diagramPositionCache = new Map();
         this.diagramSelectionPending = false;
         this.diagramSelectionModalOpen = false;
         this.diagramFilterText = '';
         this.diagramFilterDicomType = '';
-        this.diagramFilterAddMode = false;
         this.patientInfo = null;
         this.structureItems = [];
         this.structureItemsByRoi = new Map();
@@ -643,6 +643,14 @@ class WebAppClient {
             });
         }
 
+        const modalAdd = document.getElementById('diagramStructureModalAddBtn');
+        if (modalAdd) {
+            modalAdd.addEventListener('click', () => {
+                this.addDiagramSelectionToCurrent();
+                this.closeDiagramStructureModal(false);
+            });
+        }
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.diagramSelectionModalOpen) {
                 this.closeDiagramStructureModal(true);
@@ -731,13 +739,6 @@ class WebAppClient {
             diagramTypeFilter.addEventListener('change', (e) => {
                 this.diagramFilterDicomType = e.target.value || '';
                 this.applyDiagramModalFilters({ updateSelection: true });
-            });
-        }
-
-        const diagramAddToCurrent = document.getElementById('diagramAddToCurrentSelection');
-        if (diagramAddToCurrent) {
-            diagramAddToCurrent.addEventListener('change', (e) => {
-                this.diagramFilterAddMode = e.target.checked === true;
             });
         }
 
@@ -3461,6 +3462,7 @@ class WebAppClient {
 
         this.diagramSelection = new Set();
         this.diagramAppliedSelection = new Set();
+        this.diagramPositionCache.clear();
 
         this.structureItems.forEach(item => {
             const listItem = this.createDiagramListItem(item);
@@ -3556,7 +3558,6 @@ class WebAppClient {
     resetDiagramModalFilters() {
         this.diagramFilterText = '';
         this.diagramFilterDicomType = '';
-        this.diagramFilterAddMode = false;
 
         const textInput = document.getElementById('diagramStructureTextFilter');
         if (textInput) {
@@ -3566,11 +3567,6 @@ class WebAppClient {
         const typeFilter = document.getElementById('diagramTypeFilter');
         if (typeFilter) {
             typeFilter.value = '';
-        }
-
-        const addModeCheckbox = document.getElementById('diagramAddToCurrentSelection');
-        if (addModeCheckbox) {
-            addModeCheckbox.checked = false;
         }
 
         this.applyDiagramModalFilters({ updateSelection: false });
@@ -3605,13 +3601,7 @@ class WebAppClient {
             return matches;
         }
 
-        if (this.diagramFilterAddMode) {
-            matches.forEach((roi) => {
-                this.diagramSelection.add(roi);
-            });
-        } else {
-            this.diagramSelection = new Set(matches);
-        }
+        this.diagramSelection = new Set(matches);
 
         this.syncDiagramCheckboxes();
         this.updateDiagramPendingState();
@@ -3699,12 +3689,13 @@ class WebAppClient {
         return this.refreshDiagram();
     }
 
-    applyDiagramSelection() {
+    commitDiagramSelection(selection) {
         const templateChanged = (
             this.diagramLayoutTemplateName !== this.diagramLayoutTemplateNameApplied
         );
         this.ensureManualLayoutForDiagramChanges();
-        this.diagramAppliedSelection = new Set(this.diagramSelection);
+        this.diagramSelection = new Set(selection);
+        this.diagramAppliedSelection = new Set(selection);
         this.hiddenNodes = new Set(
             this.structureItems
                 .map(item => parseInt(item.roi))
@@ -3717,6 +3708,17 @@ class WebAppClient {
         this.diagramTemplateNeedsFreshLayout = templateChanged;
         this.updateDiagramPendingState();
         return this.refreshDiagram();
+    }
+
+    applyDiagramSelection() {
+        return this.commitDiagramSelection(this.diagramSelection);
+    }
+
+    addDiagramSelectionToCurrent() {
+        return this.commitDiagramSelection(new Set([
+            ...this.diagramAppliedSelection,
+            ...this.diagramSelection,
+        ]));
     }
 
     setDiagramPending(isPending) {
@@ -3777,9 +3779,13 @@ class WebAppClient {
             return;
         }
 
-        const positionSnapshot = this.diagramTemplateNeedsFreshLayout
+        const needsFreshLayout = this.diagramTemplateNeedsFreshLayout;
+        const positionSnapshot = needsFreshLayout
             ? null
             : this._captureDiagramPositionSnapshot();
+        if (needsFreshLayout) {
+            this.diagramPositionCache.clear();
+        }
         this.diagramTemplateNeedsFreshLayout = false;
         const useTemplateSelection = this.diagramTemplateSelectionPending;
         this.diagramTemplateSelectionPending = false;
@@ -3853,13 +3859,20 @@ class WebAppClient {
         if (!nodeIds || nodeIds.length === 0) return null;
 
         const positions = this.network.getPositions(nodeIds);
+        Object.entries(positions).forEach(([id, position]) => {
+            const x = Number(position?.x);
+            const y = Number(position?.y);
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+                this.diagramPositionCache.set(String(id), { x, y });
+            }
+        });
         const hiddenNodeIds = new Set(
             this.network.body.data.nodes
                 .get({ filter: (node) => Boolean(node.hidden) })
                 .map((node) => Number(node.id))
         );
         return {
-            positions,
+            positions: Object.fromEntries(this.diagramPositionCache),
             hiddenNodeIds,
         };
     }
@@ -5369,7 +5382,10 @@ class WebAppClient {
             });
         }
 
-        if (renderOptions.useBackendAnchors !== false) {
+        if (
+            renderOptions.useBackendAnchors !== false
+            && !positionSnapshot?.positions
+        ) {
             data.nodes.forEach(node => {
             const id = String(node.id);
             if (!Object.prototype.hasOwnProperty.call(anchorPositions, id)) {
@@ -5388,14 +5404,6 @@ class WebAppClient {
         const unanchoredNodes = data.nodes.filter(
             node => !anchoredNodeIds.has(String(node.id))
         );
-        const unanchoredNodeIds = new Set(
-            unanchoredNodes.map(node => String(node.id))
-        );
-        const unanchoredEdges = data.edges.filter(edge => (
-            edge.layout_candidate !== false
-            && unanchoredNodeIds.has(String(edge.from_node))
-            && unanchoredNodeIds.has(String(edge.to_node))
-        ));
         const layoutRules = this.diagramOptions?.layout?.layout_rules;
         let computedPositions = {};
         if (unanchoredNodes.length > 0) {
@@ -5407,16 +5415,16 @@ class WebAppClient {
                 ) || {};
             } else {
                 computedPositions = this.computeDeterministicLayout(
-                    unanchoredNodes,
-                    unanchoredEdges,
+                    data.nodes,
+                    data.edges,
                     layoutRules,
                 ) || {};
             }
 
             if (Object.keys(computedPositions).length === 0) {
                 computedPositions = this.applyCycleLayout(
-                    unanchoredNodes,
-                    unanchoredEdges,
+                    data.nodes,
+                    data.edges,
                     layoutRules,
                 );
             }

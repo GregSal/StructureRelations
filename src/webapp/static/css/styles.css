@@ -811,19 +811,6 @@ header h1 {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.diagram-selection-add-mode {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-}
-
-.diagram-selection-add-mode input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-}
-
 .structure-set-badge {
     position: absolute;
     top: 10px;
@@ -999,10 +986,6 @@ header h1 {
     .diagram-selection-controls {
         grid-template-columns: 1fr;
         align-items: stretch;
-    }
-
-    .diagram-selection-add-mode {
-        padding-top: 0.2rem;
     }
 }
 
