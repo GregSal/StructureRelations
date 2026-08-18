@@ -29,6 +29,7 @@ class WebAppClient {
         this.diagramLayoutTemplateName = 'Target Relations';
         this.diagramLayoutTemplateNameApplied = 'Target Relations';
         this.diagramTemplateNeedsFreshLayout = false;
+        this.diagramTemplateSelectionPending = false;
         this.diagramShowDisjointApplied = false;
         this.diagramShowLabelsApplied = true;
         this.diagramShowUnknownApplied = false;
@@ -192,6 +193,7 @@ class WebAppClient {
             if (selectedName) {
                 this.diagramLayoutTemplateName = selectedName;
                 this.diagramLayoutTemplateNameApplied = selectedName;
+                this._layoutTemplatePreviousValue = selectedName;
                 selector.value = selectedName;
             }
         } catch (error) {
@@ -673,10 +675,7 @@ class WebAppClient {
             this.diagramLogicalRelationsMode = e.target.value;
             this.updateDiagramPendingState();
         });
-        document.getElementById('diagramLayoutTemplate').addEventListener('change', (e) => {
-            this.diagramLayoutTemplateName = e.target.value;
-            this.updateDiagramPendingState();
-        });
+        this.setupLayoutTemplateSelector();
         document.getElementById('applyDiagramBtn').addEventListener('click', () => {
             this.applyDiagramSelection();
         });
@@ -3654,6 +3653,52 @@ class WebAppClient {
         });
     }
 
+    setupLayoutTemplateSelector() {
+        const selector = document.getElementById('diagramLayoutTemplate');
+        if (!selector) return;
+
+        // Blanking the selection while the menu is open makes re-picking the
+        // current template fire a change event so the template can re-apply.
+        const blankSelection = () => {
+            if (selector.selectedIndex === -1) return;
+            this._layoutTemplatePreviousValue = selector.value;
+            selector.selectedIndex = -1;
+        };
+        const restoreSelection = () => {
+            if (selector.selectedIndex !== -1) return;
+            selector.value = this._layoutTemplatePreviousValue
+                || this.diagramLayoutTemplateNameApplied;
+        };
+
+        selector.addEventListener('mousedown', blankSelection);
+        selector.addEventListener('blur', restoreSelection);
+        selector.addEventListener('keyup', (event) => {
+            if (event.key === 'Escape' || event.key === 'Tab') {
+                restoreSelection();
+            }
+        });
+        selector.addEventListener('change', () => {
+            if (selector.selectedIndex === -1) return;
+            this._layoutTemplatePreviousValue = selector.value;
+            this.applyLayoutTemplate(selector.value);
+        });
+    }
+
+    applyLayoutTemplate(templateName) {
+        this.diagramLayoutTemplateName = templateName;
+        this.diagramLayoutTemplateNameApplied = templateName;
+        this.diagramTemplateSelectionPending = true;
+        this.diagramTemplateNeedsFreshLayout = true;
+        this.fixedNodes.clear();
+        this.manualLayoutActive = false;
+        this._dragFrozen = [];
+        this.diagramShowDisjointApplied = document.getElementById('showDisjointToggle').checked;
+        this.diagramShowLabelsApplied = document.getElementById('showLabelsToggle').checked;
+        this.diagramLogicalRelationsModeApplied = this.diagramLogicalRelationsMode;
+        this.updateDiagramPendingState();
+        return this.refreshDiagram();
+    }
+
     applyDiagramSelection() {
         const templateChanged = (
             this.diagramLayoutTemplateName !== this.diagramLayoutTemplateNameApplied
@@ -3736,26 +3781,31 @@ class WebAppClient {
             ? null
             : this._captureDiagramPositionSnapshot();
         this.diagramTemplateNeedsFreshLayout = false;
+        const useTemplateSelection = this.diagramTemplateSelectionPending;
+        this.diagramTemplateSelectionPending = false;
 
         try {
             const templateName = this.diagramLayoutTemplateNameApplied;
             const selectedRois = this.getDiagramAppliedRois();
-            if (selectedRois.length === 0) {
+            if (!useTemplateSelection && selectedRois.length === 0) {
                 alert('Please select at least one structure for the diagram');
                 return;
             }
 
             const showDisjoint = this.diagramShowDisjointApplied;
 
+            // Omitting the ROI lists lets the template define the selection.
             const diagramRequest = {
                 session_id: this.sessionId,
-                row_rois: selectedRois,
-                col_rois: selectedRois,
                 show_disjoint: showDisjoint,
                 show_unknown: this.diagramShowUnknownApplied,
                 logical_relations_mode: this.diagramLogicalRelationsModeApplied,
                 layout_template_name: templateName
             };
+            if (!useTemplateSelection) {
+                diagramRequest.row_rois = selectedRois;
+                diagramRequest.col_rois = selectedRois;
+            }
             console.log('Sending diagram request:', diagramRequest);
 
             this.appendStatusLogLine('frontend', 'Fetching relationship diagram...');
@@ -6915,10 +6965,12 @@ class WebAppClient {
         this.diagramLayoutTemplateName = 'Target Relations';
         this.diagramLayoutTemplateNameApplied = 'Target Relations';
         this.diagramTemplateNeedsFreshLayout = false;
+        this.diagramTemplateSelectionPending = false;
         const layoutTemplateSelector = document.getElementById('diagramLayoutTemplate');
         if (layoutTemplateSelector) {
             layoutTemplateSelector.value = 'Target Relations';
         }
+        this._layoutTemplatePreviousValue = 'Target Relations';
         this.diagramSelectionModalOpen = false;
         this.sortableListsInitialized = false;
         this.sortableInitScheduled = false;
