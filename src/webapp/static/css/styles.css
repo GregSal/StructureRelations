@@ -1723,6 +1723,57 @@ tbody tr:hover {
     color: var(--text-primary);
 }
 
+.diagram-canvas-layout {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 0.4rem;
+    align-items: stretch;
+}
+
+.diagram-spacing-slider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diagram-spacing-vertical {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.diagram-spacing-horizontal {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.diagram-canvas-layout .network-diagram-wrapper {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.diagram-spacing-slider input[type="range"] {
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+.diagram-spacing-slider input[type="range"]:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.diagram-spacing-horizontal input[type="range"] {
+    width: 100%;
+}
+
+/* Vertical orientation: max spacing at the top of the slider track. */
+.diagram-spacing-vertical input[type="range"] {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    height: 600px;
+    width: 1.2rem;
+}
+
 .network-diagram-wrapper {
     position: relative;
 }

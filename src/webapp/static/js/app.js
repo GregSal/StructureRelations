@@ -53,6 +53,12 @@ class WebAppClient {
         this._contextMenu = null;        // active context menu DOM element
         this._initialDiagramFitTimer = null;
         this._initialDiagramFitAttempts = 0;
+        this.diagramSpacingBaseline = null;
+        this.diagramSpacing = { x: 50, y: 50 };
+        // Slider values that correspond to the captured baseline (scale 1).
+        this._spacingAnchorValues = { x: 50, y: 50 };
+        this._spacingBaselineTimer = null;
+        this._spacingBaselineAttempts = 0;
         this._invalidTooltipRelationshipModesWarned = new Set();
         this.diagramOptions = {
             font: {
@@ -686,6 +692,33 @@ class WebAppClient {
         document.getElementById('copyFromMatrixBtn').addEventListener('click', () => {
             this.copyFromMatrixToDiagram();
         });
+        const horizontalSpacingSlider = document.getElementById('horizontalSpacingSlider');
+        if (horizontalSpacingSlider) {
+            horizontalSpacingSlider.addEventListener('pointerdown', () => {
+                this.beginDiagramSpacingAdjustment();
+            });
+            horizontalSpacingSlider.addEventListener('keydown', () => {
+                this.beginDiagramSpacingAdjustment();
+            });
+            horizontalSpacingSlider.addEventListener('input', (e) => {
+                this.diagramSpacing.x = Number(e.target.value);
+                this.applyDiagramSpacing();
+            });
+        }
+
+        const verticalSpacingSlider = document.getElementById('verticalSpacingSlider');
+        if (verticalSpacingSlider) {
+            verticalSpacingSlider.addEventListener('pointerdown', () => {
+                this.beginDiagramSpacingAdjustment();
+            });
+            verticalSpacingSlider.addEventListener('keydown', () => {
+                this.beginDiagramSpacingAdjustment();
+            });
+            verticalSpacingSlider.addEventListener('input', (e) => {
+                this.diagramSpacing.y = Number(e.target.value);
+                this.applyDiagramSpacing();
+            });
+        }
         const diagramTextFilter = document.getElementById('diagramStructureTextFilter');
         if (diagramTextFilter) {
             diagramTextFilter.addEventListener('input', (e) => {
@@ -3867,6 +3900,249 @@ class WebAppClient {
         this._initialDiagramFitTimer = setTimeout(tryFit, 0);
     }
 
+    // ============ NODE SPACING SLIDERS ============
+
+    scheduleDiagramSpacingBaseline(maxAttempts = 120) {
+        if (this._spacingBaselineTimer) {
+            clearTimeout(this._spacingBaselineTimer);
+            this._spacingBaselineTimer = null;
+        }
+        this._spacingBaselineAttempts = 0;
+
+        const tryCapture = () => {
+            const container = document.getElementById('networkDiagram');
+            const visible = Boolean(this.network) && Boolean(container)
+                && container.clientWidth > 0
+                && container.clientHeight > 0;
+
+            if (visible) {
+                this._spacingBaselineTimer = null;
+                this.captureDiagramSpacingBaseline();
+                return;
+            }
+
+            this._spacingBaselineAttempts += 1;
+            if (this._spacingBaselineAttempts >= maxAttempts) {
+                this._spacingBaselineTimer = null;
+                return;
+            }
+            this._spacingBaselineTimer = setTimeout(tryCapture, 50);
+        };
+
+        this._spacingBaselineTimer = setTimeout(tryCapture, 0);
+    }
+
+    captureDiagramSpacingBaseline(options = {}) {
+        const preserveSliderValues = Boolean(options.preserveSliderValues);
+        this.diagramSpacingBaseline = null;
+        if (!this.network) {
+            this.updateSpacingSliderState();
+            return;
+        }
+
+        const container = document.getElementById('networkDiagram');
+        const visibleNodes = this.network.body.data.nodes
+            .get({ filter: (node) => !node.hidden });
+        if (!container || visibleNodes.length < 2) {
+            this.updateSpacingSliderState();
+            return;
+        }
+
+        const ids = visibleNodes.map((node) => node.id);
+        const positions = this.network.getPositions(ids);
+        const nodes = [];
+        ids.forEach((id) => {
+            const position = positions[id];
+            if (!position
+                || !Number.isFinite(position.x)
+                || !Number.isFinite(position.y)) {
+                return;
+            }
+            const box = this.network.getBoundingBox(id) || {};
+            const halfWidth = Number.isFinite(box.right) && Number.isFinite(box.left)
+                ? Math.abs(box.right - box.left) / 2
+                : 20;
+            const halfHeight = Number.isFinite(box.bottom) && Number.isFinite(box.top)
+                ? Math.abs(box.bottom - box.top) / 2
+                : 12;
+            nodes.push({
+                id,
+                x: position.x,
+                y: position.y,
+                halfWidth: Math.max(halfWidth, 1),
+                halfHeight: Math.max(halfHeight, 1),
+            });
+        });
+
+        if (nodes.length < 2) {
+            this.updateSpacingSliderState();
+            return;
+        }
+
+        const xs = nodes.map((node) => node.x);
+        const ys = nodes.map((node) => node.y);
+        const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+        // Positions are stored relative to the centre so scaling keeps the
+        // graph centred while only the gaps between nodes change.
+        nodes.forEach((node) => {
+            node.x -= centerX;
+            node.y -= centerY;
+        });
+
+        // Canvas-coordinate extent of the visible viewport at the current zoom.
+        const viewScale = this.network.getScale() || 1;
+        this.diagramSpacingBaseline = {
+            nodes,
+            centerX,
+            centerY,
+            availableWidth: container.clientWidth / viewScale,
+            availableHeight: container.clientHeight / viewScale,
+        };
+
+        const rangeX = this.computeSpacingScaleRange('x', 1);
+        const rangeY = this.computeSpacingScaleRange('y', 1);
+        if (!preserveSliderValues) {
+            this.diagramSpacing = {
+                x: this.sliderValueFromScale(1, rangeX),
+                y: this.sliderValueFromScale(1, rangeY),
+            };
+        }
+        // The current slider positions now represent the captured layout, so
+        // further movement scales relative to what is on screen.
+        this._spacingAnchorValues = {
+            x: this.diagramSpacing.x,
+            y: this.diagramSpacing.y,
+        };
+        this.updateSpacingSliderState();
+    }
+
+    /**
+     * Re-reads the on-screen node positions so a new slider gesture adjusts
+     * spacing from the layout the user is currently looking at.
+     */
+    beginDiagramSpacingAdjustment() {
+        if (!this.network) return;
+        this.captureDiagramSpacingBaseline({ preserveSliderValues: true });
+    }
+
+    computeSpacingScaleRange(axis, otherScale) {
+        const baseline = this.diagramSpacingBaseline;
+        if (!baseline) return { minScale: 1, maxScale: 1 };
+
+        const nodes = baseline.nodes;
+        let minScale = 0;
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                const a = nodes[i];
+                const b = nodes[j];
+                const primary = axis === 'x'
+                    ? Math.abs(a.x - b.x)
+                    : Math.abs(a.y - b.y);
+                const secondary = axis === 'x'
+                    ? Math.abs(a.y - b.y)
+                    : Math.abs(a.x - b.x);
+                const needPrimary = axis === 'x'
+                    ? a.halfWidth + b.halfWidth
+                    : a.halfHeight + b.halfHeight;
+                const needSecondary = axis === 'x'
+                    ? a.halfHeight + b.halfHeight
+                    : a.halfWidth + b.halfWidth;
+                // Pairs already clear on the other axis can never collide.
+                if (secondary * otherScale >= needSecondary) continue;
+                if (primary < 1e-6) continue;
+                minScale = Math.max(minScale, needPrimary / primary);
+            }
+        }
+
+        const key = axis === 'x' ? 'x' : 'y';
+        const halfKey = axis === 'x' ? 'halfWidth' : 'halfHeight';
+        const available = axis === 'x'
+            ? baseline.availableWidth
+            : baseline.availableHeight;
+
+        let lowNode = nodes[0];
+        let highNode = nodes[0];
+        nodes.forEach((node) => {
+            if (node[key] < lowNode[key]) lowNode = node;
+            if (node[key] > highNode[key]) highNode = node;
+        });
+        const span = highNode[key] - lowNode[key];
+        const usable = available - (lowNode[halfKey] + highNode[halfKey]);
+        let maxScale = span > 1e-6 && usable > 0 ? usable / span : minScale;
+        maxScale = Math.max(maxScale, minScale);
+        return { minScale, maxScale };
+    }
+
+    scaleFromSliderValue(value, range, anchorValue) {
+        const current = this.clampNumber(Number(value) || 0, 0, 100);
+        const anchor = this.clampNumber(Number(anchorValue) || 0, 0, 100);
+        // The captured layout is always reachable, so it bounds the range.
+        const minScale = Math.min(range.minScale, 1);
+        const maxScale = Math.max(range.maxScale, 1);
+        if (current >= anchor) {
+            const span = 100 - anchor;
+            const weight = span <= 1e-9 ? 1 : (current - anchor) / span;
+            return 1 + ((maxScale - 1) * weight);
+        }
+        const weight = anchor <= 1e-9 ? 0 : current / anchor;
+        return minScale + ((1 - minScale) * weight);
+    }
+
+    sliderValueFromScale(scale, range) {
+        const span = range.maxScale - range.minScale;
+        if (span <= 1e-9) return 0;
+        return this.clampNumber(
+            ((scale - range.minScale) / span) * 100,
+            0,
+            100,
+        );
+    }
+
+    updateSpacingSliderState() {
+        const enabled = Boolean(this.diagramSpacingBaseline);
+        const horizontal = document.getElementById('horizontalSpacingSlider');
+        const vertical = document.getElementById('verticalSpacingSlider');
+        if (horizontal) {
+            horizontal.disabled = !enabled;
+            horizontal.value = String(Math.round(this.diagramSpacing.x));
+        }
+        if (vertical) {
+            vertical.disabled = !enabled;
+            vertical.value = String(Math.round(this.diagramSpacing.y));
+        }
+    }
+
+    applyDiagramSpacing() {
+        const baseline = this.diagramSpacingBaseline;
+        if (!this.network || !baseline) return;
+
+        const rangeX = this.computeSpacingScaleRange('x', 1);
+        const scaleX = this.scaleFromSliderValue(
+            this.diagramSpacing.x, rangeX, this._spacingAnchorValues.x
+        );
+        const rangeY = this.computeSpacingScaleRange('y', scaleX);
+        const scaleY = this.scaleFromSliderValue(
+            this.diagramSpacing.y, rangeY, this._spacingAnchorValues.y
+        );
+
+        this.network.setOptions({
+            physics: {
+                ...this.getPhysicsFromInfluence(),
+                enabled: false,
+            },
+        });
+
+        const updates = baseline.nodes.map((node) => {
+            const x = baseline.centerX + (node.x * scaleX);
+            const y = baseline.centerY + (node.y * scaleY);
+            this._diagramAnchorPositions[String(node.id)] = { x, y };
+            return { id: node.id, x, y };
+        });
+        this.network.body.data.nodes.update(updates);
+        this.network.stopSimulation();
+    }
+
     // ============ PRE-LAYOUT ENGINE ============
 
     /**
@@ -5328,6 +5604,7 @@ class WebAppClient {
 
         this.renderDiagramLegend(data);
         this.updateDiagramLayoutButtons();
+        this.scheduleDiagramSpacingBaseline();
     }
 
     removeStructureFromDiagram(roi) {

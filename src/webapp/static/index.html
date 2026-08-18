@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StructureRelations - DICOM RT Analysis</title>
-    <link rel="stylesheet" href="static/css/styles.css?v=40">
+    <link rel="stylesheet" href="static/css/styles.css?v=41">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -202,18 +202,46 @@
                                     <button class="btn btn-secondary" id="resetLayoutBtn" disabled>Reset</button>
                                 </div>
                             </div>
-                            <div class="network-diagram-wrapper">
-                                <div id="networkDiagram" class="network-diagram"></div>
-                                <button
-                                    type="button"
-                                    id="structureSetBadge"
-                                    class="structure-set-badge"
-                                    title="Right-click to select structures"
-                                >
-                                    <span class="structure-set-badge-icon">SS</span>
-                                    <span class="structure-set-badge-name" id="structureSetBadgeName">Structure Set</span>
-                                </button>
-                                <div id="structureSetBadgeTooltip" class="structure-set-tooltip"></div>
+                            <div class="diagram-canvas-layout">
+                                <div class="diagram-spacing-slider diagram-spacing-vertical">
+                                    <input
+                                        type="range"
+                                        id="verticalSpacingSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="50"
+                                        disabled
+                                        title="Vertical node spacing"
+                                        aria-label="Vertical node spacing"
+                                    >
+                                </div>
+                                <div class="network-diagram-wrapper">
+                                    <div id="networkDiagram" class="network-diagram"></div>
+                                    <button
+                                        type="button"
+                                        id="structureSetBadge"
+                                        class="structure-set-badge"
+                                        title="Right-click to select structures"
+                                    >
+                                        <span class="structure-set-badge-icon">SS</span>
+                                        <span class="structure-set-badge-name" id="structureSetBadgeName">Structure Set</span>
+                                    </button>
+                                    <div id="structureSetBadgeTooltip" class="structure-set-tooltip"></div>
+                                </div>
+                                <div class="diagram-spacing-slider diagram-spacing-horizontal">
+                                    <input
+                                        type="range"
+                                        id="horizontalSpacingSlider"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="50"
+                                        disabled
+                                        title="Horizontal node spacing"
+                                        aria-label="Horizontal node spacing"
+                                    >
+                                </div>
                             </div>
                         </div>
 
@@ -518,7 +546,7 @@
         </footer>
     </div>
 
-                    <script src="static/js/app.js?v=148"></script>
+                    <script src="static/js/app.js?v=149"></script>
     <!-- v35: Added show_disjoint parameter to diagram requests -->
 </body>
 </html>
