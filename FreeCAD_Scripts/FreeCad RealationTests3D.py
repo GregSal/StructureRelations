@@ -1008,3 +1008,26 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
+
+
+# %% Make Box in Cylinder
+file_name = 'Box in cylinder'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_cylinder = make_vertical_cylinder(radius=4, length=8,
+                                          offset_x=0, offset_y=0, offset_z=0)
+inner_box = make_box(width=2, height=6, offset_x=0, offset_y=0, offset_z=0)
+
+
+a, b, both = display_interactions(outer_cylinder, inner_box)
+both.ViewObject.Transparency = 0
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+
