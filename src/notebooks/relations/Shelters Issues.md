@@ -35,7 +35,7 @@ the "C" shape contains the circle.</li>
 As soon as the cut-plane is no longer perpendicular to the slice plane, the difficulties begin.<br><br>
 
 <ul><li>In this example the a hollow cylinder <b>"Shelters"</b> an inner cylinder. cut-plane is essentially parallel to the slice plane.</li></ul></td><td width="250px">
-<img src="Images/FreeCAD Images/Sheltered cylinder angled view.png" alt="shelters">
+<img src="../../Images/FreeCAD Images/Sheltered cylinder angled view.png" alt="shelters">
 </td></tr>
 <tr><td width="350">
 <ul><li>If the information is limited to the slice plane, then using the basic relation definitions, the hollow cylinder should be classified as <b>"Surrounding"</b> the inner cylinder.</li>
