@@ -46,7 +46,6 @@ class MetricsConfig:
     # Margin settings
     calculate_orthogonal_margins: bool = True
     calculate_minimum_margin: bool = True
-    calculate_maximum_margin: bool = False
     orthogonal_directions: List[str] = None
     use_anatomical_labels: bool = True
     anatomical_labels: Dict[str, str] = None
@@ -165,7 +164,6 @@ class MetricsConfig:
             # Margin settings
             calculate_orthogonal_margins=raw_config.get('margin_settings', {}).get('calculate_orthogonal', True),
             calculate_minimum_margin=raw_config.get('margin_settings', {}).get('calculate_minimum', True),
-            calculate_maximum_margin=raw_config.get('margin_settings', {}).get('calculate_maximum', False),
             orthogonal_directions=raw_config.get('margin_settings', {}).get('orthogonal_directions', None),
             use_anatomical_labels=raw_config.get('margin_settings', {}).get('anatomical_labels', {}).get('use_anatomical', True),
             anatomical_labels=cls._extract_anatomical_labels(raw_config),

@@ -79,7 +79,8 @@ class MetricCalculator(ABC):
         self,
         structure_a: StructureShape,
         structure_b: StructureShape,
-        relationship: StructureRelationship
+        relationship: StructureRelationship,
+        tolerance: Optional[float] = None
     ) -> Any:
         """Calculate metric for the given structure pair.
 
@@ -98,6 +99,9 @@ class MetricCalculator(ABC):
             structure_a: First structure
             structure_b: Second structure
             relationship: StructureRelationship with type and DE-27IM data
+            tolerance: Optional structure set tolerance.  When supplied and
+                positive, calculators may use it to round metric values
+                instead of the config distance precision.
 
         Returns:
             Metric-specific dataclass (MarginMetrics, DistanceMetrics, VolumeMetrics,

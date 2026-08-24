@@ -280,7 +280,6 @@
             }
           },
           "show_minimum_margin": true,
-          "show_maximum_margin": false,
           "highlight_below_threshold": false,
           "threshold_value": 0.5
         },

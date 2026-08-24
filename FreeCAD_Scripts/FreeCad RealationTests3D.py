@@ -1031,3 +1031,25 @@ Gui.ActiveDocument.ActiveView.setAxisCross(True)
 Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
 App.activeDocument().saveAs(fcad_file_path)
 
+
+# %% Make Cube in Sphere
+file_name = 'Cube in Sphere'
+image_file_path = IMAGE_PATH + "//" + file_name + ".png"
+fcad_file_path = SCRIPT_PATH + "//" + file_name + ".FCStd"
+doc = App.newDocument(fcad_file_path)
+
+outer_sphere = make_sphere(radius=6, offset_x=0, offset_y=0, offset_z=0)
+
+inner_cube = make_box(width=4, height=4, offset_x=0, offset_y=0, offset_z=0)
+
+
+a, b, both = display_interactions(outer_sphere, inner_cube)
+both.ViewObject.Transparency = 0
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
+Gui.ActiveDocument.ActiveView.setAxisCross(True)
+
+Gui.ActiveDocument.ActiveView.saveImage(image_file_path)
+App.activeDocument().saveAs(fcad_file_path)
+

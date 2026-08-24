@@ -21,7 +21,6 @@ from metrics import get_config as get_metrics_config, MetricCalculatorRegistry
 from metrics.data_structures import (
     RelationshipMetrics,
     MarginMetrics,
-    MaximumMarginMetrics,
     DistanceMetrics,
     VolumeMetrics,
     SurfaceMetrics,
@@ -1146,17 +1145,15 @@ class StructureSet:
             roi_b (ROI_Type): Second structure ROI.
             metric_name (str): Name of the metric calculator to use.
                 Available metrics:
-                - 'orthogonal_margins': Clearance in 6 directions (±X, ±Y, ±Z)
-                - 'minimum_margin': Worst-case clearance distance
-                - 'maximum_margin': Largest clearance (Hausdorff-based)
+                - 'minimum_margins': Orthogonal clearance in 6 directions
+                    (±X, ±Y, ±Z) and minimum clearance distance
                 - 'minimum_distance': Gap between disjoint structures
 
         Returns:
-            Metric result dataclass (MarginMetrics, MaximumMarginMetrics,
-            DistanceMetrics, etc.)
+            Metric result dataclass (MarginMetrics, DistanceMetrics, etc.)
             The result is also stored in the relationship graph at:
             relationship_graph[roi_a][roi_b]['relationship'].metrics.<category>
-            where <category> is 'margin', 'maximum_margin', 'distance', 'volume',
+            where <category> is 'margin', 'distance', 'volume',
             'surface', or 'geometry'.
 
         Raises:
@@ -1234,7 +1231,8 @@ class StructureSet:
                 roi_b
             )
             # Still call calculate() to get N/A result
-            return calculator.calculate(structure_a, structure_b, relationship)
+            return calculator.calculate(structure_a, structure_b, relationship,
+                                        tolerance=self.tolerance)
 
         # Calculate metric
         self._log(
@@ -1247,7 +1245,8 @@ class StructureSet:
             structure_b.name
         )
 
-        result = calculator.calculate(structure_a, structure_b, relationship)
+        result = calculator.calculate(structure_a, structure_b, relationship,
+                                      tolerance=self.tolerance)
 
         # Initialize RelationshipMetrics if it doesn't exist
         if relationship.metrics is None:
@@ -1264,8 +1263,6 @@ class StructureSet:
         # Store result in appropriate field based on type
         if isinstance(result, MarginMetrics):
             relationship.metrics.margin = result
-        elif isinstance(result, MaximumMarginMetrics):
-            relationship.metrics.maximum_margin = result
         elif isinstance(result, DistanceMetrics):
             relationship.metrics.distance = result
         elif isinstance(result, VolumeMetrics):

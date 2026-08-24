@@ -42,7 +42,6 @@ from metrics.config import MetricsConfig, get_config, reload_config
 # Data structures
 from metrics.data_structures import (
     MarginMetrics,
-    MaximumMarginMetrics,
     DistanceMetrics,
     VolumeMetrics,
     SurfaceMetrics,
