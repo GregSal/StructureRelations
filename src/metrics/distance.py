@@ -19,6 +19,7 @@ from typing import Dict, Tuple, Set, Optional
 from shapely import distance as shapely_distance
 
 from structures import StructureShape
+from contour_graph import get_slices_for_labels
 from relationships import StructureRelationship
 from types_and_classes import SliceIndexType, ContourIndex
 from metrics.base import MetricCalculator, register_calculator
@@ -223,18 +224,11 @@ class MinimumDistanceCalculator(MetricCalculator):
         contours: Set[ContourIndex],
     ) -> list[SliceIndexType]:
         """Get sorted slice indices for a region using contour lookup data."""
-        contour_lookup = structure.contour_lookup
-
-        if contour_lookup.empty:
-            return sorted({contour[1] for contour in contours})
-
-        labels = set(contours)
-        region_rows = contour_lookup.loc[contour_lookup['Label'].isin(labels)]
-
-        if region_rows.empty:
-            return sorted({contour[1] for contour in contours})
-
-        return sorted(region_rows['SliceIndex'].unique())
+        slices = get_slices_for_labels(structure.contour_lookup, contours)
+        if slices:
+            return slices
+        # Fall back to the slice index embedded in each ContourIndex.
+        return sorted({contour[1] for contour in contours})
 
     def _nearest_target_slices(
         self,

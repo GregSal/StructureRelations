@@ -688,6 +688,66 @@ class TestBuildContourLookup():
         assert lookup['RegionIndex'].nunique() == 2
 
 
+class TestGetRegionSlices():
+    '''Test the get_region_slices and get_slices_for_labels functions.'''
+
+    def test_get_region_slices_valid_region(self):
+        contour_table, slice_sequence = hole_test_contour_table()
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+        lookup = build_contour_lookup(contour_graph)
+        region_index = lookup['RegionIndex'].iloc[0]
+        expected_slices = sorted(
+            lookup.loc[lookup['RegionIndex'] == region_index,
+                       'SliceIndex'].unique()
+        )
+
+        slices = get_region_slices(lookup, region_index)
+
+        assert slices == expected_slices
+        assert slices == sorted(slices)
+
+    def test_get_region_slices_unknown_region(self):
+        contour_table, slice_sequence = hole_test_contour_table()
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+        lookup = build_contour_lookup(contour_graph)
+
+        assert get_region_slices(lookup, 'not_a_region') == []
+
+    def test_get_region_slices_empty_lookup(self):
+        assert get_region_slices(pd.DataFrame(), '1A') == []
+
+    def test_get_slices_for_labels_valid_labels(self):
+        contour_table, slice_sequence = hole_test_contour_table()
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+        lookup = build_contour_lookup(contour_graph)
+        labels = lookup['Label'].iloc[:2].tolist()
+        expected_slices = sorted(
+            lookup.loc[lookup['Label'].isin(labels), 'SliceIndex'].unique()
+        )
+
+        slices = get_slices_for_labels(lookup, labels)
+
+        assert slices == expected_slices
+
+    def test_get_slices_for_labels_unmatched_labels(self):
+        contour_table, slice_sequence = hole_test_contour_table()
+        contour_graph, slice_sequence = build_contour_graph(contour_table,
+                                                            slice_sequence,
+                                                            roi=1)
+        lookup = build_contour_lookup(contour_graph)
+
+        assert get_slices_for_labels(lookup, []) == []
+
+    def test_get_slices_for_labels_empty_lookup(self):
+        assert get_slices_for_labels(pd.DataFrame(), []) == []
+
+
 class TestBuildContourGraph():
     '''Test the build_contour_graph function.
 

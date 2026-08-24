@@ -437,15 +437,18 @@ class StructureSet:
 
                 pair_key = f'{min(roi_a, roi_b)}|{max(roi_a, roi_b)}'
                 pair_slice_records: List[dict] = []
+                pair_per_region: Dict[tuple, object] = {}
 
                 def make_capture_slice_relation(
                     pair_records: List[dict],
-                ) -> Callable[[float, object, object, object], None]:
+                    per_region: Dict[tuple, object],
+                ) -> Callable[[float, object, object, object, object], None]:
                     def capture_slice_relation(
                         slice_index: float,
                         relation: object,
                         region_self: object,
                         region_other: object,
+                        region_relations: Optional[Dict[tuple, object]] = None,
                     ) -> None:
                         relation_type = relation.identify_relation()
 
@@ -455,11 +458,56 @@ class StructureSet:
                         def _slice_has_boundary(region: object) -> bool:
                             if region is None or not hasattr(region, 'merged_boundary'):
                                 return False
-                            try:
-                                boundary = region.merged_boundary()
-                            except TypeError:
+                            boundary = region.merged_boundary
+                            if not hasattr(boundary, 'is_empty'):
                                 return False
                             return bool(boundary) and not boundary.is_empty
+
+                        def _region_boundary_only(
+                            region: object,
+                            region_idx: object,
+                        ) -> bool:
+                            '''True when the region has only boundary-face
+                            geometry on this slice (no area region).'''
+                            if region is None or not hasattr(region, 'regions'):
+                                return False
+                            region_poly = region.regions.get(region_idx)
+                            boundary_poly = region.boundaries.get(region_idx)
+                            has_region = (
+                                region_poly is not None
+                                and not region_poly.is_empty
+                            )
+                            has_boundary = (
+                                boundary_poly is not None
+                                and not boundary_poly.is_empty
+                            )
+                            return has_boundary and not has_region
+
+                        region_records: List[dict] = []
+                        if region_relations:
+                            for region_key, region_de27im in (
+                                    region_relations.items()):
+                                idx_a, idx_b = region_key
+                                region_relation_type = (
+                                    region_de27im.identify_relation()
+                                )
+                                region_records.append({
+                                    'region_a': str(idx_a),
+                                    'region_b': str(idx_b),
+                                    'relation_type':
+                                        region_relation_type.label,
+                                    'relation_symbol':
+                                        region_relation_type.symbol,
+                                    'boundary_only_a': _region_boundary_only(
+                                        region_self, idx_a),
+                                    'boundary_only_b': _region_boundary_only(
+                                        region_other, idx_b),
+                                })
+                                if region_key in per_region:
+                                    per_region[region_key].merge(
+                                        region_de27im)
+                                else:
+                                    per_region[region_key] = region_de27im
 
                         pair_records.append({
                             'slice_index': float(slice_index),
@@ -473,11 +521,13 @@ class StructureSet:
                                 _slice_has_boundary(region_self)
                                 or _slice_has_boundary(region_other)
                             ),
+                            'region_relations': region_records,
                         })
 
                     return capture_slice_relation
 
-                capture_slice_relation = make_capture_slice_relation(pair_slice_records)
+                capture_slice_relation = make_capture_slice_relation(
+                    pair_slice_records, pair_per_region)
 
                 # Calculate the DE27IM relationship
                 de27im_relationship = structure_a.relate_to(
@@ -499,11 +549,11 @@ class StructureSet:
                     is_identical=False
                 )
 
-                # Compute per-region relationships and attach to the result.
-                per_region = structure_a.relate_regions(
-                    structure_b, tolerance=self.tolerance
+                # Attach per-region relationships accumulated by the slice
+                # callback during relate_to (single geometry pass).
+                relationship.per_region_relations = (
+                    pair_per_region if pair_per_region else None
                 )
-                relationship.per_region_relations = per_region if per_region else None
 
                 # Add edge to graph with relationship data
                 self.relationship_graph.add_edge(
@@ -1665,6 +1715,7 @@ class StructureSet:
                     'relation_symbol': record['relation_symbol'],
                     'is_interpolated': record['is_interpolated'],
                     'has_boundary': record['has_boundary'],
+                    'region_relations': record.get('region_relations', []),
                 })
 
         return slice_relationships

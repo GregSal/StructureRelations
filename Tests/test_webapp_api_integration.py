@@ -851,7 +851,24 @@ def test_structure_set_serializes_slice_relationships():
                 'relation_symbol': 'o',
                 'is_interpolated': False,
                 'has_boundary': True,
-            }
+                'region_relations': [
+                    {
+                        'region_a': '1A',
+                        'region_b': '2A',
+                        'relation_type': 'OVERLAPS',
+                        'relation_symbol': 'o',
+                        'boundary_only_a': False,
+                        'boundary_only_b': True,
+                    }
+                ],
+            },
+            {
+                'slice_index': 1.5,
+                'relation_type': 'DISJOINT',
+                'relation_symbol': 'd',
+                'is_interpolated': True,
+                'has_boundary': False,
+            },
         ]
     }
 
@@ -861,6 +878,12 @@ def test_structure_set_serializes_slice_relationships():
     assert serialized['1.0000'][0]['rois'] == [1, 2]
     assert serialized['1.0000'][0]['label'] == 'Alpha / Beta: OVERLAPS'
     assert serialized['1.0000'][0]['has_boundary'] is True
+    region_relations = serialized['1.0000'][0]['region_relations']
+    assert region_relations[0]['region_a'] == '1A'
+    assert region_relations[0]['region_b'] == '2A'
+    assert region_relations[0]['boundary_only_b'] is True
+    # Records without a region_relations key default to an empty list.
+    assert serialized['1.5000'][0]['region_relations'] == []
 
 
 # ============ LAYOUT METADATA TESTS (Phase 5) ============

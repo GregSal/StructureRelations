@@ -324,3 +324,88 @@ class TestSingleRegionNoMulti:
         rel = simple_ss.get_relationship(2, 1)
         label = rel.display_label(show_multi=True)
         assert '{' not in label
+
+
+class TestPerRegionSliceRecords:
+    '''Tests that calculate_relationships() stores per-region slice records.
+
+    Uses the two-cylinders-in-box fixture: ROI 2 (box, single region) is
+    larger than ROI 1 (two disjoint cylinders), so relate_to is called with
+    structure_a=ROI 2 and structure_b=ROI 1 and pair_key is '1|2'.
+    '''
+
+    @pytest.fixture(scope='class')
+    def two_in_box(self):
+        return _two_disjoint_cylinders_vs_container()
+
+    def test_slice_records_have_region_relations(self, two_in_box):
+        records = two_in_box.slice_relationship_records.get('1|2')
+        assert records, 'expected slice records for pair 1|2'
+        for record in records:
+            assert 'region_relations' in record
+            assert isinstance(record['region_relations'], list)
+
+    def test_region_record_fields(self, two_in_box):
+        records = two_in_box.slice_relationship_records.get('1|2')
+        non_empty = [r for r in records if r['region_relations']]
+        assert non_empty, 'expected at least one slice with region relations'
+        for record in non_empty:
+            for entry in record['region_relations']:
+                assert isinstance(entry['region_a'], str)
+                assert isinstance(entry['region_b'], str)
+                assert isinstance(entry['relation_type'], str)
+                assert isinstance(entry['relation_symbol'], str)
+                assert isinstance(entry['boundary_only_a'], bool)
+                assert isinstance(entry['boundary_only_b'], bool)
+
+    def test_multi_region_slice_has_two_entries(self, two_in_box):
+        '''Slices where both cylinders are present produce two region entries
+        (one per ROI-1 region) against the single box region.'''
+        records = two_in_box.slice_relationship_records.get('1|2')
+        multi = [r for r in records if len(r['region_relations']) >= 2]
+        assert multi, 'expected slices with two cylinder region entries'
+        for record in multi:
+            regions_b = {e['region_b'] for e in record['region_relations']}
+            assert len(regions_b) == 2
+
+    def test_slice_records_match_direct_computation(self, two_in_box):
+        '''Recorded per-region relations match compute_region_pair_de27im()
+        called directly on the same slice.'''
+        ss = two_in_box
+        records = ss.slice_relationship_records.get('1|2')
+        record = next(r for r in records if r['region_relations'])
+        slice_index = record['slice_index']
+        region_a = ss.structures[2].get_slice(slice_index)
+        region_b = ss.structures[1].get_slice(slice_index)
+        idxs_a = region_a.get_region_indexes(
+            include_boundaries=False, include_holes=False
+        )
+        idxs_b = region_b.get_region_indexes(
+            include_boundaries=False, include_holes=False
+        )
+        expected = {}
+        for idx_a in idxs_a:
+            for idx_b in idxs_b:
+                de27im = compute_region_pair_de27im(
+                    region_a, idx_a, region_b, idx_b
+                )
+                expected[(str(idx_a), str(idx_b))] = (
+                    de27im.identify_relation().label
+                )
+        actual = {
+            (e['region_a'], e['region_b']): e['relation_type']
+            for e in record['region_relations']
+        }
+        assert actual == expected
+
+    def test_per_region_parity_with_relate_regions(self, two_in_box):
+        '''relationship.per_region_relations accumulated via the slice
+        callback matches a direct relate_regions() call.'''
+        ss = two_in_box
+        rel = ss.get_relationship(2, 1)
+        assert rel is not None
+        assert rel.per_region_relations is not None
+        direct = ss.structures[2].relate_regions(ss.structures[1])
+        assert set(rel.per_region_relations.keys()) == set(direct.keys())
+        for key, de27im in direct.items():
+            assert rel.per_region_relations[key].int == de27im.int

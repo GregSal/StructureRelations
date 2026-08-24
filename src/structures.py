@@ -15,7 +15,7 @@ from types_and_classes import ROI_Type, SliceIndexType
 from types_and_classes import ContourIndex, SLICE_INDEX_PRECISION
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
-from contour_graph import build_contour_graph, build_contour_lookup
+from contour_graph import build_contour_graph, build_contour_lookup, get_region_slices
 from region_slice import RegionSlice
 from relations import DE27IM, compute_region_pair_de27im
 
@@ -446,7 +446,8 @@ class StructureShape():
         tolerance=0.0,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         slice_relation_callback: Optional[
-            Callable[[SliceIndexType, 'DE27IM', object, object], None]
+            Callable[[SliceIndexType, 'DE27IM', object, object,
+                      Optional[Dict[Tuple[str, str], 'DE27IM']]], None]
         ] = None,
     ) -> 'DE27IM':
         '''Relate this structure to another structure.
@@ -462,9 +463,12 @@ class StructureShape():
             progress_callback (Optional[Callable[[int, int], None]]): Optional
                 callback receiving (current_slice_index, total_slices).
             slice_relation_callback (Optional[Callable[[SliceIndexType, DE27IM,
-                object, object], None]]): Optional callback receiving the slice
-                index, slice relationship, and raw RegionSlice entries for self
-                and other.
+                object, object, Optional[Dict[Tuple[str, str], DE27IM]]],
+                None]]): Optional callback receiving the slice index, the
+                combined slice relationship, the raw RegionSlice entries for
+                self and other, and a dict mapping (region_idx_self,
+                region_idx_other) tuples to the per-region slice DE27IM
+                (empty dict when per-region relations are not applicable).
 
         Returns:
             DE27IM: A DE27IM relationship object containing the relationship
@@ -534,11 +538,15 @@ class StructureShape():
 
             composite_relation.merge(relation)
             if slice_relation_callback is not None:
+                region_relations = self._compute_slice_region_relations(
+                    region_self, region_other, tolerance
+                )
                 slice_relation_callback(
                     slice_index,
                     relation,
                     region_self,
                     region_other,
+                    region_relations,
                 )
             if progress_callback is not None:
                 progress_callback(current_slice_index, total_slices)
@@ -548,6 +556,59 @@ class StructureShape():
         '''Backward-compatible wrapper for relate_to.'''
         return self.relate_to(other=other, tolerance=tolerance)
 
+    @staticmethod
+    def _compute_slice_region_relations(
+        region_self: 'RegionSlice',
+        region_other: 'RegionSlice',
+        tolerance: float = 0.0,
+    ) -> Dict[Tuple[str, str], 'DE27IM']:
+        '''Compute per-region DE27IM relationships for a single slice pair.
+
+        For every combination of top-level region index from region_self and
+        region_other, compute the DE27IM relationship on this slice. Boundary
+        regions and holes are excluded from the region-index loops (but their
+        geometry is still picked up internally by compute_region_pair_de27im
+        via RegionSlice.boundaries).
+
+        Args:
+            region_self: The RegionSlice for this structure on the slice, or
+                None/NaN when the structure has no slice at this position.
+            region_other: The RegionSlice for the other structure on the
+                slice, or None/NaN when absent.
+            tolerance: Geometric tolerance passed to DE27IM operations.
+
+        Returns:
+            Dict mapping (region_idx_self, region_idx_other) tuples to
+            slice-level DE27IM objects.  Empty when either side has no valid
+            RegionSlice or no top-level regions on the slice.
+        '''
+        if region_self is None or not hasattr(region_self,
+                                              'get_region_indexes'):
+            return {}
+        if region_other is None or not hasattr(region_other,
+                                               'get_region_indexes'):
+            return {}
+
+        # Top-level regions only (no boundaries, no holes).
+        idxs_self = region_self.get_region_indexes(
+            include_boundaries=False, include_holes=False
+        )
+        idxs_other = region_other.get_region_indexes(
+            include_boundaries=False, include_holes=False
+        )
+        if not idxs_self or not idxs_other:
+            return {}
+
+        region_relations: Dict[Tuple[str, str], DE27IM] = {}
+        for idx_a in idxs_self:
+            for idx_b in idxs_other:
+                region_relations[(idx_a, idx_b)] = compute_region_pair_de27im(
+                    region_self, idx_a,
+                    region_other, idx_b,
+                    tolerance=tolerance,
+                )
+        return region_relations
+
     def relate_regions(
         self,
         other: 'StructureShape',
@@ -555,15 +616,9 @@ class StructureShape():
     ) -> Dict[Tuple[str, str], DE27IM]:
         '''Compute per-region DE27IM relationships between this and another structure.
 
-        Iterates over the same valid slice positions used by relate_to(), but
-        instead of merging all regions into a single polygon, it computes a
-        separate DE27IM for every combination of top-level region index from
-        self and top-level region index from other.  Boundary regions and holes
-        are excluded from the region-index loops (but their geometry is still
-        picked up internally by compute_region_pair_de27im via
-        RegionSlice.boundaries).
-
-        The results for each region pair are accumulated across slices via
+        Delegates to relate_to() with an internal slice callback that
+        accumulates the per-region DE27IM computed for each slice.  The
+        results for each region pair are merged across slices via
         DE27IM.merge(), exactly as relate_to() accumulates the composite.
 
         Args:
@@ -577,71 +632,39 @@ class StructureShape():
         '''
         per_region: Dict[Tuple[str, str], DE27IM] = {}
 
-        # Build the same valid-position outer join as relate_to().
-        this_valid_mask = (
-            ~self.region_table.Interpolated | self.region_table.IsBoundary
+        def accumulate_region_relations(
+            slice_index: SliceIndexType,
+            relation: DE27IM,
+            region_self: object,
+            region_other: object,
+            region_relations: Optional[Dict[Tuple[str, str], DE27IM]],
+        ) -> None:
+            if not region_relations:
+                return
+            for key, slice_de27im in region_relations.items():
+                if key in per_region:
+                    per_region[key].merge(slice_de27im)
+                else:
+                    per_region[key] = slice_de27im
+
+        self.relate_to(
+            other,
+            tolerance=tolerance,
+            slice_relation_callback=accumulate_region_relations,
         )
-        valid_slices_self = set(
-            self.region_table.loc[this_valid_mask, 'SliceIndex']
-        )
-        other_valid_mask = (
-            ~other.region_table.Interpolated | other.region_table.IsBoundary
-        )
-        valid_slices_other = set(
-            other.region_table.loc[other_valid_mask, 'SliceIndex']
-        )
-        valid_positions = valid_slices_self | valid_slices_other
-
-        this_slice_mask = self.region_table.SliceIndex.isin(valid_positions)
-        this_mask = this_slice_mask & ~self.region_table.Empty
-        regions_self = self.region_table.loc[
-            this_mask, ['SliceIndex', 'RegionSlice']
-        ].set_index('SliceIndex')
-
-        other_slice_mask = other.region_table.SliceIndex.isin(valid_positions)
-        other_mask = other_slice_mask & ~other.region_table.Empty
-        regions_other = other.region_table.loc[
-            other_mask, ['SliceIndex', 'RegionSlice']
-        ].set_index('SliceIndex')
-
-        regions = regions_self.join(
-            regions_other, how='outer', lsuffix='_self', rsuffix='_other'
-        )
-
-        for _slice_index, row in regions.iterrows():
-            region_self = row['RegionSlice_self']
-            region_other = row['RegionSlice_other']
-
-            if region_self is None or not hasattr(region_self, 'get_region_indexes'):
-                continue
-            if region_other is None or not hasattr(region_other, 'get_region_indexes'):
-                continue
-
-            # Top-level regions only (no boundaries, no holes).
-            idxs_self = region_self.get_region_indexes(
-                include_boundaries=False, include_holes=False
-            )
-            idxs_other = region_other.get_region_indexes(
-                include_boundaries=False, include_holes=False
-            )
-
-            if not idxs_self or not idxs_other:
-                continue
-
-            for idx_a in idxs_self:
-                for idx_b in idxs_other:
-                    key = (idx_a, idx_b)
-                    slice_de27im = compute_region_pair_de27im(
-                        region_self, idx_a,
-                        region_other, idx_b,
-                        tolerance=tolerance,
-                    )
-                    if key in per_region:
-                        per_region[key].merge(slice_de27im)
-                    else:
-                        per_region[key] = slice_de27im
-
         return per_region
+
+    def get_region_slices(self, region_index: str) -> List[SliceIndexType]:
+        '''Get the sorted slice indexes containing contours for a region.
+
+        Args:
+            region_index (str): The RegionIndex to look up.
+
+        Returns:
+            List[SliceIndexType]: Sorted slice indexes containing contours
+                for the given region.
+        '''
+        return get_region_slices(self.contour_lookup, region_index)
 
     def get_region_indexes(self, include_boundaries=True,
                            include_holes=True,

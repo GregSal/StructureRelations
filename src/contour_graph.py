@@ -4,7 +4,7 @@ and edges are directed from lower to higher slice indices, connecting matched
 contours on adjacent slices.
 '''
 # %% Setup
-from typing import List, Tuple
+from typing import Iterable, List, Tuple
 from collections import defaultdict
 import logging
 import math
@@ -73,6 +73,48 @@ def build_contour_lookup(contour_graph: ContourGraph) -> pd.DataFrame:
     contour_lookup.sort_values(by=['SliceIndex', 'ContourIndex'],
                                ascending=True,inplace=True)
     return contour_lookup
+
+
+def get_slices_for_labels(contour_lookup: pd.DataFrame,
+                          labels: Iterable[ContourIndex]) -> List[SliceIndexType]:
+    '''Return sorted slice indexes for contours with the given labels.
+
+    Args:
+        contour_lookup (pd.DataFrame): The contour lookup table. This
+            DataFrame should contain the columns 'Label' and 'SliceIndex'.
+        labels (Iterable[ContourIndex]): The contour node labels to match
+            against the 'Label' column.
+
+    Returns:
+        List[SliceIndexType]: Sorted unique slice indexes for the matching
+            contours, or an empty list if none are found.
+    '''
+    if contour_lookup.empty:
+        return []
+    rows = contour_lookup.loc[contour_lookup['Label'].isin(labels)]
+    if rows.empty:
+        return []
+    return sorted(rows['SliceIndex'].unique())
+
+
+def get_region_slices(contour_lookup: pd.DataFrame,
+                      region_index: RegionIndex) -> List[SliceIndexType]:
+    '''Return sorted slice indexes containing contours for the given region.
+
+    Args:
+        contour_lookup (pd.DataFrame): The contour lookup table. This
+            DataFrame should contain the columns 'RegionIndex' and
+            'SliceIndex'.
+        region_index (RegionIndex): The RegionIndex to look up.
+
+    Returns:
+        List[SliceIndexType]: Sorted unique slice indexes for the region, or
+            an empty list if the region is not found.
+    '''
+    if contour_lookup.empty:
+        return []
+    mask = contour_lookup['RegionIndex'] == region_index
+    return sorted(contour_lookup.loc[mask, 'SliceIndex'].unique())
 
 
 def get_region_contours(contour_graph: ContourGraph,
