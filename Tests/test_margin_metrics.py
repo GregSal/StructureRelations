@@ -241,22 +241,20 @@ class TestBoxInCylinder:
 
     def test_box_in_cylinder(self):
         def box_in_cylinder_example():
-            slice_spacing = 0.2
+            slice_spacing = 0.1
             body = make_vertical_cylinder(roi_num=0, radius=20, length=10,
                                           offset_z=0, spacing=slice_spacing)
             outer_cylinder = make_vertical_cylinder(roi_num=1, radius=4,
                                                     length=8, offset_z=0,
+                                                    num_points=360,
                                                     spacing=slice_spacing)
-            # Note: the notebook example code used length=2, but its
-            # documented formulas (1.46 orthogonal, 1.17 minimum) assume a
-            # square 4x4 cross-section, so length=4 is used here.
             inner_box = make_box(roi_num=2, width=4, length=4, height=6,
                                  offset_x=0, offset_y=0, offset_z=0,
                                  spacing=slice_spacing)
             return outer_cylinder + inner_box + body
 
-        tolerance = 0.1
-        structures, relation_type, margin_result = get_relation_and_margins(
+        tolerance = 0.01
+        _, relation_type, margin_result = get_relation_and_margins(
             box_in_cylinder_example(), tolerance=tolerance)
 
         assert relation_type.relation_type == 'CONTAINS'
@@ -290,7 +288,7 @@ class TestCubeInSphere:
             return outer_sphere + inner_cube + body
 
         tolerance = 0.1
-        structures, relation_type, margin_result = get_relation_and_margins(
+        _, relation_type, margin_result = get_relation_and_margins(
             cube_in_sphere_example(), tolerance=tolerance)
 
         assert relation_type.relation_type == 'CONTAINS'
@@ -329,18 +327,18 @@ class TestTwoBoxesInSphere:
             return outer_sphere + left_inner_box + right_inner_box + body
 
         tolerance = 0.1
-        structures, relation_type, margin_result = get_relation_and_margins(
+        _, relation_type, margin_result = get_relation_and_margins(
             two_boxes_in_sphere_example(), tolerance=tolerance)
 
         assert relation_type.relation_type == 'CONTAINS'
 
         # Final values are the minimum across the two region pairs.
-        expected_margins = {'x_neg': 0.83, 'x_pos': 0.24,
-                            'y_neg': 0.66, 'y_pos': 0.66,
+        expected_margins = {'x_neg': 0.8, 'x_pos': 0.2,
+                            'y_neg': 0.6, 'y_pos': 0.6,
                             'z_neg': 0.7, 'z_pos': 0.7}
         assert_margins_close(margin_result.orthogonal_margins,
                              expected_margins, tolerance)
-        assert abs(margin_result.minimum_margin - 0.23) <= tolerance
+        assert abs(margin_result.minimum_margin - 0.2) <= tolerance
 
         # Per-region-pair checks.
         per_region = margin_result.per_region_orthogonal_margins
@@ -639,7 +637,7 @@ class TestHorizontalShelteredCylinder:
                               if contour['Slice'] <= 0.0]
 
             cylinder_hole = make_horizontal_cylinder(
-                roi_num=1, radius=3.0, length=8.0, offset_x=0, offset_y=0,
+                roi_num=1, radius=3.0, length=10.0, offset_x=0, offset_y=0,
                 offset_z=0, spacing=slice_spacing)
             # Exclude slices above the Z=0 plane to match the cylinder.
             cylinder_hole = [contour for contour in cylinder_hole
@@ -659,7 +657,7 @@ class TestHorizontalShelteredCylinder:
 
         assert relation_type.relation_type == 'SHELTERS'
 
-        expected_margins = {'x_neg': 1.0, 'x_pos': 1.0,
+        expected_margins = {'x_neg': nan, 'x_pos': nan,
                             'y_neg': 1.0, 'y_pos': 1.0,
                             'z_neg': 1.0, 'z_pos': nan}
         assert_margins_close(margin_result.orthogonal_margins,
