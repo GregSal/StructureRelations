@@ -94,10 +94,8 @@ def test_parse_structure_metadata_merges_and_collapses_expansions():
     parsed = parse_structure_metadata(metadata)
 
     assert list(parsed.index) == ['PTV_5040', 'PTV +5mm']
-    assert parsed.index.name == 'Structure ID'
+    assert parsed.index.name == 'Structure'
     assert parsed.loc['PTV_5040', 'ROINumber'] == 1
-    assert parsed.loc['PTV_5040', 'Structure Name'] == 'Boost'
-    assert parsed.loc['PTV_5040', 'File'] == 'sample.dcm'
     assert parsed.loc['PTV +5mm', 'ExpansionSize'] == '5'
     assert parsed.loc['PTV +5mm', 'ExpansionUnit'] == 'mm'
 

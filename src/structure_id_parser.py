@@ -478,7 +478,7 @@ def parse_structure_metadata(
 
     # jOIN the relevant parsed columns with the selected metadata columns
     selected_columns = ['Structure ID', 'DICOM Type', 'Structure Code',
-                        'Coding Scheme', 'Code Meaning']
+                        'Coding Scheme', 'Code Meaning', 'ROINumber']
     selected_metadata = metadata[selected_columns].copy()
     metadata_indexed = selected_metadata.set_index(structure_column)
     merged = relevant_parsed.merge(metadata_indexed, how='left',
