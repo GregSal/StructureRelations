@@ -497,7 +497,11 @@ def add_boundary_contours(contour_graph: ContourGraph,
             else:
                 # No previous slice, create boundary at this_slice - half the
                 # distance to the next slice
-                slice_spacing = neighbors.next_slice - this_slice
+                if math.isnan(neighbors.next_slice):
+                    # If next_slice is NaN, use the slice_spacing from the slice_sequence
+                    slice_spacing = slice_sequence.slice_spacing
+                else:
+                    slice_spacing = neighbors.next_slice - this_slice
                 boundary_slice = this_slice - slice_spacing / 2
             boundary_nodes.add(node)
             contour_parameters['starting_contour'] = node
@@ -518,7 +522,11 @@ def add_boundary_contours(contour_graph: ContourGraph,
             else:
                 # No next slice, create boundary at this_slice + half the
                 # distance to the previous slice
-                slice_spacing = this_slice - neighbors.previous_slice
+                if math.isnan(neighbors.previous_slice):
+                    # If previous_slice is NaN, use the slice_spacing from the slice_sequence
+                    slice_spacing = slice_sequence.slice_spacing
+                else:
+                    slice_spacing = this_slice - neighbors.previous_slice
                 boundary_slice = this_slice + slice_spacing / 2
             boundary_nodes.add(node)
             contour_parameters['starting_contour'] = node
