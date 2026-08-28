@@ -110,6 +110,22 @@ class TestSliceSequence():
         assert ss.slices == [1.0, 2.0, 3.0]
         assert len(ss) == 3
 
+    def test_slice_spacing(self):
+        '''Test that slice spacing is the mean consecutive slice difference.'''
+        ss = SliceSequence([5.0, 1.0, 2.0])
+        assert ss.slice_spacing == approx(2.0)
+
+        ss.add_slice(8.0)
+        assert ss.slice_spacing == approx(7.0 / 3.0)
+
+        ss.remove_slice(8.0)
+        assert ss.slice_spacing == approx(2.0)
+
+    def test_single_slice_spacing(self):
+        '''Test that a single slice uses the neutral spacing fallback.'''
+        ss = SliceSequence([1.0])
+        assert ss.slice_spacing == 1.0
+
     def test_neighbour_slices(self):
         '''Test that the SliceSequence class contains the correct neighbour
         slices.'''

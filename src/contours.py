@@ -145,6 +145,7 @@ class SliceSequence:
         get_neighbors: Method to get the neighbors of a given slice index.
     '''
     sequence: pd.DataFrame
+    slice_spacing = 1.0
 
     def __init__(self, slice_indices: Union[List[SliceIndexType], pd.Series]) -> None:
         '''Initialize the SliceSequence.
@@ -163,6 +164,15 @@ class SliceSequence:
             'PreviousSlice': slice_series.shift(1),
             'Original': True
         }).set_index('ThisSlice', drop=False)
+        self._update_slice_spacing()
+
+    def _update_slice_spacing(self) -> None:
+        '''Calculate the average spacing between consecutive slices.'''
+        slices = self.sequence['ThisSlice'].sort_values()
+        if len(slices) < 2:
+            self.slice_spacing = 1.0
+            return
+        self.slice_spacing = float(slices.diff().dropna().mean())
 
     @property
     def slices(self) -> List[SliceIndexType]:
@@ -209,6 +219,7 @@ class SliceSequence:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=FutureWarning)
                 self.sequence = pd.concat([self.sequence, new_row]).sort_index()
+            self._update_slice_spacing()
 
     def remove_slice(self, slice_index: SliceIndexType) -> None:
         '''Remove a slice index from the sequence.'''
@@ -216,6 +227,7 @@ class SliceSequence:
             self.sequence = self.sequence.drop(slice_index)
             self.sequence['NextSlice'] = self.sequence['ThisSlice'].shift(-1)
             self.sequence['PreviousSlice'] = self.sequence['ThisSlice'].shift(1)
+            self._update_slice_spacing()
 
     def get_nearest_slice(self, value: float) -> SliceIndexType:
         '''Find the nearest slice index to a given value.'''
