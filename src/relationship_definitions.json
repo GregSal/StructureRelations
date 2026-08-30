@@ -167,7 +167,7 @@
             "symmetric": false,
             "transitive": true,
             "reversed_arrow": false,
-            "description": "A and B have no interior points in common, but with the holes of A filled, (Exterior of A) it contains B.",
+            "description": "A and B have no interior points in common, but the Exterior of A (A with its holes of filled) contains B.",
             "examples": [
                 "src\\Images\\Relationships\\surrounds simple.png",
                 "src\\Images\\Relationships\\surrounds with ring.png"
