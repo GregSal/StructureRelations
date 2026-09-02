@@ -477,7 +477,7 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             for p1, p2 in zip(sampled_1, sampled_2)
         ]
 
-    def build_interpolated_geometry(boundary_builder):
+    def build_interpolated_geometry(boundary_builder, new_z):
         shell_points = boundary_builder(aligned_poly1.exterior,
                                         aligned_poly2.exterior)
         candidate_poly = polygon_from_points(shell_points)
@@ -487,7 +487,16 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             hole_poly = polygon_from_points(hole_points)
             candidate_poly = candidate_poly - hole_poly
         candidate_poly = repair_polygon(candidate_poly)
-        return candidate_poly
+        itp_poly = Polygon(shapely.get_coordinates(candidate_poly))
+        itp_poly = shapely.force_3d(itp_poly, new_z)
+        return itp_poly
+
+    def scale_poly(poly: shapely.Polygon, new_z: float, xfact=0.5, yfact=0.5):
+        itp_poly = shapely.affinity.scale(poly, xfact=xfact, yfact=yfact,
+                                          origin='center')
+        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
+        itp_poly = shapely.force_3d(itp_poly, new_z)
+        return itp_poly.exterior
 
     # Get the z value for the new polygon.
     new_z = calculate_new_slice_index(slices)
@@ -508,18 +517,15 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
         if p1.interiors:
             # Reconstruct polygon with exterior and all interior rings (holes)
             itp_poly = Polygon(
-                shapely.get_coordinates(p1.exterior),
-                [shapely.get_coordinates(interior) for interior in p1.interiors]
+                scale_poly(p1, new_z),
+                [scale_poly(interior) for interior in p1.interiors]
             )
         else:
             # No holes - just use exterior
-            itp_poly = Polygon(shapely.get_coordinates(p1.exterior))
-        itp_poly = shapely.force_3d(itp_poly, new_z)
+            itp_poly = Polygon(scale_poly(p1, new_z))
         return itp_poly
     elif p1.is_empty:
-        itp_poly = shapely.affinity.scale(p2, xfact=0.5, yfact=0.5)
-        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
-        itp_poly = shapely.force_3d(itp_poly, new_z)
+        itp_poly = Polygon(scale_poly(p2, new_z))
         return itp_poly
 
     # If two polygons given, align the polygons to the same center and size and
@@ -532,18 +538,17 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
     boundary1 = aligned_poly1.exterior
     boundary2 = aligned_poly2.exterior
     # Build candidate polygon from nearest-boundary interpolation.
-    itp_poly = build_interpolated_geometry(interpolate_boundaries)
+    # FIXME Implicit variable passing in use making the code unclear
+    # FIXME The place where the Z coordinate is being added is inconsistent making the code unclear
+    itp_poly = build_interpolated_geometry(interpolate_boundaries, new_z)
     # Fallback to robust resampling interpolation when topology is invalid.
     if itp_poly.is_empty or not itp_poly.is_valid:
-        itp_poly = build_interpolated_geometry(interpolate_boundaries_resampled)
+        itp_poly = build_interpolated_geometry(interpolate_boundaries_resampled, new_z)
 
     # Ensure the output remains a polygon-like geometry for downstream contour use.
     itp_poly = largest_polygon(itp_poly)
     if itp_poly.is_empty:
-        itp_poly = Polygon(shapely.get_coordinates(p1.exterior))
-
-    # Add the z value to the polygon.
-    itp_poly = shapely.force_3d(itp_poly, new_z)
+        itp_poly = Polygon(shapely.get_coordinates(p1.exterior, include_z=True))
     return itp_poly
 
 

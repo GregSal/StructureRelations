@@ -272,10 +272,10 @@ class TestInterpolatePolygon():
         '''
         p1 = Polygon([(0, 0), (2, 0), (2, 2), (0, 2)])
         interpolated = interpolate_polygon([0], p1)
-        #shape_difference = shapely.affinity.scale(p1, 0.5, 0.5)  - interpolated
-        shape_difference = p1 - interpolated
-        #assert interpolated.area == approx(p1.area / 4, rel=1e-9)
-        assert interpolated.area == approx(p1.area, rel=1e-9)
+        shape_difference = shapely.affinity.scale(p1, 0.5, 0.5)  - interpolated
+        #shape_difference = p1 - interpolated
+        assert interpolated.area == approx(p1.area / 4, rel=1e-9)
+        #assert interpolated.area == approx(p1.area, rel=1e-9)
         assert shape_difference.area == pytest.approx(0.0, rel=1e-9)
 
     def test_polygon_with_hole(self):

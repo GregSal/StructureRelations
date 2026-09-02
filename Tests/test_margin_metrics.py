@@ -334,7 +334,7 @@ class TestTwoBoxesInSphere:
 
         # Final values are the minimum across the two region pairs.
         expected_margins = {'x_neg': 0.8, 'x_pos': 0.2,
-                            'y_neg': 0.6, 'y_pos': 0.6,
+                            'y_neg': 0.7, 'y_pos': 0.7,
                             'z_neg': 0.7, 'z_pos': 0.7}
         assert_margins_close(margin_result.orthogonal_margins,
                              expected_margins, tolerance)

@@ -278,9 +278,9 @@ def generate_interpolated_contours(contour_graph: ContourGraph,
     '''
     # Generate the interpolated polygon
     interpolated_polygon = generate_interpolated_polygon(contour_graph,
-                                                   slice_sequence,
-                                                   starting_contour,
-                                                   interpolated_slice)
+                                                         slice_sequence,
+                                                         starting_contour,
+                                                         interpolated_slice)
 
     # Handle MultiPolygon case - create separate contours for each polygon
     if isinstance(interpolated_polygon, shapely.MultiPolygon):
