@@ -142,10 +142,9 @@ class TestEmbeddedSpheres:
                             'z_neg': 3.0, 'z_pos': 3.0}
         assert_margins_close(margin_result.orthogonal_margins,
                              expected_margins, tolerance)
-        # The pseudo-boundary extension of the inner sphere (1/2 slice beyond
-        # its last contour) reduces the axial 3D minimum by half a slice
-        # spacing: 3.0 - 0.05 = 2.95.  The in-plane margins remain 3.0.
-        assert abs(margin_result.minimum_margin - 2.95) <= tolerance
+        # Pseudo-boundary slices affect only the Z orthogonal margins, so the
+        # minimum margin is calculated from the original contours.
+        assert abs(margin_result.minimum_margin - 3.0) <= tolerance
     """Equal structures: all margins are 0, minimum distance is NaN."""
 
     def test_equal_boxes(self):
@@ -517,9 +516,7 @@ class TestSphereInSphereInShell:
                             'z_neg': 1.0, 'z_pos': 1.0}
         assert_margins_close(margin_result.orthogonal_margins,
                              expected_margins, tolerance)
-        # The pseudo-boundary extension of the inner sphere reduces the axial
-        # 3D minimum by half a slice spacing: 1.0 - 0.05 = 0.95.
-        assert abs(margin_result.minimum_margin - 0.95) <= tolerance
+        assert abs(margin_result.minimum_margin - 1.0) <= tolerance
 class TestSphereInShell:
     """Sphere surrounded by a hollow sphere: margins are the same."""
 
@@ -550,9 +547,7 @@ class TestSphereInShell:
                             'z_neg': 3.0, 'z_pos': 3.0}
         assert_margins_close(margin_result.orthogonal_margins,
                              expected_margins, tolerance)
-        # The pseudo-boundary extension of the inner sphere reduces the axial
-        # 3D minimum by half a slice spacing: 3.0 - 0.05 = 2.95.
-        assert abs(margin_result.minimum_margin - 2.95) <= tolerance
+        assert abs(margin_result.minimum_margin - 3.0) <= tolerance
 
 
 # %% Shelters

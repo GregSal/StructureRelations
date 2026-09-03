@@ -108,7 +108,7 @@ Z_MARGIN_CHANGE_TESTS = {
 RegionPair = Tuple[RegionIndex, RegionIndex]
 
 
-def nanmin(values) -> float:
+def safe_min(values) -> float:
     """Return the minimum of the values, ignoring NaN.
 
     Args:
@@ -243,10 +243,21 @@ class ContainmentMarginsCalculator(MetricCalculator):
                 continue
 
             region_idx_a, region_idx_b = pair
-            polys_a = self._region_slice_map(structure_a, region_idx_a)
-            polys_b = self._region_slice_map(structure_b, region_idx_b)
+            polys_a = self._region_slice_map(
+                structure_a, region_idx_a, include_boundary=False
+            )
+            polys_b = self._region_slice_map(
+                structure_b, region_idx_b, include_boundary=False
+            )
             if not polys_a or not polys_b:
                 continue
+
+            z_polys_a = self._region_slice_map(
+                structure_a, region_idx_a, include_boundary=True
+            )
+            z_polys_b = self._region_slice_map(
+                structure_b, region_idx_b, include_boundary=True
+            )
 
             # Orthogonal planar margins for slices containing both regions.
             common_slices = sorted(set(polys_a) & set(polys_b))
@@ -266,13 +277,14 @@ class ContainmentMarginsCalculator(MetricCalculator):
 
             # Z-margin walk (also updates the minimum margin).
             slices_a = self._valid_region_slices(structure_a, region_idx_a,
-                                                 polys_a)
+                                                 z_polys_a)
             slices_b = self._valid_region_slices(structure_b, region_idx_b,
-                                                 polys_b)
+                                                 z_polys_b)
             z_margins, minimum, z_records, walk_records = (
                 self._z_margin_walk(
-                    pair, pair_type, polys_a, polys_b, slices_a, slices_b,
-                    slice_classes, minimum, decimals
+                    pair, pair_type, z_polys_a, z_polys_b, slices_a,
+                    slices_b, set(polys_a), set(polys_b), slice_classes,
+                    minimum, decimals
                 )
             )
 
@@ -284,7 +296,7 @@ class ContainmentMarginsCalculator(MetricCalculator):
             pair_orthogonal = {}
             for direction in PLANAR_DIRECTIONS:
                 pair_orthogonal[direction] = self._round(
-                    nanmin(margins[direction]
+                    safe_min(margins[direction]
                            for margins in planar_records.values()),
                     decimals
                 )
@@ -319,11 +331,11 @@ class ContainmentMarginsCalculator(MetricCalculator):
 
         # Final (3D) aggregated values: minimum across all region pairs.
         orthogonal_margins = {
-            direction: nanmin(margins[direction]
+            direction: safe_min(margins[direction]
                               for margins in per_region_orthogonal.values())
             for direction in ALL_DIRECTIONS
         }
-        minimum_margin = nanmin(list(per_region_minimum.values()))
+        minimum_margin = safe_min(list(per_region_minimum.values()))
 
         # Traceability metadata.
         closest_pair = None
@@ -458,20 +470,22 @@ class ContainmentMarginsCalculator(MetricCalculator):
     def _region_slice_map(
         self,
         structure: StructureShape,
-        region_index: RegionIndex
+        region_index: RegionIndex,
+        include_boundary: bool = True,
     ) -> Dict[SliceIndexType, shapely.MultiPolygon]:
         """Map slice indexes to region polygons for all slices with geometry.
 
         Args:
             structure: The structure to analyze.
             region_index: The RegionIndex of the region.
+            include_boundary: Whether to include pseudo-boundary slices.
 
         Returns:
             Dict mapping slice index to the region's polygon on that slice.
         """
         slice_map = {}
         for _, row in structure.region_table.iterrows():
-            if row['Empty']:
+            if row['Empty'] or (not include_boundary and row['IsBoundary']):
                 continue
             poly = self._region_polygon(row['RegionSlice'], region_index)
             if poly is None or poly.is_empty or not poly.area > 0:
@@ -570,7 +584,7 @@ class ContainmentMarginsCalculator(MetricCalculator):
                     safe_distance(origin, crossings))
 
         return {
-            direction: self._round(nanmin(values), decimals)
+            direction: self._round(safe_min(values), decimals)
             for direction, values in direction_values.items()
         }
 
@@ -623,6 +637,8 @@ class ContainmentMarginsCalculator(MetricCalculator):
         polys_b: Dict[SliceIndexType, shapely.MultiPolygon],
         slices_a: List[SliceIndexType],
         slices_b: List[SliceIndexType],
+        minimum_slices_a: set[SliceIndexType],
+        minimum_slices_b: set[SliceIndexType],
         slice_classes: Dict[Tuple[SliceIndexType, RegionPair],
                             Optional[str]],
         minimum: float,
@@ -645,6 +661,10 @@ class ContainmentMarginsCalculator(MetricCalculator):
             polys_b: Slice index to polygon map for the inner region.
             slices_a: Sorted valid slice indexes of the outer region.
             slices_b: Sorted valid slice indexes of the inner region.
+            minimum_slices_a: Original outer-region slice indexes eligible for
+                minimum-margin calculation.
+            minimum_slices_b: Original inner-region slice indexes eligible for
+                minimum-margin calculation.
             slice_classes: (slice, pair) to relationship type string map.
             minimum: The seeded minimum margin for the pair.
             decimals: Number of decimals used to round the stored values.
@@ -699,6 +719,11 @@ class ContainmentMarginsCalculator(MetricCalculator):
                         break
                     poly_a_test = polys_a.get(test)
                     if poly_a_test is None:
+                        continue
+
+                    # Boundary slices participate only in Z-margin detection,
+                    # not in minimum-margin calculations.
+                    if ref not in minimum_slices_b or test not in minimum_slices_a:
                         continue
 
                     # Cross-slice 3D minimum distance.
