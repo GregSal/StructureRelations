@@ -487,14 +487,14 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             hole_poly = polygon_from_points(hole_points)
             candidate_poly = candidate_poly - hole_poly
         candidate_poly = repair_polygon(candidate_poly)
-        itp_poly = Polygon(shapely.get_coordinates(candidate_poly))
+        itp_poly = shapely.force_2d(candidate_poly)
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly
 
     def scale_poly(poly: shapely.Polygon, new_z: float, xfact=0.5, yfact=0.5):
         itp_poly = shapely.affinity.scale(poly, xfact=xfact, yfact=yfact,
                                           origin='center')
-        itp_poly = Polygon(shapely.get_coordinates(itp_poly))
+        itp_poly = shapely.force_2d(itp_poly)
         itp_poly = shapely.force_3d(itp_poly, new_z)
         return itp_poly.exterior
 
