@@ -1320,9 +1320,9 @@ class StructureSet:
 
         # Define functions that return the relevant volume type for a structure.
         volume_getters = {
-            'physical': lambda structure: structure.volume_metrics.physical,
-            'exterior': lambda structure: structure.volume_metrics.exterior,
-            'hull': lambda structure: structure.volume_metrics.hull,
+            'physical': lambda structure: structure.structure_volumes.physical,
+            'exterior': lambda structure: structure.structure_volumes.exterior,
+            'hull': lambda structure: structure.structure_volumes.hull,
         }
         # Verify that all provided volume types are one of the defined types.
         invalid_types = [
@@ -1359,11 +1359,11 @@ class StructureSet:
             summary_data.append({
                 'ROI': roi,
                 'Name': structure.name,
-                'Physical_Volume': round_value(structure.volume_metrics.physical,
+                'Physical_Volume': round_value(structure.structure_volumes.physical,
                                                self.tolerance),
-                'Exterior_Volume': round_value(structure.volume_metrics.exterior,
+                'Exterior_Volume': round_value(structure.structure_volumes.exterior,
                                               self.tolerance),
-                'Hull_Volume': round_value(structure.volume_metrics.hull,
+                'Hull_Volume': round_value(structure.structure_volumes.hull,
                                           self.tolerance),
                 'Num_Contours': len(structure.contour_graph),
                 'Num_Regions': len(structure.get_region_indexes(include_holes=False)),

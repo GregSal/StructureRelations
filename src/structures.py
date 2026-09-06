@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class VolumeMetrics:
+class StructureVolumes:
     '''Container for structure volume metrics in cm^3.'''
 
     physical: float = 0.0
@@ -54,7 +54,7 @@ class StructureShape():
                 - Label.
         region_table (SliceIndexType): A table of RegionSlice.
 
-        volume_metrics (VolumeMetrics): Physical, exterior, and hull volumes
+        structure_volumes (StructureVolumes): Physical, exterior, and hull volumes
             in cm^3.
     '''
 
@@ -67,7 +67,7 @@ class StructureShape():
         self.contour_graph = nx.DiGraph()
         self.contour_lookup = pd.DataFrame()
         self.region_table = pd.DataFrame()
-        self.volume_metrics = VolumeMetrics()
+        self.structure_volumes = StructureVolumes()
 
     @property
     def region_count(self) -> int:
@@ -311,7 +311,7 @@ class StructureShape():
                 total_volume -= volume
             else:
                 total_volume += volume
-        self.volume_metrics.physical = total_volume
+        self.structure_volumes.physical = total_volume
 
     def calculate_exterior_volume(self):
         '''Calculate the exterior volume of a ContourGraph.
@@ -337,7 +337,7 @@ class StructureShape():
                     total_volume -= volume
             else:
                 total_volume += volume
-        self.volume_metrics.exterior = total_volume
+        self.structure_volumes.exterior = total_volume
 
     def calculate_hull_volume(self):
         '''Calculate the hull volume of an EnclosedRegionTable.
@@ -359,7 +359,7 @@ class StructureShape():
             if contour1.is_hole:
                 volume = 0.0
             total_volume += volume
-        self.volume_metrics.hull = total_volume
+        self.structure_volumes.hull = total_volume
 
     def build_region_table(self):
         '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
