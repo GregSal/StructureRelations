@@ -974,7 +974,7 @@ def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
     column.
 
     Args:
-        slice_data (List[ContourPoints]): A list of Contour objects.
+        slice_data (List[ContourPoints]): A list of ContourPoints objects.
 
     Returns:
         tuple: A tuple containing the contour table and the slice sequence.
