@@ -4,7 +4,7 @@
 from BOPTools import BOPFeatures
 
 
-save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
+save_path = r"D:\OneDrive\Python\Projects\StructureRelations\src\FreeCAD Scripts"
 file_name = 'ContainsCubes'
 file_path = save_path + "//" + file_name + ".FCStd"
 Gui.activateWorkbench("PartWorkbench")

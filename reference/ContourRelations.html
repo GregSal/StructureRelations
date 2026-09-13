@@ -7717,10 +7717,10 @@ a.anchor-link {
 </thead>
 <tbody>
 <tr><td>Disjoint</td><td>
-<p>$\begin{smallmatrix} 
-    \mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
-  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
+  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
   \end{smallmatrix}$</p>
 </td>
 <td>FF*FF****</td>
@@ -7728,81 +7728,81 @@ a.anchor-link {
 <td>not Intersects</td>
 </tr>
 <tr><td>Borders</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
-  \\\mathrm {F} &amp;\mathrm {1} &amp;\mathrm {*} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
+  \\\mathrm {F} &amp;\mathrm {1} &amp;\mathrm {*}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>FF*F1****</td>
-<td>The boundaries of a and b have more than one point in common, but their 
+<td>The boundaries of a and b have more than one point in common, but their
     interiors do not intersect.</td>
 <td></td>
 </tr>
 <tr><td>Overlaps</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {2} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
-  \\\mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {2}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
+  \\\mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>2*2***2**</td>
 <td>a and b have some but not all points in common.</td>
 <td></td></tr>
 <tr><td>Equals</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {F} 
-  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {F}
+  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>2*F**FFF*</td>
-<td>The interiors of a and b intersect and no part of the interior or boundary 
+<td>The interiors of a and b intersect and no part of the interior or boundary
     of one geometry intersects the exterior of the other.</td>
 <td>Within &amp; Contains</td>
 </tr>
 <tr><td>Delimits</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F} 
-  \\\mathrm {*} &amp;\mathrm {1} &amp;\mathrm {F} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F}
+  \\\mathrm {*} &amp;\mathrm {1} &amp;\mathrm {F}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>2*F*1F***</td>
-<td>The boundaries of a and b have more than one point in common, and a lies 
+<td>The boundaries of a and b have more than one point in common, and a lies
     in the interior of b.</td>
 <td>Encompasses(b,a)</td>
 </tr>
 <tr><td>Encompasses</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*} 
-  \\\mathrm {*} &amp;\mathrm {1} &amp;\mathrm {*} 
-  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*}
+  \\\mathrm {*} &amp;\mathrm {1} &amp;\mathrm {*}
+  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>2***1*FF*</td>
-<td>The boundaries of a and b have more than one point in common, and b lies 
+<td>The boundaries of a and b have more than one point in common, and b lies
     in the interior of a.</td>
 <td>Delimits(b,a)</td>
 <tr><td>Within</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {F} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {F}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {F}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 <td>2*F**F***</td>
 <td>a lies in the interior of b.</td>
 <td>Contains(b,a)</td>
 </td></tr>
 <tr><td>Contains</td><td>
-<p>$\begin{smallmatrix}  
-    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*} 
-  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*} 
-  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*} 
+<p>$\begin{smallmatrix}
+    \mathrm {2} &amp;\mathrm {*} &amp;\mathrm {*}
+  \\\mathrm {*} &amp;\mathrm {*} &amp;\mathrm {*}
+  \\\mathrm {F} &amp;\mathrm {F} &amp;\mathrm {*}
 \end{smallmatrix}$</p>
 </td>
 <td>2*****FF*</td>
-<td>No points of b lies in the exterior of a, and some of the the points of 
+<td>No points of b lies in the exterior of a, and some of the the points of
     the interior of b lie in the interior of a.</td>
 <td>Within(b,a)</td>
 </tr>
@@ -8041,7 +8041,7 @@ $a$ <em>embeds</em> $b$.</p>
  'StructureSet': 'SingleContours',
  'StudyID': 'Phantom7',
  'SeriesNumber': '0',
- 'File': WindowsPath("d:/OneDrive - Queen's University/Python/Projects/StructureRelations/Test Data/StructureVolumeTests/SingleContours/RS.1.2.246.352.205.4685366430287938805.4531089973474303636.dcm")}</pre>
+ 'File': WindowsPath("d:/OneDrive/Python/Projects/StructureRelations/Test Data/StructureVolumeTests/SingleContours/RS.1.2.246.352.205.4685366430287938805.4531089973474303636.dcm")}</pre>
 </div>
 </div>
 </div>

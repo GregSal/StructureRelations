@@ -4,7 +4,7 @@
 from BOPTools import BOPFeatures
 
 
-save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
+save_path = r"D:\OneDrive\Python\Projects\StructureRelations\src\FreeCAD Scripts"
 file_name = 'BorderingCylinders'
 file_path = save_path + "//" + file_name + ".FCStd"
 Gui.activateWorkbench("PartWorkbench")
@@ -38,13 +38,13 @@ bp.make_multi_fuse(["a", "a001", ])
 >>> # Gui.Selection.clearSelection()
 >>> # Gui.Selection.addSelection('BorderingCylinders','Fusion')
 >>> FreeCADGui.getDocument('BorderingCylinders').getObject('Fusion').ShapeColor = (85,255,127)
->>> 
+>>>
 >>> FreeCADGui.getDocument('BorderingCylinders').getObject('Fusion').Transparency = 50
->>> 
+>>>
 >>> # Gui.Selection.clearSelection()
 >>> # Gui.Selection.addSelection('BorderingCylinders','primary')
 >>> FreeCADGui.getDocument('BorderingCylinders').getObject('primary').ShapeColor = (0,255,255)
->>> 
+>>>
 >>> FreeCADGui.getDocument('BorderingCylinders').getObject('primary').Transparency = 50
 >>> FreeCAD.getDocument('BorderingCylinders').getObject('a').Placement = App.Placement(App.Vector(0,0,-10),App.Rotation(App.Vector(0,0,1),0))
 
@@ -59,7 +59,7 @@ bp.make_multi_fuse(["a", "a001", ])
 >>> ### Begin command Std_AxisCross
 >>> # Gui.ActiveDocument.ActiveView.setAxisCross(True)
 >>> ### End command Std_AxisCross
->>> 
+>>>
 
 
 

@@ -9,8 +9,8 @@ import FreeCADGui as Gui
 import Part
 from BOPTools import BOPFeatures
 
-SCRIPT_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD_Scripts"
-IMAGE_PATH = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
+SCRIPT_PATH = r"D:\OneDrive\Python\Projects\StructureRelations\src\FreeCAD_Scripts"
+IMAGE_PATH = r"D:\OneDrive\Python\Projects\StructureRelations\src\Images\FreeCAD Images"
 
 Gui.activateWorkbench("PartWorkbench")
 

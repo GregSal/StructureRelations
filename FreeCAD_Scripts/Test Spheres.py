@@ -11,7 +11,7 @@ intersect_color = (255,170,0)  # Orange
 transparency = 0
 
 #in_2_mm = 25.4
-save_path = r"D:\OneDrive - Queen's University\Python\Projects\StructureRelations\src\FreeCAD Scripts"
+save_path = r"D:\OneDrive\Python\Projects\StructureRelations\src\FreeCAD Scripts"
 file_name = 'TestSpheres'
 #file_path = save_path + "//" + file_name + ".FCStd"
 Gui.activateWorkbench("PartWorkbench")
