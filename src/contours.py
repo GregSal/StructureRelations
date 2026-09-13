@@ -518,7 +518,7 @@ def interpolate_polygon(slices: SliceIndexSequenceType, p1: shapely.Polygon,
             # Reconstruct polygon with exterior and all interior rings (holes)
             itp_poly = Polygon(
                 scale_poly(p1, new_z),
-                [scale_poly(interior) for interior in p1.interiors]
+                [scale_poly(interior, new_z) for interior in p1.interiors]
             )
         else:
             # No holes - just use exterior
