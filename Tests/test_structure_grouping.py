@@ -123,9 +123,10 @@ def test_build_structure_grouping_table_supports_mixed_numeric_sorting():
 
 def test_analyze_structure_grouping_uses_hn_example_as_acceptance_case():
     '''The H&N notebook example should split opt PTV 56 rows as planned.'''
+    tests_dir = Path(__file__).parent
     dicom_file = DicomStructureFile(
-        top_dir=Path('tests'),
-        file_path=Path('tests/RS.OROP2_3_dose_levels.dcm'),
+        top_dir=tests_dir,
+        file_path=tests_dir / 'RS.OROP2_3_dose_levels.dcm',
     )
 
     result = analyze_structure_grouping(

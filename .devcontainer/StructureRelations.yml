@@ -22,4 +22,5 @@ dependencies:
   - pytest
   - pylint
   - ipympl
+  - selenium
 prefix: /opt/conda/envs/StructureRelations

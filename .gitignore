@@ -189,3 +189,5 @@ layout_tuner_output/
 layout_tuner_output_cola/
 TEMP/
 /src/webapp/config/webapp_settings.json
+src/notebooks/metrics/StructureVolumeMetricTests.ipynb
+.devcontainer/devcontainer-lock.json
