@@ -962,6 +962,30 @@ class ContourMargin:
 
 
 # %% Contour Table Construction
+def _finalize_contour_table(
+        contour_table: pd.DataFrame,
+) -> Tuple[pd.DataFrame, SliceSequence]:
+    '''Calculate contour areas, sort rows, and create a slice sequence.
+
+    Args:
+        contour_table (pd.DataFrame): A table containing ROI, Slice, Points,
+            and Polygon columns.
+
+    Returns:
+        tuple: The normalized contour table and its slice sequence.
+    '''
+    contour_table['Area'] = contour_table['Polygon'].apply(
+        lambda polygon: polygon.area
+    )
+    contour_table.sort_values(
+        by=['ROI', 'Slice', 'Area'],
+        ascending=[True, True, False],
+        inplace=True,
+    )
+    slice_sequence = SliceSequence(contour_table['Slice'])
+    return contour_table, slice_sequence
+
+
 def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
                                                                   SliceSequence]:
     '''Build a contour table from a list of Contour objects.
@@ -983,15 +1007,61 @@ def build_contour_table(slice_data: List[ContourPoints]) -> Tuple[pd.DataFrame,
             use and their neighbours.
     '''
     contour_table = pd.DataFrame(slice_data)
-    # Convert the contours points to polygons and calculate their areas
+    # Convert contour points to polygons before normalizing the table.
     contour_table['Polygon'] = contour_table['Points'].apply(points_to_polygon)
-    contour_table['Area'] = contour_table['Polygon'].apply(lambda poly: poly.area)
-    # Sort the contours by ROI, Slice and decreasing Area
-    # Decreasing area is important because that an earlier contour cannot be
-    # inside a later one.
-    contour_table.sort_values(by=['ROI', 'Slice', 'Area'],
-                        ascending=[True, True, False],
-                        inplace=True)
-    # Generate the slice sequence for the contours
-    slice_sequence = SliceSequence(contour_table.Slice)
-    return contour_table, slice_sequence
+    return _finalize_contour_table(contour_table)
+
+
+def build_contour_table_from_polygons(
+        polygons: List[shapely.MultiPolygon],
+        roi: ROI_Type,
+) -> Tuple[pd.DataFrame, SliceSequence]:
+    '''Build a contour table from a list of 3D MultiPolygons.
+
+    Each MultiPolygon represents one slice. Every exterior ring and every
+    hole (interior ring) of every polygon in the MultiPolygon becomes its
+    own row in the table, with the Polygon column always hole-free (built
+    directly from the ring, ignoring any interiors of the source polygon).
+
+    The table contains the following columns:
+        ROI, Slice, Points, Polygon, Area
+    The table is sorted by ROI, Slice and by descending area. The slice
+    sequence is generated from the Slice column.
+
+    Args:
+        polygons (List[shapely.MultiPolygon]): A list of 3D MultiPolygons,
+            one per slice.
+        roi (ROI_Type): The ROI number to assign to all contours.
+
+    Raises:
+        InvalidContour: If any of the MultiPolygons is not 3D.
+
+    Returns:
+        tuple: A tuple containing the contour table and the slice sequence.
+            contour_table (pd.DataFrame): The contour table.
+        slice_sequence (SliceSequence): An ordered list of all slice indexes in
+            use and their neighbours.
+    '''
+    def ring_row(ring: shapely.LinearRing, slice_index: SliceIndexType) -> dict:
+        points = list(ring.coords)
+        polygon = Polygon(ring)
+        return {
+            'ROI': roi,
+            'Slice': slice_index,
+            'Points': points,
+            'Polygon': polygon,
+            'Area': polygon.area,
+        }
+
+    contours = []
+    for multi_polygon in polygons:
+        if shapely.get_coordinate_dimension(multi_polygon) != 3:
+            raise InvalidContour('MultiPolygons must be 3D.')
+        # All rings of a MultiPolygon share the same slice (Z) value.
+        slice_index = shapely.get_coordinates(multi_polygon, include_z=True)[0][2]
+        for polygon in multi_polygon.geoms:
+            contours.append(ring_row(polygon.exterior, slice_index))
+            for hole in polygon.interiors:
+                contours.append(ring_row(hole, slice_index))
+    contour_table = pd.DataFrame(contours)
+    return _finalize_contour_table(contour_table)

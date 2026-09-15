@@ -12,6 +12,7 @@ from types_and_classes import InvalidContour
 from contours import SliceNeighbours, SliceSequence
 from contours import points_to_polygon, calculate_new_slice_index
 from contours import interpolate_polygon, ContourPoints, build_contour_table
+from contours import build_contour_table_from_polygons
 from contours import Contour, ContourMatch
 
 
@@ -365,6 +366,77 @@ class TestBuildContourTable():
         assert slices == [1.0, 2.0, 0.0, 1.0, 1.0]
         assert slice_sequence == [0.0, 1.0, 2.0]
         assert areas[3] > areas[4]  # Area 4 > Area 1 for ROI 1, Slice 1.0
+
+
+class TestBuildContourTableFromPolygons():
+    '''Test the build_contour_table_from_polygons function.'''
+    def test_table_creation(self):
+        '''Test that a single box MultiPolygon produces a single-row table
+        with the correct ROI, Slice and Area.'''
+        box = shapely.force_3d(Polygon(box_points(width=1)), 0.0)
+        multi_poly = shapely.MultiPolygon([box])
+        table, _ = build_contour_table_from_polygons([multi_poly], roi=1)
+        assert len(table) == 1
+        assert table['ROI'].iloc[0] == 1
+        assert table['Slice'].iloc[0] == 0.0
+        assert table['Area'].iloc[0] == approx(1.0)
+
+    def test_multiple_slices_sorting(self):
+        '''Test that rows from multiple MultiPolygons are sorted by Slice
+        and descending Area within a single ROI.'''
+        box1 = shapely.force_3d(Polygon(box_points(width=1)), 1.0)
+        box2 = shapely.force_3d(Polygon(box_points(width=2)), 0.0)
+        box3 = shapely.force_3d(Polygon(box_points(width=3)), 1.0)
+        polygons = [
+            shapely.MultiPolygon([box1, box3]),  # Slice 1.0, Areas 1 and 9
+            shapely.MultiPolygon([box2]),         # Slice 0.0, Area 4
+        ]
+        table, sequence = build_contour_table_from_polygons(polygons, roi=2)
+        assert list(table['Slice']) == [0.0, 1.0, 1.0]
+        assert list(table['Area']) == approx([4.0, 9.0, 1.0])
+        assert sequence.slices == [0.0, 1.0]
+
+
+    def test_polygon_with_hole(self):
+        '''Test that a polygon with a hole produces two rows (exterior and
+        hole), both with hole-free Polygon values.'''
+        outer = box_points(width=4)
+        inner = box_points(width=2)
+        donut = shapely.force_3d(Polygon(outer, [inner]), 0.0)
+        multi_poly = shapely.MultiPolygon([donut])
+        table, _ = build_contour_table_from_polygons([multi_poly], roi=1)
+        assert len(table) == 2
+        assert all(table['ROI'] == 1)
+        assert all(table['Slice'] == 0.0)
+        assert all(len(poly.interiors) == 0 for poly in table['Polygon'])
+        areas = sorted(table['Area'])
+        assert areas == approx([4.0, 16.0])
+
+    def test_multiple_polygons_per_slice(self):
+        '''Test that two disjoint polygons on the same slice produce two
+        separate rows.'''
+        box1 = shapely.force_3d(Polygon(box_points(width=1, offset_x=0)), 0.0)
+        box2 = shapely.force_3d(Polygon(box_points(width=1, offset_x=10)), 0.0)
+        multi_poly = shapely.MultiPolygon([box1, box2])
+        table, _ = build_contour_table_from_polygons([multi_poly], roi=1)
+        assert len(table) == 2
+        assert all(table['Slice'] == 0.0)
+
+    def test_raises_on_2d_multipolygon(self):
+        '''Test that a 2D MultiPolygon (no Z coordinate) raises InvalidContour.'''
+        box = Polygon(box_points(width=1))
+        multi_poly = shapely.MultiPolygon([box])
+        with pytest.raises(InvalidContour):
+            build_contour_table_from_polygons([multi_poly], roi=1)
+
+    def test_points_match_ring_coords(self):
+        '''Test that the Points list of a row matches the coordinates of the
+        corresponding ring, including Z.'''
+        box = shapely.force_3d(Polygon(box_points(width=1)), 2.0)
+        multi_poly = shapely.MultiPolygon([box])
+        table, _ = build_contour_table_from_polygons([multi_poly], roi=1)
+        expected_points = list(box.exterior.coords)
+        assert table['Points'].iloc[0] == expected_points
 
 
 class TestContour():
