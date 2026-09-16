@@ -1026,7 +1026,10 @@ def build_contour_table_from_polygons(
     The table contains the following columns:
         ROI, Slice, Points, Polygon, Area
     The table is sorted by ROI, Slice and by descending area. The slice
-    sequence is generated from the Slice column.
+    sequence is generated from the Slice column. Empty rings are stored as
+    an empty shapely.Polygon, and if no contours are generated (for example
+    when all MultiPolygons are empty) the returned table is empty but still
+    contains the 'Polygon' column.
 
     Args:
         polygons (List[shapely.MultiPolygon]): A list of 3D MultiPolygons,
@@ -1044,7 +1047,9 @@ def build_contour_table_from_polygons(
     '''
     def ring_row(ring: shapely.LinearRing, slice_index: SliceIndexType) -> dict:
         points = list(ring.coords)
-        polygon = Polygon(ring)
+        # Always store a shapely.Polygon, using an empty Polygon when the
+        # ring has no coordinates.
+        polygon = Polygon(ring) if points else Polygon()
         return {
             'ROI': roi,
             'Slice': slice_index,
@@ -1057,11 +1062,18 @@ def build_contour_table_from_polygons(
     for multi_polygon in polygons:
         if shapely.get_coordinate_dimension(multi_polygon) != 3:
             raise InvalidContour('MultiPolygons must be 3D.')
+        coordinates = shapely.get_coordinates(multi_polygon, include_z=True)
+        if len(coordinates) == 0:
+            # An empty MultiPolygon has no slice (Z) information; skip it.
+            continue
         # All rings of a MultiPolygon share the same slice (Z) value.
-        slice_index = shapely.get_coordinates(multi_polygon, include_z=True)[0][2]
+        slice_index = coordinates[0][2]
         for polygon in multi_polygon.geoms:
             contours.append(ring_row(polygon.exterior, slice_index))
             for hole in polygon.interiors:
                 contours.append(ring_row(hole, slice_index))
-    contour_table = pd.DataFrame(contours)
+    # Specify the columns so the table always has a 'Polygon' column of
+    # shapely.Polygon objects, even when no contours were generated.
+    contour_table = pd.DataFrame(
+        contours, columns=['ROI', 'Slice', 'Points', 'Polygon'])
     return _finalize_contour_table(contour_table)

@@ -2,9 +2,16 @@
 from pytest import approx
 
 from contours import ContourPoints
-from debug_tools import box_points
+from debug_tools import box_points, make_box, make_sphere
+from debug_tools import make_vertical_cylinder
 from structure_set import StructureSet
 from composite_structure import CompositeStructure, structure_boolean
+
+# Allowance for boundary-slice effects in volume calculations.  Boundary
+# contours (half-size polygons half a slice spacing beyond each end of a
+# structure) add volume not present in the ideal geometry, and composites
+# with holes accumulate additional boundary contributions.
+VOLUME_TOLERANCE = 0.05
 
 
 def _composite_area(composite: CompositeStructure, slice_index: float) -> float:
@@ -136,3 +143,158 @@ class TestStructureBoolean():
         composite = structure_boolean(structure_set, '1 UNION 2')
         # Donut area (16 - 4) plus disjoint box area (1)
         assert _composite_area(composite, 0.0) == approx(13.0)
+
+
+def _embedded_boxes_example() -> list:
+    '''Cube-in-cube (CONTAINS) test geometry.'''
+    slice_spacing = 0.1
+    # Body structure defines slices in use.  This is required to get the
+    # correct boundary slices for the outer cube.
+    body = make_vertical_cylinder(roi_num=0, radius=20, length=10, offset_z=0,
+                                  spacing=slice_spacing)
+    outer_cube = make_box(roi_num=1, width=4, offset_x=0, offset_z=0,
+                          spacing=slice_spacing)
+    inner_cube = make_box(roi_num=2, width=2, offset_x=0, offset_z=0,
+                          spacing=slice_spacing)
+    return outer_cube + inner_cube + body
+
+
+def _embedded_spheres_example() -> list:
+    '''Embedded spheres (CONTAINS) test geometry.'''
+    slice_spacing = 0.1
+    sphere6 = make_sphere(roi_num=1, radius=6, spacing=slice_spacing,
+                          num_points=100)
+    sphere3 = make_sphere(roi_num=2, radius=3, spacing=slice_spacing,
+                          num_points=100)
+    return sphere6 + sphere3
+
+
+def _overlapping_boxes_example() -> list:
+    '''Overlapping cubes (OVERLAPS) test geometry.'''
+    slice_spacing = 0.1
+    # Body structure defines slices in use.  This is required to get the
+    # correct boundary slices for the cubes.
+    body = make_vertical_cylinder(roi_num=0, radius=20, length=10, offset_z=0,
+                                  spacing=slice_spacing)
+    left_cube = make_box(roi_num=1, width=4, offset_x=-1, offset_z=0,
+                         spacing=slice_spacing)
+    right_cube = make_box(roi_num=2, width=4, offset_x=1, offset_z=0,
+                          spacing=slice_spacing)
+    return left_cube + right_cube + body
+
+
+def _partitioning_boxes_example() -> list:
+    '''Cube and half-height cube (PARTITIONED) test geometry.'''
+    slice_spacing = 0.1
+    # Body structure defines slices in use.  This is required to get the
+    # correct boundary slices for the outer cube.
+    body = make_vertical_cylinder(roi_num=0, radius=20, length=10, offset_z=0,
+                                  spacing=slice_spacing)
+    outer_cube = make_box(roi_num=1, width=4, offset_x=0, offset_z=0,
+                          spacing=slice_spacing)
+    inner_cube = make_box(roi_num=2, width=4, length=4, height=2, offset_x=0,
+                          offset_z=1, spacing=slice_spacing)
+    return outer_cube + inner_cube + body
+
+
+def _disjoint_boxes_example() -> list:
+    '''Disjoint cubes (DISJOINT) test geometry.'''
+    slice_spacing = 0.1
+    # Body structure defines slices in use.  This is required to get the
+    # correct boundary slices for the cubes.
+    body = make_vertical_cylinder(roi_num=0, radius=20, length=10, offset_z=0,
+                                  spacing=slice_spacing)
+    left_cube = make_box(roi_num=1, width=2, offset_x=-2, offset_z=0,
+                         spacing=slice_spacing)
+    right_cube = make_box(roi_num=2, width=2, offset_x=2, offset_z=0,
+                          spacing=slice_spacing)
+    return left_cube + right_cube + body
+
+
+class TestCompositeVolumeCalculations():
+    '''Volume checks for composite structures.
+
+    Expected values are derived from the operand structure volumes, and a
+    relative tolerance (VOLUME_TOLERANCE) allows for the volume contributed
+    by boundary contours at the ends of each structure.
+    '''
+
+    @staticmethod
+    def _composite_volumes(structure_set: StructureSet) -> dict:
+        '''Return the physical volumes of the UNION, INTERSECTION and
+        DIFFERENCE composites of structures 1 and 2.'''
+        union = structure_boolean(structure_set, expression='1 UNION 2')
+        intersection = structure_boolean(structure_set,
+                                         expression='1 INTERSECTION 2')
+        difference = structure_boolean(structure_set,
+                                       expression='1 DIFFERENCE 2')
+        return {
+            'union': union.structure_volumes.physical,
+            'intersection': intersection.structure_volumes.physical,
+            'difference': difference.structure_volumes.physical,
+        }
+
+    def test_contains_box_volumes(self):
+        '''CONTAINS: Union = V_A, Intersection = V_B, Difference = V_A - V_B.'''
+        slice_data = _embedded_boxes_example()
+        structures = StructureSet(slice_data=slice_data, logging_enabled=False)
+        volume_a = structures.structures[1].structure_volumes.physical
+        volume_b = structures.structures[2].structure_volumes.physical
+        volumes = self._composite_volumes(structures)
+        assert volumes['union'] == approx(volume_a, rel=VOLUME_TOLERANCE)
+        assert volumes['intersection'] == approx(volume_b, rel=VOLUME_TOLERANCE)
+        assert volumes['difference'] == approx(volume_a - volume_b,
+                                               rel=VOLUME_TOLERANCE)
+
+    def test_contains_sphere_volumes(self):
+        '''CONTAINS (spheres): Union = V_A, Intersection = V_B,
+        Difference = V_A - V_B.'''
+        slice_data = _embedded_spheres_example()
+        structures = StructureSet(slice_data=slice_data, logging_enabled=False)
+        volume_a = structures.structures[1].structure_volumes.physical
+        volume_b = structures.structures[2].structure_volumes.physical
+        volumes = self._composite_volumes(structures)
+        assert volumes['union'] == approx(volume_a, rel=VOLUME_TOLERANCE)
+        assert volumes['intersection'] == approx(volume_b, rel=VOLUME_TOLERANCE)
+        assert volumes['difference'] == approx(volume_a - volume_b,
+                                               rel=VOLUME_TOLERANCE)
+
+    def test_overlaps_volumes(self):
+        '''OVERLAPS: Union = V_A + V_B - overlap, Intersection = overlap,
+        Difference = V_A - overlap.'''
+        slice_data = _overlapping_boxes_example()
+        structures = StructureSet(slice_data=slice_data, logging_enabled=False)
+        volume_a = structures.structures[1].structure_volumes.physical
+        volume_b = structures.structures[2].structure_volumes.physical
+        overlap = volume_a / 2
+        volumes = self._composite_volumes(structures)
+        assert volumes['union'] == approx(volume_a + volume_b - overlap,
+                                          rel=VOLUME_TOLERANCE)
+        assert volumes['intersection'] == approx(overlap, rel=VOLUME_TOLERANCE)
+        assert volumes['difference'] == approx(volume_a - overlap,
+                                               rel=VOLUME_TOLERANCE)
+
+    def test_partitioned_volumes(self):
+        '''PARTITIONED: Union = V_A, Intersection = V_B,
+        Difference = V_A - V_B.'''
+        slice_data = _partitioning_boxes_example()
+        structures = StructureSet(slice_data=slice_data, logging_enabled=False)
+        volume_a = structures.structures[1].structure_volumes.physical
+        volume_b = structures.structures[2].structure_volumes.physical
+        volumes = self._composite_volumes(structures)
+        assert volumes['union'] == approx(volume_a, rel=VOLUME_TOLERANCE)
+        assert volumes['intersection'] == approx(volume_b, rel=VOLUME_TOLERANCE)
+        assert volumes['difference'] == approx(volume_a - volume_b,
+                                               rel=VOLUME_TOLERANCE)
+
+    def test_disjoint_volumes(self):
+        '''DISJOINT: Union = V_A + V_B, Intersection = 0, Difference = V_A.'''
+        slice_data = _disjoint_boxes_example()
+        structures = StructureSet(slice_data=slice_data, logging_enabled=False)
+        volume_a = structures.structures[1].structure_volumes.physical
+        volume_b = structures.structures[2].structure_volumes.physical
+        volumes = self._composite_volumes(structures)
+        assert volumes['union'] == approx(volume_a + volume_b,
+                                          rel=VOLUME_TOLERANCE)
+        assert volumes['intersection'] == approx(0.0, abs=1e-6)
+        assert volumes['difference'] == approx(volume_a, rel=VOLUME_TOLERANCE)

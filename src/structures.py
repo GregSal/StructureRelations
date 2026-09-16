@@ -378,6 +378,12 @@ class StructureShape():
 
         # Get slice indexes from contour_lookup instead of slice_sequence
         contour_lookup = build_contour_lookup(self.contour_graph)
+        if contour_lookup.empty:
+            # No contours: the region table is empty but keeps its columns.
+            self.region_table = pd.DataFrame(
+                columns=['SliceIndex', 'RegionSlice', 'Empty',
+                         'Interpolated', 'IsBoundary'])
+            return
         slice_indexes = contour_lookup['SliceIndex'].unique()
 
         # Iterate through each unique SliceIndex
