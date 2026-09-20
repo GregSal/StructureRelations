@@ -804,6 +804,9 @@ class Contour:
                 # New contour is completely within the existing contour
                 # Add the existing contour to the related contours of the new
                 # contour and vice versa.
+                # A is within B if no points of A lie in the exterior of B and
+                # at least one point of the interior of A lies in the
+                # interior of B.
                 self.related_contours.append(contour.index)
                 contour.related_contours.append(self.index)
                 if contour.is_hole:
@@ -815,6 +818,10 @@ class Contour:
                     # New contour is completely within the existing contour
                     self.is_hole = True
                     self.hole_type = 'Unknown'
+                    # If the hole touches the exterior of the containing
+                    # contour, the hole is open to the outside.
+                    if self.polygon.touches(contour.polygon.exterior):
+                        self.hole_type = 'Open'
                     # Subtract the existing contour polygon from the new
                     # contour polygon to get the polygon with holes.
                     contour.poly_h = contour.poly_h - self.polygon

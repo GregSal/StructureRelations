@@ -648,6 +648,13 @@ def set_hole_type(contour_graph: ContourGraph,
     # 5. Use the region hole type dictionary to set the hole type for each
     #    region.
 
+    # Note: This function selects boundary contours for classification by
+    # filtering HoleType == 'Unknown'. Since touching holes are now 'Open'
+    # rom the start, they are excluded from Stage 2 re-evaluation — which is
+    # consistent with the "open always overrides closed" rule, since a hole that
+    # touches the exterior on any slice is geometrically open regardless of what
+    # happens at other slices.
+
     ### 1. Select boundary contours that are holes. ###
     # Create the Graph indexer
     contour_lookup = build_contour_lookup(contour_graph)

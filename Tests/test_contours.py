@@ -474,6 +474,33 @@ class TestContour():
         assert hole_contour.related_contours == [outer_contour.index]
         assert outer_contour.related_contours == [hole_contour.index]
 
+    def test_hole_touching_exterior_is_open(self):
+        '''Test that a hole touching the exterior of its containing contour is
+        classified as open.'''
+        outer_polygon = Polygon([(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)])
+        # Hole touches the left edge (x=0) of the outer polygon.
+        touching_hole = Polygon([(0, 1), (2, 1), (2, 3), (0, 3), (0, 1)])
+
+        outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
+                                existing_contours=[])
+        hole_contour = Contour(roi=1, slice_index=0.0, polygon=touching_hole,
+                               existing_contours=[outer_contour])
+        assert hole_contour.is_hole
+        assert hole_contour.hole_type == 'Open'
+
+    def test_hole_not_touching_exterior_is_unknown(self):
+        '''Test that a hole fully inside its containing contour remains
+        'Unknown' at this stage.'''
+        outer_polygon = Polygon([(0, 0), (4, 0), (4, 4), (0, 4), (0, 0)])
+        inner_hole = Polygon([(1, 1), (3, 1), (3, 3), (1, 3), (1, 1)])
+
+        outer_contour = Contour(roi=1, slice_index=0.0, polygon=outer_polygon,
+                                existing_contours=[])
+        hole_contour = Contour(roi=1, slice_index=0.0, polygon=inner_hole,
+                               existing_contours=[outer_contour])
+        assert hole_contour.is_hole
+        assert hole_contour.hole_type == 'Unknown'
+
     def test_identify_islands(self):
         '''Test that the Contour class correctly identifies islands.
         '''
