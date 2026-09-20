@@ -12,12 +12,13 @@ import networkx as nx
 from shapely.errors import GEOSException
 
 from types_and_classes import ROI_Type, SliceIndexType
-from types_and_classes import ContourIndex, SLICE_INDEX_PRECISION
+from types_and_classes import ContourIndex, RegionIndex, SLICE_INDEX_PRECISION
 from contours import SliceSequence, Contour, ContourMatch
 from contours import interpolate_polygon
 from contour_graph import build_contour_graph, build_contour_lookup, get_region_slices
 from region_slice import RegionSlice
 from relations import DE27IM, compute_region_pair_de27im
+from utilities import round_value
 
 
 # %% Configure logging if not already configured
@@ -361,23 +362,69 @@ class StructureShape():
             total_volume += volume
         self.structure_volumes.hull = total_volume
 
+    def _build_contour_region_map(self) -> Dict[ContourIndex, RegionIndex]:
+        '''Map each contour to the combined region that contains it.
+
+        Uses the RegionSlice for each slice, which combines related
+        regions (holes, boundaries, and embedded regions) under a single
+        reference RegionIndex.
+
+        Returns:
+            Dict[ContourIndex, RegionIndex]: Mapping of each contour index
+                to the RegionIndex of the combined region containing it.
+        '''
+        contour_region_map: Dict[ContourIndex, RegionIndex] = {}
+        if not self.region_table.empty:
+            region_slices = list(self.region_table['RegionSlice'])
+        else:
+            # The region table has not been built; build the RegionSlices
+            # directly from the contour graph.
+            contour_lookup = build_contour_lookup(self.contour_graph)
+            if contour_lookup.empty:
+                return contour_region_map
+            region_slices = [
+                RegionSlice(self.contour_graph, slice_index)
+                for slice_index in contour_lookup['SliceIndex'].unique()
+            ]
+        for region_slice in region_slices:
+            for region_index, contour_indexes in (
+                    region_slice.contour_indexes.items()):
+                for contour_index in contour_indexes:
+                    contour_region_map[contour_index] = region_index
+        return contour_region_map
+
     def calculate_region_volumes(
         self,
-        volume_type: str = 'Physical'
-    ) -> Dict[str, float]:
+        volume_type: str = 'Physical',
+        tolerance: float = 0.0
+    ) -> Dict[RegionIndex, float]:
         '''Calculate volumes for each region of the structure.
 
-        Groups contour graph edges by the region index of their source
-        contour and applies the same hole add/subtract logic used by the
-        overall volume calculations. This method is called on demand and
-        is not invoked by finalize().
+        Groups contour graph edges by the combined region of their source
+        contour, as identified by the RegionSlice on each slice, and
+        applies the same hole add/subtract logic used by the overall
+        volume calculations.  Related regions are combined into a single
+        summary entry for their reference region:
+
+        - For 'Physical' volumes, all related holes are subtracted from
+            the main region volume.
+        - For 'Exterior' volumes, open holes are subtracted from the main
+            region volume; closed holes are not included in the volume
+            nor in the summary.
+        - For 'Hull' volumes, holes are not included.
+
+        This method is called on demand and is not invoked by finalize().
 
         Args:
             volume_type (str): Which volume to calculate. One of
                 'Physical', 'Exterior', or 'Hull'. Defaults to 'Physical'.
+            tolerance (float): The tolerance increment used to round the
+                accumulated volumes.  If 0.0, no rounding is performed.
+                Defaults to 0.0.
 
         Returns:
-            Dict[str, float]: Mapping of region index to volume in cm^3.
+            Dict[RegionIndex, float]: Mapping of combined region index to
+                volume in cm^3.
 
         Raises:
             ValueError: If volume_type is not 'Physical', 'Exterior',
@@ -390,11 +437,15 @@ class StructureShape():
                 f"got '{volume_type}'"
             )
 
-        region_volumes: Dict[str, float] = {}
+        contour_region_map = self._build_contour_region_map()
+        region_volumes: Dict[RegionIndex, float] = {}
         for _, _, data in self.contour_graph.edges(data=True):
             match = data['match']
             contour1 = match.contour1
-            region_index = contour1.region_index
+            # Combine related regions (holes, boundaries, and embedded
+            # regions) into the reference region from the RegionSlice.
+            region_index = contour_region_map.get(contour1.index,
+                                                  contour1.region_index)
 
             if volume_type == 'Hull':
                 volume = match.volume(use_hull=True)
@@ -412,6 +463,10 @@ class StructureShape():
             region_volumes[region_index] = (
                 region_volumes.get(region_index, 0.0) + volume
             )
+        # Round the accumulated volumes to the specified tolerance
+        # increment as the final step.
+        for region_index, volume in region_volumes.items():
+            region_volumes[region_index] = round_value(volume, tolerance)
         return region_volumes
 
     def build_region_table(self):

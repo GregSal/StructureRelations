@@ -697,9 +697,6 @@ class Contour:
 
       hole information:
         is_hole (bool): Whether the contour is a hole.
-        hole_reference (ContourIndex): If is_hole is True, contains the index
-            of the smallest non-hole contour that contains this hole.
-            If is_hole is False, hole_reference is None.
         hole_type (str): If is_hole is True, the type of the hole. One of:
                 Open,
                 Closed, or
