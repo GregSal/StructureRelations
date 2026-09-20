@@ -361,6 +361,59 @@ class StructureShape():
             total_volume += volume
         self.structure_volumes.hull = total_volume
 
+    def calculate_region_volumes(
+        self,
+        volume_type: str = 'Physical'
+    ) -> Dict[str, float]:
+        '''Calculate volumes for each region of the structure.
+
+        Groups contour graph edges by the region index of their source
+        contour and applies the same hole add/subtract logic used by the
+        overall volume calculations. This method is called on demand and
+        is not invoked by finalize().
+
+        Args:
+            volume_type (str): Which volume to calculate. One of
+                'Physical', 'Exterior', or 'Hull'. Defaults to 'Physical'.
+
+        Returns:
+            Dict[str, float]: Mapping of region index to volume in cm^3.
+
+        Raises:
+            ValueError: If volume_type is not 'Physical', 'Exterior',
+                or 'Hull'.
+        '''
+        valid_types = ('Physical', 'Exterior', 'Hull')
+        if volume_type not in valid_types:
+            raise ValueError(
+                f"volume_type must be one of {valid_types}, "
+                f"got '{volume_type}'"
+            )
+
+        region_volumes: Dict[str, float] = {}
+        for _, _, data in self.contour_graph.edges(data=True):
+            match = data['match']
+            contour1 = match.contour1
+            region_index = contour1.region_index
+
+            if volume_type == 'Hull':
+                volume = match.volume(use_hull=True)
+                if contour1.is_hole:
+                    volume = 0.0
+            else:
+                volume = match.volume()
+                if contour1.is_hole:
+                    if (volume_type == 'Exterior'
+                            and contour1.hole_type == 'Closed'):
+                        volume = 0.0
+                    else:
+                        volume = -volume
+
+            region_volumes[region_index] = (
+                region_volumes.get(region_index, 0.0) + volume
+            )
+        return region_volumes
+
     def build_region_table(self):
         '''Build a DataFrame of RegionSlices for each RegionIndex and SliceIndex.
 
