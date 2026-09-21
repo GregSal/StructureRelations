@@ -23,6 +23,7 @@ from metrics.data_structures import (
     MarginMetrics,
     DistanceMetrics,
     VolumeMetrics,
+    VolumeRatioMetrics,
     SurfaceMetrics,
     GeometryMetrics,
 )
@@ -1232,7 +1233,8 @@ class StructureSet:
             )
             # Still call calculate() to get N/A result
             return calculator.calculate(structure_a, structure_b, relationship,
-                                        tolerance=self.tolerance)
+                                        tolerance=self.tolerance,
+                                        structure_set=self)
 
         # Calculate metric
         self._log(
@@ -1246,7 +1248,8 @@ class StructureSet:
         )
 
         result = calculator.calculate(structure_a, structure_b, relationship,
-                                      tolerance=self.tolerance)
+                                      tolerance=self.tolerance,
+                                      structure_set=self)
 
         # Initialize RelationshipMetrics if it doesn't exist
         if relationship.metrics is None:
@@ -1267,6 +1270,8 @@ class StructureSet:
             relationship.metrics.distance = result
         elif isinstance(result, VolumeMetrics):
             relationship.metrics.volume = result
+        elif isinstance(result, VolumeRatioMetrics):
+            relationship.metrics.volume_ratio = result
         elif isinstance(result, SurfaceMetrics):
             relationship.metrics.surface = result
         elif isinstance(result, GeometryMetrics):

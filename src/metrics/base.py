@@ -5,13 +5,16 @@ and provides a registry pattern for dynamic calculator discovery and instantiati
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Type, Optional, Any, Set
+from typing import Dict, Type, Optional, Any, Set, TYPE_CHECKING
 import logging
 
 from relations import RelationshipType
 from structures import StructureShape
 from relationships import StructureRelationship
 from metrics.config import MetricsConfig
+
+if TYPE_CHECKING:
+    from structure_set import StructureSet
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +83,8 @@ class MetricCalculator(ABC):
         structure_a: StructureShape,
         structure_b: StructureShape,
         relationship: StructureRelationship,
-        tolerance: Optional[float] = None
+        tolerance: Optional[float] = None,
+        structure_set: Optional['StructureSet'] = None
     ) -> Any:
         """Calculate metric for the given structure pair.
 
@@ -102,6 +106,10 @@ class MetricCalculator(ABC):
             tolerance: Optional structure set tolerance.  When supplied and
                 positive, calculators may use it to round metric values
                 instead of the config distance precision.
+            structure_set: Optional StructureSet containing the structures.
+                Supplied by StructureSet.calculate_metric.  Calculators that
+                build CompositeStructures (e.g. volume ratios) require it;
+                other calculators ignore it.
 
         Returns:
             Metric-specific dataclass (MarginMetrics, DistanceMetrics, VolumeMetrics,

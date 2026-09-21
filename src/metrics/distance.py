@@ -75,7 +75,8 @@ class MinimumDistanceCalculator(MetricCalculator):
         structure_a: StructureShape,
         structure_b: StructureShape,
         relationship: StructureRelationship,
-        tolerance: Optional[float] = None
+        tolerance: Optional[float] = None,
+        structure_set: Optional['StructureSet'] = None
     ) -> DistanceMetrics:
         """Calculate minimum distance for structure pair.
 
@@ -85,6 +86,8 @@ class MinimumDistanceCalculator(MetricCalculator):
             relationship: Relationship with type information
             tolerance: Optional structure set tolerance (unused; distance
                 values are rounded with config distance precision)
+            structure_set: Optional StructureSet containing the structures
+                (unused by this calculator)
 
         Returns:
             DistanceMetrics with minimum_distance and per-region data

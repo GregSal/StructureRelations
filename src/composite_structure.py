@@ -50,6 +50,10 @@ class CompositeStructure(StructureShape):
     def __init__(self, roi: ROI_Type, name: str, expression: str):
         super().__init__(roi=roi, name=name)
         self.expression = expression
+        # Provenance: operand ROIs and operators that produced this composite.
+        # Used by metric calculators to reuse existing composites.
+        self.operand_rois: Tuple[ROI_Type, ...] = tuple()
+        self.operators: Tuple[str, ...] = tuple()
 
     @classmethod
     def _next_roi(cls) -> ROI_Type:
@@ -206,6 +210,8 @@ def structure_boolean(structure_set: 'StructureSet',
 
     composite = CompositeStructure(roi=new_roi, name=structure_name,
                                    expression=structure_name)
+    composite.operand_rois = tuple(operand.roi for operand in operands)
+    composite.operators = tuple(operators)
     structure_set.slice_sequence = composite.add_contour_graph(
         contour_table, structure_set.slice_sequence
     )

@@ -149,6 +149,53 @@ class VolumeMetrics:
 
 
 @dataclass
+class VolumeRatioMetrics:
+    """Volume ratio metrics for structures with shared volume.
+
+    Applicable to: EQUAL, CONTAINS, WITHIN, PARTITIONED, PARTITIONS, OVERLAPS
+    ("Shared" relationships).  Non-applicable ratios are NaN.
+
+    A single instance is shared by the overlapping and non-overlapping ratio
+    calculators and stored at RelationshipMetrics.volume_ratio.  Each
+    calculator fills only its own ratio fields; fields belonging to the
+    other calculator remain None ("not evaluated") until that calculator is
+    run.  Composite volumes come from CompositeStructure objects (Union,
+    Intersection, Difference) registered in the StructureSet.  Per-region
+    values reference regions of the composite structures, not regions of
+    the original structures.
+    """
+    # 3D aggregated ratios (from total composite volumes)
+    overlapping_ratio: Optional[float] = None  # Intersection / Union
+    non_overlapping_ratio: Optional[float] = None  # Difference (A - B) / Union
+
+    # Composite volumes used for the ratios
+    intersection_volume: Optional[float] = None  # Volume of A INTERSECTION B
+    union_volume: Optional[float] = None  # Volume of A UNION B
+    difference_volume: Optional[float] = None  # Volume of A DIFFERENCE B
+
+    # Per-region-pair ratios
+    # Keys: (numerator_region, union_region) composite region index pairs
+    per_region_overlapping_ratio: Optional[Dict[Tuple[str, str], float]] = None
+    per_region_non_overlapping_ratio: Optional[Dict[Tuple[str, str], float]] = None
+
+    # Per-region volumes of the composite structures
+    # Keys: composite region index
+    per_region_intersection_volumes: Optional[Dict[str, float]] = None
+    per_region_union_volumes: Optional[Dict[str, float]] = None
+    per_region_difference_volumes: Optional[Dict[str, float]] = None
+
+    def __post_init__(self):
+        """Validate that evaluated ratios are between 0 and 1 or NaN."""
+        for ratio, name in ((self.overlapping_ratio, 'Overlapping ratio'),
+                            (self.non_overlapping_ratio,
+                             'Non-overlapping ratio')):
+            if ratio is not None and not math.isnan(ratio):
+                if not 0 <= ratio <= 1:
+                    raise ValueError(
+                        f'{name} must be between 0 and 1: {ratio}')
+
+
+@dataclass
 class SurfaceMetrics:
     """Surface boundary overlap metrics for touching structures.
 
@@ -213,6 +260,7 @@ class RelationshipMetrics:
     margin: Optional[MarginMetrics] = None
     distance: Optional[DistanceMetrics] = None
     volume: Optional[VolumeMetrics] = None
+    volume_ratio: Optional[VolumeRatioMetrics] = None
     surface: Optional[SurfaceMetrics] = None
     geometry: Optional[GeometryMetrics] = None
 

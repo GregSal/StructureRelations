@@ -178,7 +178,8 @@ class ContainmentMarginsCalculator(MetricCalculator):
         structure_a: StructureShape,
         structure_b: StructureShape,
         relationship: StructureRelationship,
-        tolerance: Optional[float] = None
+        tolerance: Optional[float] = None,
+        structure_set: Optional['StructureSet'] = None
     ) -> MarginMetrics:
         """Calculate orthogonal and minimum margins for a structure pair.
 
@@ -189,6 +190,8 @@ class ContainmentMarginsCalculator(MetricCalculator):
             tolerance: Structure set tolerance.  When supplied and positive,
                 margin values are rounded to the number of decimals implied
                 by the tolerance; otherwise config distance precision is used.
+            structure_set: Optional StructureSet containing the structures
+                (unused by this calculator).
 
         Returns:
             MarginMetrics with orthogonal_margins, minimum_margin, per-region
