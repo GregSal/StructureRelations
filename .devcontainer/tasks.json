@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start StructureRelations web app",
+            "type": "shell",
+            "command": "bash src/start_webapp_bash",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "webapp"
+            }
+        },
+        {
+            "label": "Run StructureRelations tests",
+            "type": "shell",
+            "command": "/opt/conda/envs/StructureRelations/bin/python -m pytest Tests",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+   ]
+}

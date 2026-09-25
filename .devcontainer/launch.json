@@ -1,0 +1,37 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug StructureRelations web app",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--app-dir",
+                "src/webapp",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug StructureRelations tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "Tests"
+            ],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
