@@ -13,6 +13,7 @@ import asyncio
 import tempfile
 import json
 import time
+import math
 from contextlib import asynccontextmanager
 from collections import OrderedDict
 from pathlib import Path
@@ -44,6 +45,7 @@ matplotlib.use('Agg')  # Use non-interactive backend
 
 from dicom import DicomStructureFile, clean_uploaded_file_name
 from structure_set import StructureSet
+from metrics import MetricCalculatorRegistry, get_config as get_metrics_config
 from contour_plotting import plot_roi_slice
 from relations import RELATION_SCHEMA_VERSION
 from webapp.session_manager import SessionManager, SessionData
@@ -219,6 +221,27 @@ class DiagramNode(BaseModel):
     layout_source: Optional[str] = None
 
 
+class DiagramMetricOption(BaseModel):
+    name: str
+    label: str
+
+
+class DiagramEdgeMetricRequest(BaseModel):
+    session_id: str
+    from_node: int
+    to_node: int
+    relation_type: str
+    metric_name: Optional[str] = None
+
+
+class DiagramEdgeMetricResponse(BaseModel):
+    metrics: List[DiagramMetricOption] = Field(default_factory=list)
+    metric_name: Optional[str] = None
+    label: Optional[str] = None
+    value: Optional[str] = None
+    unit: str = ''
+
+
 class DiagramEdge(BaseModel):
     from_node: int
     to_node: int
@@ -231,6 +254,7 @@ class DiagramEdge(BaseModel):
     dashes: bool
     arrows: Optional[str] = None
     is_logical: bool = False
+    metric_options: List[DiagramMetricOption] = Field(default_factory=list)
     layout_candidate: bool = True  # True if edge used for layout optimization, False if excluded
     edge_weight_for_crossing: float = 1.0  # 0.5 for OVERLAPS, 1.0 for others (used in crossing cost)
 
@@ -2211,6 +2235,111 @@ def extract_target_group_key(label: str) -> Optional[str]:
     return f'{family}{dose}'
 
 
+_DIAGRAM_METRIC_DETAILS = {
+    'minimum_margins': (
+        'Minimum margin', 'margin', 'minimum_margin', 'distance_precision', True,
+    ),
+    'minimum_distance': (
+        'Minimum distance', 'distance', 'minimum_distance', 'distance_precision', True,
+    ),
+    'overlapping_volume_ratio': (
+        'Overlapping volume ratio', 'volume_ratio', 'overlapping_ratio',
+        'ratio_precision', False,
+    ),
+    'non_overlapping_volume_ratio': (
+        'Non-overlapping volume ratio', 'volume_ratio', 'non_overlapping_ratio',
+        'ratio_precision', False,
+    ),
+}
+_SYMMETRIC_DIAGRAM_RELATIONS = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
+
+
+def _get_applicable_diagram_metrics(relationship) -> List[DiagramMetricOption]:
+    if relationship is None or relationship.relationship_type is None:
+        return []
+
+    calculators = MetricCalculatorRegistry.get_all_calculators()
+    return [
+        DiagramMetricOption(
+            name=name,
+            label=_DIAGRAM_METRIC_DETAILS[name][0],
+        )
+        for name, calculator in calculators.items()
+        if name in _DIAGRAM_METRIC_DETAILS
+        and calculator.is_applicable(relationship)
+    ]
+
+
+@app.post(
+    '/api/diagram/edge-metric',
+    response_model=DiagramEdgeMetricResponse,
+)
+async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
+    session_data = session_manager.load_session(request.session_id, touch=False)
+    if session_data is None:
+        raise HTTPException(status_code=404, detail='Session expired, please re-upload')
+    structure_set = session_data.structure_set
+    if structure_set is None:
+        raise HTTPException(status_code=400, detail='Structures not yet processed')
+
+    roi_a, roi_b = request.from_node, request.to_node
+    relationship = structure_set.get_relationship(roi_a, roi_b)
+    relation_type = request.relation_type.upper()
+    if relationship is None and relation_type in _SYMMETRIC_DIAGRAM_RELATIONS:
+        roi_a, roi_b = roi_b, roi_a
+        relationship = structure_set.get_relationship(roi_a, roi_b)
+    if relationship is None:
+        raise HTTPException(status_code=404, detail='Relationship not found')
+    actual_relation_type = relationship.relationship_type.relation_type.upper()
+    if actual_relation_type != relation_type:
+        raise HTTPException(status_code=409, detail='Relationship type has changed')
+
+    options = _get_applicable_diagram_metrics(relationship)
+    if request.metric_name is None:
+        return DiagramEdgeMetricResponse(metrics=options)
+
+    details = _DIAGRAM_METRIC_DETAILS.get(request.metric_name)
+    if details is None:
+        raise HTTPException(status_code=404, detail='Metric not found')
+    if request.metric_name not in {option.name for option in options}:
+        raise HTTPException(
+            status_code=400,
+            detail='Metric is not applicable to this relationship',
+        )
+
+    label, category, value_field, precision_field, has_unit = details
+    metric_category = getattr(relationship.metrics, category, None) \
+        if relationship.metrics is not None else None
+    value = getattr(metric_category, value_field, None)
+    if value is None:
+        result = structure_set.calculate_metric(roi_a, roi_b, request.metric_name)
+        session_manager.save_session(request.session_id, session_data)
+        metric_category = getattr(relationship.metrics, category, None) \
+            if relationship.metrics is not None else None
+        value = getattr(metric_category, value_field, None)
+        if value is None:
+            value = getattr(result, value_field, None)
+
+    config = get_metrics_config()
+    precision = int(getattr(config, precision_field, 2))
+    try:
+        numeric_value = float(value)
+        formatted_value = (
+            f'{numeric_value:.{precision}f}'
+            if math.isfinite(numeric_value) else 'N/A'
+        )
+    except (TypeError, ValueError):
+        formatted_value = 'N/A'
+
+    unit = getattr(structure_set, 'unit', config.distance_unit) if has_unit else ''
+    return DiagramEdgeMetricResponse(
+        metric_name=request.metric_name,
+        label=label,
+        value=formatted_value,
+        unit=unit,
+    )
+
+
 @app.post('/api/diagram', response_model=DiagramResponse)
 async def get_diagram_data(request: MatrixRequest):
     '''Generate network diagram data for relationship visualization.
@@ -2588,6 +2717,7 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        metric_options=_get_applicable_diagram_metrics(rel),
                         layout_candidate=layout_candidate,
                         edge_weight_for_crossing=edge_weight,
                     ))
@@ -2675,6 +2805,7 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        metric_options=_get_applicable_diagram_metrics(rel),
                         layout_candidate=layout_candidate,
                         edge_weight_for_crossing=edge_weight,
                     ))

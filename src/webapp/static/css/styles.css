@@ -1931,6 +1931,55 @@ tbody tr:hover {
     margin: 0.25rem 0;
 }
 
+.edge-metric-overlay {
+    position: absolute;
+    z-index: 20;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: calc(100% - 16px);
+    padding: 0.25rem 0.4rem 0.25rem 0.55rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-lg);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    line-height: 1.25;
+    user-select: none;
+    cursor: grab;
+    touch-action: none;
+    white-space: nowrap;
+}
+
+.edge-metric-overlay:active {
+    cursor: grabbing;
+}
+
+.edge-metric-overlay-value {
+    font-weight: 600;
+}
+
+.edge-metric-overlay-close {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.edge-metric-overlay-close:hover {
+    background: var(--bg-color);
+    color: var(--primary-color);
+}
+
 footer {
     text-align: center;
     margin-top: 3rem;

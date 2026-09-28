@@ -52,6 +52,7 @@ class WebAppClient {
         this.manualLayoutActive = false;
         this._dragFrozen = [];
         this._contextMenu = null;        // active context menu DOM element
+        this._metricOverlays = new Map();
         this._initialDiagramFitTimer = null;
         this._initialDiagramFitAttempts = 0;
         this.diagramSpacingBaseline = null;
@@ -5303,6 +5304,7 @@ class WebAppClient {
     }
 
     renderDiagram(data, positionSnapshot = null, renderOptions = {}) {
+        this._removeAllMetricOverlays();
         const container = document.getElementById('networkDiagram');
         const showLabels = this.diagramShowLabelsApplied;
         const nodeFont = this.diagramOptions.font || {};
@@ -5507,6 +5509,9 @@ class WebAppClient {
             from: edge.from_node,
             to: edge.to_node,
             _edgeKey: edgeKey,
+            relation_type: edge.relation_type,
+            is_logical: edge.is_logical,
+            metric_options: edge.metric_options || [],
             label: showLabels ? displayLabel : '',
             originalLabel: displayLabel,
             title: this.buildEdgeTooltip(edge, data.nodes),
@@ -5575,6 +5580,9 @@ class WebAppClient {
 
         // Add event listeners
         this.network.on('click', () => this._dismissContextMenu());
+        this.network.on('zoom', () => this._positionMetricOverlays());
+        this.network.on('dragging', () => this._positionMetricOverlays());
+        this.network.on('afterDrawing', () => this._positionMetricOverlays());
 
         this._restoreDiagramCoordinates(positionSnapshot);
         this._applyNodeVisibilityState();
@@ -5601,7 +5609,7 @@ class WebAppClient {
             const hitEdge = domPoint ? this.network.getEdgeAt(domPoint) : null;
             const targetEdge = hitEdge ?? (params.edges.length > 0 ? params.edges[0] : null);
             if (targetEdge !== null && targetEdge !== undefined) {
-                this._showEdgeContextMenu(targetEdge, params.event);
+                this._showEdgeContextMenu(targetEdge, params.event, params.pointer);
             }
         });
 
@@ -5767,21 +5775,243 @@ class WebAppClient {
         document.addEventListener('mousedown', dismiss, true);
     }
 
-    _showEdgeContextMenu(edgeId, event) {
+    async _showEdgeContextMenu(edgeId, event, pointer) {
         if (!this.network) return;
         const edge = this.network.body.data.edges.get(edgeId);
         if (!edge || !edge._edgeKey) return;
 
         const edgeKey = edge._edgeKey;
         const isHidden = this.hiddenEdges.has(edgeKey);
+        const visibilityItem = {
+            label: isHidden ? 'Show Relation' : 'Hide Relation',
+            active: isHidden,
+            action: () => this._ctxToggleEdgeVisibility(edgeId),
+        };
+        let metricOptions = edge.metric_options || [];
+        if (metricOptions.length === 0 && this.sessionId) {
+            this._showSimpleContextMenu([
+                visibilityItem,
+                { separator: true },
+                { label: 'Loading metrics...', disabled: true },
+            ], event);
+            try {
+                const response = await fetch('/api/diagram/edge-metric', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: this.sessionId,
+                        from_node: Number(edge.from),
+                        to_node: Number(edge.to),
+                        relation_type: edge.relation_type,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Unable to load metrics');
+                }
+                metricOptions = data.metrics || [];
+                this.network.body.data.edges.update({
+                    id: edgeId,
+                    metric_options: metricOptions,
+                });
+            } catch (error) {
+                this.appendStatusLogLine('frontend', error.message);
+                if (this._contextMenu) {
+                    this._showSimpleContextMenu([
+                        visibilityItem,
+                        { separator: true },
+                        { label: 'Metrics unavailable', disabled: true },
+                    ], event);
+                }
+                return;
+            }
+        }
 
-        this._showSimpleContextMenu([
-            {
-                label: isHidden ? 'Show Relation' : 'Hide Relation',
-                active: isHidden,
-                action: () => this._ctxToggleEdgeVisibility(edgeId),
-            },
-        ], event);
+        const items = [visibilityItem];
+        if (metricOptions.length > 0) {
+            items.push({ separator: true });
+            metricOptions.forEach((metric) => {
+                items.push({
+                    label: metric.label,
+                    action: () => this._showEdgeMetric(edgeId, metric, pointer),
+                });
+            });
+        } else {
+            items.push(
+                { separator: true },
+                { label: 'No compatible metrics', disabled: true },
+            );
+        }
+        if (this._contextMenu || edge.metric_options?.length > 0) {
+            this._showSimpleContextMenu(items, event);
+        }
+    }
+
+    async _showEdgeMetric(edgeId, metric, pointer) {
+        const edge = this.network?.body?.data?.edges?.get(edgeId);
+        const container = document.getElementById('networkDiagram');
+        if (!edge || !container || !this.sessionId) return;
+
+        this._removeMetricOverlay(edgeId);
+        const overlay = document.createElement('div');
+        overlay.className = 'edge-metric-overlay';
+        overlay.setAttribute('role', 'status');
+
+        const value = document.createElement('span');
+        value.className = 'edge-metric-overlay-value';
+        value.textContent = `${metric.label}: calculating...`;
+        overlay.appendChild(value);
+
+        const closeButton = document.createElement('button');
+        closeButton.className = 'edge-metric-overlay-close';
+        closeButton.type = 'button';
+        closeButton.setAttribute('aria-label', 'Remove metric label');
+        closeButton.title = 'Remove metric label';
+        closeButton.textContent = '\u00d7';
+        closeButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this._removeMetricOverlay(edgeId);
+        });
+        overlay.appendChild(closeButton);
+        container.appendChild(overlay);
+
+        const midpoint = this._getMetricEdgeMidpoint(edge.from, edge.to);
+        const pointerCanvas = pointer?.canvas;
+        const state = {
+            element: overlay,
+            edgeId,
+            from: edge.from,
+            to: edge.to,
+            offset: pointerCanvas && midpoint
+                ? {
+                    x: pointerCanvas.x - midpoint.x,
+                    y: pointerCanvas.y - midpoint.y,
+                }
+                : { x: 0, y: 0 },
+            valueElement: value,
+            dragHandlers: null,
+            resizeHandler: () => this._positionMetricOverlay(state),
+        };
+        this._metricOverlays.set(edgeId, state);
+        this._positionMetricOverlay(state);
+        this._enableMetricOverlayDragging(state);
+        window.addEventListener('resize', state.resizeHandler);
+
+        try {
+            const response = await fetch('/api/diagram/edge-metric', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    from_node: Number(edge.from),
+                    to_node: Number(edge.to),
+                    relation_type: edge.relation_type,
+                    metric_name: metric.name,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Metric calculation failed');
+            }
+            if (this._metricOverlays.get(edgeId) !== state) return;
+            const unit = data.unit ? ` ${data.unit}` : '';
+            value.textContent = `${data.label}: ${data.value}${unit}`;
+        } catch (error) {
+            if (this._metricOverlays.get(edgeId) !== state) return;
+            value.textContent = `${metric.label}: unavailable`;
+            this.appendStatusLogLine('frontend', error.message);
+        }
+    }
+
+    _getMetricEdgeMidpoint(from, to) {
+        if (!this.network) return null;
+        const positions = this.network.getPositions([from, to]);
+        const fromPosition = positions[from];
+        const toPosition = positions[to];
+        if (!fromPosition || !toPosition) return null;
+        return {
+            x: (fromPosition.x + toPosition.x) / 2,
+            y: (fromPosition.y + toPosition.y) / 2,
+        };
+    }
+
+    _positionMetricOverlays() {
+        this._metricOverlays.forEach((state) => {
+            this._positionMetricOverlay(state);
+        });
+    }
+
+    _positionMetricOverlay(state) {
+        if (!state || !this.network) return;
+        const midpoint = this._getMetricEdgeMidpoint(state.from, state.to);
+        if (!midpoint) return;
+        const point = this.network.canvasToDOM({
+            x: midpoint.x + state.offset.x,
+            y: midpoint.y + state.offset.y,
+        });
+        state.element.style.left = `${point.x}px`;
+        state.element.style.top = `${point.y}px`;
+    }
+
+    _enableMetricOverlayDragging(state) {
+        const onPointerDown = (event) => {
+            if (event.target.closest('.edge-metric-overlay-close')) return;
+            event.preventDefault();
+            event.stopPropagation();
+            state.element.setPointerCapture(event.pointerId);
+            const rect = state.element.getBoundingClientRect();
+            const pointerOffset = {
+                x: event.clientX - (rect.left + rect.width / 2),
+                y: event.clientY - (rect.top + rect.height / 2),
+            };
+            const onPointerMove = (moveEvent) => {
+                const containerRect = state.element.parentElement.getBoundingClientRect();
+                const localPoint = {
+                    x: moveEvent.clientX - pointerOffset.x - containerRect.left,
+                    y: moveEvent.clientY - pointerOffset.y - containerRect.top,
+                };
+                state.element.style.left = `${localPoint.x}px`;
+                state.element.style.top = `${localPoint.y}px`;
+                const canvasPoint = this.network.DOMtoCanvas(localPoint);
+                const midpoint = this._getMetricEdgeMidpoint(state.from, state.to);
+                if (midpoint) {
+                    state.offset = {
+                        x: canvasPoint.x - midpoint.x,
+                        y: canvasPoint.y - midpoint.y,
+                    };
+                }
+            };
+            const onPointerUp = () => {
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', onPointerUp);
+                window.removeEventListener('pointercancel', onPointerUp);
+                state.dragHandlers = null;
+            };
+            state.dragHandlers = { onPointerMove, onPointerUp };
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('pointercancel', onPointerUp);
+        };
+        state.element.addEventListener('pointerdown', onPointerDown);
+    }
+
+    _removeMetricOverlay(edgeId) {
+        const state = this._metricOverlays.get(edgeId);
+        if (!state) return;
+        state.element.remove();
+        window.removeEventListener('resize', state.resizeHandler);
+        if (state.dragHandlers) {
+            window.removeEventListener('pointermove', state.dragHandlers.onPointerMove);
+            window.removeEventListener('pointerup', state.dragHandlers.onPointerUp);
+            window.removeEventListener('pointercancel', state.dragHandlers.onPointerUp);
+        }
+        this._metricOverlays.delete(edgeId);
+    }
+
+    _removeAllMetricOverlays() {
+        Array.from(this._metricOverlays.keys()).forEach((edgeId) => {
+            this._removeMetricOverlay(edgeId);
+        });
     }
 
     _ctxToggleFixed(roi) {
