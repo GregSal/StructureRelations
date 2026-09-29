@@ -50,6 +50,7 @@ class WebAppClient {
         this.hiddenEdges = new Set();    // edge keys hidden via context menu
         this.highlightedEdges = new Set();
         this.doubleLineEdges = new Set();
+        this.straightLineEdges = new Set();
         this.fadedEdgeOpacities = new Map();
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
@@ -5374,6 +5375,9 @@ class WebAppClient {
         this.doubleLineEdges = new Set(
             Array.from(this.doubleLineEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
         );
+        this.straightLineEdges = new Set(
+            Array.from(this.straightLineEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
         this.fadedEdgeOpacities = new Map(
             Array.from(this.fadedEdgeOpacities.entries())
                 .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
@@ -5553,6 +5557,7 @@ class WebAppClient {
             const isHiddenByToggle = this.hiddenEdges.has(edgeKey);
             const isHighlighted = this.highlightedEdges.has(edgeKey);
             const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
+            const isStraightLine = this.straightLineEdges.has(edgeKey);
             const edgeColor = this._getEdgeColorWithOpacity(
                 edge.color,
                 this.fadedEdgeOpacities.get(edgeKey),
@@ -5591,10 +5596,10 @@ class WebAppClient {
                 x: 0,
                 y: 0,
             } : undefined,
-            smooth: edgeCurvatureMap[edgeKey] || {
+            smooth: isStraightLine ? false : (edgeCurvatureMap[edgeKey] || {
                 type: 'continuous',
                 roundness: 0.18
-            }
+            })
             };
 
             if (isHighlighted) {
@@ -5935,6 +5940,7 @@ class WebAppClient {
         const isHidden = this.hiddenEdges.has(edgeKey);
         const isHighlighted = this.highlightedEdges.has(edgeKey);
         const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
+        const isStraightLine = this.straightLineEdges.has(edgeKey);
         const isFaded = this._getEffectiveEdgeOpacity(edgeKey, edge) < 1;
         const visibilityItem = {
             label: isHidden ? 'Show Relationship' : 'Hide Relationship',
@@ -5958,6 +5964,11 @@ class WebAppClient {
                     label: 'Double Line',
                     active: hasDoubleLine,
                     action: () => this._ctxToggleDoubleLine(edgeKey),
+                },
+                {
+                    label: 'Straight Line',
+                    active: isStraightLine,
+                    action: () => this._ctxToggleStraightLine(edgeKey),
                 },
             ],
         }];
@@ -6419,6 +6430,15 @@ class WebAppClient {
             this.doubleLineEdges.delete(edgeKey);
         } else {
             this.doubleLineEdges.add(edgeKey);
+        }
+        this._rerenderEdgeFormatting();
+    }
+
+    _ctxToggleStraightLine(edgeKey) {
+        if (this.straightLineEdges.has(edgeKey)) {
+            this.straightLineEdges.delete(edgeKey);
+        } else {
+            this.straightLineEdges.add(edgeKey);
         }
         this._rerenderEdgeFormatting();
     }
@@ -7570,6 +7590,7 @@ class WebAppClient {
         this.hiddenEdges.clear();
         this.highlightedEdges.clear();
         this.doubleLineEdges.clear();
+        this.straightLineEdges.clear();
         this.fadedEdgeOpacities.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
