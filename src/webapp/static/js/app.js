@@ -50,6 +50,7 @@ class WebAppClient {
         this.hiddenEdges = new Set();    // edge keys hidden via context menu
         this.highlightedEdges = new Set();
         this.doubleLineEdges = new Set();
+        this.fadedEdgeOpacities = new Map();
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
         this._dragFrozen = [];
@@ -5373,6 +5374,10 @@ class WebAppClient {
         this.doubleLineEdges = new Set(
             Array.from(this.doubleLineEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
         );
+        this.fadedEdgeOpacities = new Map(
+            Array.from(this.fadedEdgeOpacities.entries())
+                .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
+        );
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
@@ -5548,6 +5553,10 @@ class WebAppClient {
             const isHiddenByToggle = this.hiddenEdges.has(edgeKey);
             const isHighlighted = this.highlightedEdges.has(edgeKey);
             const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
+            const edgeColor = this._getEdgeColorWithOpacity(
+                edge.color,
+                this.fadedEdgeOpacities.get(edgeKey),
+            );
             const edgeId = `${edgeKey}:1-main`;
             const edgeOptions = {
             from: edge.from_node,
@@ -5561,13 +5570,13 @@ class WebAppClient {
             label: showLabels ? displayLabel : '',
             originalLabel: displayLabel,
             title: this.buildEdgeTooltip(edge, data.nodes),
-            color: edge.color,
+            color: edgeColor,
             width: edge.width,
             dashes: edge.dashes,
             arrows: edge.arrows ? edge.arrows : undefined,
             font: {
                 size: Number(nodeFont.edge_size || 12),
-                color: edge.color,
+                color: edgeColor,
                 background: edgeLabelBackground,
                 strokeColor: edgeLabelBackground,
                 strokeWidth: 3
@@ -5594,7 +5603,7 @@ class WebAppClient {
                     id: `${edgeKey}:0-highlight`,
                     _edgeLayer: 'highlight-underlay',
                     color: {
-                        color: edge.color,
+                        color: edgeColor,
                         opacity: 0.35,
                     },
                     width: Number(edge.width || 1) + 5,
@@ -5614,7 +5623,7 @@ class WebAppClient {
                 ...edgeOptions,
                 id: `${edgeKey}:0-underlay`,
                 _edgeLayer: 'underlay',
-                color: edge.color,
+                color: edgeColor,
                 width: Number(edge.width || 1) + 5,
                 label: '',
                 originalLabel: '',
@@ -5628,7 +5637,7 @@ class WebAppClient {
                 shadow: undefined,
                 font: {
                     ...edgeOptions.font,
-                    color: edge.color,
+                    color: edgeColor,
                 },
             };
             return [underlay, foreground];
@@ -5799,6 +5808,52 @@ class WebAppClient {
         return [fromNode, toNode, relationType, isLogical ? 1 : 0, label].join('|');
     }
 
+    _getEdgeColorOpacity(color) {
+        if (typeof color !== 'string') return 1;
+        const match = color.match(
+            /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*([\d.]+))?\s*\)$/i
+        );
+        return match?.[1] === undefined ? 1 : Number(match[1]);
+    }
+
+    _getEdgeColorWithOpacity(color, opacity) {
+        if (opacity === undefined || typeof color !== 'string') return color;
+        const rgbaMatch = color.match(
+            /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)$/i
+        );
+        if (rgbaMatch) {
+            return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${opacity})`;
+        }
+        const hex = color.replace('#', '');
+        if (/^[\da-f]{6}$/i.test(hex)) {
+            return `rgba(${parseInt(hex.slice(0, 2), 16)}, `
+                + `${parseInt(hex.slice(2, 4), 16)}, `
+                + `${parseInt(hex.slice(4, 6), 16)}, ${opacity})`;
+        }
+        return color;
+    }
+
+    _getEdgeSourceData(edgeKey) {
+        return this.latestDiagramData?.edges?.find(
+            edge => this._buildEdgeKey(edge) === edgeKey
+        );
+    }
+
+    _getEffectiveEdgeOpacity(edgeKey, edge) {
+        const sourceEdge = this._getEdgeSourceData(edgeKey) || edge;
+        if (this.fadedEdgeOpacities.has(edgeKey)) {
+            return this.fadedEdgeOpacities.get(edgeKey);
+        }
+        return this._getEdgeColorOpacity(sourceEdge?.color);
+    }
+
+    _getFadeOpacity(edge) {
+        const relationType = String(
+            edge?.relation_type ?? edge?.relationType ?? ''
+        ).toUpperCase();
+        return edge?.is_logical || relationType === 'DISJOINT' ? 0.2 : 0.6;
+    }
+
     _showNodeContextMenu(roi, event) {
         const normalizedRoi = Number(roi);
         const node = this.network?.body?.data?.nodes?.get(normalizedRoi);
@@ -5882,23 +5937,32 @@ class WebAppClient {
         const isHidden = this.hiddenEdges.has(edgeKey);
         const isHighlighted = this.highlightedEdges.has(edgeKey);
         const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
+        const isFaded = this._getEffectiveEdgeOpacity(edgeKey, edge) < 1;
         const visibilityItem = {
             label: isHidden ? 'Show Relationship' : 'Hide Relationship',
             active: isHidden,
             action: () => this._ctxToggleEdgeVisibility(edgeId),
         };
-        const formattingItems = [
-            {
-                label: 'Highlight',
-                active: isHighlighted,
-                action: () => this._ctxToggleEdgeHighlight(edgeKey),
-            },
-            {
-                label: 'Double Line',
-                active: hasDoubleLine,
-                action: () => this._ctxToggleDoubleLine(edgeKey),
-            },
-        ];
+        const formattingItems = [{
+            label: 'Format',
+            children: [
+                {
+                    label: 'Fade',
+                    active: isFaded,
+                    action: () => this._ctxToggleEdgeFade(edgeKey),
+                },
+                {
+                    label: 'Highlight',
+                    active: isHighlighted,
+                    action: () => this._ctxToggleEdgeHighlight(edgeKey),
+                },
+                {
+                    label: 'Double Line',
+                    active: hasDoubleLine,
+                    action: () => this._ctxToggleDoubleLine(edgeKey),
+                },
+            ],
+        }];
         let metricOptions = edge.metric_options || [];
         if (metricOptions.length === 0 && this.sessionId) {
             this._showSimpleContextMenu([
@@ -6337,6 +6401,18 @@ class WebAppClient {
         } else {
             this.highlightedEdges.add(edgeKey);
         }
+        this._rerenderEdgeFormatting();
+    }
+
+    _ctxToggleEdgeFade(edgeKey) {
+        const edge = this._getEdgeSourceData(edgeKey);
+        if (!edge) return;
+
+        const currentOpacity = this._getEffectiveEdgeOpacity(edgeKey, edge);
+        const nextOpacity = currentOpacity < 1
+            ? 1
+            : this._getFadeOpacity(edge);
+        this.fadedEdgeOpacities.set(edgeKey, nextOpacity);
         this._rerenderEdgeFormatting();
     }
 
@@ -7496,6 +7572,7 @@ class WebAppClient {
         this.hiddenEdges.clear();
         this.highlightedEdges.clear();
         this.doubleLineEdges.clear();
+        this.fadedEdgeOpacities.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
         this.summaryRowOrder = [];
