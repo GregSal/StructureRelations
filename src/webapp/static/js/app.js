@@ -51,6 +51,8 @@ class WebAppClient {
         this.highlightedEdges = new Set();
         this.doubleLineEdges = new Set();
         this.straightLineEdges = new Set();
+        this.edgeCurvatureOverrides = new Map();
+        this.edgeCurvatureMaximum = 0.5;
         this.fadedEdgeOpacities = new Map();
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
@@ -2194,7 +2196,17 @@ class WebAppClient {
         this.applySummaryColumnSettings();
     }
 
-    showNumericInputDialog(title, message, initialValue, minValue = 0, maxValue = 6) {
+    showNumericInputDialog(
+        title,
+        message,
+        initialValue,
+        minValue = 0,
+        maxValue = 6,
+        stepValue = 1,
+        inputLabel = 'Decimal places',
+        defaultValue = initialValue,
+        showSlider = false
+    ) {
         if (this._activeInputModal) {
             this._activeInputModal.remove();
             this._activeInputModal = null;
@@ -2211,18 +2223,29 @@ class WebAppClient {
                         <h3 id="summaryInputDialogTitle">${this.escapeHtml(title)}</h3>
                     </div>
                     <p class="summary-input-help">${this.escapeHtml(message)}</p>
-                    <label for="summaryNumericInput" class="summary-input-label">Decimal places</label>
+                    <label for="summaryNumericInput" class="summary-input-label">${this.escapeHtml(inputLabel)}</label>
+                    ${showSlider ? `
+                    <input
+                        id="summaryNumericSlider"
+                        class="summary-input-slider"
+                        type="range"
+                        min="${minValue}"
+                        max="${maxValue}"
+                        step="${stepValue}"
+                        value="${Number(initialValue)}"
+                    >` : ''}
                     <input
                         id="summaryNumericInput"
                         class="summary-input-field"
                         type="number"
                         min="${minValue}"
                         max="${maxValue}"
-                        step="1"
+                        step="${stepValue}"
                         value="${Number(initialValue)}"
                     >
                     <p class="summary-input-error" id="summaryNumericInputError"></p>
                     <div class="button-group">
+                        ${showSlider ? '<button class="btn btn-secondary" type="button" id="summaryNumericResetBtn">Reset</button>' : ''}
                         <button class="btn btn-secondary" type="button" id="summaryNumericCancelBtn">Cancel</button>
                         <button class="btn btn-primary" type="button" id="summaryNumericApplyBtn">Apply</button>
                     </div>
@@ -2233,7 +2256,9 @@ class WebAppClient {
             this._activeInputModal = modal;
 
             const input = modal.querySelector('#summaryNumericInput');
+            const slider = modal.querySelector('#summaryNumericSlider');
             const error = modal.querySelector('#summaryNumericInputError');
+            const resetButton = modal.querySelector('#summaryNumericResetBtn');
             const cancelButton = modal.querySelector('#summaryNumericCancelBtn');
             const applyButton = modal.querySelector('#summaryNumericApplyBtn');
             const backdrop = modal.querySelector('.diagram-structure-modal-backdrop');
@@ -2248,9 +2273,15 @@ class WebAppClient {
             };
 
             const apply = () => {
-                const parsed = Number.parseInt(input.value, 10);
-                if (!Number.isFinite(parsed) || parsed < minValue || parsed > maxValue) {
-                    error.textContent = `Enter a whole number from ${minValue} to ${maxValue}.`;
+                const parsed = Number(input.value);
+                const requiresInteger = Number(stepValue) >= 1;
+                if (!Number.isFinite(parsed)
+                    || (requiresInteger && !Number.isInteger(parsed))
+                    || parsed < minValue
+                    || parsed > maxValue) {
+                    error.textContent = requiresInteger
+                        ? `Enter a whole number from ${minValue} to ${maxValue}.`
+                        : `Enter a value from ${minValue} to ${maxValue}.`;
                     error.style.display = 'block';
                     input.focus();
                     input.select();
@@ -2270,6 +2301,23 @@ class WebAppClient {
 
             cancelButton.addEventListener('click', () => close(null));
             applyButton.addEventListener('click', apply);
+            if (slider) {
+                slider.addEventListener('input', () => {
+                    input.value = slider.value;
+                    error.style.display = 'none';
+                });
+                input.addEventListener('input', () => {
+                    slider.value = input.value;
+                    error.style.display = 'none';
+                });
+            }
+            if (resetButton) {
+                resetButton.addEventListener('click', () => {
+                    input.value = Number(defaultValue);
+                    if (slider) slider.value = Number(defaultValue);
+                    error.style.display = 'none';
+                });
+            }
             backdrop.addEventListener('click', () => close(null));
             document.addEventListener('keydown', handleKeyDown);
 
@@ -3079,6 +3127,8 @@ class WebAppClient {
         if (!this.latestDiagramData) return;
 
         this.fixedNodes.clear();
+        this.straightLineEdges.clear();
+        this.edgeCurvatureOverrides.clear();
         this.manualLayoutActive = false;
         this._dragFrozen = [];
         this.renderDiagram(this.latestDiagramData, null, {
@@ -5378,6 +5428,10 @@ class WebAppClient {
         this.straightLineEdges = new Set(
             Array.from(this.straightLineEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
         );
+        this.edgeCurvatureOverrides = new Map(
+            Array.from(this.edgeCurvatureOverrides.entries())
+                .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
+        );
         this.fadedEdgeOpacities = new Map(
             Array.from(this.fadedEdgeOpacities.entries())
                 .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
@@ -5558,6 +5612,7 @@ class WebAppClient {
             const isHighlighted = this.highlightedEdges.has(edgeKey);
             const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
             const isStraightLine = this.straightLineEdges.has(edgeKey);
+            const curvatureOverride = this.edgeCurvatureOverrides.get(edgeKey);
             const edgeColor = this._getEdgeColorWithOpacity(
                 edge.color,
                 this.fadedEdgeOpacities.get(edgeKey),
@@ -5596,10 +5651,17 @@ class WebAppClient {
                 x: 0,
                 y: 0,
             } : undefined,
-            smooth: isStraightLine ? false : (edgeCurvatureMap[edgeKey] || {
-                type: 'continuous',
-                roundness: 0.18
-            })
+            smooth: isStraightLine
+                ? false
+                : curvatureOverride !== undefined
+                    ? {
+                        type: 'continuous',
+                        roundness: curvatureOverride * this.edgeCurvatureMaximum,
+                    }
+                    : (edgeCurvatureMap[edgeKey] || {
+                        type: 'continuous',
+                        roundness: 0.18
+                    })
             };
 
             if (isHighlighted) {
@@ -5969,6 +6031,10 @@ class WebAppClient {
                     label: 'Straight Line',
                     active: isStraightLine,
                     action: () => this._ctxToggleStraightLine(edgeKey),
+                },
+                {
+                    label: 'Set Curvature...',
+                    action: () => this._setEdgeCurvature(edgeKey),
                 },
             ],
         }];
@@ -6440,6 +6506,26 @@ class WebAppClient {
         } else {
             this.straightLineEdges.add(edgeKey);
         }
+        this._rerenderEdgeFormatting();
+    }
+
+    async _setEdgeCurvature(edgeKey) {
+        const currentValue = Number(this.edgeCurvatureOverrides.get(edgeKey) ?? 0.36);
+        const curvature = await this.showNumericInputDialog(
+            'Set edge curvature',
+            'Choose a value between 0 and 1.',
+            currentValue,
+            0,
+            1,
+            0.01,
+            'Curvature',
+            0.36,
+            true
+        );
+        if (curvature === null) return;
+
+        this.edgeCurvatureOverrides.set(edgeKey, curvature);
+        this.straightLineEdges.delete(edgeKey);
         this._rerenderEdgeFormatting();
     }
 
@@ -7591,6 +7677,7 @@ class WebAppClient {
         this.highlightedEdges.clear();
         this.doubleLineEdges.clear();
         this.straightLineEdges.clear();
+        this.edgeCurvatureOverrides.clear();
         this.fadedEdgeOpacities.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
