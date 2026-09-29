@@ -48,6 +48,8 @@ class WebAppClient {
         this.hiddenNodes = new Set();    // ROI ids hidden via context menu
         this.hiddenLabels = new Set();   // ROI ids with label hidden
         this.hiddenEdges = new Set();    // edge keys hidden via context menu
+        this.highlightedEdges = new Set();
+        this.doubleLineEdges = new Set();
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
         this._dragFrozen = [];
@@ -5365,6 +5367,12 @@ class WebAppClient {
         this.hiddenEdges = new Set(
             Array.from(this.hiddenEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
         );
+        this.highlightedEdges = new Set(
+            Array.from(this.highlightedEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
+        this.doubleLineEdges = new Set(
+            Array.from(this.doubleLineEdges).filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
@@ -5409,7 +5417,11 @@ class WebAppClient {
 
         if (positionSnapshot?.positions) {
             Object.entries(positionSnapshot.positions).forEach(([id, position]) => {
-                addAnchor(id, position?.x, position?.y);
+                const x = Number(position?.x);
+                const y = Number(position?.y);
+                if (Number.isFinite(x) && Number.isFinite(y)) {
+                    anchorPositions[String(id)] = { x, y };
+                }
             });
         }
 
@@ -5525,7 +5537,7 @@ class WebAppClient {
         }
 
         // Prepare edges for vis-network
-        const edges = data.edges.map(edge => {
+        const edges = data.edges.flatMap(edge => {
             const relationType = String(edge.relation_type || '').toUpperCase();
             const relationConfig = this.symbolConfig?.relationships?.[relationType] || {};
             const baseLabel = relationConfig.label || edge.label || relationType;
@@ -5534,10 +5546,15 @@ class WebAppClient {
                 : baseLabel;
             const edgeKey = this._buildEdgeKey(edge);
             const isHiddenByToggle = this.hiddenEdges.has(edgeKey);
-            return ({
+            const isHighlighted = this.highlightedEdges.has(edgeKey);
+            const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
+            const edgeId = `${edgeKey}:1-main`;
+            const edgeOptions = {
             from: edge.from_node,
             to: edge.to_node,
+            id: edgeId,
             _edgeKey: edgeKey,
+            _edgeLayer: 'main',
             relation_type: edge.relation_type,
             is_logical: edge.is_logical,
             metric_options: edge.metric_options || [],
@@ -5558,11 +5575,63 @@ class WebAppClient {
             hidden: isHiddenByToggle
                 || this.hiddenNodes.has(Number(edge.from_node))
                 || this.hiddenNodes.has(Number(edge.to_node)),
+            shadow: isHighlighted ? {
+                enabled: true,
+                color: '#ffffff',
+                size: 30,
+                x: 0,
+                y: 0,
+            } : undefined,
             smooth: edgeCurvatureMap[edgeKey] || {
                 type: 'continuous',
                 roundness: 0.18
             }
-        });
+            };
+
+            if (isHighlighted) {
+                const highlightUnderlay = {
+                    ...edgeOptions,
+                    id: `${edgeKey}:0-highlight`,
+                    _edgeLayer: 'highlight-underlay',
+                    color: {
+                        color: edge.color,
+                        opacity: 0.35,
+                    },
+                    width: Number(edge.width || 1) + 5,
+                    label: '',
+                    originalLabel: '',
+                    title: undefined,
+                    arrows: undefined,
+                    font: undefined,
+                    shadow: undefined,
+                };
+                return [highlightUnderlay, edgeOptions];
+            }
+
+            if (!hasDoubleLine) return [edgeOptions];
+
+            const underlay = {
+                ...edgeOptions,
+                id: `${edgeKey}:0-underlay`,
+                _edgeLayer: 'underlay',
+                color: edge.color,
+                width: Number(edge.width || 1) + 5,
+                label: '',
+                originalLabel: '',
+                title: undefined,
+                font: undefined,
+            };
+            const foreground = {
+                ...edgeOptions,
+                color: edgeLabelBackground,
+                arrows: undefined,
+                shadow: undefined,
+                font: {
+                    ...edgeOptions.font,
+                    color: edge.color,
+                },
+            };
+            return [underlay, foreground];
         });
 
         // Network options
@@ -5811,15 +5880,30 @@ class WebAppClient {
 
         const edgeKey = edge._edgeKey;
         const isHidden = this.hiddenEdges.has(edgeKey);
+        const isHighlighted = this.highlightedEdges.has(edgeKey);
+        const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
         const visibilityItem = {
             label: isHidden ? 'Show Relationship' : 'Hide Relationship',
             active: isHidden,
             action: () => this._ctxToggleEdgeVisibility(edgeId),
         };
+        const formattingItems = [
+            {
+                label: 'Highlight',
+                active: isHighlighted,
+                action: () => this._ctxToggleEdgeHighlight(edgeKey),
+            },
+            {
+                label: 'Double Line',
+                active: hasDoubleLine,
+                action: () => this._ctxToggleDoubleLine(edgeKey),
+            },
+        ];
         let metricOptions = edge.metric_options || [];
         if (metricOptions.length === 0 && this.sessionId) {
             this._showSimpleContextMenu([
                 visibilityItem,
+                ...formattingItems,
                 { separator: true },
                 { label: 'Loading metrics...', disabled: true },
             ], event);
@@ -5848,6 +5932,7 @@ class WebAppClient {
                 if (this._contextMenu) {
                     this._showSimpleContextMenu([
                         visibilityItem,
+                        ...formattingItems,
                         { separator: true },
                         { label: 'Metrics unavailable', disabled: true },
                     ], event);
@@ -5856,7 +5941,7 @@ class WebAppClient {
             }
         }
 
-        const items = [visibilityItem, { separator: true }];
+        const items = [visibilityItem, ...formattingItems, { separator: true }];
         if (metricOptions.length > 0) {
             items.push({
                 label: 'Metrics',
@@ -6238,6 +6323,30 @@ class WebAppClient {
         }
 
         this._applyNodeVisibilityState();
+    }
+
+    _rerenderEdgeFormatting() {
+        if (!this.network || !this.latestDiagramData) return;
+        const positionSnapshot = this._captureDiagramPositionSnapshot();
+        this.renderDiagram(this.latestDiagramData, positionSnapshot);
+    }
+
+    _ctxToggleEdgeHighlight(edgeKey) {
+        if (this.highlightedEdges.has(edgeKey)) {
+            this.highlightedEdges.delete(edgeKey);
+        } else {
+            this.highlightedEdges.add(edgeKey);
+        }
+        this._rerenderEdgeFormatting();
+    }
+
+    _ctxToggleDoubleLine(edgeKey) {
+        if (this.doubleLineEdges.has(edgeKey)) {
+            this.doubleLineEdges.delete(edgeKey);
+        } else {
+            this.doubleLineEdges.add(edgeKey);
+        }
+        this._rerenderEdgeFormatting();
     }
 
     _applyNodeVisibilityState() {
@@ -7385,6 +7494,8 @@ class WebAppClient {
         this.hiddenNodes.clear();
         this.hiddenLabels.clear();
         this.hiddenEdges.clear();
+        this.highlightedEdges.clear();
+        this.doubleLineEdges.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
         this.summaryRowOrder = [];
