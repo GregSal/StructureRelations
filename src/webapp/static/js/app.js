@@ -5706,15 +5706,13 @@ class WebAppClient {
             params.event.preventDefault();
             this._dismissContextMenu();
             const domPoint = params.pointer?.DOM;
-            const hitNode = domPoint ? this.network.getNodeAt(domPoint) : null;
-            const targetNode = hitNode ?? (params.nodes.length > 0 ? params.nodes[0] : null);
+            const targetNode = domPoint ? this.network.getNodeAt(domPoint) : null;
             if (targetNode !== null && targetNode !== undefined) {
                 this._showNodeContextMenu(Number(targetNode), params.event);
                 return;
             }
 
-            const hitEdge = domPoint ? this.network.getEdgeAt(domPoint) : null;
-            const targetEdge = hitEdge ?? (params.edges.length > 0 ? params.edges[0] : null);
+            const targetEdge = domPoint ? this.network.getEdgeAt(domPoint) : null;
             if (targetEdge !== null && targetEdge !== undefined) {
                 this._showEdgeContextMenu(targetEdge, params.event, params.pointer);
             }
