@@ -16,8 +16,9 @@ import time
 import math
 from contextlib import asynccontextmanager
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import io
 import networkx as nx
@@ -224,6 +225,13 @@ class DiagramNode(BaseModel):
 class DiagramMetricOption(BaseModel):
     name: str
     label: str
+    menu_path: List[str] = Field(default_factory=list)
+
+
+class DiagramMetricValue(BaseModel):
+    label: str
+    value: str
+    direction: Optional[str] = None
 
 
 class DiagramEdgeMetricRequest(BaseModel):
@@ -239,6 +247,7 @@ class DiagramEdgeMetricResponse(BaseModel):
     metric_name: Optional[str] = None
     label: Optional[str] = None
     value: Optional[str] = None
+    values: List[DiagramMetricValue] = Field(default_factory=list)
     unit: str = ''
 
 
@@ -2235,21 +2244,48 @@ def extract_target_group_key(label: str) -> Optional[str]:
     return f'{family}{dose}'
 
 
-_DIAGRAM_METRIC_DETAILS = {
-    'minimum_margins': (
-        'Minimum margin', 'margin', 'minimum_margin', 'distance_precision', True,
+@dataclass(frozen=True)
+class DiagramMetricSpec:
+    '''Edge-menu display option backed by a registered metric calculator.'''
+    calculator: str
+    title: str
+    menu_path: Tuple[str, ...]
+    category: str
+    field: str
+    precision_field: str
+    has_unit: bool
+    as_percent: bool = False
+
+
+# Insertion order defines the order of the edge-menu metric submenus.
+_DIAGRAM_METRICS = {
+    'minimum_distance': DiagramMetricSpec(
+        'minimum_distance', 'Minimum distance', ('Distance',),
+        'distance', 'minimum_distance', 'distance_precision', True,
     ),
-    'minimum_distance': (
-        'Minimum distance', 'distance', 'minimum_distance', 'distance_precision', True,
+    'orthogonal_margins': DiagramMetricSpec(
+        'minimum_margins', 'Orthogonal Margins', ('Margins', 'Orthogonal'),
+        'margin', 'orthogonal_margins', 'distance_precision', True,
     ),
-    'overlapping_volume_ratio': (
-        'Overlapping volume ratio', 'volume_ratio', 'overlapping_ratio',
-        'ratio_precision', False,
+    'minimum_margin': DiagramMetricSpec(
+        'minimum_margins', 'Minimum margin', ('Margins', 'Minimum'),
+        'margin', 'minimum_margin', 'distance_precision', True,
     ),
-    'non_overlapping_volume_ratio': (
-        'Non-overlapping volume ratio', 'volume_ratio', 'non_overlapping_ratio',
-        'ratio_precision', False,
+    'overlapping_volume_ratio': DiagramMetricSpec(
+        'overlapping_volume_ratio', 'Overlapping volume ratio',
+        ('Volume Ratio', 'Overlapping'),
+        'volume_ratio', 'overlapping_ratio', 'ratio_precision', False, True,
     ),
+    'non_overlapping_volume_ratio': DiagramMetricSpec(
+        'non_overlapping_volume_ratio', 'Non-overlapping volume ratio',
+        ('Volume Ratio', 'Non-overlapping'),
+        'volume_ratio', 'non_overlapping_ratio', 'ratio_precision', False, True,
+    ),
+}
+_AXIS_DIRECTION_LABELS = {
+    'x_neg': '-X', 'x_pos': '+X',
+    'y_neg': '-Y', 'y_pos': '+Y',
+    'z_neg': '-Z', 'z_pos': '+Z',
 }
 _SYMMETRIC_DIAGRAM_RELATIONS = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
 
@@ -2262,12 +2298,30 @@ def _get_applicable_diagram_metrics(relationship) -> List[DiagramMetricOption]:
     return [
         DiagramMetricOption(
             name=name,
-            label=_DIAGRAM_METRIC_DETAILS[name][0],
+            label=spec.title,
+            menu_path=list(spec.menu_path),
         )
-        for name, calculator in calculators.items()
-        if name in _DIAGRAM_METRIC_DETAILS
-        and calculator.is_applicable(relationship)
+        for name, spec in _DIAGRAM_METRICS.items()
+        if spec.calculator in calculators
+        and calculators[spec.calculator].is_applicable(relationship)
     ]
+
+
+def _format_metric_value(value, precision: int, scale: float = 1.0) -> str:
+    try:
+        numeric_value = float(value) * scale
+    except (TypeError, ValueError):
+        return 'N/A'
+    if not math.isfinite(numeric_value):
+        return 'N/A'
+    return f'{numeric_value:.{precision}f}'
+
+
+def _get_stored_metric_value(relationship, spec: DiagramMetricSpec):
+    if relationship.metrics is None:
+        return None
+    metric_category = getattr(relationship.metrics, spec.category, None)
+    return getattr(metric_category, spec.field, None)
 
 
 @app.post(
@@ -2298,8 +2352,8 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
     if request.metric_name is None:
         return DiagramEdgeMetricResponse(metrics=options)
 
-    details = _DIAGRAM_METRIC_DETAILS.get(request.metric_name)
-    if details is None:
+    spec = _DIAGRAM_METRICS.get(request.metric_name)
+    if spec is None:
         raise HTTPException(status_code=404, detail='Metric not found')
     if request.metric_name not in {option.name for option in options}:
         raise HTTPException(
@@ -2307,35 +2361,50 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
             detail='Metric is not applicable to this relationship',
         )
 
-    label, category, value_field, precision_field, has_unit = details
-    metric_category = getattr(relationship.metrics, category, None) \
-        if relationship.metrics is not None else None
-    value = getattr(metric_category, value_field, None)
+    value = _get_stored_metric_value(relationship, spec)
     if value is None:
-        result = structure_set.calculate_metric(roi_a, roi_b, request.metric_name)
+        result = structure_set.calculate_metric(roi_a, roi_b, spec.calculator)
         session_manager.save_session(request.session_id, session_data)
-        metric_category = getattr(relationship.metrics, category, None) \
-            if relationship.metrics is not None else None
-        value = getattr(metric_category, value_field, None)
+        value = _get_stored_metric_value(relationship, spec)
         if value is None:
-            value = getattr(result, value_field, None)
+            value = getattr(result, spec.field, None)
 
     config = get_metrics_config()
-    precision = int(getattr(config, precision_field, 2))
-    try:
-        numeric_value = float(value)
-        formatted_value = (
-            f'{numeric_value:.{precision}f}'
-            if math.isfinite(numeric_value) else 'N/A'
-        )
-    except (TypeError, ValueError):
-        formatted_value = 'N/A'
+    precision = int(getattr(config, spec.precision_field, 2))
+    unit = getattr(structure_set, 'unit', config.distance_unit) if spec.has_unit else ''
 
-    unit = getattr(structure_set, 'unit', config.distance_unit) if has_unit else ''
+    if isinstance(value, dict):
+        direction_labels = (
+            config.anatomical_labels if config.use_anatomical_labels
+            else _AXIS_DIRECTION_LABELS
+        )
+        directions = config.orthogonal_directions or list(value)
+        return DiagramEdgeMetricResponse(
+            metric_name=request.metric_name,
+            label=spec.title,
+            values=[
+                DiagramMetricValue(
+                    label=direction_labels.get(direction, direction),
+                    value=_format_metric_value(value.get(direction), precision),
+                    direction=direction,
+                )
+                for direction in directions
+            ],
+            unit=unit,
+        )
+
+    if spec.as_percent:
+        return DiagramEdgeMetricResponse(
+            metric_name=request.metric_name,
+            label=spec.title,
+            value=_format_metric_value(value, max(precision - 2, 0), 100.0),
+            unit='%',
+        )
+
     return DiagramEdgeMetricResponse(
         metric_name=request.metric_name,
-        label=label,
-        value=formatted_value,
+        label=spec.title,
+        value=_format_metric_value(value, precision),
         unit=unit,
     )
 

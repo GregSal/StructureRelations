@@ -1,6 +1,7 @@
 """Focused API tests for diagram edge metric actions."""
 
 from types import SimpleNamespace
+import math
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,7 +35,14 @@ class FakeMetricStructureSet:
                 volume_ratio=None,
             )
         if metric_name == 'minimum_margins':
-            result = SimpleNamespace(minimum_margin=1.234)
+            result = SimpleNamespace(
+                minimum_margin=1.234,
+                orthogonal_margins={
+                    'x_neg': 0.5, 'x_pos': 0.25,
+                    'y_neg': 1.0, 'y_pos': 1.5,
+                    'z_neg': math.nan, 'z_pos': 0.3,
+                },
+            )
             self.relationship.metrics.margin = result
         elif metric_name == 'overlapping_volume_ratio':
             if self.relationship.metrics.volume_ratio is None:
@@ -90,21 +98,60 @@ def test_edge_metric_options_only_include_compatible_calculators(
     )
 
     assert response.status_code == 200
-    names = {item['name'] for item in response.json()['metrics']}
+    options = response.json()['metrics']
+    names = {item['name'] for item in options}
+    calculators = MetricCalculatorRegistry.get_all_calculators()
     expected = {
         name
-        for name, calculator in MetricCalculatorRegistry.get_all_calculators().items()
-        if name in web_main._DIAGRAM_METRIC_DETAILS
-        and calculator.is_applicable(structure_set.relationship)
+        for name, spec in web_main._DIAGRAM_METRICS.items()
+        if spec.calculator in calculators
+        and calculators[spec.calculator].is_applicable(structure_set.relationship)
     }
     assert names == expected
     assert 'minimum_distance' not in names
+    paths = {item['name']: item['menu_path'] for item in options}
+    assert paths['orthogonal_margins'] == ['Margins', 'Orthogonal']
+    assert paths['minimum_margin'] == ['Margins', 'Minimum']
+    assert paths['overlapping_volume_ratio'] == ['Volume Ratio', 'Overlapping']
+
+
+def test_margin_views_share_one_calculation(monkeypatch, tmp_path):
+    structure_set = FakeMetricStructureSet('CONTAINS')
+    client, _ = _make_client(monkeypatch, tmp_path, structure_set)
+
+    orthogonal = client.post(
+        '/api/diagram/edge-metric',
+        json=_request(1, 2, 'orthogonal_margins'),
+    )
+    minimum = client.post(
+        '/api/diagram/edge-metric',
+        json=_request(1, 2, 'minimum_margin'),
+    )
+
+    assert orthogonal.status_code == minimum.status_code == 200
+    payload = orthogonal.json()
+    assert payload['value'] is None
+    assert payload['unit'] == 'cm'
+    assert [item['value'] for item in payload['values']] == [
+        '0.50', '0.25', '1.00', '1.50', 'N/A', '0.30',
+    ]
+    assert [item['direction'] for item in payload['values']] == [
+        'x_neg', 'x_pos', 'y_neg', 'y_pos', 'z_neg', 'z_pos',
+    ]
+    config = web_main.get_metrics_config()
+    if config.use_anatomical_labels:
+        assert [item['label'] for item in payload['values']] == [
+            config.anatomical_labels[direction]
+            for direction in config.orthogonal_directions
+        ]
+    assert minimum.json()['value'] == '1.23'
+    assert structure_set.calculation_calls == [(1, 2, 'minimum_margins')]
 
 
 def test_edge_metric_is_calculated_once_and_persisted(monkeypatch, tmp_path):
     structure_set = FakeMetricStructureSet('CONTAINS')
     client, manager = _make_client(monkeypatch, tmp_path, structure_set)
-    payload = _request(1, 2, 'minimum_margins')
+    payload = _request(1, 2, 'minimum_margin')
 
     first = client.post('/api/diagram/edge-metric', json=payload)
     second = client.post('/api/diagram/edge-metric', json=payload)
@@ -138,8 +185,8 @@ def test_symmetric_edge_calculates_using_stored_relationship_direction(
     )
 
     assert response.status_code == 200
-    assert response.json()['value'] == '0.457'
-    assert response.json()['unit'] == ''
+    assert response.json()['value'] == '45.7'
+    assert response.json()['unit'] == '%'
     assert structure_set.calculation_calls == [
         (1, 2, 'overlapping_volume_ratio')
     ]
@@ -164,9 +211,9 @@ def test_volume_ratio_calculators_reuse_their_own_shared_result_field(
         json=_request(1, 2, 'overlapping_volume_ratio'),
     )
 
-    assert overlap.json()['value'] == '0.457'
-    assert non_overlap.json()['value'] == '0.321'
-    assert overlap_again.json()['value'] == '0.457'
+    assert overlap.json()['value'] == '45.7'
+    assert non_overlap.json()['value'] == '32.1'
+    assert overlap_again.json()['value'] == '45.7'
     assert structure_set.calculation_calls == [
         (1, 2, 'overlapping_volume_ratio'),
         (1, 2, 'non_overlapping_volume_ratio'),

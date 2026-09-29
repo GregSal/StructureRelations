@@ -2296,14 +2296,7 @@ class WebAppClient {
         );
     }
 
-    _showSimpleContextMenu(items, event) {
-        this._dismissContextMenu();
-
-        const menu = document.createElement('div');
-        menu.className = 'node-context-menu';
-        menu.style.left = `${event.clientX}px`;
-        menu.style.top = `${event.clientY}px`;
-
+    _appendContextMenuItems(menu, items) {
         for (const item of items) {
             if (item.separator) {
                 const sep = document.createElement('div');
@@ -2320,6 +2313,31 @@ class WebAppClient {
             if (item.disabled) {
                 el.classList.add('is-disabled');
             }
+
+            if (item.children?.length) {
+                el.classList.add('has-submenu');
+                const label = document.createElement('span');
+                label.textContent = item.label;
+                const arrow = document.createElement('span');
+                arrow.className = 'node-context-menu-arrow';
+                arrow.textContent = '\u25b8';
+                const submenu = document.createElement('div');
+                submenu.className = 'node-context-menu node-context-submenu';
+                this._appendContextMenuItems(submenu, item.children);
+                el.append(label, arrow, submenu);
+                el.addEventListener('mouseenter', () => {
+                    submenu.classList.remove('opens-left');
+                    if (submenu.getBoundingClientRect().right > window.innerWidth) {
+                        submenu.classList.add('opens-left');
+                    }
+                });
+                el.addEventListener('mousedown', (mouseEvent) => {
+                    mouseEvent.stopPropagation();
+                });
+                menu.appendChild(el);
+                continue;
+            }
+
             el.textContent = item.label;
             if (!item.disabled) {
                 el.addEventListener('mousedown', (mouseEvent) => {
@@ -2330,6 +2348,17 @@ class WebAppClient {
             }
             menu.appendChild(el);
         }
+    }
+
+    _showSimpleContextMenu(items, event) {
+        this._dismissContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'node-context-menu';
+        menu.style.left = `${event.clientX}px`;
+        menu.style.top = `${event.clientY}px`;
+
+        this._appendContextMenuItems(menu, items);
 
         document.body.appendChild(menu);
         this._contextMenu = menu;
@@ -5783,7 +5812,7 @@ class WebAppClient {
         const edgeKey = edge._edgeKey;
         const isHidden = this.hiddenEdges.has(edgeKey);
         const visibilityItem = {
-            label: isHidden ? 'Show Relation' : 'Hide Relation',
+            label: isHidden ? 'Show Relationship' : 'Hide Relationship',
             active: isHidden,
             action: () => this._ctxToggleEdgeVisibility(edgeId),
         };
@@ -5827,24 +5856,39 @@ class WebAppClient {
             }
         }
 
-        const items = [visibilityItem];
+        const items = [visibilityItem, { separator: true }];
         if (metricOptions.length > 0) {
-            items.push({ separator: true });
-            metricOptions.forEach((metric) => {
-                items.push({
-                    label: metric.label,
-                    action: () => this._showEdgeMetric(edgeId, metric, pointer),
-                });
+            items.push({
+                label: 'Metrics',
+                children: this._buildMetricMenuItems(edgeId, metricOptions, pointer),
             });
         } else {
-            items.push(
-                { separator: true },
-                { label: 'No compatible metrics', disabled: true },
-            );
+            items.push({ label: 'No compatible metrics', disabled: true });
         }
         if (this._contextMenu || edge.metric_options?.length > 0) {
             this._showSimpleContextMenu(items, event);
         }
+    }
+
+    _buildMetricMenuItems(edgeId, metricOptions, pointer) {
+        const root = [];
+        metricOptions.forEach((metric) => {
+            const path = metric.menu_path?.length ? metric.menu_path : [metric.label];
+            let level = root;
+            path.slice(0, -1).forEach((groupLabel) => {
+                let group = level.find(item => item.label === groupLabel && item.children);
+                if (!group) {
+                    group = { label: groupLabel, children: [] };
+                    level.push(group);
+                }
+                level = group.children;
+            });
+            level.push({
+                label: path[path.length - 1],
+                action: () => this._showEdgeMetric(edgeId, metric, pointer),
+            });
+        });
+        return root;
     }
 
     async _showEdgeMetric(edgeId, metric, pointer) {
@@ -5856,11 +5900,18 @@ class WebAppClient {
         const overlay = document.createElement('div');
         overlay.className = 'edge-metric-overlay';
         overlay.setAttribute('role', 'status');
+        this._applyMetricOverlayTheme(overlay);
 
-        const value = document.createElement('span');
+        const content = document.createElement('div');
+        content.className = 'edge-metric-overlay-content';
+        const heading = document.createElement('div');
+        heading.className = 'edge-metric-overlay-heading';
+        heading.textContent = this._buildMetricOverlayHeading(edge);
+        const value = document.createElement('div');
         value.className = 'edge-metric-overlay-value';
         value.textContent = `${metric.label}: calculating...`;
-        overlay.appendChild(value);
+        content.append(heading, value);
+        overlay.appendChild(content);
 
         const closeButton = document.createElement('button');
         closeButton.className = 'edge-metric-overlay-close';
@@ -5914,13 +5965,130 @@ class WebAppClient {
                 throw new Error(data.detail || 'Metric calculation failed');
             }
             if (this._metricOverlays.get(edgeId) !== state) return;
-            const unit = data.unit ? ` ${data.unit}` : '';
-            value.textContent = `${data.label}: ${data.value}${unit}`;
+            this._renderMetricOverlayValue(value, data);
         } catch (error) {
             if (this._metricOverlays.get(edgeId) !== state) return;
             value.textContent = `${metric.label}: unavailable`;
             this.appendStatusLogLine('frontend', error.message);
         }
+    }
+
+    _buildMetricOverlayHeading(edge) {
+        const nodes = this.network.body.data.nodes;
+        const nodeLabel = (id) => {
+            const node = nodes.get(id);
+            return node?._originalLabel || node?.label || `ROI ${id}`;
+        };
+        const relationLabel = edge.originalLabel || edge.relation_type || '';
+        return `${nodeLabel(edge.from)} ${relationLabel} ${nodeLabel(edge.to)}`;
+    }
+
+    _applyMetricOverlayTheme(element) {
+        const background = this.diagramOptions?.Background?.color || '#ffffff';
+        const hex = background.replace('#', '');
+        const fullHex = hex.length === 3
+            ? hex.split('').map(ch => ch + ch).join('')
+            : hex;
+        const channels = [0, 2, 4].map(start => parseInt(fullHex.substr(start, 2), 16));
+        const base = channels.every(Number.isFinite) ? channels : [255, 255, 255];
+        const lighten = amount => base
+            .map(channel => Math.round(channel + (255 - channel) * amount))
+            .join(', ');
+        element.style.backgroundColor = `rgba(${lighten(0.15)}, 0.75)`;
+        element.style.borderColor = `rgba(${lighten(0.35)}, 0.8)`;
+        element.style.color = this.getTextColor(background);
+        element.style.fontFamily = this.diagramOptions?.font?.face || 'Arial';
+    }
+
+    _renderMetricOverlayValue(element, data) {
+        let unit = '';
+        if (data.unit) {
+            unit = data.unit === '%' ? '%' : ` ${data.unit}`;
+        }
+        if (!data.values?.length) {
+            element.textContent = `${data.label}: ${data.value}${unit}`;
+            return;
+        }
+        const title = document.createElement('div');
+        title.textContent = data.unit ? `${data.label} (${data.unit})` : data.label;
+        element.replaceChildren(title, this._buildOrthogonalMetricDiagram(data.values));
+    }
+
+    _buildOrthogonalMetricDiagram(values) {
+        const anatomicalSlots = {
+            R: ['left', 'RT'], L: ['right', 'LT'],
+            A: ['up', 'ANT'], P: ['down', 'POST'],
+            S: ['upRight', 'SUP'], I: ['downLeft', 'INF'],
+        };
+        const axisSlots = {
+            x_neg: 'left', x_pos: 'right',
+            y_neg: 'up', y_pos: 'down',
+            z_neg: 'downLeft', z_pos: 'upRight',
+        };
+        const slots = {};
+        values.forEach((entry) => {
+            const anatomical = anatomicalSlots[String(entry.label).toUpperCase()];
+            const slot = anatomical ? anatomical[0] : axisSlots[entry.direction];
+            if (slot) {
+                slots[slot] = {
+                    label: anatomical ? anatomical[1] : entry.label,
+                    value: entry.value,
+                };
+            }
+        });
+
+        // Layout units are em, so the diagram scales with the overlay font size.
+        const width = 12.6;
+        const height = 7.6;
+        const cx = 6.3;
+        const cy = 3.8;
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('class', 'edge-metric-overlay-diagram');
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.style.width = `${width}em`;
+        svg.style.height = `${height}em`;
+
+        const addLine = (x1, y1, x2, y2) => {
+            const line = document.createElementNS(svgNS, 'line');
+            Object.entries({ x1, y1, x2, y2 }).forEach(([key, val]) => {
+                line.setAttribute(key, val);
+            });
+            svg.appendChild(line);
+        };
+        const addText = (text, x, y, anchor = 'middle') => {
+            const node = document.createElementNS(svgNS, 'text');
+            node.setAttribute('x', x);
+            node.setAttribute('y', y);
+            node.setAttribute('text-anchor', anchor);
+            node.textContent = text;
+            svg.appendChild(node);
+        };
+
+        addLine(cx - 0.3, cy, cx - 2.3, cy);
+        addLine(cx + 0.3, cy, cx + 2.3, cy);
+        addLine(cx, cy - 0.3, cx, cy - 1.7);
+        addLine(cx, cy + 0.3, cx, cy + 1.7);
+        addLine(cx + 0.25, cy - 0.25, cx + 1.8, cy - 1.6);
+        addLine(cx - 0.25, cy + 0.25, cx - 1.8, cy + 1.6);
+
+        if (slots.left) {
+            addText(`${slots.left.value} ${slots.left.label}`, cx - 2.5, cy, 'end');
+        }
+        if (slots.right) {
+            addText(`${slots.right.label} ${slots.right.value}`, cx + 2.5, cy, 'start');
+        }
+        [
+            ['up', cx, -1],
+            ['upRight', cx + 2.5, -1],
+            ['down', cx, 1],
+            ['downLeft', cx - 2.5, 1],
+        ].forEach(([slot, x, sign]) => {
+            if (!slots[slot]) return;
+            addText(slots[slot].label, x, cy + sign * 2.2);
+            addText(slots[slot].value, x, cy + sign * 3.3);
+        });
+        return svg;
     }
 
     _getMetricEdgeMidpoint(from, to) {
@@ -5951,6 +6119,8 @@ class WebAppClient {
         });
         state.element.style.left = `${point.x}px`;
         state.element.style.top = `${point.y}px`;
+        const nodeFontSize = Number(this.diagramOptions?.font?.node_size || 14);
+        state.element.style.fontSize = `${nodeFontSize * this.network.getScale()}px`;
     }
 
     _enableMetricOverlayDragging(state) {
