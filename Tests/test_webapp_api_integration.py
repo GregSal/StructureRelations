@@ -21,10 +21,10 @@ from webapp.main import app
 import webapp.main as web_main
 from webapp.session_manager import SessionData, SessionManager
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
-    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
-)
+#pytestmark = pytest.mark.skipif(
+#    os.environ.get('RUN_SELENIUM_TESTS', '0') != '1',
+#    reason='Selenium UI tests require browser/driver stability; set RUN_SELENIUM_TESTS=1 to run.',
+#)
 
 class FakeDiagramStructureSet:
     '''Pickle-safe minimal structure set for diagram endpoint tests.'''
@@ -354,7 +354,7 @@ def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_
 
     assert response.status_code == 200
     names = [template['name'] for template in response.json()['templates']]
-    assert names[:4] == [
+    assert names[:3] == [
         'Target Relations',
         'All Structures',
         'Targets vs OARs'
