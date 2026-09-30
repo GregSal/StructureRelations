@@ -8,6 +8,7 @@ import shutil
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Optional
 
 import networkx as nx
 import pandas as pd
@@ -29,13 +30,18 @@ from webapp.session_manager import SessionData, SessionManager
 class FakeDiagramStructureSet:
     '''Pickle-safe minimal structure set for diagram endpoint tests.'''
 
-    def __init__(self, relationship, tolerance: float = 0.1):
+    def __init__(
+        self,
+        relationship,
+        tolerance: float = 0.1,
+        summary_rows: Optional[list[dict]] = None,
+    ):
         self.relationship_graph = nx.DiGraph()
         self.relationship_graph.add_edge(1, 2, relationship=relationship)
         self.tolerance = tolerance
         self.dicom_structure_file = None
-        self._summary_df = pd.DataFrame(
-            [
+        if summary_rows is None:
+            summary_rows = [
                 {
                     'ROI': 1,
                     'Name': 'Alpha',
@@ -51,7 +57,7 @@ class FakeDiagramStructureSet:
                     'Num_Regions': 1,
                 },
             ]
-        )
+        self._summary_df = pd.DataFrame(summary_rows)
         self._relationship = relationship
 
     def summary(self):
@@ -398,8 +404,8 @@ def test_diagram_request_returns_partial_template_positions(monkeypatch, tmp_pat
 
     assert default_response.status_code == 200
     default_payload = default_response.json()
-    assert [node['id'] for node in default_payload['nodes']] == [1]
-    assert default_payload['template_displayed_rois'] == [1]
+    assert [node['id'] for node in default_payload['nodes']] == [1, 2]
+    assert default_payload['template_displayed_rois'] is None
 
     response = client.post(
         '/api/diagram',
@@ -922,7 +928,7 @@ def test_diagram_payload_includes_layout_metadata(monkeypatch, tmp_path):
 
 
 def test_diagram_disjoint_edges_excluded_from_layout(monkeypatch, tmp_path):
-    '''Verify disjoint edges are marked as not layout_candidate.'''
+    '''Hide disjoint edges by default and exclude shown ones from layout.'''
     client, manager = _prepare_client(monkeypatch, tmp_path)
     session_id = 'diagram-disjoint-exclude'
 
@@ -938,11 +944,23 @@ def test_diagram_disjoint_edges_excluded_from_layout(monkeypatch, tmp_path):
         SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
     )
 
+    default_response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert default_response.status_code == 200
+    assert default_response.json()['edges'] == []
+
     response = client.post(
         '/api/diagram',
         json={
             'session_id': session_id,
             'logical_relations_mode': 'show',
+            'show_disjoint': True,
         },
     )
 
@@ -995,31 +1013,18 @@ def test_diagram_side_tag_parsing_LRB(monkeypatch, tmp_path):
     client, manager = _prepare_client(monkeypatch, tmp_path)
     session_id = 'diagram-side-tags'
 
-    # Create structure set with custom names
-    class CustomFakeDiagramSet:
-        def __init__(self):
-            self.relationship_graph = nx.DiGraph()
-            self.relationship_graph.add_edge(1, 2, relationship=StructureRelationship(
-                de27im=None,
-                is_identical=False,
-                _override_type=RELATIONSHIP_TYPES['CONTAINS'],
-            ))
-            self.tolerance = 0.1
-            self.dicom_structure_file = None
-            self._summary_df = pd.DataFrame(
-                [
-                    {'ROI': 1, 'Name': 'PTV L', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
-                    {'ROI': 2, 'Name': 'PTV R', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
-                ]
-            )
-        def summary(self):
-            return self._summary_df
-        def get_relationship(self, from_roi, to_roi):
-            if from_roi == 1 and to_roi == 2:
-                return self.relationship_graph.edges[1, 2]['relationship']
-            return None
-
-    fake_set = CustomFakeDiagramSet()
+    relationship = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['CONTAINS'],
+    )
+    fake_set = FakeDiagramStructureSet(
+        relationship=relationship,
+        summary_rows=[
+            {'ROI': 1, 'Name': 'PTV L', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
+            {'ROI': 2, 'Name': 'PTV R', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
+        ],
+    )
     manager.save_session(
         session_id,
         SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
@@ -1048,31 +1053,18 @@ def test_diagram_opt_grouping_key_extraction(monkeypatch, tmp_path):
     client, manager = _prepare_client(monkeypatch, tmp_path)
     session_id = 'diagram-opt-grouping'
 
-    # Create structure set with opt names
-    class OptFakeDiagramSet:
-        def __init__(self):
-            self.relationship_graph = nx.DiGraph()
-            self.relationship_graph.add_edge(1, 2, relationship=StructureRelationship(
-                de27im=None,
-                is_identical=False,
-                _override_type=RELATIONSHIP_TYPES['OVERLAPS'],
-            ))
-            self.tolerance = 0.1
-            self.dicom_structure_file = None
-            self._summary_df = pd.DataFrame(
-                [
-                    {'ROI': 1, 'Name': 'opt Brainstem a', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
-                    {'ROI': 2, 'Name': 'opt Brainstem b', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
-                ]
-            )
-        def summary(self):
-            return self._summary_df
-        def get_relationship(self, from_roi, to_roi):
-            if from_roi == 1 and to_roi == 2:
-                return self.relationship_graph.edges[1, 2]['relationship']
-            return None
-
-    fake_set = OptFakeDiagramSet()
+    relationship = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['OVERLAPS'],
+    )
+    fake_set = FakeDiagramStructureSet(
+        relationship=relationship,
+        summary_rows=[
+            {'ROI': 1, 'Name': 'opt Brainstem a', 'DICOM_Type': 'CTV', 'Physical_Volume': 1.0, 'Num_Regions': 1},
+            {'ROI': 2, 'Name': 'opt Brainstem b', 'DICOM_Type': 'GTV', 'Physical_Volume': 2.0, 'Num_Regions': 1},
+        ],
+    )
     manager.save_session(
         session_id,
         SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),

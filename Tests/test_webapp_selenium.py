@@ -114,6 +114,14 @@ def test_dicom_file():
     return str(test_file)
 
 
+@pytest.fixture
+def diagram_selection_dicom_file():
+    """Returns a DICOM file with multiple structures for diagram selection."""
+    test_file = Path(__file__).parent / 'RS.GJS_Struct_Tests.BRBL BH.dcm'
+    assert test_file.exists(), f'Test file not found: {test_file}'
+    return str(test_file)
+
+
 class WebAppTestHelper:
     """Helper class for common web app testing operations."""
 
@@ -715,18 +723,28 @@ class TestDiagramStructureSelection:
         def test_selection_actions_preserve_and_restore_positions(
             self,
             chrome_headless_driver,
-            test_dicom_file,
+            diagram_selection_dicom_file,
         ):
             """Cancel, Add, and Apply should commit their respective selections."""
             helper = WebAppTestHelper(chrome_headless_driver)
             helper.navigate_home()
-            helper.upload_dicom(test_dicom_file)
+            helper.upload_dicom(diagram_selection_dicom_file)
 
             structures = helper.get_structure_list()
-            if len(structures) < 2:
-                pytest.skip('Diagram selection test requires at least two structures')
-
-            selected_rois = [structure['roi'] for structure in structures[:2]]
+            target_structures = [
+                structure
+                for structure in structures
+                if any(
+                    target in structure['name'].upper()
+                    for target in ('GTV', 'CTV', 'PTV', 'ITV', 'HTV')
+                )
+            ]
+            assert len(target_structures) >= 2, (
+                'Diagram selection test requires at least two target structures'
+            )
+            selected_rois = [
+                structure['roi'] for structure in target_structures[:2]
+            ]
             helper.select_structures(selected_rois)
             helper.start_processing()
             assert helper.wait_for_processing(timeout=240)
