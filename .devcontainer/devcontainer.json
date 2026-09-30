@@ -1,7 +1,10 @@
 {
   "name": "Structure Relations Dev Environment",
-  "image": "mcr.microsoft.com/vscode/devcontainers/anaconda:3",
-  "postCreateCommand": "apt-get update && apt-get install -y libnspr4 libnss3 libdbus-1-3 && mkdir -p .vscode && cp -f .devcontainer/settings.json .vscode/settings.json && cp -f .devcontainer/tasks.json .vscode/tasks.json && cp -f .devcontainer/launch.json .vscode/launch.json && cp -f .devcontainer/DevCont.env .env && cp -f .devcontainer/StructureRelations.yml environment.yml && conda init && conda env create --name StructureRelations -f .devcontainer/StructureRelations.yml",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "postCreateCommand": "mkdir -p .vscode && cp -f .devcontainer/settings.json .vscode/settings.json && cp -f .devcontainer/tasks.json .vscode/tasks.json && cp -f .devcontainer/launch.json .vscode/launch.json && cp -f .devcontainer/DevCont.env .env && cp -f .devcontainer/StructureRelations.yml environment.yml && conda init && conda env create --name StructureRelations -f .devcontainer/StructureRelations.yml",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -10,8 +13,6 @@
         "ms-python.vscode-pylance",
         "hbenl.vscode-test-explorer",
         "LittleFoxTeam.vscode-python-test-adapter",
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
         "streetsidesoftware.code-spell-checker",
         "ms-python.pylint",
         "ms-toolsai.datawrangler"
