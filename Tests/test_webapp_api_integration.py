@@ -357,8 +357,7 @@ def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_
     assert names[:4] == [
         'Target Relations',
         'All Structures',
-        'principle_targets',
-        'Targets vs OARs',
+        'Targets vs OARs'
     ]
 
 
