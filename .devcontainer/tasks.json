@@ -22,6 +22,30 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+        {
+            "label": "Selenium Tests",
+            "type": "shell",
+            "command": "/opt/conda/envs/StructureRelations/bin/python",
+            "args": [
+                "-m",
+                "pytest",
+                "--rootdir=/workspaces/StructureRelations",
+                "./Tests/test_webapp_api_integration.py",
+                "./Tests/test_webapp_selenium.py"
+            ],
+            "options": {
+                "env": {
+                    "RUN_SELENIUM_TESTS": "1",
+                    "PYTHONPATH": "${workspaceFolder}/src:${workspaceFolder}/Tests"
+                }
+            },
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
         }
    ]
 }
