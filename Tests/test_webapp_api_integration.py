@@ -315,6 +315,7 @@ def test_symbol_config_includes_diagram_style_sections(monkeypatch, tmp_path):
     assert payload['node_shapes'].get('default_shape')
     assert 'CONTAINS' in payload['relationship_styles']
     assert payload['relationships']['CONTAINS']['category'] == 'Shared'
+    assert payload['relationships']['CONTAINS']['complementary_relation'] == 'WITHIN'
     assert payload['relationships']['BORDERS']['category'] == 'Adjoining'
     assert payload['relationships']['DISJOINT']['category'] == 'Separate'
     assert payload['relationships']['UNKNOWN']['category'] == 'UNKNOWN'

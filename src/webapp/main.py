@@ -1017,6 +1017,9 @@ async def get_symbol_config():
                     'category': rel.get('category', 'UNKNOWN'),
                     'symbol': rel.get('symbol', '?'),
                     'label': rel.get('label', rel_type),
+                    'complementary_relation': rel.get(
+                        'complementary_relation', ''
+                    ),
                     'description': rel.get('description', ''),
                     'color': relationship_styles.get(rel_type, {}).get(
                         'color', '#9ca3af'

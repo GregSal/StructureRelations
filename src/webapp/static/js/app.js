@@ -2360,12 +2360,6 @@ class WebAppClient {
 
             const el = document.createElement('div');
             el.className = 'node-context-menu-item';
-            if (item.heading) {
-                el.className += ' node-context-menu-heading';
-                el.textContent = item.label;
-                menu.appendChild(el);
-                continue;
-            }
             if (item.active) {
                 el.classList.add('is-active');
             }
@@ -6050,8 +6044,22 @@ class WebAppClient {
             const targetLabel = targetNode?._originalLabel
                 || targetNode?.label
                 || `ROI ${to}`;
-            const relationshipLabel = edge.originalLabel
-                || edge.relation_type;
+            const relationshipType = String(
+                edge.relation_type || 'UNKNOWN'
+            ).toUpperCase();
+            const relationshipConfig =
+                this.symbolConfig?.relationships?.[relationshipType] || {};
+            const relationshipLabel = (
+                roi === to
+                    ? this.symbolConfig?.relationships?.[
+                        relationshipConfig.complementary_relation
+                    ]?.label
+                    : null
+            ) || relationshipConfig.label
+                || String(edge.originalLabel || relationshipType)
+                    .replace(/^\[|\]$/g, '');
+            const firstLabel = roi === to ? targetLabel : sourceLabel;
+            const secondLabel = roi === to ? sourceLabel : targetLabel;
 
             return [{
                 edgeId: edge.id,
@@ -6063,8 +6071,8 @@ class WebAppClient {
                     ? Number(edge.relationship_rank)
                     : 99,
                 distance,
-                label: `${sourceLabel} | ${relationshipLabel} | ${targetLabel}`,
-                type: String(edge.relation_type || 'UNKNOWN'),
+                label: `${firstLabel} ${relationshipLabel} ${secondLabel}`,
+                type: relationshipType,
                 hasCalculatedMetrics: Boolean(edge.has_calculated_metrics),
             }];
         });
@@ -6097,38 +6105,35 @@ class WebAppClient {
                     first[1].rank - second[1].rank
                     || first[0].localeCompare(second[0])
                 ))
-                .map(([type, group]) => ({
-                    label: type,
-                    children: group.relationships
-                        .sort(compareDistance)
-                        .map(relationship => ({
-                            label: relationship.label,
-                            hasCalculatedMetrics:
-                                relationship.hasCalculatedMetrics,
-                            hiddenBecauseStructure: hiddenStructure,
-                            hiddenBecauseEdge: !hiddenStructure
-                                && !relationship.edgeVisible,
-                            ...(hiddenStructure
-                                ? {
-                                    children: [{
-                                        label: 'Show Structure',
-                                        action: () => this._ctxToggleVisibility(
-                                            relationship.otherRoi,
-                                        ),
-                                    }],
-                                }
-                                : {
-                                    launchesContextMenu: true,
-                                    action: (menuEvent) => (
-                                        this._showEdgeContextMenu(
-                                            relationship.edgeId,
-                                            menuEvent,
-                                            null,
-                                        )
+                .flatMap(([, group]) => group.relationships
+                    .sort(compareDistance)
+                    .map(relationship => ({
+                        label: relationship.label,
+                        hasCalculatedMetrics:
+                            relationship.hasCalculatedMetrics,
+                        hiddenBecauseStructure: hiddenStructure,
+                        hiddenBecauseEdge: !hiddenStructure
+                            && !relationship.edgeVisible,
+                        ...(hiddenStructure
+                            ? {
+                                children: [{
+                                    label: 'Show Structure',
+                                    action: () => this._ctxToggleVisibility(
+                                        relationship.otherRoi,
                                     ),
-                                }),
-                        })),
-                }));
+                                }],
+                            }
+                            : {
+                                launchesContextMenu: true,
+                                action: (menuEvent) => (
+                                    this._showEdgeContextMenu(
+                                        relationship.edgeId,
+                                        menuEvent,
+                                        null,
+                                    )
+                                ),
+                            }),
+                    })));
         };
 
         const visibleStructureEdges = relationships.filter(
@@ -6146,27 +6151,18 @@ class WebAppClient {
         const items = [];
 
         if (visibleStructureEdges.length > 0) {
-            items.push(
-                { label: 'Other structures visible', heading: true },
-                ...groupByType(visibleEdges, false),
-            );
+            items.push(...groupByType(visibleEdges, false));
             if (hiddenEdges.length > 0) {
-                items.push(
-                    { separator: true },
-                    { label: 'Relationships hidden', heading: true },
-                    ...groupByType(hiddenEdges, false),
-                );
+                items.push({ separator: true });
+                items.push(...groupByType(hiddenEdges, false));
             }
         }
 
         if (hiddenStructureEdges.length > 0) {
             if (visibleStructureEdges.length > 0) {
-                items.push({ separator: true }, { separator: true });
+                items.push({ separator: true });
             }
-            items.push(
-                { label: 'Other structures hidden', heading: true },
-                ...groupByType(hiddenStructureEdges, true),
-            );
+            items.push(...groupByType(hiddenStructureEdges, true));
         }
 
         return items;

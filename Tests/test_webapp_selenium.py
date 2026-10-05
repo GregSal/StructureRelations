@@ -735,6 +735,24 @@ class TestDiagramRelationshipContextMenu:
         result = chrome_headless_driver.execute_script(
             """
             const app = window.app;
+            app.symbolConfig = {relationships: {
+                CONTAINS: {
+                    label: 'Contains',
+                    complementary_relation: 'WITHIN',
+                },
+                WITHIN: {
+                    label: 'is Within',
+                    complementary_relation: 'CONTAINS',
+                },
+                EQUALS: {
+                    label: 'is Equal to',
+                    complementary_relation: 'EQUALS',
+                },
+                OVERLAPS: {
+                    label: 'Overlaps with',
+                    complementary_relation: 'OVERLAPS',
+                },
+            }};
             const nodes = [
                 {id: 1, _originalLabel: 'Alpha', hidden: false},
                 {id: 2, _originalLabel: 'Beta', hidden: false},
@@ -745,14 +763,19 @@ class TestDiagramRelationshipContextMenu:
             ];
             const edges = [
                 {id: 'contains-far', from: 1, to: 2, relation_type: 'CONTAINS',
+                    originalLabel: 'Contains',
                     relationship_rank: 4, has_calculated_metrics: true},
                 {id: 'contains-near', from: 1, to: 4, relation_type: 'CONTAINS',
+                    originalLabel: 'Contains',
                     relationship_rank: 4, has_calculated_metrics: false},
                 {id: 'overlaps-hidden', from: 1, to: 5, relation_type: 'OVERLAPS',
+                    originalLabel: 'Overlaps with',
                     relationship_rank: 13, has_calculated_metrics: false},
                 {id: 'equals-visible', from: 1, to: 6, relation_type: 'EQUALS',
+                    originalLabel: 'is Equal to',
                     relationship_rank: 1, has_calculated_metrics: false},
                 {id: 'equals-hidden-node', from: 1, to: 3, relation_type: 'EQUALS',
+                    originalLabel: 'is Equal to',
                     relationship_rank: 1, has_calculated_metrics: false},
             ].map(edge => ({
                 ...edge,
@@ -799,49 +822,31 @@ class TestDiagramRelationshipContextMenu:
             };
 
             const items = app._buildNodeRelationshipMenuItems(1);
-            const visibleHeading = items.find(
-                item => item.label === 'Other structures visible'
+            const reverseItems = app._buildNodeRelationshipMenuItems(2);
+            const relationships = items.filter(item => !item.separator);
+            const nearestVisibleRelationship = relationships.find(
+                item => item.label.includes('Nearby')
             );
-            const visibleHeadingIndex = items.indexOf(visibleHeading);
-            const hiddenHeadingIndex = items.findIndex(
-                item => item.label === 'Relationships hidden'
+            const farVisibleRelationship = relationships.find(
+                item => item.label.includes('Beta')
             );
-            const visibleTypeItems = items.slice(
-                visibleHeadingIndex + 1,
-                hiddenHeadingIndex,
-            ).filter(item => item.children);
-            const contains = visibleTypeItems.find(
-                item => item.label === 'CONTAINS'
+            const hiddenEdgeRelationship = relationships.find(
+                item => item.label.includes('Faded')
             );
-            const hiddenEdgeGroup = items.find(
-                item => item.label === 'OVERLAPS'
+            const hiddenStructureRelationship = relationships.find(
+                item => item.label.includes('Hidden')
             );
-            const structureHeadingIndex = items.findIndex(
-                item => item.label === 'Other structures hidden'
-            );
-            const hiddenStructureGroup = items.slice(
-                structureHeadingIndex + 1,
-            ).find(item => item.label === 'EQUALS');
-            const hiddenStructureRelationship =
-                hiddenStructureGroup.children[0];
             hiddenStructureRelationship.children[0].action();
-            const nearestVisibleRelationship = contains.children[0];
             nearestVisibleRelationship.action({clientX: 123, clientY: 456});
             app._markEdgeMetricsCalculated('contains-near');
 
             return {
-                visibleTypeOrder: visibleTypeItems.map(item => item.label),
-                edgeVisibilitySeparators: items.slice(
-                    visibleHeadingIndex + 1,
-                    hiddenHeadingIndex,
-                ).filter(item => item.separator).length,
-                structureVisibilitySeparators: items.slice(
-                    hiddenHeadingIndex + 1,
-                    structureHeadingIndex,
-                ).filter(item => item.separator).length,
+                labels: relationships.map(item => item.label),
+                reverseLabel: reverseItems[0].label,
+                separatorCount: items.filter(item => item.separator).length,
                 nearestLabel: nearestVisibleRelationship.label,
-                metricEmphasis: contains.children[1].hasCalculatedMetrics,
-                hiddenEdgeStyle: hiddenEdgeGroup.children[0].hiddenBecauseEdge,
+                metricEmphasis: farVisibleRelationship.hasCalculatedMetrics,
+                hiddenEdgeStyle: hiddenEdgeRelationship.hiddenBecauseEdge,
                 hiddenStructureStyle:
                     hiddenStructureRelationship.hiddenBecauseStructure,
                 hiddenStructureActions:
@@ -853,10 +858,16 @@ class TestDiagramRelationshipContextMenu:
             """
         )
 
-        assert result['visibleTypeOrder'] == ['EQUALS', 'CONTAINS']
-        assert result['edgeVisibilitySeparators'] == 1
-        assert result['structureVisibilitySeparators'] == 2
-        assert 'Nearby' in result['nearestLabel']
+        assert result['labels'] == [
+            'Alpha is Equal to Equals',
+            'Alpha Contains Nearby',
+            'Alpha Contains Beta',
+            'Alpha Overlaps with Faded',
+            'Alpha is Equal to Hidden',
+        ]
+        assert result['reverseLabel'] == 'Beta is Within Alpha'
+        assert result['separatorCount'] == 2
+        assert result['nearestLabel'] == 'Alpha Contains Nearby'
         assert result['metricEmphasis'] is True
         assert result['hiddenEdgeStyle'] is True
         assert result['hiddenStructureStyle'] is True

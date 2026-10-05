@@ -1925,20 +1925,6 @@ tbody tr:hover {
     background: transparent;
 }
 
-.node-context-menu-heading {
-    color: var(--text-secondary);
-    cursor: default;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding-bottom: 0.3rem;
-    padding-top: 0.45rem;
-    text-transform: uppercase;
-}
-
-.node-context-menu-heading:hover {
-    background: transparent;
-}
-
 .node-context-menu-item.has-calculated-metrics {
     font-weight: 700;
 }
