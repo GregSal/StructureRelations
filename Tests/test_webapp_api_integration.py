@@ -350,6 +350,46 @@ def test_diagram_endpoint_uses_human_relationship_label(monkeypatch, tmp_path):
     edge = payload['edges'][0]
     assert edge['relation_type'] == 'CONTAINS'
     assert edge['label'] == 'Contains'
+    assert edge['relationship_rank'] == 4
+    assert edge['has_calculated_metrics'] is False
+
+
+def test_diagram_edge_exposes_equals_rank_and_calculated_metrics(
+    monkeypatch,
+    tmp_path,
+):
+    '''EQUALS edges report canonical rank and recognize stored zero metrics.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    session_id = 'diagram-equals-metrics'
+    relationship = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['EQUALS'],
+    )
+    relationship.metrics = SimpleNamespace(
+        volume_ratio=SimpleNamespace(overlapping_ratio=0.0),
+    )
+    manager.save_session(
+        session_id,
+        SessionData(
+            dicom_file_path='dummy.dcm',
+            structure_set=FakeDiagramStructureSet(relationship),
+        ),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': session_id,
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    edge = response.json()['edges'][0]
+    assert edge['relation_type'] == 'EQUALS'
+    assert edge['relationship_rank'] == 1
+    assert edge['has_calculated_metrics'] is True
 
 
 def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_path):

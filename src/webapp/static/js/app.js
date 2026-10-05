@@ -58,6 +58,7 @@ class WebAppClient {
         this.manualLayoutActive = false;
         this._dragFrozen = [];
         this._contextMenu = null;        // active context menu DOM element
+        this._contextMenuDismissHandler = null;
         this._metricOverlays = new Map();
         this._initialDiagramFitTimer = null;
         this._initialDiagramFitAttempts = 0;
@@ -2359,11 +2360,26 @@ class WebAppClient {
 
             const el = document.createElement('div');
             el.className = 'node-context-menu-item';
+            if (item.heading) {
+                el.className += ' node-context-menu-heading';
+                el.textContent = item.label;
+                menu.appendChild(el);
+                continue;
+            }
             if (item.active) {
                 el.classList.add('is-active');
             }
             if (item.disabled) {
                 el.classList.add('is-disabled');
+            }
+            if (item.hiddenBecauseStructure) {
+                el.classList.add('is-hidden-structure');
+            }
+            if (item.hiddenBecauseEdge) {
+                el.classList.add('is-hidden-edge');
+            }
+            if (item.hasCalculatedMetrics) {
+                el.classList.add('has-calculated-metrics');
             }
 
             if (item.children?.length) {
@@ -2385,6 +2401,27 @@ class WebAppClient {
                 });
                 el.addEventListener('mousedown', (mouseEvent) => {
                     mouseEvent.stopPropagation();
+                });
+                menu.appendChild(el);
+                continue;
+            }
+
+            if (item.launchesContextMenu) {
+                el.classList.add('has-submenu');
+                const label = document.createElement('span');
+                label.textContent = item.label;
+                const arrow = document.createElement('span');
+                arrow.className = 'node-context-menu-arrow';
+                arrow.textContent = '\u25b8';
+                el.append(label, arrow);
+                el.addEventListener('mousedown', (mouseEvent) => {
+                    mouseEvent.stopPropagation();
+                    const rect = el.getBoundingClientRect();
+                    this._dismissContextMenu();
+                    item.action?.({
+                        clientX: rect.right,
+                        clientY: rect.top,
+                    });
                 });
                 menu.appendChild(el);
                 continue;
@@ -2426,9 +2463,9 @@ class WebAppClient {
         const dismiss = (mouseEvent) => {
             if (!menu.contains(mouseEvent.target)) {
                 this._dismissContextMenu();
-                document.removeEventListener('mousedown', dismiss, true);
             }
         };
+        this._contextMenuDismissHandler = dismiss;
         document.addEventListener('mousedown', dismiss, true);
     }
 
@@ -5625,6 +5662,8 @@ class WebAppClient {
             _edgeKey: edgeKey,
             _edgeLayer: 'main',
             relation_type: edge.relation_type,
+            relationship_rank: edge.relationship_rank,
+            has_calculated_metrics: edge.has_calculated_metrics,
             is_logical: edge.is_logical,
             metric_options: edge.metric_options || [],
             label: showLabels ? displayLabel : '',
@@ -5857,6 +5896,14 @@ class WebAppClient {
     }
 
     _dismissContextMenu() {
+        if (this._contextMenuDismissHandler) {
+            document.removeEventListener(
+                'mousedown',
+                this._contextMenuDismissHandler,
+                true,
+            );
+            this._contextMenuDismissHandler = null;
+        }
         if (this._contextMenu) {
             this._contextMenu.remove();
             this._contextMenu = null;
@@ -5904,6 +5951,20 @@ class WebAppClient {
         );
     }
 
+    _markEdgeMetricsCalculated(edgeId) {
+        const edge = this.network?.body?.data?.edges?.get(edgeId);
+        if (!edge) return;
+
+        this.network.body.data.edges.update({
+            id: edgeId,
+            has_calculated_metrics: true,
+        });
+        const sourceEdge = this._getEdgeSourceData(edge._edgeKey);
+        if (sourceEdge) {
+            sourceEdge.has_calculated_metrics = true;
+        }
+    }
+
     _getEffectiveEdgeOpacity(edgeKey, edge) {
         const sourceEdge = this._getEdgeSourceData(edgeKey) || edge;
         if (this.fadedEdgeOpacities.has(edgeKey)) {
@@ -5929,11 +5990,6 @@ class WebAppClient {
         const isLabelHidden = this.hiddenLabels.has(normalizedRoi);
         const isHidden = !isDisplayed;
 
-        const menu = document.createElement('div');
-        menu.className = 'node-context-menu';
-        menu.style.left = `${event.clientX}px`;
-        menu.style.top = `${event.clientY}px`;
-
         const items = [
             {
                 label: isFixed ? 'Unfix Position' : 'Fix Position',
@@ -5951,46 +6007,169 @@ class WebAppClient {
                 active: isHidden,
                 action: () => this._ctxToggleVisibility(normalizedRoi),
             },
+            { separator: true },
+            {
+                label: 'Relationships',
+                children: this._buildNodeRelationshipMenuItems(
+                    normalizedRoi,
+                ),
+            },
         ];
 
-        for (const item of items) {
-            if (item.separator) {
-                const sep = document.createElement('div');
-                sep.className = 'node-context-menu-separator';
-                menu.appendChild(sep);
-                continue;
-            }
-            const el = document.createElement('div');
-            el.className = 'node-context-menu-item' + (item.active ? ' is-active' : '');
-            el.textContent = item.label;
-            el.addEventListener('mousedown', (e) => {
-                e.stopPropagation();
-                item.action();
-                this._dismissContextMenu();
+        this._showSimpleContextMenu(items, event);
+    }
+
+    _buildNodeRelationshipMenuItems(roi) {
+        const nodes = this.network?.body?.data?.nodes;
+        const edges = this.network?.body?.data?.edges;
+        if (!nodes || !edges) return [];
+
+        const positions = this.network.getPositions(nodes.getIds());
+        const origin = positions[roi];
+        const relationships = edges.get({
+            filter: edge => edge._edgeLayer === 'main',
+        }).flatMap((edge) => {
+            const from = Number(edge.from);
+            const to = Number(edge.to);
+            if (from !== roi && to !== roi) return [];
+
+            const otherRoi = from === roi ? to : from;
+            const otherNode = nodes.get(otherRoi);
+            const sourceNode = nodes.get(from);
+            const targetNode = nodes.get(to);
+            const otherPosition = positions[otherRoi];
+            const distance = origin && otherPosition
+                ? Math.hypot(
+                    origin.x - otherPosition.x,
+                    origin.y - otherPosition.y,
+                )
+                : Number.POSITIVE_INFINITY;
+            const sourceLabel = sourceNode?._originalLabel
+                || sourceNode?.label
+                || `ROI ${from}`;
+            const targetLabel = targetNode?._originalLabel
+                || targetNode?.label
+                || `ROI ${to}`;
+            const relationshipLabel = edge.originalLabel
+                || edge.relation_type;
+
+            return [{
+                edgeId: edge.id,
+                edgeKey: edge._edgeKey,
+                otherRoi,
+                otherVisible: Boolean(otherNode && !otherNode.hidden),
+                edgeVisible: !this.hiddenEdges.has(edge._edgeKey),
+                rank: Number.isFinite(Number(edge.relationship_rank))
+                    ? Number(edge.relationship_rank)
+                    : 99,
+                distance,
+                label: `${sourceLabel} | ${relationshipLabel} | ${targetLabel}`,
+                type: String(edge.relation_type || 'UNKNOWN'),
+                hasCalculatedMetrics: Boolean(edge.has_calculated_metrics),
+            }];
+        });
+        if (relationships.length === 0) {
+            return [{
+                label: 'No relationships in diagram',
+                disabled: true,
+            }];
+        }
+
+        const compareDistance = (first, second) => (
+            first.distance - second.distance
+            || first.otherRoi - second.otherRoi
+            || first.label.localeCompare(second.label)
+        );
+        const groupByType = (items, hiddenStructure) => {
+            const groups = new Map();
+            items.forEach((relationship) => {
+                if (!groups.has(relationship.type)) {
+                    groups.set(relationship.type, {
+                        rank: relationship.rank,
+                        relationships: [],
+                    });
+                }
+                groups.get(relationship.type).relationships.push(relationship);
             });
-            menu.appendChild(el);
-        }
 
-        document.body.appendChild(menu);
-        this._contextMenu = menu;
-
-        // Flip menu if it would overflow the viewport
-        const rect = menu.getBoundingClientRect();
-        if (rect.right > window.innerWidth) {
-            menu.style.left = `${event.clientX - rect.width}px`;
-        }
-        if (rect.bottom > window.innerHeight) {
-            menu.style.top = `${event.clientY - rect.height}px`;
-        }
-
-        // Dismiss on next outside click
-        const dismiss = (e) => {
-            if (!menu.contains(e.target)) {
-                this._dismissContextMenu();
-                document.removeEventListener('mousedown', dismiss, true);
-            }
+            return Array.from(groups.entries())
+                .sort((first, second) => (
+                    first[1].rank - second[1].rank
+                    || first[0].localeCompare(second[0])
+                ))
+                .map(([type, group]) => ({
+                    label: type,
+                    children: group.relationships
+                        .sort(compareDistance)
+                        .map(relationship => ({
+                            label: relationship.label,
+                            hasCalculatedMetrics:
+                                relationship.hasCalculatedMetrics,
+                            hiddenBecauseStructure: hiddenStructure,
+                            hiddenBecauseEdge: !hiddenStructure
+                                && !relationship.edgeVisible,
+                            ...(hiddenStructure
+                                ? {
+                                    children: [{
+                                        label: 'Show Structure',
+                                        action: () => this._ctxToggleVisibility(
+                                            relationship.otherRoi,
+                                        ),
+                                    }],
+                                }
+                                : {
+                                    launchesContextMenu: true,
+                                    action: (menuEvent) => (
+                                        this._showEdgeContextMenu(
+                                            relationship.edgeId,
+                                            menuEvent,
+                                            null,
+                                        )
+                                    ),
+                                }),
+                        })),
+                }));
         };
-        document.addEventListener('mousedown', dismiss, true);
+
+        const visibleStructureEdges = relationships.filter(
+            relationship => relationship.otherVisible,
+        );
+        const hiddenStructureEdges = relationships.filter(
+            relationship => !relationship.otherVisible,
+        );
+        const visibleEdges = visibleStructureEdges.filter(
+            relationship => relationship.edgeVisible,
+        );
+        const hiddenEdges = visibleStructureEdges.filter(
+            relationship => !relationship.edgeVisible,
+        );
+        const items = [];
+
+        if (visibleStructureEdges.length > 0) {
+            items.push(
+                { label: 'Other structures visible', heading: true },
+                ...groupByType(visibleEdges, false),
+            );
+            if (hiddenEdges.length > 0) {
+                items.push(
+                    { separator: true },
+                    { label: 'Relationships hidden', heading: true },
+                    ...groupByType(hiddenEdges, false),
+                );
+            }
+        }
+
+        if (hiddenStructureEdges.length > 0) {
+            if (visibleStructureEdges.length > 0) {
+                items.push({ separator: true }, { separator: true });
+            }
+            items.push(
+                { label: 'Other structures hidden', heading: true },
+                ...groupByType(hiddenStructureEdges, true),
+            );
+        }
+
+        return items;
     }
 
     async _showEdgeContextMenu(edgeId, event, pointer) {
@@ -6189,6 +6368,7 @@ class WebAppClient {
                 throw new Error(data.detail || 'Metric calculation failed');
             }
             if (this._metricOverlays.get(edgeId) !== state) return;
+            this._markEdgeMetricsCalculated(edgeId);
             this._renderMetricOverlayValue(value, data);
         } catch (error) {
             if (this._metricOverlays.get(edgeId) !== state) return;

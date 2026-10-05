@@ -64,8 +64,12 @@ The application will be available at: http://localhost:8000
    - Relationship matrix displays with default symbol notation
    - Drag structures between "Available" and "Selected" lists to customize matrix axes
    - Rows and columns can display different structures
-   - Toggle between symbols (?, =, ⊂, etc.) and labels (UNKNOWN, EQUAL, CONTAINS, etc.)
+   - Toggle between symbols (?, =, ⊂, etc.) and labels (UNKNOWN, EQUALS, CONTAINS, etc.)
    - Click "Update Matrix" to refresh display
+   - In the relationship diagram, right-click a structure and open **Relationships**
+     to browse its connected relationships by structure visibility, edge visibility,
+     relationship type, and visual distance. Select a relationship to open its
+     edge menu; relationships to hidden structures offer **Show Structure**.
 
 5. **Export**
    - Export relationship matrix as CSV, Excel, or JSON
@@ -171,7 +175,7 @@ Test coverage includes:
 | Symbol | Relationship Type | Description |
 |--------|------------------|-------------|
 | ?      | UNKNOWN          | Relationship not determined |
-| =      | EQUAL            | Identical structures |
+| =      | EQUALS            | Identical structures |
 | ⊂      | CONTAINS         | One inside the other |
 | ∩      | OVERLAPS         | Partial intersection |
 | ⊕      | PARTITION        | Adjacent without overlap |

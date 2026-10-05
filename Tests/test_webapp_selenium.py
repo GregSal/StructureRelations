@@ -598,11 +598,11 @@ class TestWebAppWorkflow:
         assert rows > 0
         assert cols > 0
 
-        # Check diagonal is EQUAL
+        # Check diagonal is EQUALS
         for i in range(min(rows, cols)):
             cell_value = helper.get_matrix_cell(i, i)
-            # Should be either '=' symbol or 'EQUAL' text
-            assert cell_value in ['=', 'EQUAL']
+            # Should be either '=' symbol or 'EQUALS' text
+            assert cell_value in ['=', 'EQUALS']
 
     def test_independent_matrix_axes(
         self,
@@ -716,6 +716,155 @@ class TestWebAppWorkflow:
             helper.export_matrix(format_type)
             # Note: Can't easily verify download in headless mode
             # In production, would check download folder
+
+class TestDiagramRelationshipContextMenu:
+    """Test relationship grouping and actions in a structure context menu."""
+
+    def test_relationships_are_grouped_sorted_and_actionable(
+        self,
+        chrome_headless_driver,
+    ):
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        WebDriverWait(chrome_headless_driver, 20).until(
+            lambda driver: driver.execute_script(
+                'return Boolean(window.app);'
+            )
+        )
+
+        result = chrome_headless_driver.execute_script(
+            """
+            const app = window.app;
+            const nodes = [
+                {id: 1, _originalLabel: 'Alpha', hidden: false},
+                {id: 2, _originalLabel: 'Beta', hidden: false},
+                {id: 3, _originalLabel: 'Hidden', hidden: true},
+                {id: 4, _originalLabel: 'Nearby', hidden: false},
+                {id: 5, _originalLabel: 'Faded', hidden: false},
+                {id: 6, _originalLabel: 'Equals', hidden: false},
+            ];
+            const edges = [
+                {id: 'contains-far', from: 1, to: 2, relation_type: 'CONTAINS',
+                    relationship_rank: 4, has_calculated_metrics: true},
+                {id: 'contains-near', from: 1, to: 4, relation_type: 'CONTAINS',
+                    relationship_rank: 4, has_calculated_metrics: false},
+                {id: 'overlaps-hidden', from: 1, to: 5, relation_type: 'OVERLAPS',
+                    relationship_rank: 13, has_calculated_metrics: false},
+                {id: 'equals-visible', from: 1, to: 6, relation_type: 'EQUALS',
+                    relationship_rank: 1, has_calculated_metrics: false},
+                {id: 'equals-hidden-node', from: 1, to: 3, relation_type: 'EQUALS',
+                    relationship_rank: 1, has_calculated_metrics: false},
+            ].map(edge => ({
+                ...edge,
+                _edgeLayer: 'main',
+                _edgeKey: app._buildEdgeKey(edge),
+            }));
+            const dataSet = rows => ({
+                get(query) {
+                    if (typeof query === 'number') {
+                        return rows.find(row => row.id === query);
+                    }
+                    return query?.filter ? rows.filter(query.filter) : rows;
+                },
+                update(update) {
+                    const updates = Array.isArray(update) ? update : [update];
+                    updates.forEach(changes => {
+                        const row = rows.find(item => item.id === changes.id);
+                        if (row) Object.assign(row, changes);
+                    });
+                },
+                getIds() {
+                    return rows.map(row => row.id);
+                },
+            });
+            app.latestDiagramData = {edges};
+            app.network = {
+                body: {data: {nodes: dataSet(nodes), edges: dataSet(edges)}},
+                getPositions() {
+                    return {
+                        1: {x: 0, y: 0},
+                        2: {x: 5, y: 0},
+                        3: {x: 3, y: 0},
+                        4: {x: 2, y: 0},
+                        5: {x: 1, y: 0},
+                        6: {x: 4, y: 0},
+                    };
+                },
+            };
+            app.hiddenNodes = new Set([3]);
+            app.hiddenEdges = new Set([edges[2]._edgeKey]);
+            app._ctxToggleVisibility = roi => { app.testShownRoi = roi; };
+            app._showEdgeContextMenu = (edgeId, event) => {
+                app.testOpenedEdge = [edgeId, event.clientX, event.clientY];
+            };
+
+            const items = app._buildNodeRelationshipMenuItems(1);
+            const visibleHeading = items.find(
+                item => item.label === 'Other structures visible'
+            );
+            const visibleHeadingIndex = items.indexOf(visibleHeading);
+            const hiddenHeadingIndex = items.findIndex(
+                item => item.label === 'Relationships hidden'
+            );
+            const visibleTypeItems = items.slice(
+                visibleHeadingIndex + 1,
+                hiddenHeadingIndex,
+            ).filter(item => item.children);
+            const contains = visibleTypeItems.find(
+                item => item.label === 'CONTAINS'
+            );
+            const hiddenEdgeGroup = items.find(
+                item => item.label === 'OVERLAPS'
+            );
+            const structureHeadingIndex = items.findIndex(
+                item => item.label === 'Other structures hidden'
+            );
+            const hiddenStructureGroup = items.slice(
+                structureHeadingIndex + 1,
+            ).find(item => item.label === 'EQUALS');
+            const hiddenStructureRelationship =
+                hiddenStructureGroup.children[0];
+            hiddenStructureRelationship.children[0].action();
+            const nearestVisibleRelationship = contains.children[0];
+            nearestVisibleRelationship.action({clientX: 123, clientY: 456});
+            app._markEdgeMetricsCalculated('contains-near');
+
+            return {
+                visibleTypeOrder: visibleTypeItems.map(item => item.label),
+                edgeVisibilitySeparators: items.slice(
+                    visibleHeadingIndex + 1,
+                    hiddenHeadingIndex,
+                ).filter(item => item.separator).length,
+                structureVisibilitySeparators: items.slice(
+                    hiddenHeadingIndex + 1,
+                    structureHeadingIndex,
+                ).filter(item => item.separator).length,
+                nearestLabel: nearestVisibleRelationship.label,
+                metricEmphasis: contains.children[1].hasCalculatedMetrics,
+                hiddenEdgeStyle: hiddenEdgeGroup.children[0].hiddenBecauseEdge,
+                hiddenStructureStyle:
+                    hiddenStructureRelationship.hiddenBecauseStructure,
+                hiddenStructureActions:
+                    hiddenStructureRelationship.children.map(item => item.label),
+                shownRoi: app.testShownRoi,
+                openedEdge: app.testOpenedEdge,
+                metricsUpdated: edges[1].has_calculated_metrics,
+            };
+            """
+        )
+
+        assert result['visibleTypeOrder'] == ['EQUALS', 'CONTAINS']
+        assert result['edgeVisibilitySeparators'] == 1
+        assert result['structureVisibilitySeparators'] == 2
+        assert 'Nearby' in result['nearestLabel']
+        assert result['metricEmphasis'] is True
+        assert result['hiddenEdgeStyle'] is True
+        assert result['hiddenStructureStyle'] is True
+        assert result['hiddenStructureActions'] == ['Show Structure']
+        assert result['shownRoi'] == 3
+        assert result['openedEdge'] == ['contains-near', 123, 456]
+        assert result['metricsUpdated'] is True
+
 
 class TestDiagramStructureSelection:
         """Test staged diagram structure-selection actions."""

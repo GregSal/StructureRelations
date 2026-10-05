@@ -48,7 +48,7 @@ from dicom import DicomStructureFile, clean_uploaded_file_name
 from structure_set import StructureSet
 from metrics import MetricCalculatorRegistry, get_config as get_metrics_config
 from contour_plotting import plot_roi_slice
-from relations import RELATION_SCHEMA_VERSION
+from relations import RELATION_RANK, RELATION_SCHEMA_VERSION
 from webapp.session_manager import SessionManager, SessionData
 from webapp.websocket_manager import ConnectionManager
 
@@ -255,6 +255,8 @@ class DiagramEdge(BaseModel):
     from_node: int
     to_node: int
     relation_type: str
+    relationship_rank: int = 99
+    has_calculated_metrics: bool = False
     symbol: Optional[str] = None
     label: str
     title: str
@@ -2287,7 +2289,7 @@ _AXIS_DIRECTION_LABELS = {
     'y_neg': '-Y', 'y_pos': '+Y',
     'z_neg': '-Z', 'z_pos': '+Z',
 }
-_SYMMETRIC_DIAGRAM_RELATIONS = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
+_SYMMETRIC_DIAGRAM_RELATIONS = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUALS'}
 
 
 def _get_applicable_diagram_metrics(relationship) -> List[DiagramMetricOption]:
@@ -2322,6 +2324,20 @@ def _get_stored_metric_value(relationship, spec: DiagramMetricSpec):
         return None
     metric_category = getattr(relationship.metrics, spec.category, None)
     return getattr(metric_category, spec.field, None)
+
+
+def _has_calculated_diagram_metrics(relationship) -> bool:
+    if relationship is None:
+        return False
+
+    for spec in _DIAGRAM_METRICS.values():
+        value = _get_stored_metric_value(relationship, spec)
+        if isinstance(value, dict):
+            if any(item is not None for item in value.values()):
+                return True
+        elif value is not None:
+            return True
+    return False
 
 
 @app.post(
@@ -2709,7 +2725,7 @@ async def get_diagram_data(request: MatrixRequest):
         )
 
         # Define symmetric relationships (no direction)
-        symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUAL'}
+        symmetric_relations = {'OVERLAPS', 'BORDERS', 'DISJOINT', 'EQUALS'}
 
         # For symmetric relationships: check all visible pairs once
         edge_build_start = time.perf_counter()
@@ -2778,6 +2794,10 @@ async def get_diagram_data(request: MatrixRequest):
                         from_node=roi1,
                         to_node=roi2,
                         relation_type=rel_type,
+                        relationship_rank=RELATION_RANK.get(rel_type, 99),
+                        has_calculated_metrics=(
+                            _has_calculated_diagram_metrics(rel)
+                        ),
                         symbol=edge_symbol,
                         label=edge_label,
                         title=edge_title,
@@ -2866,6 +2886,10 @@ async def get_diagram_data(request: MatrixRequest):
                         from_node=from_roi,
                         to_node=to_roi,
                         relation_type=rel_type,
+                        relationship_rank=RELATION_RANK.get(rel_type, 99),
+                        has_calculated_metrics=(
+                            _has_calculated_diagram_metrics(rel)
+                        ),
                         symbol=edge_symbol,
                         label=edge_label,
                         title=edge_title,
@@ -2881,7 +2905,7 @@ async def get_diagram_data(request: MatrixRequest):
                     directional_edges_added += 1
         directional_ms = round((time.perf_counter() - directional_start) * 1000.0)
 
-        # Apply a final EQUAL-peer dedup pass at diagram time to ensure that
+        # Apply a final EQUALS-peer dedup pass at diagram time to ensure that
         # only one representative edge per equal-component is shown as direct
         # for the same external relationship.
         volume_sorted_rois = [
@@ -2896,7 +2920,7 @@ async def get_diagram_data(request: MatrixRequest):
             int(node.id): set() for node in nodes
         }
         for edge in edges:
-            if edge.relation_type != 'EQUAL':
+            if edge.relation_type != 'EQUALS':
                 continue
             from_roi = int(edge.from_node)
             to_roi = int(edge.to_node)
@@ -2932,7 +2956,7 @@ async def get_diagram_data(request: MatrixRequest):
                 grouped_candidates: dict[tuple[str, str], list[tuple[int, int]]] = {}
 
                 for index, edge in enumerate(edges):
-                    if edge.relation_type == 'EQUAL':
+                    if edge.relation_type == 'EQUALS':
                         continue
 
                     from_roi = int(edge.from_node)
