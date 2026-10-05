@@ -5945,17 +5945,19 @@ class WebAppClient {
         );
     }
 
-    _markEdgeMetricsCalculated(edgeId) {
+    _markEdgeMetricsCalculated(edgeId, metricOptions) {
         const edge = this.network?.body?.data?.edges?.get(edgeId);
         if (!edge) return;
 
         this.network.body.data.edges.update({
             id: edgeId,
             has_calculated_metrics: true,
+            ...(metricOptions ? { metric_options: metricOptions } : {}),
         });
         const sourceEdge = this._getEdgeSourceData(edge._edgeKey);
         if (sourceEdge) {
             sourceEdge.has_calculated_metrics = true;
+            if (metricOptions) sourceEdge.metric_options = metricOptions;
         }
         const catalogEdge = this.latestDiagramData?.relationship_catalog?.find(
             relationship => (
@@ -5968,6 +5970,7 @@ class WebAppClient {
         );
         if (catalogEdge) {
             catalogEdge.has_calculated_metrics = true;
+            if (metricOptions) catalogEdge.metric_options = metricOptions;
         }
     }
 
@@ -6305,6 +6308,7 @@ class WebAppClient {
         if (metricOptions.length > 0) {
             items.push({
                 label: 'Metrics',
+                hasCalculatedMetrics: metricOptions.some(metric => metric.calculated),
                 children: this._buildMetricMenuItems(edgeId, metricOptions, pointer),
             });
         } else {
@@ -6326,10 +6330,12 @@ class WebAppClient {
                     group = { label: groupLabel, children: [] };
                     level.push(group);
                 }
+                if (metric.calculated) group.hasCalculatedMetrics = true;
                 level = group.children;
             });
             level.push({
                 label: path[path.length - 1],
+                hasCalculatedMetrics: Boolean(metric.calculated),
                 action: () => this._showEdgeMetric(edgeId, metric, pointer),
             });
         });
@@ -6409,8 +6415,8 @@ class WebAppClient {
             if (!response.ok) {
                 throw new Error(data.detail || 'Metric calculation failed');
             }
+            this._markEdgeMetricsCalculated(edgeId, data.metrics);
             if (this._metricOverlays.get(edgeId) !== state) return;
-            this._markEdgeMetricsCalculated(edgeId);
             this._renderMetricOverlayValue(value, data);
         } catch (error) {
             if (this._metricOverlays.get(edgeId) !== state) return;

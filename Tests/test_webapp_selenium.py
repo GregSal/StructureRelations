@@ -720,6 +720,63 @@ class TestWebAppWorkflow:
 class TestDiagramRelationshipContextMenu:
     """Test relationship grouping and actions in a structure context menu."""
 
+    def test_calculated_metrics_bold_only_their_menu_path(
+        self,
+        chrome_headless_driver,
+    ):
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        helper.wait.until(
+            lambda driver: driver.execute_script('return Boolean(window.app);')
+        )
+        result = chrome_headless_driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const app = window.app;
+            const options = [
+                {name: 'overlapping_volume_ratio', label: 'Overlapping',
+                    menu_path: ['Volume Ratio', 'Overlapping'], calculated: false},
+                {name: 'non_overlapping_volume_ratio', label: 'Non-overlapping',
+                    menu_path: ['Volume Ratio', 'Non-overlapping'], calculated: false},
+                {name: 'minimum_margin', label: 'Minimum',
+                    menu_path: ['Margins', 'Minimum'], calculated: false},
+            ];
+            const edge = {id: 'test-edge', _edgeKey: 'test-key',
+                from: 1, to: 2, metric_options: options};
+            app.network = {body: {data: {edges: {
+                get: () => edge,
+                update: update => Object.assign(edge, update),
+            }}}};
+            const readWeights = () => Object.fromEntries(
+                Array.from(app._contextMenu.querySelectorAll(
+                    '.node-context-menu-item'
+                )).map(item => [
+                    item.querySelector(':scope > span')?.textContent
+                        || item.textContent,
+                    getComputedStyle(item).fontWeight,
+                ])
+            );
+            (async () => {
+                await app._showEdgeContextMenu(edge.id, {clientX: 10, clientY: 10});
+                const before = readWeights();
+                app._markEdgeMetricsCalculated(edge.id, options.map(metric => ({
+                    ...metric,
+                    calculated: metric.name === 'overlapping_volume_ratio',
+                })));
+                await app._showEdgeContextMenu(edge.id, {clientX: 10, clientY: 10});
+                const after = readWeights();
+                app._dismissContextMenu();
+                done({before, after});
+            })().catch(error => done({error: error.message}));
+            """
+        )
+        assert 'error' not in result
+        for label in ['Metrics', 'Volume Ratio', 'Overlapping']:
+            assert result['before'][label] == '400'
+            assert result['after'][label] == '700'
+        for label in ['Non-overlapping', 'Margins', 'Minimum', 'Format']:
+            assert result['after'][label] == '400'
+
     def test_relationships_are_grouped_sorted_and_actionable(
         self,
         chrome_headless_driver,

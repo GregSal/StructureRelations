@@ -226,6 +226,7 @@ class DiagramMetricOption(BaseModel):
     name: str
     label: str
     menu_path: List[str] = Field(default_factory=list)
+    calculated: bool = False
 
 
 class DiagramMetricValue(BaseModel):
@@ -2307,6 +2308,7 @@ def _get_applicable_diagram_metrics(relationship) -> List[DiagramMetricOption]:
             name=name,
             label=spec.title,
             menu_path=list(spec.menu_path),
+            calculated=_is_diagram_metric_calculated(relationship, spec),
         )
         for name, spec in _DIAGRAM_METRICS.items()
         if spec.calculator in calculators
@@ -2331,18 +2333,22 @@ def _get_stored_metric_value(relationship, spec: DiagramMetricSpec):
     return getattr(metric_category, spec.field, None)
 
 
+def _is_diagram_metric_calculated(relationship, spec: DiagramMetricSpec) -> bool:
+    '''Report stored metric values, including zero and partial margin results.'''
+    value = _get_stored_metric_value(relationship, spec)
+    if isinstance(value, dict):
+        return any(item is not None for item in value.values())
+    return value is not None
+
+
 def _has_calculated_diagram_metrics(relationship) -> bool:
     if relationship is None:
         return False
 
-    for spec in _DIAGRAM_METRICS.values():
-        value = _get_stored_metric_value(relationship, spec)
-        if isinstance(value, dict):
-            if any(item is not None for item in value.values()):
-                return True
-        elif value is not None:
-            return True
-    return False
+    return any(
+        _is_diagram_metric_calculated(relationship, spec)
+        for spec in _DIAGRAM_METRICS.values()
+    )
 
 
 @app.post(
@@ -2391,6 +2397,7 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
             value = getattr(result, spec.field, None)
 
     config = get_metrics_config()
+    options = _get_applicable_diagram_metrics(relationship)
     precision = int(getattr(config, spec.precision_field, 2))
     unit = getattr(structure_set, 'unit', config.distance_unit) if spec.has_unit else ''
 
@@ -2401,6 +2408,7 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
         )
         directions = config.orthogonal_directions or list(value)
         return DiagramEdgeMetricResponse(
+            metrics=options,
             metric_name=request.metric_name,
             label=spec.title,
             values=[
@@ -2416,6 +2424,7 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
 
     if spec.as_percent:
         return DiagramEdgeMetricResponse(
+            metrics=options,
             metric_name=request.metric_name,
             label=spec.title,
             value=_format_metric_value(value, max(precision - 2, 0), 100.0),
@@ -2423,6 +2432,7 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
         )
 
     return DiagramEdgeMetricResponse(
+        metrics=options,
         metric_name=request.metric_name,
         label=spec.title,
         value=_format_metric_value(value, precision),

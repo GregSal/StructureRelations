@@ -77,6 +77,8 @@ The application will be available at: http://localhost:8000
      adds it to the diagram while preserving existing node positions.
      Disjoint relationships are omitted when the other structure is hidden or
      excluded, but remain available when the other structure is visible.
+     In an edge's **Metrics** menu, calculated metrics and all their parent
+     headings are bold; uncalculated metrics remain normal weight.
 
 5. **Export**
    - Export relationship matrix as CSV, Excel, or JSON

@@ -1929,6 +1929,10 @@ tbody tr:hover {
     font-weight: 700;
 }
 
+.node-context-submenu {
+    font-weight: 400;
+}
+
 .node-context-menu-item.is-hidden-structure {
     color: var(--text-secondary);
     opacity: 0.58;

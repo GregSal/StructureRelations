@@ -108,6 +108,7 @@ def test_edge_metric_options_only_include_compatible_calculators(
         and calculators[spec.calculator].is_applicable(structure_set.relationship)
     }
     assert names == expected
+    assert all(not item['calculated'] for item in options)
     assert 'minimum_distance' not in names
     paths = {item['name']: item['menu_path'] for item in options}
     assert paths['orthogonal_margins'] == ['Margins', 'Orthogonal']
@@ -145,6 +146,10 @@ def test_margin_views_share_one_calculation(monkeypatch, tmp_path):
             for direction in config.orthogonal_directions
         ]
     assert minimum.json()['value'] == '1.23'
+    calculated = {
+        item['name'] for item in payload['metrics'] if item['calculated']
+    }
+    assert calculated == {'orthogonal_margins', 'minimum_margin'}
     assert structure_set.calculation_calls == [(1, 2, 'minimum_margins')]
 
 
@@ -166,6 +171,22 @@ def test_edge_metric_is_calculated_once_and_persisted(monkeypatch, tmp_path):
         'edge-metric-session'
     )
     assert persisted.structure_set.relationship.metrics.margin.minimum_margin == 1.234
+
+
+def test_metric_options_preserve_calculated_zero_after_reload(monkeypatch, tmp_path):
+    structure_set = FakeMetricStructureSet('CONTAINS')
+    structure_set.relationship.metrics = SimpleNamespace(
+        volume_ratio=SimpleNamespace(overlapping_ratio=0.0),
+    )
+    client, _ = _make_client(monkeypatch, tmp_path, structure_set)
+    response = client.post('/api/diagram/edge-metric', json=_request(1, 2))
+
+    assert response.status_code == 200
+    calculated = {
+        item['name'] for item in response.json()['metrics'] if item['calculated']
+    }
+    assert calculated == {'overlapping_volume_ratio'}
+    assert structure_set.calculation_calls == []
 
 
 def test_symmetric_edge_calculates_using_stored_relationship_direction(
