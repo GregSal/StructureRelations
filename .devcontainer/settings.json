@@ -1,5 +1,4 @@
 {
-    "python.envFile": "${workspaceFolder}/.env",
     "python.testing.pytestArgs": [
         "Tests"
     ],
@@ -7,10 +6,25 @@
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,
     "pythonTestExplorer.testFramework": "pytest",
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/src/metrics",
+        "${workspaceFolder}/examples",
+        "${workspaceFolder}/Tests"
+    ],
     "python.analysis.extraPaths": [
         "${workspaceFolder}/src",
         "${workspaceFolder}/Tests",
         "${workspaceFolder}/examples"
+    ],
+    "python.analysis.ignore": [
+        "**/FreeCAD Scripts"
+    ],
+    "python.analysis.exclude": [
+        "**/debug_tools.py",
+        "**/FreeCAD_Scripts/*"
     ],
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": false,
@@ -22,30 +36,97 @@
     "python.analysis.inlayHints.pytestParameters": true,
     "python.analysis.supportDocstringTemplate": true,
     "python.analysis.reportExtraTelemetry": false,
-    "python.analysis.ignore": [
-        "**/FreeCAD Scripts/*"
+    "pylint.args": [
+        "--init-hook",
+        "import sys; sys.path.insert(0, '${workspaceFolder}/src')"
     ],
-    "python.analysis.exclude": [
-        "**/debug_tools.py",
-        "**/FreeCAD_Scripts/*"
+    "pylint.ignorePatterns": [
+        "**\\\\FreeCAD Scripts\\\\*.py",
+        "./FreeCAD Scripts/*.py",
+        "FreeCAD Scripts"
     ],
-    "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python",
-    "python.terminal.activateEnvInCurrentTerminal": true,
+    "pylint.importStrategy": "fromEnvironment",
+
     "notebook.diff.ignoreMetadata": true,
     "notebook.diff.ignoreOutputs": true,
     "jupyter.notebookFileRoot": "${workspaceFolder}",
     "jupyter.showVariableViewWhenDebugging": true,
     "python.REPL.sendToNativeREPL": true,
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.defaultInterpreterPath": "/opt/conda/envs/StructureRelations/bin/python",
+    "python.terminal.activateEnvInCurrentTerminal": true,
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "cSpell.words": [
-        "DICOM"
-    ],
     "python-envs.pythonProjects": [
         {
             "path": ".",
             "envManager": "ms-python.python:conda",
             "packageManager": "ms-python.python:conda"
         }
-    ]
+    ],
+    "workbench.browser.openLocalhostLinks": true,
+    "workbench.browser.dataStorage": "workspace",
+    "workbench.browser.showInTitleBar": true,
+    "workbench.browser.enableChatTools": true,
+    "explorer.fileNesting.enabled": true,
+    "files.associations": {
+        "**/metrics/**/*.json": "jsonc"  // Allow comments in metrics_config.json
+    },
+
+    "cSpell.words": [
+        "axhline",
+        "axvline",
+        "bdry",
+        "CentroidCalculator",
+        "dataclass",
+        "dataclasses",
+        "dcmread",
+        "defn",
+        "DiceCalculator",
+        "Dicom",
+        "DICOM",
+        "DistanceMetrics",
+        "facecolor",
+        "figsize",
+        "geoms",
+        "housdorff",
+        "IGTV",
+        "intp",
+        "isocentre",
+        "levelname",
+        "MetricCalculator",
+        "MinimumDistanceCalculator",
+        "orchestrator",
+        "OrthogonalDistanceCalculator",
+        "pydicom",
+        "RegionSlice",
+        "RelationshipMetrics",
+        "RTIMAGE",
+        "RTROI",
+        "RTSTRUCT",
+        "SliceIndexType",
+        "StructureShape",
+        "SurfaceMetrics",
+        "SurfaceOverlapCalculator",
+        "unstarted",
+        "VolumeMetrics",
+        "VolumeOverlapCalculator",
+        "xfact",
+        "xoff",
+        "yfact",
+        "yoff"
+    ],
+    "chat.checkpoints.showFileChanges": true,
+    "chat.planAgent.defaultModel": "Auto (copilot)",
+    "chat.agent.thinking.collapsedTools": "off",
+    "chat.agentsControl.enabled": "badge",
+    "chat.editing.explainChanges.enabled": true,
+    "chat.unifiedAgentsBar.enabled": true,
+    "chat.viewProgressBadge.enabled": true,
+    "chat.restoreLastPanelSession": true,
+    "chat.viewSessions.orientation": "sideBySide",
+    "chat.includeReferencedInstructions": true,
+    "inlineChat.notebookAgent": true,
+    "inlineChat.defaultModel": "Auto (copilot)"
+
 }
