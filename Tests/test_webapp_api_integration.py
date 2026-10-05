@@ -393,6 +393,48 @@ def test_diagram_edge_exposes_equals_rank_and_calculated_metrics(
     assert edge['has_calculated_metrics'] is True
 
 
+@pytest.mark.parametrize('relation_type', ['CONTAINS', 'DISJOINT', 'UNKNOWN'])
+def test_diagram_relationship_catalog_includes_unselected_structures(
+    monkeypatch,
+    tmp_path,
+    relation_type,
+):
+    '''Menu relationships come from the graph even when nodes are excluded.'''
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    fake_set = _make_fake_diagram_structure_set()
+    fake_set._relationship._override_type = RELATIONSHIP_TYPES[relation_type]
+    fake_set._relationship.is_logical = True
+    fake_set.relationship_graph.add_edge(
+        2, 2, relationship=StructureRelationship(is_identical=True),
+    )
+    manager.save_session(
+        'diagram-graph-catalog',
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': 'diagram-graph-catalog',
+            'row_rois': [2],
+            'col_rois': [2],
+            'logical_relations_mode': 'hide',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [node['id'] for node in payload['nodes']] == [2]
+    assert payload['edges'] == []
+    assert payload['relationship_names'] == {'1': 'Alpha', '2': 'Beta'}
+    assert len(payload['relationship_catalog']) == 1
+    relationship = payload['relationship_catalog'][0]
+    assert relationship['from_node'] == 1
+    assert relationship['to_node'] == 2
+    assert relationship['relation_type'] == relation_type
+    assert relationship['is_logical'] is True
+
+
 def test_diagram_templates_endpoint_lists_registered_templates(monkeypatch, tmp_path):
     '''The template catalog endpoint should expose built-ins and loaded templates.'''
     client, _ = _prepare_client(monkeypatch, tmp_path)

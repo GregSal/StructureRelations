@@ -67,9 +67,14 @@ The application will be available at: http://localhost:8000
    - Toggle between symbols (?, =, ⊂, etc.) and labels (UNKNOWN, EQUALS, CONTAINS, etc.)
    - Click "Update Matrix" to refresh display
    - In the relationship diagram, right-click a structure and open **Relationships**
-     to browse its connected relationships by structure visibility, edge visibility,
-     relationship type, and visual distance. Select a relationship to open its
-     edge menu; relationships to hidden structures offer **Show Structure**.
+     to browse its analyzed structure-set graph relationships, including structures
+     not selected for the diagram. Entries are ordered by structure visibility,
+     edge visibility, relationship type, and visual distance. Select a relationship
+     to open its edge menu; relationships to hidden or excluded structures are
+     greyed out and offer only **Show Structure**. Showing an excluded structure
+     adds it to the diagram while preserving existing node positions.
+     Disjoint relationships are omitted when the other structure is hidden or
+     excluded, but remain available when the other structure is visible.
 
 5. **Export**
    - Export relationship matrix as CSV, Excel, or JSON

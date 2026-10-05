@@ -752,6 +752,10 @@ class TestDiagramRelationshipContextMenu:
                     label: 'Overlaps with',
                     complementary_relation: 'OVERLAPS',
                 },
+                DISJOINT: {
+                    label: 'is Disjoint from',
+                    complementary_relation: 'DISJOINT',
+                },
             }};
             const nodes = [
                 {id: 1, _originalLabel: 'Alpha', hidden: false},
@@ -760,6 +764,9 @@ class TestDiagramRelationshipContextMenu:
                 {id: 4, _originalLabel: 'Nearby', hidden: false},
                 {id: 5, _originalLabel: 'Faded', hidden: false},
                 {id: 6, _originalLabel: 'Equals', hidden: false},
+                {id: 8, _originalLabel: 'Filtered', hidden: false},
+                {id: 9, _originalLabel: 'Hidden disjoint', hidden: true},
+                {id: 10, _originalLabel: 'Visible disjoint', hidden: false},
             ];
             const edges = [
                 {id: 'contains-far', from: 1, to: 2, relation_type: 'CONTAINS',
@@ -784,7 +791,7 @@ class TestDiagramRelationshipContextMenu:
             }));
             const dataSet = rows => ({
                 get(query) {
-                    if (typeof query === 'number') {
+                    if (typeof query === 'number' || typeof query === 'string') {
                         return rows.find(row => row.id === query);
                     }
                     return query?.filter ? rows.filter(query.filter) : rows;
@@ -799,8 +806,42 @@ class TestDiagramRelationshipContextMenu:
                 getIds() {
                     return rows.map(row => row.id);
                 },
+                add(row) {
+                    rows.push(row);
+                },
             });
-            app.latestDiagramData = {edges};
+            const catalog = edges.map(edge => ({
+                ...edge,
+                from_node: edge.from,
+                to_node: edge.to,
+                label: edge.originalLabel,
+            }));
+            catalog.push({
+                from_node: 7, to_node: 1, relation_type: 'CONTAINS',
+                relationship_rank: 4, label: 'Contains',
+                has_calculated_metrics: true,
+            }, {
+                from_node: 1, to_node: 8, relation_type: 'CONTAINS',
+                relationship_rank: 4, label: 'Contains',
+            }, {
+                from_node: 1, to_node: 9, relation_type: 'DISJOINT',
+                relationship_rank: 14, label: 'is Disjoint from',
+            }, {
+                from_node: 1, to_node: 10, relation_type: 'DISJOINT',
+                relationship_rank: 14, label: 'is Disjoint from',
+            }, {
+                from_node: 1, to_node: 11, relation_type: 'DISJOINT',
+                relationship_rank: 14, label: 'is Disjoint from',
+            });
+            app.latestDiagramData = {
+                edges: edges.slice(),
+                relationship_catalog: catalog,
+                relationship_names: {
+                    7: 'Not in diagram',
+                    11: 'Excluded disjoint',
+                },
+            };
+            app.diagramPositionCache = new Map();
             app.network = {
                 body: {data: {nodes: dataSet(nodes), edges: dataSet(edges)}},
                 getPositions() {
@@ -811,6 +852,7 @@ class TestDiagramRelationshipContextMenu:
                         4: {x: 2, y: 0},
                         5: {x: 1, y: 0},
                         6: {x: 4, y: 0},
+                        8: {x: 6, y: 0},
                     };
                 },
             };
@@ -836,7 +878,16 @@ class TestDiagramRelationshipContextMenu:
             const hiddenStructureRelationship = relationships.find(
                 item => item.label.includes('Hidden')
             );
+            const absentStructureRelationship = relationships.find(
+                item => item.label.includes('Not in diagram')
+            );
+            const filteredRelationship = relationships.find(
+                item => item.label.includes('Filtered')
+            );
+            filteredRelationship.action({clientX: 123, clientY: 456});
+            const filteredEdgeId = app.testOpenedEdge[0];
             hiddenStructureRelationship.children[0].action();
+            absentStructureRelationship.children[0].action();
             nearestVisibleRelationship.action({clientX: 123, clientY: 456});
             app._markEdgeMetricsCalculated('contains-near');
 
@@ -851,6 +902,15 @@ class TestDiagramRelationshipContextMenu:
                     hiddenStructureRelationship.hiddenBecauseStructure,
                 hiddenStructureActions:
                     hiddenStructureRelationship.children.map(item => item.label),
+                absentStructureActions:
+                    absentStructureRelationship.children.map(item => item.label),
+                absentStructureStyle:
+                    absentStructureRelationship.hiddenBecauseStructure,
+                absentStructureMetrics:
+                    absentStructureRelationship.hasCalculatedMetrics,
+                filteredEdgeAdded: edges.some(edge => (
+                    edge.id === filteredEdgeId && edge.hidden
+                )),
                 shownRoi: app.testShownRoi,
                 openedEdge: app.testOpenedEdge,
                 metricsUpdated: edges[1].has_calculated_metrics,
@@ -862,8 +922,11 @@ class TestDiagramRelationshipContextMenu:
             'Alpha is Equal to Equals',
             'Alpha Contains Nearby',
             'Alpha Contains Beta',
+            'Alpha Contains Filtered',
             'Alpha Overlaps with Faded',
+            'Alpha is Disjoint from Visible disjoint',
             'Alpha is Equal to Hidden',
+            'Alpha is Within Not in diagram',
         ]
         assert result['reverseLabel'] == 'Beta is Within Alpha'
         assert result['separatorCount'] == 2
@@ -872,9 +935,125 @@ class TestDiagramRelationshipContextMenu:
         assert result['hiddenEdgeStyle'] is True
         assert result['hiddenStructureStyle'] is True
         assert result['hiddenStructureActions'] == ['Show Structure']
-        assert result['shownRoi'] == 3
+        assert result['absentStructureActions'] == ['Show Structure']
+        assert result['absentStructureStyle'] is True
+        assert result['absentStructureMetrics'] is True
+        assert result['filteredEdgeAdded'] is True
+        assert result['shownRoi'] == 7
         assert result['openedEdge'] == ['contains-near', 123, 456]
         assert result['metricsUpdated'] is True
+
+    def test_show_absent_structure_refreshes_applied_selection(
+        self,
+        chrome_headless_driver,
+    ):
+        '''Showing an absent graph endpoint adds it without discarding selection.'''
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        helper.wait.until(
+            lambda driver: driver.execute_script('return Boolean(window.app);')
+        )
+        result = chrome_headless_driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const app = window.app;
+            app.network = {body: {data: {nodes: {get: () => null}}}};
+            app.diagramSelection = new Set([1]);
+            app.diagramAppliedSelection = new Set([1]);
+            app.hiddenNodes = new Set([7]);
+            app.ensureManualLayoutForDiagramChanges = () => {};
+            app.updateDiagramPendingState = () => {};
+            app.refreshDiagram = async () => {
+                app.testRefreshed = true;
+            };
+            app._applyNodeVisibilityState = () => {
+                throw new Error('Absent node requires a diagram refresh');
+            };
+            Promise.resolve(app._ctxToggleVisibility(7)).then(() => done({
+                selected: Array.from(app.diagramSelection),
+                applied: Array.from(app.diagramAppliedSelection),
+                hidden: app.hiddenNodes.has(7),
+                refreshed: app.testRefreshed,
+            })).catch(error => done({error: error.message}));
+            """
+        )
+        assert result == {
+            'selected': [1, 7],
+            'applied': [1, 7],
+            'hidden': False,
+            'refreshed': True,
+        }
+
+    def test_show_structure_from_graph_adds_excluded_node(
+        self,
+        chrome_headless_driver,
+        diagram_selection_dicom_file,
+    ):
+        '''A graph-menu action restores a real omitted node without moving peers.'''
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        helper.upload_dicom(diagram_selection_dicom_file)
+        targets = [
+            structure for structure in helper.get_structure_list()
+            if any(
+                target in structure['name'].upper()
+                for target in ('GTV', 'CTV', 'PTV', 'ITV', 'HTV')
+            )
+        ]
+        assert len(targets) >= 2
+        retained_roi, excluded_roi = [
+            structure['roi'] for structure in targets[:2]
+        ]
+        helper.select_structures([retained_roi, excluded_roi])
+        helper.start_processing()
+        assert helper.wait_for_processing(timeout=240)
+        helper.switch_tab('diagram')
+        helper.wait.until(
+            lambda driver: driver.execute_script(
+                'return Boolean(window.app.network);'
+            )
+        )
+        helper.driver.execute_script(
+            'window.app.commitDiagramSelection(new Set([arguments[0]]));',
+            retained_roi,
+        )
+        helper.wait.until(
+            lambda driver: driver.execute_script(
+                'return window.app.network.body.data.nodes.getIds().length === 1'
+                ' && !window.app.network.body.data.nodes.get(arguments[0]);',
+                excluded_roi,
+            )
+        )
+        before = helper.driver.execute_script(
+            'return window.app.network.getPositions([arguments[0]])[arguments[0]];',
+            retained_roi,
+        )
+        action = helper.driver.execute_script(
+            """
+            const app = window.app;
+            const items = app._buildNodeRelationshipMenuItems(arguments[0]);
+            const item = items.find(entry => entry.hiddenBecauseStructure);
+            const actions = item.children.map(child => child.label);
+            item.children[0].action();
+            return {hidden: item.hiddenBecauseStructure, actions};
+            """,
+            retained_roi,
+        )
+        assert action == {'hidden': True, 'actions': ['Show Structure']}
+        helper.wait.until(
+            lambda driver: driver.execute_script(
+                'return Boolean(window.app.network.body.data.nodes'
+                '.get(arguments[0]))'
+                ' && !window.app.network.body.data.nodes.get(arguments[0]).hidden;',
+                excluded_roi,
+            )
+        )
+        after = helper.driver.execute_script(
+            'return window.app.network.getPositions([arguments[0]])[arguments[0]];',
+            retained_roi,
+        )
+        assert after['x'] == pytest.approx(before['x'])
+        assert after['y'] == pytest.approx(before['y'])
 
 
 class TestDiagramStructureSelection:

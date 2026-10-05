@@ -273,6 +273,8 @@ class DiagramEdge(BaseModel):
 class DiagramResponse(BaseModel):
     nodes: List[DiagramNode]
     edges: List[DiagramEdge]
+    relationship_catalog: List[DiagramEdge] = Field(default_factory=list)
+    relationship_names: Dict[int, str] = Field(default_factory=dict)
     layout_template_name: Optional[str] = None
     template_displayed_rois: Optional[List[int]] = None
 
@@ -2566,6 +2568,52 @@ async def get_diagram_data(request: MatrixRequest):
         summary_start = time.perf_counter()
         summary_df = structure_set.summary()
         summary_ms = round((time.perf_counter() - summary_start) * 1000.0)
+        relationship_names = {
+            int(row['ROI']): str(row['Name'])
+            for _, row in summary_df.iterrows()
+        }
+        relationship_catalog = []
+        for from_roi, to_roi, edge_data in (
+            structure_set.relationship_graph.edges(data=True)
+        ):
+            if from_roi == to_roi:
+                continue
+            relationship = edge_data.get('relationship')
+            if relationship is None or relationship.relationship_type is None:
+                continue
+            relation_type = relationship.relationship_type.relation_type
+            style = edge_styles.get(
+                relation_type,
+                {'color': '#999999', 'width': 2, 'dashes': False},
+            )
+            relation_label = relationship_metadata.get(
+                relation_type, {}
+            ).get('label', relation_type)
+            title, symbol = build_edge_tooltip(
+                relationship_names.get(from_roi, f'ROI {from_roi}'),
+                relationship_names.get(to_roi, f'ROI {to_roi}'),
+                relation_type,
+                relationship.is_logical,
+                style,
+            )
+            relationship_catalog.append(DiagramEdge(
+                from_node=int(from_roi),
+                to_node=int(to_roi),
+                relation_type=relation_type,
+                relationship_rank=RELATION_RANK.get(relation_type, 99),
+                has_calculated_metrics=_has_calculated_diagram_metrics(
+                    relationship
+                ),
+                label=relation_label,
+                title=title,
+                symbol=symbol,
+                color=style['color'],
+                width=style['width'],
+                dashes=style['dashes'],
+                arrows=style.get('arrows'),
+                is_logical=relationship.is_logical,
+                layout_candidate=False,
+            ))
 
         selected_template_name = request.layout_template_name
         selected_template = None
@@ -3094,6 +3142,8 @@ async def get_diagram_data(request: MatrixRequest):
         return DiagramResponse(
             nodes=nodes,
             edges=edges,
+            relationship_catalog=relationship_catalog,
+            relationship_names=relationship_names,
             layout_template_name=selected_template_name,
             template_displayed_rois=(
                 None if has_explicit_selection else template_displayed_rois

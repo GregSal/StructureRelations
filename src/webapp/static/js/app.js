@@ -5957,6 +5957,18 @@ class WebAppClient {
         if (sourceEdge) {
             sourceEdge.has_calculated_metrics = true;
         }
+        const catalogEdge = this.latestDiagramData?.relationship_catalog?.find(
+            relationship => (
+                Number(relationship.from_node) === Number(edge.from)
+                && Number(relationship.to_node) === Number(edge.to)
+            ) || (
+                Number(relationship.from_node) === Number(edge.to)
+                && Number(relationship.to_node) === Number(edge.from)
+            )
+        );
+        if (catalogEdge) {
+            catalogEdge.has_calculated_metrics = true;
+        }
     }
 
     _getEffectiveEdgeOpacity(edgeKey, edge) {
@@ -6020,18 +6032,28 @@ class WebAppClient {
 
         const positions = this.network.getPositions(nodes.getIds());
         const origin = positions[roi];
-        const relationships = edges.get({
+        const renderedEdges = edges.get({
             filter: edge => edge._edgeLayer === 'main',
-        }).flatMap((edge) => {
-            const from = Number(edge.from);
-            const to = Number(edge.to);
+        });
+        const catalog = this.latestDiagramData?.relationship_catalog
+            ?? renderedEdges;
+        const names = this.latestDiagramData?.relationship_names || {};
+        const relationships = catalog.flatMap((sourceEdge) => {
+            const from = Number(sourceEdge.from_node ?? sourceEdge.from);
+            const to = Number(sourceEdge.to_node ?? sourceEdge.to);
             if (from !== roi && to !== roi) return [];
 
+            const renderedEdge = renderedEdges.find(edge => (
+                Number(edge.from) === from && Number(edge.to) === to
+            ) || (
+                Number(edge.from) === to && Number(edge.to) === from
+            ));
             const otherRoi = from === roi ? to : from;
             const otherNode = nodes.get(otherRoi);
             const sourceNode = nodes.get(from);
             const targetNode = nodes.get(to);
-            const otherPosition = positions[otherRoi];
+            const otherPosition = positions[otherRoi]
+                || this.diagramPositionCache.get(String(otherRoi));
             const distance = origin && otherPosition
                 ? Math.hypot(
                     origin.x - otherPosition.x,
@@ -6040,13 +6062,17 @@ class WebAppClient {
                 : Number.POSITIVE_INFINITY;
             const sourceLabel = sourceNode?._originalLabel
                 || sourceNode?.label
+                || names[from]
                 || `ROI ${from}`;
             const targetLabel = targetNode?._originalLabel
                 || targetNode?.label
+                || names[to]
                 || `ROI ${to}`;
             const relationshipType = String(
-                edge.relation_type || 'UNKNOWN'
+                sourceEdge.relation_type || 'UNKNOWN'
             ).toUpperCase();
+            const otherVisible = Boolean(otherNode && !otherNode.hidden);
+            if (relationshipType === 'DISJOINT' && !otherVisible) return [];
             const relationshipConfig =
                 this.symbolConfig?.relationships?.[relationshipType] || {};
             const relationshipLabel = (
@@ -6056,29 +6082,36 @@ class WebAppClient {
                     ]?.label
                     : null
             ) || relationshipConfig.label
-                || String(edge.originalLabel || relationshipType)
+                || String(
+                    sourceEdge.originalLabel || sourceEdge.label
+                    || relationshipType
+                )
                     .replace(/^\[|\]$/g, '');
             const firstLabel = roi === to ? targetLabel : sourceLabel;
             const secondLabel = roi === to ? sourceLabel : targetLabel;
 
             return [{
-                edgeId: edge.id,
-                edgeKey: edge._edgeKey,
+                edgeId: renderedEdge?.id,
+                sourceEdge,
                 otherRoi,
-                otherVisible: Boolean(otherNode && !otherNode.hidden),
-                edgeVisible: !this.hiddenEdges.has(edge._edgeKey),
-                rank: Number.isFinite(Number(edge.relationship_rank))
-                    ? Number(edge.relationship_rank)
+                otherVisible,
+                edgeVisible: Boolean(renderedEdge && !renderedEdge.hidden
+                    && !this.hiddenEdges.has(renderedEdge._edgeKey)),
+                rank: Number.isFinite(Number(sourceEdge.relationship_rank))
+                    ? Number(sourceEdge.relationship_rank)
                     : 99,
                 distance,
                 label: `${firstLabel} ${relationshipLabel} ${secondLabel}`,
                 type: relationshipType,
-                hasCalculatedMetrics: Boolean(edge.has_calculated_metrics),
+                hasCalculatedMetrics: Boolean(
+                    sourceEdge.has_calculated_metrics
+                    || renderedEdge?.has_calculated_metrics
+                ),
             }];
         });
         if (relationships.length === 0) {
             return [{
-                label: 'No relationships in diagram',
+                label: 'No analyzed relationships',
                 disabled: true,
             }];
         }
@@ -6127,7 +6160,10 @@ class WebAppClient {
                                 launchesContextMenu: true,
                                 action: (menuEvent) => (
                                     this._showEdgeContextMenu(
-                                        relationship.edgeId,
+                                        relationship.edgeId
+                                            ?? this._addHiddenRelationshipEdge(
+                                                relationship.sourceEdge,
+                                            ),
                                         menuEvent,
                                         null,
                                     )
@@ -6153,7 +6189,9 @@ class WebAppClient {
         if (visibleStructureEdges.length > 0) {
             items.push(...groupByType(visibleEdges, false));
             if (hiddenEdges.length > 0) {
-                items.push({ separator: true });
+                if (items.length > 0) {
+                    items.push({ separator: true });
+                }
                 items.push(...groupByType(hiddenEdges, false));
             }
         }
@@ -6166,6 +6204,25 @@ class WebAppClient {
         }
 
         return items;
+    }
+
+    _addHiddenRelationshipEdge(sourceEdge) {
+        const edgeKey = this._buildEdgeKey(sourceEdge);
+        const edgeId = `${edgeKey}:1-main`;
+        this.latestDiagramData.edges.push(sourceEdge);
+        this.hiddenEdges.add(edgeKey);
+        this.network.body.data.edges.add({
+            ...sourceEdge,
+            id: edgeId,
+            from: sourceEdge.from_node,
+            to: sourceEdge.to_node,
+            _edgeKey: edgeKey,
+            _edgeLayer: 'main',
+            originalLabel: sourceEdge.label,
+            label: this.diagramShowLabelsApplied ? sourceEdge.label : '',
+            hidden: true,
+        });
+        return edgeId;
     }
 
     async _showEdgeContextMenu(edgeId, event, pointer) {
@@ -6802,6 +6859,9 @@ class WebAppClient {
         }
 
         this.updateDiagramPendingState();
+        if (shouldShow && !this.network.body.data.nodes.get(roi)) {
+            return this.refreshDiagram();
+        }
         this._applyNodeVisibilityState();
     }
 
