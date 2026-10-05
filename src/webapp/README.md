@@ -69,7 +69,9 @@ The application will be available at: http://localhost:8000
    - In the relationship diagram, right-click a structure and open **Relationships**
      to browse its analyzed structure-set graph relationships, including structures
      not selected for the diagram. Entries are ordered by structure visibility,
-     edge visibility, relationship type, and visual distance. Select a relationship
+     edge visibility, relationship type, and visual distance. Horizontal lines
+     separate visible edges, hidden edges, and relationships to hidden structures
+     within the flat list. Select a relationship
      to open its edge menu; relationships to hidden or excluded structures are
      greyed out and offer only **Show Structure**. Showing an excluded structure
      adds it to the diagram while preserving existing node positions.

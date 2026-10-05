@@ -6184,26 +6184,15 @@ class WebAppClient {
         const hiddenEdges = visibleStructureEdges.filter(
             relationship => !relationship.edgeVisible,
         );
-        const items = [];
+        const groups = [
+            groupByType(visibleEdges, false),
+            groupByType(hiddenEdges, false),
+            groupByType(hiddenStructureEdges, true),
+        ].filter(group => group.length > 0);
 
-        if (visibleStructureEdges.length > 0) {
-            items.push(...groupByType(visibleEdges, false));
-            if (hiddenEdges.length > 0) {
-                if (items.length > 0) {
-                    items.push({ separator: true });
-                }
-                items.push(...groupByType(hiddenEdges, false));
-            }
-        }
-
-        if (hiddenStructureEdges.length > 0) {
-            if (visibleStructureEdges.length > 0) {
-                items.push({ separator: true });
-            }
-            items.push(...groupByType(hiddenStructureEdges, true));
-        }
-
-        return items;
+        return groups.flatMap((group, index) => (
+            index === 0 ? group : [{ separator: true }, ...group]
+        ));
     }
 
     _addHiddenRelationshipEdge(sourceEdge) {

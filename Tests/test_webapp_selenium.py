@@ -864,6 +864,18 @@ class TestDiagramRelationshipContextMenu:
             };
 
             const items = app._buildNodeRelationshipMenuItems(1);
+            const firstHiddenStructureIndex = items.findIndex(
+                item => item.hiddenBecauseStructure
+            );
+            const hiddenGroupsSeparated =
+                items[firstHiddenStructureIndex - 1].separator === true
+                && items[firstHiddenStructureIndex - 2].hiddenBecauseEdge === true;
+            edges.forEach(edge => { edge.hidden = true; });
+            const withoutVisibleEdges = app._buildNodeRelationshipMenuItems(1);
+            edges.forEach(edge => { delete edge.hidden; });
+            const hiddenOnlyBoundary = withoutVisibleEdges.findIndex(
+                item => item.hiddenBecauseStructure
+            );
             const reverseItems = app._buildNodeRelationshipMenuItems(2);
             const relationships = items.filter(item => !item.separator);
             const nearestVisibleRelationship = relationships.find(
@@ -895,6 +907,11 @@ class TestDiagramRelationshipContextMenu:
                 labels: relationships.map(item => item.label),
                 reverseLabel: reverseItems[0].label,
                 separatorCount: items.filter(item => item.separator).length,
+                hiddenGroupsSeparated,
+                hiddenOnlyGroupsSeparated:
+                    withoutVisibleEdges[hiddenOnlyBoundary - 1].separator === true
+                    && withoutVisibleEdges[hiddenOnlyBoundary - 2]
+                        .hiddenBecauseEdge === true,
                 nearestLabel: nearestVisibleRelationship.label,
                 metricEmphasis: farVisibleRelationship.hasCalculatedMetrics,
                 hiddenEdgeStyle: hiddenEdgeRelationship.hiddenBecauseEdge,
@@ -930,6 +947,8 @@ class TestDiagramRelationshipContextMenu:
         ]
         assert result['reverseLabel'] == 'Beta is Within Alpha'
         assert result['separatorCount'] == 2
+        assert result['hiddenGroupsSeparated'] is True
+        assert result['hiddenOnlyGroupsSeparated'] is True
         assert result['nearestLabel'] == 'Alpha Contains Nearby'
         assert result['metricEmphasis'] is True
         assert result['hiddenEdgeStyle'] is True
