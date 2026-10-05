@@ -20,7 +20,7 @@ class MarginMetrics:
 
     Applicable to: CONTAINS, PARTITIONED, SURROUNDS, SHELTERS, CONFINES
     relationships.
-    Special case: EQUAL returns 0 for all margins.
+    Special case: EQUALS returns 0 for all margins.
 
     Captures clearance in each cardinal direction (orthogonal_margins) and the
     worst-case clearance across all directions (minimum_margin). These are
@@ -79,7 +79,7 @@ class DistanceMetrics:
     """Gap between disjoint structures.
 
     Applicable to: DISJOINT, SHELTERS relationships.
-    N/A for: BORDERS, CONFINES (BORDERS_INTERIOR), EQUAL (structures touch or are identical).
+    N/A for: BORDERS, CONFINES (BORDERS_INTERIOR), EQUALS (structures touch or are identical).
 
     Distance measures the gap between structures that don't touch. This is different
     from margins which measure clearance inside a containing structure.
@@ -115,8 +115,8 @@ class DistanceMetrics:
 class VolumeMetrics:
     """Volume overlap metrics for intersecting structures.
 
-    Applicable to: OVERLAPS, PARTITION, CONTAINS, EQUAL relationships.
-    Special case: EQUAL has overlap_ratio=1.0, dice_coefficient=1.0.
+    Applicable to: OVERLAPS, PARTITION, CONTAINS, EQUALS relationships.
+    Special case: EQUALS has overlap_ratio=1.0, dice_coefficient=1.0.
 
     Volume calculations sum all regions on each slice before aggregating to 3D.
     """
@@ -152,7 +152,7 @@ class VolumeMetrics:
 class VolumeRatioMetrics:
     """Volume ratio metrics for structures with shared volume.
 
-    Applicable to: EQUAL, CONTAINS, WITHIN, PARTITIONED, PARTITIONS, OVERLAPS
+    Applicable to: EQUALS, CONTAINS, WITHIN, PARTITIONED, PARTITIONS, OVERLAPS
     ("Shared" relationships).  Non-applicable ratios are NaN.
 
     A single instance is shared by the overlapping and non-overlapping ratio

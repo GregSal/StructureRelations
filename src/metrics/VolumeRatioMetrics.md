@@ -23,9 +23,9 @@
 <td><img src="../Images/2D Relations/Volume Difference.png" alt="Equals" class="d100"></td>
 </tr></table>
 
-### EQUAL
+### EQUALS
 <table width="450px">
-<tr class="l"><th>EQUAL</th><th>Shared</th><th>Symmetric, Transitive</th></tr>
+<tr class="l"><th>EQUALS</th><th>Shared</th><th>Symmetric, Transitive</th></tr>
 <td class="d" colspan="3">
 The interiors of <span class="a">A</span> and <span class="b">B</span>
 intersect and no part of the interior of one geometry intersects the exterior of the other.

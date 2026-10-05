@@ -151,7 +151,7 @@ BORDERS: RelationshipType  # Borders
 CONFINES: RelationshipType  # Confines
 CONTAINS: RelationshipType  # Contains
 DISJOINT: RelationshipType  # Disjoint
-EQUAL: RelationshipType  # Equal
+EQUALS: RelationshipType  # Equal
 OVERLAPS: RelationshipType  # Overlaps
 PARTITIONED: RelationshipType  # Partitioned by
 SHELTERS: RelationshipType  # Shelters

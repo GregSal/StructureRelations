@@ -7,8 +7,8 @@ Two calculators are provided:
 - NonOverlappingVolumeRatioCalculator ('non_overlapping_volume_ratio'):
     Difference (A - B) volume / Union volume.
 
-Both are applicable only to "Shared" relationships (EQUAL, CONTAINS, WITHIN,
-PARTITIONED, PARTITIONS, OVERLAPS).  For EQUAL relationships no
+Both are applicable only to "Shared" relationships (EQUALS, CONTAINS, WITHIN,
+PARTITIONED, PARTITIONS, OVERLAPS).  For EQUALS relationships no
 CompositeStructure is required: the overlapping ratio is 1.0 and the
 non-overlapping ratio is 0.0.  For the remaining shared relationships the
 required composites (Intersection/Union or Difference/Union) are obtained
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # Volume ratios are only meaningful for "Shared" relationships.
 SHARED_RELATIONSHIP_TYPES = (
-    'EQUAL', 'CONTAINS', 'WITHIN', 'PARTITIONED', 'PARTITIONS', 'OVERLAPS'
+    'EQUALS', 'CONTAINS', 'WITHIN', 'PARTITIONED', 'PARTITIONS', 'OVERLAPS'
 )
 
 
@@ -84,7 +84,7 @@ class _VolumeRatioCalculator(MetricCalculator):
     numerator_operator = ''  # 'INTERSECTION' or 'DIFFERENCE'
     numerator_volume_field = ''  # 'intersection_volume'/'difference_volume'
     numerator_regions_field = ''  # Per-region volumes field for the numerator
-    equal_ratio = math.nan  # Ratio value for EQUAL relationships
+    equal_ratio = math.nan  # Ratio value for EQUALS relationships
 
     def is_applicable(self, relationship: StructureRelationship) -> bool:
         """Volume ratios apply only to "Shared" relationships.
@@ -93,7 +93,7 @@ class _VolumeRatioCalculator(MetricCalculator):
             relationship: The spatial relationship to check.
 
         Returns:
-            True for EQUAL, CONTAINS, WITHIN, PARTITIONED, PARTITIONS and
+            True for EQUALS, CONTAINS, WITHIN, PARTITIONED, PARTITIONS and
             OVERLAPS; False otherwise.
         """
         rel_type = relationship.relationship_type.relation_type
@@ -116,7 +116,7 @@ class _VolumeRatioCalculator(MetricCalculator):
             tolerance: Optional structure set tolerance, passed to the
                 per-region volume calculation.
             structure_set: StructureSet containing the structures.  Required
-                for non-EQUAL shared relationships (used to build the
+                for non-EQUALS shared relationships (used to build the
                 composite structures).
 
         Returns:
@@ -132,7 +132,7 @@ class _VolumeRatioCalculator(MetricCalculator):
             setattr(metrics, self.ratio_field,
                     self.get_non_applicable_value())
             return metrics
-        if relationship.relationship_type.relation_type == 'EQUAL':
+        if relationship.relationship_type.relation_type == 'EQUALS':
             return self._apply_equal(structure_a, metrics)
         if structure_set is None:
             raise ValueError(
@@ -167,7 +167,7 @@ class _VolumeRatioCalculator(MetricCalculator):
         structure_a: StructureShape,
         metrics: VolumeRatioMetrics
     ) -> VolumeRatioMetrics:
-        """Fill ratio values for EQUAL relationships without composites.
+        """Fill ratio values for EQUALS relationships without composites.
 
         Union = Intersection = V(A) = V(B); Difference = 0.  Per-region
         values reference the regions of structure A (which are identical to

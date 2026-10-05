@@ -49,7 +49,7 @@ def test_get_relationship_matrix_with_symbols():
 
     # Verify matrix contains string symbols, not objects
     assert not matrix.empty
-    # Check diagonal contains '=' symbol for EQUAL
+    # Check diagonal contains '=' symbol for EQUALS
     structure_names = list(structure_set.structures.values())
     for struct in structure_names:
         assert matrix.loc[struct.name, struct.name] == '='

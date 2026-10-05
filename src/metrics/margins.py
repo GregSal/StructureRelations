@@ -6,7 +6,7 @@ Margins measure clearance distances inside containing structures. Applicable to:
 - SURROUNDS: Structure inside a hole of another
 - SHELTERS: Structure within convex hull but not touching
 - CONFINES: Structure inside a hole of another, touching the boundary
-- EQUAL: Special case, all margins are 0
+- EQUALS: Special case, all margins are 0
 
 Margins are not defined for OVERLAPS, BORDERS, or DISJOINT relationships
 (NaN is returned).
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 
 # Relationship types for which margins are defined (A is the outer structure).
 MARGIN_RELATIONSHIP_TYPES = [
-    'CONTAINS', 'PARTITIONED', 'SURROUNDS', 'SHELTERS', 'CONFINES', 'EQUAL'
+    'CONTAINS', 'PARTITIONED', 'SURROUNDS', 'SHELTERS', 'CONFINES', 'EQUALS'
 ]
 
 # Relationship types where the inner structure sits in a hole or cavity of
@@ -207,8 +207,8 @@ class ContainmentMarginsCalculator(MetricCalculator):
                 minimum_margin=na_value,
             )
 
-        # Special case: EQUAL relationship -> all margins are 0.
-        if relationship.relationship_type.relation_type == 'EQUAL':
+        # Special case: EQUALS relationship -> all margins are 0.
+        if relationship.relationship_type.relation_type == 'EQUALS':
             return MarginMetrics(
                 orthogonal_margins={
                     direction: 0.0 for direction in ALL_DIRECTIONS
@@ -238,7 +238,7 @@ class ContainmentMarginsCalculator(MetricCalculator):
             pair_type = self._classify(pair_de27im)
             if pair_type not in MARGIN_RELATIONSHIP_TYPES:
                 continue
-            if pair_type == 'EQUAL':
+            if pair_type == 'EQUALS':
                 per_region_orthogonal[pair] = {
                     direction: 0.0 for direction in ALL_DIRECTIONS
                 }

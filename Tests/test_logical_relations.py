@@ -135,7 +135,7 @@ class TestLogicalConfines:
 
 
 class TestLogicalEquals:
-    '''Tests for logical relationships derived from EQUAL.'''
+    '''Tests for logical relationships derived from EQUALS.'''
 
     def test_equals_borders_logical(self):
         '''Test: A is Equal to B, B Borders C => A Borders C is logical.'''
@@ -159,9 +159,9 @@ class TestLogicalEquals:
         slice_data = bottom_box1 + bottom_box2 + top_box
         structures = StructureSet(slice_data)
 
-        # Check (1,2) is EQUAL
+        # Check (1,2) is EQUALS
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
-        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
         assert not rel_1_2.is_logical
 
         # Check (2,3) is logical
@@ -191,9 +191,9 @@ class TestLogicalEquals:
         slice_data = cylinder_a + cylinder_b + cylinder_c
         structures = StructureSet(slice_data)
 
-        # Check (1,2) is EQUAL
+        # Check (1,2) is EQUALS
         rel_1_2 = structures.get_relationship(ROI_Type(1), ROI_Type(2))
-        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
         assert not rel_1_2.is_logical
 
         # Check (2,3) is logical
@@ -202,7 +202,7 @@ class TestLogicalEquals:
         assert rel_2_3.is_logical
 
     def test_equal_trio_uses_canonical_for_external_edges(self):
-        '''Test: Equal trio keeps EQUAL direct and deduplicates peer edges.'''
+        '''Test: Equal trio keeps EQUALS direct and deduplicates peer edges.'''
         slice_spacing = 1
         sphere_a = make_sphere(roi_num=1, radius=6, spacing=slice_spacing)
         sphere_b = make_sphere(roi_num=2, radius=6, spacing=slice_spacing)
@@ -217,9 +217,9 @@ class TestLogicalEquals:
         rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
 
-        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
-        assert rel_1_3.relationship_type.relation_type == 'EQUAL'
-        assert rel_2_3.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
+        assert rel_1_3.relationship_type.relation_type == 'EQUALS'
+        assert rel_2_3.relationship_type.relation_type == 'EQUALS'
         assert not rel_1_2.is_logical
         assert not rel_1_3.is_logical
         assert rel_2_3.is_logical
@@ -253,7 +253,7 @@ class TestLogicalEquals:
         assert filtered_matrix.loc[name_4, name_2] is None
         assert filtered_matrix.loc[name_4, name_3] is None
 
-        # Limited mode also hides the logical EQUAL peer edge 2<->3.
+        # Limited mode also hides the logical EQUALS peer edge 2<->3.
         assert filtered_matrix.loc[name_3, name_2] is None
         assert filtered_matrix.loc[name_2, name_3] is None
 
@@ -283,9 +283,9 @@ class TestLogicalEquals:
         rel_1_3 = structures.get_relationship(ROI_Type(1), ROI_Type(3))
         rel_2_3 = structures.get_relationship(ROI_Type(2), ROI_Type(3))
 
-        assert rel_1_2.relationship_type.relation_type == 'EQUAL'
-        assert rel_1_3.relationship_type.relation_type == 'EQUAL'
-        assert rel_2_3.relationship_type.relation_type == 'EQUAL'
+        assert rel_1_2.relationship_type.relation_type == 'EQUALS'
+        assert rel_1_3.relationship_type.relation_type == 'EQUALS'
+        assert rel_2_3.relationship_type.relation_type == 'EQUALS'
 
         # Only canonical member should keep direct external->member relation.
         rel_4_1 = structures.get_relationship(ROI_Type(4), ROI_Type(1))

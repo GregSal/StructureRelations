@@ -918,7 +918,7 @@ class TestEquals:
         # combine the contours
         slice_data = body + a_sphere6 + b_sphere6
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
 
     def test_equal_boxes(self):
         slice_spacing = 0.1
@@ -931,7 +931,7 @@ class TestEquals:
         # combine the contours
         slice_data = a_box6 + b_box6 + body
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
 
     def test_equal_boxes_by_crop(self):
         def apply_crop(p):
@@ -974,7 +974,7 @@ class TestEquals:
         cropped_box = get_cropped_box(box8)
         slice_data = body + box4 + cropped_box
         relation_type = get_relation_type(slice_data)
-        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
 
 
 class TestWithin:
@@ -1189,5 +1189,5 @@ class TestSymmetricOrderInvariance:
         a_box6 = make_box(roi_num=1, width=0.6, spacing=slice_spacing)
         b_box6 = make_box(roi_num=2, width=0.6, spacing=slice_spacing)
         slice_data = a_box6 + b_box6 + body
-        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['EQUAL']
-        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['EQUAL']
+        assert get_relation_type(slice_data, roi1=1, roi2=2) == RELATIONSHIP_TYPES['EQUALS']
+        assert get_relation_type(slice_data, roi1=2, roi2=1) == RELATIONSHIP_TYPES['EQUALS']

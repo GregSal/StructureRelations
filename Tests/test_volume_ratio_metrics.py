@@ -4,7 +4,7 @@ Converted from the examples in
 src/notebooks/metrics/StructureVolumeMetricTests.ipynb, which defines the
 volume ratio algorithms and the composite structures used to compute them.
 
-Volume ratios are only meaningful for "Shared" relationships (EQUAL,
+Volume ratios are only meaningful for "Shared" relationships (EQUALS,
 CONTAINS, PARTITIONED, OVERLAPS).  Both ratios are stored in a single
 shared VolumeRatioMetrics instance at relationship.metrics.volume_ratio;
 each calculator fills only its own fields and reuses CompositeStructures
@@ -70,7 +70,7 @@ def disjoint_boxes_example():
 
 
 def equal_spheres_example():
-    """Two identical spheres with different ROIs (EQUAL)."""
+    """Two identical spheres with different ROIs (EQUALS)."""
     slice_spacing = 0.1
     sphere_a = make_sphere(roi_num=1, radius=6, spacing=slice_spacing,
                            num_points=100)
@@ -183,18 +183,18 @@ class TestPartitioned:
 
 
 class TestEqual:
-    """Volume ratios for an EQUAL relationship (identical spheres)."""
+    """Volume ratios for an EQUALS relationship (identical spheres)."""
 
     def test_equal_ratios_without_composites(self):
         slice_data = equal_spheres_example()
         structures = StructureSet(slice_data, logging_enabled=False)
         relationship = structures.get_relationship(1, 2)
-        assert relationship.relationship_type.relation_type == 'EQUAL'
+        assert relationship.relationship_type.relation_type == 'EQUALS'
         structure_count = len(structures.structures)
         result = structures.calculate_metric(1, 2, 'overlapping_volume_ratio')
         assert result.overlapping_ratio == 1.0
         assert result.non_overlapping_ratio is None
-        # EQUAL relationships do not need composite structures.
+        # EQUALS relationships do not need composite structures.
         assert len(structures.structures) == structure_count
         result = structures.calculate_metric(1, 2,
                                              'non_overlapping_volume_ratio')

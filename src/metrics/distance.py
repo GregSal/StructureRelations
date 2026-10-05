@@ -8,7 +8,7 @@ Applicable to:
 - SHELTERS: Structure within convex hull (distance to actual boundary)
 
 NOT applicable to:
-- EQUAL: N/A (identical structures have no separation)
+- EQUALS: N/A (identical structures have no separation)
 """
 
 import math
@@ -45,7 +45,7 @@ class MinimumDistanceCalculator(MetricCalculator):
     Special cases:
     - BORDERS: Return 0 (structures are touching at boundaries)
     - CONFINES: Return 0 (structures confined with boundaries touching)
-    - EQUAL: Return N/A (no separation)
+    - EQUALS: Return N/A (no separation)
     - DISJOINT: True 3D minimum distance
     - SHELTERS: Distance from contained to actual boundary (not hull)
     """
@@ -65,7 +65,7 @@ class MinimumDistanceCalculator(MetricCalculator):
             relationship: The spatial relationship
 
         Returns:
-            True for DISJOINT, SHELTERS, BORDERS, CONFINES; False for EQUAL
+            True for DISJOINT, SHELTERS, BORDERS, CONFINES; False for EQUALS
         """
         rel_type = relationship.relationship_type.relation_type
         return rel_type in ['DISJOINT', 'SHELTERS', 'BORDERS', 'CONFINES']

@@ -6,7 +6,7 @@
     },
     "Relationships": [
         {
-            "relation_type": "EQUAL",
+            "relation_type": "EQUALS",
             "category": "Shared",
             "label": "is Equal to",
             "symbol": "=",
@@ -19,7 +19,7 @@
             "examples": [
                 "src\\Images\\Relationships\\equals.png"
             ],
-            "complementary_relation": "EQUAL"
+            "complementary_relation": "EQUALS"
         },
         {
             "relation_type": "CONTAINS",

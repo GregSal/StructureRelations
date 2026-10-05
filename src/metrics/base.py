@@ -71,8 +71,8 @@ class MetricCalculator(ABC):
 
         Examples:
             - Orthogonal margins: CONTAINS, SURROUNDS, SHELTERS
-            - Minimum distance: DISJOINT, SHELTERS (but NOT BORDERS, CONFINES, EQUAL)
-            - Volume overlap: OVERLAPS, PARTITION, CONTAINS, EQUAL
+            - Minimum distance: DISJOINT, SHELTERS (but NOT BORDERS, CONFINES, EQUALS)
+            - Volume overlap: OVERLAPS, PARTITION, CONTAINS, EQUALS
             - Surface overlap: BORDERS, CONFINES
         """
         pass

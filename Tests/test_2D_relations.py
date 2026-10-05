@@ -375,7 +375,7 @@ class TestEquals:
         '''Test the "equals" relationship with two boxes that are equal.'''
         box6 = shapely.Polygon(box_points(6))
         relation_type = DE27IM(box6, box6).identify_relation()
-        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
 
     def test_equals_circle(self):
         '''Test the "equals" relationship with two circles that are equal.'''
@@ -383,7 +383,7 @@ class TestEquals:
         circle5 = shapely.Polygon(circle_points(2.5))
         cropped_circle = shapely.intersection(circle6, circle5)
         relation_type = DE27IM(circle5, cropped_circle).identify_relation()
-        assert relation_type == RELATIONSHIP_TYPES['EQUAL']
+        assert relation_type == RELATIONSHIP_TYPES['EQUALS']
 
 
 class TestWithin:
@@ -488,5 +488,5 @@ class TestSymmetricOrderInvariance:
 
     def test_equals_order_invariance(self):
         box6 = shapely.Polygon(box_points(6))
-        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUAL']
-        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUAL']
+        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUALS']
+        assert DE27IM(box6, box6).identify_relation() == RELATIONSHIP_TYPES['EQUALS']

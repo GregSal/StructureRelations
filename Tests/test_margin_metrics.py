@@ -5,7 +5,7 @@ src/notebooks/metrics/StructureMarginMetricTests.ipynb, which defines the
 margin metric algorithms.
 
 Margins measure clearance distances inside containing structures.  Applicable
-to CONTAINS, PARTITIONED, SURROUNDS, SHELTERS, CONFINES and EQUAL
+to CONTAINS, PARTITIONED, SURROUNDS, SHELTERS, CONFINES and EQUALS
 relationships; NaN for OVERLAPS, BORDERS and DISJOINT.
 
 Note on two examples where the notebook's commented-out expected values did
@@ -158,7 +158,7 @@ class TestEmbeddedSpheres:
         structures, relation_type, margin_result = get_relation_and_margins(
             slice_data)
 
-        assert relation_type.relation_type == 'EQUAL'
+        assert relation_type.relation_type == 'EQUALS'
         expected_margins = {'x_neg': 0.0, 'x_pos': 0.0,
                             'y_neg': 0.0, 'y_pos': 0.0,
                             'z_neg': 0.0, 'z_pos': 0.0}
@@ -166,7 +166,7 @@ class TestEmbeddedSpheres:
                              expected_margins, 0.001)
         assert margin_result.minimum_margin == 0.0
 
-        # Minimum distance is NaN for EQUAL structures.
+        # Minimum distance is NaN for EQUALS structures.
         distance_result = structures.calculate_metric(1, 2,
                                                       'minimum_distance')
         assert isnan(distance_result.minimum_distance)

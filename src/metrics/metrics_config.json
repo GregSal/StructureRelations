@@ -78,7 +78,7 @@
     "calculate_3d_components": false
   },
   "volume_settings": {
-    "description": "Settings for volume overlap calculations (OVERLAPS, PARTITION, CONTAINS, EQUAL)",
+    "description": "Settings for volume overlap calculations (OVERLAPS, PARTITION, CONTAINS, EQUALS)",
     "calculate_overlap_ratio": true,
     "calculate_dice": true,
     "ratio_basis": "auto",

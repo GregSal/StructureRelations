@@ -650,7 +650,7 @@ class StructureSet:
         '''Build a directed graph containing only transitive relationships.
 
         This subgraph includes all edges where the relationship type is
-        transitive (e.g., CONTAINS, SHELTERS, SURROUNDS, EQUAL).
+        transitive (e.g., CONTAINS, SHELTERS, SURROUNDS, EQUALS).
 
         Returns:
             nx.DiGraph: Subgraph with same nodes as relationship_graph but
@@ -863,7 +863,7 @@ class StructureSet:
         2. For each edge in the original graph:
            - If multiple paths exist in transitive subgraph, mark as logical
            - Extract ROIs from longest path as intermediate structures
-        3. Handle EQUAL relationships: mark downstream edges as logical
+        3. Handle EQUALS relationships: mark downstream edges as logical
         '''
         self._log(logging.INFO, 'Calculating logical flags for relationships')
 
@@ -885,7 +885,7 @@ class StructureSet:
             # Skip self-relationships and already marked logical
             if relationship.is_identical or relationship.is_logical:
                 continue
-            if rel_type and rel_type.relation_type == 'EQUAL':
+            if rel_type and rel_type.relation_type == 'EQUALS':
                 continue
 
             # Check if both ROIs exist in transitive subgraph
@@ -923,7 +923,7 @@ class StructureSet:
             rel_type = relationship.relationship_type
             if not rel_type:
                 continue
-            if rel_type.relation_type == 'EQUAL':
+            if rel_type.relation_type == 'EQUALS':
                 continue
 
             if rel_type.relation_type not in implied_graph_cache:
@@ -957,8 +957,8 @@ class StructureSet:
                     roi_a, roi_b, intermediate_structures
                 )
 
-        # Handle EQUAL relationships by equal-components. Keep EQUAL direct,
-        # but mark duplicate non-EQUAL peer relationships as logical.
+        # Handle EQUALS relationships by equal-components. Keep EQUALS direct,
+        # but mark duplicate non-EQUALS peer relationships as logical.
         equal_graph = nx.Graph()
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
@@ -967,7 +967,7 @@ class StructureSet:
                 continue
 
             rel_type = relationship.relationship_type
-            if rel_type and rel_type.relation_type == 'EQUAL':
+            if rel_type and rel_type.relation_type == 'EQUALS':
                 equal_graph.add_edge(roi_a, roi_b)
 
         equal_components = [
@@ -1013,7 +1013,7 @@ class StructureSet:
             )
             component_set = set(component)
 
-            # For EQUAL cliques, keep canonical links direct and make
+            # For EQUALS cliques, keep canonical links direct and make
             # non-canonical peer links logical (derived via canonical).
             peer_rois = sorted(
                 [roi for roi in component_set if roi != canonical_roi],
@@ -1028,7 +1028,7 @@ class StructureSet:
                     if (
                         peer_relationship is None
                         or peer_type is None
-                        or peer_type.relation_type != 'EQUAL'
+                        or peer_type.relation_type != 'EQUALS'
                     ):
                         continue
                     peer_relationship.is_logical = True
@@ -1058,7 +1058,7 @@ class StructureSet:
                     if (
                         member_relationship is None
                         or member_type is None
-                        or member_type.relation_type == 'EQUAL'
+                        or member_type.relation_type == 'EQUALS'
                     ):
                         continue
 
@@ -1068,7 +1068,7 @@ class StructureSet:
                     if (
                         canonical_relationship is None
                         or canonical_type is None
-                        or canonical_type.relation_type == 'EQUAL'
+                        or canonical_type.relation_type == 'EQUALS'
                         or canonical_type.relation_type
                         != member_type.relation_type
                     ):
@@ -1090,12 +1090,12 @@ class StructureSet:
                     ]
                     self._log(
                         logging.DEBUG,
-                        'Identified EQUAL-derived logical relationship: '
+                        'Identified EQUALS-derived logical relationship: '
                         'ROI %d <-> ROI %d (via canonical ROI %d)',
                         member_roi, external_roi, canonical_roi
                     )
 
-        # Handle EQUAL relationships
+        # Handle EQUALS relationships
         for roi_a, roi_b, edge_data in self.relationship_graph.edges(
                 data=True):
             relationship = edge_data['relationship']
@@ -1103,7 +1103,7 @@ class StructureSet:
                 continue
 
             rel_type = relationship.relationship_type
-            if not rel_type or rel_type.relation_type != 'EQUAL':
+            if not rel_type or rel_type.relation_type != 'EQUALS':
                 continue
             if not relationship.is_logical:
                 relationship.intermediate_structures = []

@@ -14,7 +14,7 @@ from relations import DE9IM, DE27IM, RELATIONSHIP_TYPES
 
 EXPECTED_RELATIONSHIP_CATEGORIES = {
     'Shared': {
-        'EQUAL', 'CONTAINS', 'WITHIN', 'PARTITIONED', 'PARTITIONS',
+        'EQUALS', 'CONTAINS', 'WITHIN', 'PARTITIONED', 'PARTITIONS',
         'OVERLAPS',
     },
     'Adjoining': {'BORDERS', 'CONFINES', 'CONFINED'},
@@ -258,7 +258,7 @@ class TestRelationshipDefinitionTranspose:
 
     @pytest.mark.parametrize(
         'relation_name',
-        ['DISJOINT', 'BORDERS', 'EQUAL', 'OVERLAPS'],
+        ['DISJOINT', 'BORDERS', 'EQUALS', 'OVERLAPS'],
     )
     def test_symmetric_core_set_identity(self, relation_name):
         relation_type, primary_test = _find_primary_test(relation_name)

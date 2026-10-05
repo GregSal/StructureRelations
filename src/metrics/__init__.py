@@ -13,7 +13,7 @@ Architecture:
 Metric Categories:
 - Margins: Clearance distances inside containing structure (CONTAINS, SURROUNDS, SHELTERS)
 - Distance: Gap between disjoint structures (DISJOINT, SHELTERS)
-- Volume: Overlap ratios and Dice coefficients (OVERLAPS, PARTITION, CONTAINS, EQUAL)
+- Volume: Overlap ratios and Dice coefficients (OVERLAPS, PARTITION, CONTAINS, EQUALS)
 - Surface: Boundary overlap for touching structures (BORDERS, CONFINES)
 - Geometry: Centroids and geometric properties
 

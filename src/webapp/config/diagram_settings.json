@@ -84,7 +84,7 @@
       "dashes": false,
       "arrows": "to"
     },
-    "EQUAL": {
+    "EQUALS": {
       "color": "#FF0000",
       "width": 5,
       "dashes": false,
@@ -284,13 +284,13 @@
           "threshold_value": 0.5
         },
         "distance": {
-          "description": "Gap between disjoint structures. Applicable to DISJOINT and SHELTERS relationships. N/A for BORDERS, CONFINES, EQUAL.",
+          "description": "Gap between disjoint structures. Applicable to DISJOINT and SHELTERS relationships. N/A for BORDERS, CONFINES, EQUALS.",
           "enabled": true,
           "show_minimum_distance": true,
           "show_3d_components": false
         },
         "volume": {
-          "description": "Volume overlap metrics. Applicable to OVERLAPS, PARTITION, CONTAINS, EQUAL relationships.",
+          "description": "Volume overlap metrics. Applicable to OVERLAPS, PARTITION, CONTAINS, EQUALS relationships.",
           "enabled": true,
           "show_overlap_ratio": true,
           "show_dice_coefficient": false,

@@ -82,7 +82,7 @@ class StructureRelationship:
 
         Returns:
             RelationshipType: The classified relationship type. Returns
-                EQUAL if is_identical is True, UNKNOWN if de27im is None,
+                EQUALS if is_identical is True, UNKNOWN if de27im is None,
                 or the relationship type identified by the DE27IM object.
                 If _override_type is set, returns that.
         '''
@@ -90,15 +90,15 @@ class StructureRelationship:
         if self._override_type is not None:
             return self._override_type
 
-        # If this is a self-relationship, return EQUAL
+        # If this is a self-relationship, return EQUALS
         if self.is_identical:
-            equals_type = RELATIONSHIP_TYPES.get('EQUAL')
+            equals_type = RELATIONSHIP_TYPES.get('EQUALS')
             if equals_type is None:
                 # Log error but return UNKNOWN to avoid crashing
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(
-                    'EQUAL relationship type not found in RELATIONSHIP_TYPES. '
+                    'EQUALS relationship type not found in RELATIONSHIP_TYPES. '
                     'Available types: %s. '
                     'This indicates a problem with relationship_definitions.json loading.',
                     list(RELATIONSHIP_TYPES.keys())
