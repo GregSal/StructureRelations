@@ -2378,6 +2378,9 @@ class WebAppClient {
 
             if (item.children?.length) {
                 el.classList.add('has-submenu');
+                if (item.scrollable) {
+                    el.classList.add('has-scrollable-submenu');
+                }
                 const label = document.createElement('span');
                 label.textContent = item.label;
                 const arrow = document.createElement('span');
@@ -2385,13 +2388,47 @@ class WebAppClient {
                 arrow.textContent = '\u25b8';
                 const submenu = document.createElement('div');
                 submenu.className = 'node-context-menu node-context-submenu';
+                if (item.scrollable) {
+                    submenu.classList.add('is-scrollable');
+                }
+                if (item.fontSize) {
+                    submenu.style.fontSize = `${item.fontSize}px`;
+                }
                 this._appendContextMenuItems(submenu, item.children);
                 el.append(label, arrow, submenu);
                 el.addEventListener('mouseenter', () => {
-                    submenu.classList.remove('opens-left');
-                    if (submenu.getBoundingClientRect().right > window.innerWidth) {
-                        submenu.classList.add('opens-left');
-                    }
+                    const submenuRect = submenu.getBoundingClientRect();
+                    const itemRect = el.getBoundingClientRect();
+                    const padding = 8;
+                    const availableRight = window.innerWidth
+                        - itemRect.right
+                        - padding;
+                    const availableLeft = itemRect.left - padding;
+                    const opensLeft = submenuRect.width > availableRight
+                        && availableLeft > availableRight;
+                    submenu.classList.toggle('opens-left', opensLeft);
+                    const targetLeft = opensLeft
+                        ? itemRect.left - submenuRect.width
+                        : itemRect.right;
+                    const minLeft = padding;
+                    const maxLeft = Math.max(
+                        minLeft,
+                        window.innerWidth - padding - submenuRect.width,
+                    );
+                    const left = Math.max(
+                        minLeft,
+                        Math.min(targetLeft, maxLeft),
+                    );
+                    submenu.style.left = `${left - itemRect.left}px`;
+                    submenu.style.right = 'auto';
+                    const maxTop = window.innerHeight
+                        - padding
+                        - submenuRect.height;
+                    const top = Math.max(
+                        padding,
+                        Math.min(itemRect.top, maxTop),
+                    );
+                    submenu.style.top = `${top - itemRect.top}px`;
                 });
                 el.addEventListener('mousedown', (mouseEvent) => {
                     mouseEvent.stopPropagation();
@@ -5609,6 +5646,7 @@ class WebAppClient {
             },
             shape: node.shape,
             title: node.title,
+            info: node.info || {},
             font: {
                 color: this.getTextColor(node.color),
                 size: Number(nodeFont.node_size || 14),
@@ -5998,6 +6036,48 @@ class WebAppClient {
         const isFixed = this.fixedNodes.has(roi);
         const isLabelHidden = this.hiddenLabels.has(normalizedRoi);
         const isHidden = !isDisplayed;
+        const info = node.info || {};
+        const configuredNodeFontSize = Number(node.font?.size);
+        const infoFontSize = Number.isFinite(configuredNodeFontSize)
+            && configuredNodeFontSize > 0
+            ? configuredNodeFontSize
+            : 14;
+        const infoFields = [
+            'Structure ID',
+            'Structure Name',
+            'ROINumber',
+            'DICOM Type',
+            'Structure Code',
+            'Coding Scheme',
+            'Code Meaning',
+            'ROI Physical Property',
+            'Density',
+            'Generation Method',
+            'Generation Description',
+            'Contour Count',
+            'Region Count',
+        ];
+        const infoItems = infoFields
+            .filter(field => Object.prototype.hasOwnProperty.call(info, field))
+            .map(field => ({
+                label: `${field}: ${info[field] ?? ''}`,
+                disabled: true,
+            }));
+        infoItems.push({
+            label: 'Volume',
+            children: [
+                'Physical Volume',
+                'Exterior Volume',
+                'Hull Volume',
+            ]
+                .filter(field => (
+                    Object.prototype.hasOwnProperty.call(info, field)
+                ))
+                .map(field => ({
+                    label: `${field}: ${info[field] ?? ''}`,
+                    disabled: true,
+                })),
+        });
 
         const items = [
             {
@@ -6022,6 +6102,12 @@ class WebAppClient {
                 children: this._buildNodeRelationshipMenuItems(
                     normalizedRoi,
                 ),
+            },
+            {
+                label: 'Info',
+                children: infoItems,
+                scrollable: true,
+                fontSize: infoFontSize,
             },
         ];
 

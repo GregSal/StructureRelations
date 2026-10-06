@@ -1968,6 +1968,23 @@ tbody tr:hover {
     left: 100%;
 }
 
+.node-context-submenu.is-scrollable {
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.node-context-submenu.is-scrollable > .node-context-menu-item {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.node-context-submenu .node-context-submenu {
+    font-size: inherit;
+}
+
 .node-context-submenu.opens-left {
     left: auto;
     right: 100%;

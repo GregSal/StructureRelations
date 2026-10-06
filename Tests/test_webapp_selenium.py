@@ -720,6 +720,201 @@ class TestWebAppWorkflow:
 class TestDiagramRelationshipContextMenu:
     """Test relationship grouping and actions in a structure context menu."""
 
+    def test_node_info_menu_is_nested_and_non_actionable(
+        self,
+        chrome_headless_driver,
+    ):
+        chrome_headless_driver.set_window_size(800, 450)
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        WebDriverWait(chrome_headless_driver, 20).until(
+            lambda driver: driver.execute_script(
+                'return Boolean(window.app);'
+            )
+        )
+
+        result = chrome_headless_driver.execute_script(
+            """
+            const app = window.app;
+            const info = {
+                'Structure ID': 'BODY',
+                'Structure Name': '',
+                ROINumber: '1',
+                'DICOM Type': 'EXTERNAL',
+                'Structure Code': '',
+                'Coding Scheme': '',
+                'Code Meaning': '',
+                'ROI Physical Property': '',
+                Density: '',
+                'Generation Method': '',
+                'Generation Description': (
+                    'Limbus Contour Machine Learning Auto-segmentation '
+                    + 'generated structure description'
+                ),
+                'Contour Count': '8',
+                'Region Count': '1',
+                'Physical Volume': '18730.01 cm³',
+                'Exterior Volume': '19000.00 cm³',
+                'Hull Volume': '20000.00 cm³',
+            };
+            const node = {id: 1, info, font: {size: 22}};
+            app.network = {body: {data: {nodes: {get: () => node}}}};
+            app._showNodeContextMenu(1, {
+                clientX: window.innerWidth - 2,
+                clientY: window.innerHeight - 2,
+            });
+            const menu = app._contextMenu;
+            const labels = parent => Array.from(
+                parent.querySelectorAll(':scope > .node-context-menu-item')
+            ).map(item => {
+                const label = item.querySelector(':scope > span')?.textContent
+                    || item.childNodes[0]?.textContent
+                    || item.textContent;
+                const submenu = item.querySelector(
+                    ':scope > .node-context-submenu'
+                );
+                return {
+                    label: label.trim(),
+                    disabled: item.classList.contains('is-disabled'),
+                    children: submenu ? labels(submenu) : [],
+                };
+            });
+            const tree = labels(menu);
+            const infoMenu = Array.from(
+                menu.querySelectorAll('.node-context-menu-item')
+            ).find(item => item.querySelector(':scope > span')?.textContent
+                === 'Info');
+            const structureName = Array.from(
+                infoMenu.querySelectorAll('.node-context-menu-item')
+            ).find(item => item.textContent.trim() === 'Structure Name:');
+            structureName.dispatchEvent(new MouseEvent('mousedown', {
+                bubbles: true,
+            }));
+            const menuStayedOpen = app._contextMenu === menu;
+            const infoSubmenu = infoMenu.querySelector(
+                ':scope > .node-context-submenu'
+            );
+            infoSubmenu.style.display = 'block';
+            infoMenu.dispatchEvent(new MouseEvent('mouseenter'));
+            const submenuRect = infoSubmenu.getBoundingClientRect();
+            const submenuStyle = getComputedStyle(infoSubmenu);
+            const descriptionItem = Array.from(
+                infoSubmenu.querySelectorAll(
+                    ':scope > .node-context-menu-item'
+                )
+            ).find(item => item.textContent.startsWith(
+                'Generation Description:'
+            ));
+            const scrollBehavior = {
+                overflowY: submenuStyle.overflowY,
+                maxHeight: submenuStyle.maxHeight,
+                scrolls: infoSubmenu.scrollHeight > infoSubmenu.clientHeight,
+                fontSize: submenuStyle.fontSize,
+                fitsHorizontally: submenuRect.left >= 0
+                    && submenuRect.right <= window.innerWidth,
+                descriptionWraps: descriptionItem.getBoundingClientRect().height
+                    > 40,
+                fitsViewport: submenuRect.top >= 0
+                    && submenuRect.bottom <= window.innerHeight,
+            };
+            infoSubmenu.scrollTop = infoSubmenu.scrollHeight;
+            const volumeItem = Array.from(
+                infoSubmenu.querySelectorAll(
+                    ':scope > .node-context-menu-item'
+                )
+            ).find(item => item.querySelector(':scope > span')?.textContent
+                === 'Volume');
+            const volumeSubmenu = volumeItem.querySelector(
+                ':scope > .node-context-submenu'
+            );
+            volumeSubmenu.style.display = 'block';
+            volumeItem.dispatchEvent(new MouseEvent('mouseenter'));
+            const volumeRect = volumeSubmenu.getBoundingClientRect();
+            scrollBehavior.volumeFitsViewport = volumeRect.top >= 0
+                && volumeRect.bottom <= window.innerHeight;
+            scrollBehavior.volumeFontSize = getComputedStyle(
+                volumeSubmenu
+            ).fontSize;
+            scrollBehavior.volumeFitsHorizontally = volumeRect.left >= 0
+                && volumeRect.right <= window.innerWidth;
+            app._dismissContextMenu();
+            node.info = {
+                ROINumber: '1',
+                'Contour Count': '8',
+                'Region Count': '1',
+                'Physical Volume': '18730.01 cm³',
+                'Exterior Volume': '19000.00 cm³',
+                'Hull Volume': '20000.00 cm³',
+            };
+            app._showNodeContextMenu(1, {clientX: 10, clientY: 10});
+            const nonDicomInfo = Array.from(
+                app._contextMenu.querySelectorAll('.node-context-menu-item')
+            ).find(item => item.querySelector(':scope > span')?.textContent
+                === 'Info');
+            const nonDicomLabels = Array.from(
+                nonDicomInfo.querySelectorAll('.node-context-menu-item')
+            ).map(item => item.textContent.trim());
+            app._dismissContextMenu();
+            return {tree, menuStayedOpen, nonDicomLabels, scrollBehavior};
+            """
+        )
+
+        info_menu = next(item for item in result['tree'] if item['label'] == 'Info')
+        labels = {item['label']: item for item in info_menu['children']}
+        assert labels['Structure ID: BODY']['disabled'] is True
+        assert labels['Structure Name:']['disabled'] is True
+        assert labels['ROINumber: 1']['disabled'] is True
+        assert labels['DICOM Type: EXTERNAL']['disabled'] is True
+        for label in [
+            'Structure Name:',
+            'Structure Code:',
+            'Coding Scheme:',
+            'Code Meaning:',
+            'ROI Physical Property:',
+            'Density:',
+            'Generation Method:',
+        ]:
+            assert labels[label]['disabled'] is True
+        description_label = next(
+            label for label in labels
+            if label.startswith('Generation Description:')
+        )
+        assert labels[description_label]['disabled'] is True
+        assert labels['Contour Count: 8']['disabled'] is True
+        assert labels['Region Count: 1']['disabled'] is True
+        volume = labels['Volume']
+        assert [item['label'] for item in volume['children']] == [
+            'Physical Volume: 18730.01 cm³',
+            'Exterior Volume: 19000.00 cm³',
+            'Hull Volume: 20000.00 cm³',
+        ]
+        assert all(item['disabled'] for item in volume['children'])
+        assert result['menuStayedOpen'] is True
+        assert result['scrollBehavior']['overflowY'] == 'auto'
+        assert result['scrollBehavior']['scrolls'] is True
+        assert result['scrollBehavior']['fontSize'] == '22px'
+        assert result['scrollBehavior']['volumeFontSize'] == '22px'
+        assert result['scrollBehavior']['fitsHorizontally'] is True
+        assert result['scrollBehavior']['descriptionWraps'] is True
+        assert result['scrollBehavior']['fitsViewport'] is True
+        assert result['scrollBehavior']['volumeFitsViewport'] is True
+        assert result['scrollBehavior']['volumeFitsHorizontally'] is True
+        assert not any(
+            label.startswith((
+                'Structure ID:',
+                'Structure Name:',
+                'DICOM Type:',
+                'Structure Code:',
+                'Coding Scheme:',
+                'Code Meaning:',
+                'ROI Physical Property:',
+                'Density:',
+                'Generation Method:',
+                'Generation Description:',
+            ))
+            for label in result['nonDicomLabels']
+        )
+
     def test_calculated_metrics_bold_only_their_menu_path(
         self,
         chrome_headless_driver,

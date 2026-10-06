@@ -213,6 +213,7 @@ class DiagramNode(BaseModel):
     color: str
     shape: str
     title: str  # Tooltip
+    info: dict[str, str] = Field(default_factory=dict)
     side_tag: Optional[str] = None  # 'L', 'R', 'B', or None for layout constraint
     opt_group_key: Optional[str] = None  # Normalized key for opt-prefix grouping
     target_group_key: Optional[str] = None  # Normalized key for target dose-level grouping
@@ -2717,6 +2718,23 @@ async def get_diagram_data(request: MatrixRequest):
             logger.debug(f'Default include for mode: {request.logical_relations_mode}')
             return True
 
+        dicom_metadata_by_roi = {}
+        dicom_file = structure_set.dicom_structure_file
+        if dicom_file is not None:
+            metadata = dicom_file.get_structure_filter_metadata()
+            if not metadata.empty:
+                dicom_metadata_by_roi = {
+                    int(index): row
+                    for index, row in metadata.iterrows()
+                }
+
+        def format_info_value(value, unit=''):
+            if value is None or value == '' or pd.isna(value):
+                return ''
+            if unit:
+                return f'{float(value):.2f} {unit}'
+            return str(value)
+
         # Build nodes only for visible structures
         nodes = []
         node_build_start = time.perf_counter()
@@ -2730,6 +2748,42 @@ async def get_diagram_data(request: MatrixRequest):
 
             name = row['Name']
             dicom_type = row.get('DICOM_Type', 'NONE')
+
+            info = {
+                'ROINumber': str(roi),
+                'Contour Count': format_info_value(
+                    row.get('Num_Contours', '')
+                ),
+                'Region Count': format_info_value(
+                    row.get('Num_Regions', '')
+                ),
+                'Physical Volume': format_info_value(
+                    row.get('Physical_Volume', ''), 'cm³'
+                ),
+                'Exterior Volume': format_info_value(
+                    row.get('Exterior_Volume', ''), 'cm³'
+                ),
+                'Hull Volume': format_info_value(
+                    row.get('Hull_Volume', ''), 'cm³'
+                ),
+            }
+            if dicom_file is not None:
+                dicom_row = dicom_metadata_by_roi.get(roi, {})
+                for field in (
+                    'Structure ID',
+                    'Structure Name',
+                    'DICOM Type',
+                    'Structure Code',
+                    'Coding Scheme',
+                    'Code Meaning',
+                    'ROI Physical Property',
+                    'Density',
+                    'Generation Method',
+                    'Generation Description',
+                ):
+                    info[field] = format_info_value(
+                        dicom_row.get(field, '')
+                    )
 
             # Get color from extracted colors or use default
             color_rgb = colors.get(roi, [200, 200, 200])  # Default gray if no color
@@ -2765,6 +2819,7 @@ async def get_diagram_data(request: MatrixRequest):
                 color=color_hex,
                 shape=shape_map.get(dicom_type, default_shape),
                 title=tooltip,
+                info=info,
                 side_tag=side_tag,
                 opt_group_key=opt_group_key,
                 target_group_key=target_group_key,

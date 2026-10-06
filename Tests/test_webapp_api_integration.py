@@ -77,6 +77,16 @@ class FakeDiagramStructureSet:
         return [SimpleNamespace(roi=1), SimpleNamespace(roi=2)]
 
 
+class FakeDicomStructureFile:
+    '''Pickle-safe DICOM metadata source for diagram endpoint tests.'''
+
+    def __init__(self, metadata):
+        self.metadata = metadata
+
+    def get_structure_filter_metadata(self):
+        return self.metadata
+
+
 def _make_fake_structure_set(tolerance: float = 0.1):
     graph = nx.DiGraph()
     rel = StructureRelationship(
@@ -353,6 +363,117 @@ def test_diagram_endpoint_uses_human_relationship_label(monkeypatch, tmp_path):
     assert edge['label'] == 'Contains'
     assert edge['relationship_rank'] == 4
     assert edge['has_calculated_metrics'] is False
+
+
+def test_diagram_node_info_without_dicom_omits_dicom_fields(
+    monkeypatch,
+    tmp_path,
+):
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    fake_set = FakeDiagramStructureSet(
+        relationship=StructureRelationship(
+            de27im=None,
+            is_identical=False,
+            _override_type=RELATIONSHIP_TYPES['CONTAINS'],
+        ),
+        summary_rows=[
+            {
+                'ROI': 1,
+                'Name': 'Alpha',
+                'DICOM_Type': 'CTV',
+                'Physical_Volume': 12.345,
+                'Exterior_Volume': 15.0,
+                'Hull_Volume': 20.0,
+                'Num_Contours': 4,
+                'Num_Regions': 2,
+            },
+            {
+                'ROI': 2,
+                'Name': 'Beta',
+                'DICOM_Type': 'GTV',
+                'Physical_Volume': 2.0,
+                'Exterior_Volume': 3.0,
+                'Hull_Volume': 4.0,
+                'Num_Contours': 1,
+                'Num_Regions': 1,
+            },
+        ],
+    )
+    manager.save_session(
+        'diagram-info-no-dicom',
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': 'diagram-info-no-dicom',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    info = response.json()['nodes'][0]['info']
+    assert info == {
+        'ROINumber': '1',
+        'Contour Count': '4',
+        'Region Count': '2',
+        'Physical Volume': '12.35 cm³',
+        'Exterior Volume': '15.00 cm³',
+        'Hull Volume': '20.00 cm³',
+    }
+
+
+def test_diagram_node_info_keeps_blank_dicom_fields(monkeypatch, tmp_path):
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    fake_set = _make_fake_diagram_structure_set()
+    fake_set.dicom_structure_file = FakeDicomStructureFile(
+        pd.DataFrame(
+            [
+                {
+                    'Structure ID': 'Alpha ID',
+                    'Structure Name': '',
+                    'DICOM Type': 'CTV',
+                    'Structure Code': '',
+                }
+            ],
+            index=[1],
+        )
+    )
+    manager.save_session(
+        'diagram-info-dicom',
+        SessionData(dicom_file_path='dummy.dcm', structure_set=fake_set),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': 'diagram-info-dicom',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    info = response.json()['nodes'][0]['info']
+    dicom_fields = {
+        'Structure ID',
+        'Structure Name',
+        'DICOM Type',
+        'Structure Code',
+        'Coding Scheme',
+        'Code Meaning',
+        'ROI Physical Property',
+        'Density',
+        'Generation Method',
+        'Generation Description',
+    }
+    assert dicom_fields.issubset(info)
+    assert info['Structure ID'] == 'Alpha ID'
+    assert info['DICOM Type'] == 'CTV'
+    assert info['Structure Name'] == ''
+    assert info['Structure Code'] == ''
+    assert info['Coding Scheme'] == ''
+    assert info['Code Meaning'] == ''
 
 
 def test_diagram_edge_exposes_equals_rank_and_calculated_metrics(
