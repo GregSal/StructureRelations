@@ -47,6 +47,9 @@ class WebAppClient {
         this.latestDiagramData = null;
         this.hiddenNodes = new Set();    // ROI ids hidden via context menu
         this.hiddenLabels = new Set();   // ROI ids with label hidden
+        this.hiddenHovers = new Set();   // ROI ids with hover popup hidden
+        this.nodeLabelFields = new Map();
+        this.nodeHoverFields = new Map();
         this.hiddenEdges = new Set();    // edge keys hidden via context menu
         this.highlightedEdges = new Set();
         this.doubleLineEdges = new Set();
@@ -2430,6 +2433,25 @@ class WebAppClient {
                     );
                     submenu.style.top = `${top - itemRect.top}px`;
                 });
+                el.addEventListener('mousedown', (mouseEvent) => {
+                    mouseEvent.stopPropagation();
+                });
+                menu.appendChild(el);
+                continue;
+            }
+
+            if (item.checkbox) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = Boolean(item.checked);
+                checkbox.setAttribute('aria-label', item.label);
+                checkbox.addEventListener('change', () => {
+                    item.action?.(checkbox.checked);
+                });
+                const label = document.createElement('span');
+                label.textContent = item.label;
+                el.classList.add('has-checkbox');
+                el.append(checkbox, label);
                 el.addEventListener('mousedown', (mouseEvent) => {
                     mouseEvent.stopPropagation();
                 });
@@ -5481,6 +5503,15 @@ class WebAppClient {
         const renderedNodeIds = new Set(data.nodes.map(node => Number(node.id)));
         this.hiddenNodes = new Set(Array.from(this.hiddenNodes).filter(id => renderedNodeIds.has(Number(id))));
         this.hiddenLabels = new Set(Array.from(this.hiddenLabels).filter(id => renderedNodeIds.has(Number(id))));
+        this.hiddenHovers = new Set(Array.from(this.hiddenHovers).filter(id => renderedNodeIds.has(Number(id))));
+        this.nodeLabelFields = new Map(
+            Array.from(this.nodeLabelFields.entries())
+                .filter(([id]) => renderedNodeIds.has(Number(id)))
+        );
+        this.nodeHoverFields = new Map(
+            Array.from(this.nodeHoverFields.entries())
+                .filter(([id]) => renderedNodeIds.has(Number(id)))
+        );
         this.fixedNodes = new Set(Array.from(this.fixedNodes).filter(id => renderedNodeIds.has(Number(id))));
 
         const renderedEdgeKeys = new Set(data.edges.map(edge => this._buildEdgeKey(edge)));
@@ -5615,13 +5646,21 @@ class WebAppClient {
             const roi = Number(node.id);
             const originalLabel = node.label;
             const labelHidden = this.hiddenLabels.has(roi);
+            const hoverHidden = this.hiddenHovers.has(roi);
             const isHidden = this.hiddenNodes.has(roi);
+            const info = node.info || {};
+            const nodeDisplayData = {
+                ...node,
+                _originalLabel: originalLabel,
+                info,
+            };
+            this._ensureNodeDisplaySelections(roi, nodeDisplayData);
             const hasAnchorPosition = Object.prototype.hasOwnProperty.call(
                 anchorPositions,
                 String(roi),
             );
-            const isPhysicsFixed = this.fixedNodes.has(roi) || hasAnchorPosition;
-
+            const isPhysicsFixed = this.fixedNodes.has(roi)
+                || hasAnchorPosition;
             // Apply pre-layout position if available
             const preLayoutPos = preLayoutPositions?.[String(roi)];
 
@@ -5634,7 +5673,10 @@ class WebAppClient {
                 _layoutX: anchorPositions[String(roi)]?.x,
                 _layoutY: anchorPositions[String(roi)]?.y,
                 _originalLabel: originalLabel,
-                label: labelHidden ? '' : originalLabel,
+                label: labelHidden
+                    ? ''
+                    : this._formatNodeDisplayLabel(roi, nodeDisplayData),
+                widthConstraint: {maximum: 180},
                 ...(preLayoutPos && { x: preLayoutPos.x, y: preLayoutPos.y }),
             color: {
                 background: node.color,
@@ -5645,8 +5687,10 @@ class WebAppClient {
                 }
             },
             shape: node.shape,
-            title: node.title,
-            info: node.info || {},
+            title: hoverHidden
+                ? ''
+                : this._formatNodeHoverTitle(roi, nodeDisplayData),
+            info,
             font: {
                 color: this.getTextColor(node.color),
                 size: Number(nodeFont.node_size || 14),
@@ -6027,6 +6071,146 @@ class WebAppClient {
         return edge?.is_logical || relationType === 'DISJOINT' ? 0.2 : 0.6;
     }
 
+    _getNodeInfoFields(node) {
+        const info = node.info || {};
+        const fields = [
+            'Structure ID',
+            'Structure Name',
+            'ROINumber',
+            'DICOM Type',
+            'Structure Code',
+            'Coding Scheme',
+            'Code Meaning',
+            'ROI Physical Property',
+            'Density',
+            'Generation Method',
+            'Generation Description',
+            'Contour Count',
+            'Region Count',
+            'Physical Volume',
+            'Exterior Volume',
+            'Hull Volume',
+        ];
+        return fields.filter(field => {
+            if (field === 'Structure ID'
+                && !Object.prototype.hasOwnProperty.call(info, field)) {
+                return Boolean(node._originalLabel || node.label);
+            }
+            return String(info[field] ?? '').trim() !== '';
+        });
+    }
+
+    _getNodeInfoFieldLabel(field) {
+        return field === 'ROINumber' ? 'ROI Number' : field;
+    }
+
+    _getDefaultNodeHoverFields(node) {
+        const nodeTooltipConfig = this.tooltipsConfig?.nodes || {};
+        const fields = ['Structure ID'];
+        if (nodeTooltipConfig.show_roi_number) fields.push('ROINumber');
+        if (nodeTooltipConfig.show_type !== false) {
+            fields.push('DICOM Type');
+        }
+        if (nodeTooltipConfig.show_volume !== false) {
+            fields.push('Physical Volume');
+        }
+        if (nodeTooltipConfig.show_regions !== false) {
+            fields.push('Region Count');
+        }
+        const availableFields = new Set(this._getNodeInfoFields(node));
+        return fields.filter(field => availableFields.has(field));
+    }
+
+    _ensureNodeDisplaySelections(roi, node) {
+        const availableFields = new Set(this._getNodeInfoFields(node));
+        if (!this.nodeLabelFields.has(roi)) {
+            this.nodeLabelFields.set(roi, new Set(['Structure ID']));
+        } else {
+            this.nodeLabelFields.set(
+                roi,
+                new Set(Array.from(this.nodeLabelFields.get(roi))
+                    .filter(field => availableFields.has(field))),
+            );
+        }
+        if (!this.nodeHoverFields.has(roi)) {
+            this.nodeHoverFields.set(
+                roi,
+                new Set(this._getDefaultNodeHoverFields(node)),
+            );
+        } else {
+            this.nodeHoverFields.set(
+                roi,
+                new Set(Array.from(this.nodeHoverFields.get(roi))
+                    .filter(field => availableFields.has(field))),
+            );
+        }
+    }
+
+    _getNodeInfoValue(node, field) {
+        const info = node.info || {};
+        if (field === 'Structure ID'
+            && !Object.prototype.hasOwnProperty.call(info, field)) {
+            return node._originalLabel || node.label || '';
+        }
+        return String(info[field] ?? '').trim();
+    }
+
+    _formatNodeDisplayLabel(roi, node) {
+        this._ensureNodeDisplaySelections(roi, node);
+        const selectedFields = this.nodeLabelFields.get(roi);
+        const structureId = this._getNodeInfoValue(node, 'Structure ID')
+            || String(roi);
+        const additionalValues = this._getNodeInfoFields(node)
+            .filter(field => field !== 'Structure ID'
+                && selectedFields.has(field))
+            .map(field => this._getNodeInfoValue(node, field));
+        if (selectedFields.has('Structure ID')) {
+            return additionalValues.length
+                ? `${structureId}\n[${additionalValues.join(', ')}]`
+                : structureId;
+        }
+        return additionalValues.join(', ');
+    }
+
+    _formatNodeHoverTitle(roi, node) {
+        this._ensureNodeDisplaySelections(roi, node);
+        const selectedFields = this.nodeHoverFields.get(roi);
+        return this._getNodeInfoFields(node)
+            .filter(field => selectedFields.has(field))
+            .map(field => (
+                `${this._getNodeInfoFieldLabel(field)}: `
+                + this._getNodeInfoValue(node, field)
+            ))
+            .join('\n');
+    }
+
+    _updateNodeDisplay(roi) {
+        const nodes = this.network?.body?.data?.nodes;
+        const node = nodes?.get(roi);
+        if (!node) return;
+        this._ensureNodeDisplaySelections(roi, node);
+        nodes.update([{
+            id: roi,
+            label: this.hiddenLabels.has(roi)
+                ? ''
+                : this._formatNodeDisplayLabel(roi, node),
+            title: this.hiddenHovers.has(roi)
+                ? ''
+                : this._formatNodeHoverTitle(roi, node),
+        }]);
+    }
+
+    _toggleNodeDisplayField(roi, mode, field, checked) {
+        const selections = mode === 'label'
+            ? this.nodeLabelFields
+            : this.nodeHoverFields;
+        const selectedFields = new Set(selections.get(roi) || []);
+        if (checked) selectedFields.add(field);
+        else selectedFields.delete(field);
+        selections.set(roi, selectedFields);
+        this._updateNodeDisplay(roi);
+    }
+
     _showNodeContextMenu(roi, event) {
         const normalizedRoi = Number(roi);
         const node = this.network?.body?.data?.nodes?.get(normalizedRoi);
@@ -6034,9 +6218,9 @@ class WebAppClient {
 
         const isDisplayed = this.diagramAppliedSelection.has(normalizedRoi);
         const isFixed = this.fixedNodes.has(roi);
-        const isLabelHidden = this.hiddenLabels.has(normalizedRoi);
         const isHidden = !isDisplayed;
         const info = node.info || {};
+        this._ensureNodeDisplaySelections(normalizedRoi, node);
         const configuredNodeFontSize = Number(node.font?.size);
         const infoFontSize = Number.isFinite(configuredNodeFontSize)
             && configuredNodeFontSize > 0
@@ -6060,7 +6244,7 @@ class WebAppClient {
         const infoItems = infoFields
             .filter(field => Object.prototype.hasOwnProperty.call(info, field))
             .map(field => ({
-                label: `${field}: ${info[field] ?? ''}`,
+                label: `${this._getNodeInfoFieldLabel(field)}: ${info[field] ?? ''}`,
                 disabled: true,
             }));
         infoItems.push({
@@ -6079,6 +6263,41 @@ class WebAppClient {
                 })),
         });
 
+        const buildDisplayItems = mode => {
+            const isLabelMode = mode === 'label';
+            const hiddenItems = isLabelMode
+                ? this.hiddenLabels
+                : this.hiddenHovers;
+            const selectedFields = isLabelMode
+                ? this.nodeLabelFields.get(normalizedRoi)
+                : this.nodeHoverFields.get(normalizedRoi);
+            const hideLabel = isLabelMode ? 'Hide Label' : 'Hide Hover';
+            return [
+                {
+                    label: hideLabel,
+                    checkbox: true,
+                    checked: hiddenItems.has(normalizedRoi),
+                    action: checked => {
+                        if (checked) hiddenItems.add(normalizedRoi);
+                        else hiddenItems.delete(normalizedRoi);
+                        this._updateNodeDisplay(normalizedRoi);
+                    },
+                },
+                {separator: true},
+                ...this._getNodeInfoFields(node).map(field => ({
+                    label: this._getNodeInfoFieldLabel(field),
+                    checkbox: true,
+                    checked: selectedFields.has(field),
+                    action: checked => this._toggleNodeDisplayField(
+                        normalizedRoi,
+                        mode,
+                        field,
+                        checked,
+                    ),
+                })),
+            ];
+        };
+
         const items = [
             {
                 label: isFixed ? 'Unfix Position' : 'Fix Position',
@@ -6087,16 +6306,26 @@ class WebAppClient {
             },
             { separator: true },
             {
-                label: isLabelHidden ? 'Show Label' : 'Hide Label',
-                active: isLabelHidden,
-                action: () => this._ctxToggleLabel(normalizedRoi),
-            },
-            {
                 label: isHidden ? 'Show Structure' : 'Hide Structure',
                 active: isHidden,
                 action: () => this._ctxToggleVisibility(normalizedRoi),
             },
             { separator: true },
+            {
+                label: 'Display',
+                children: [
+                    {
+                        label: 'Label',
+                        children: buildDisplayItems('label'),
+                        scrollable: true,
+                    },
+                    {
+                        label: 'Hover',
+                        children: buildDisplayItems('hover'),
+                        scrollable: true,
+                    },
+                ],
+            },
             {
                 label: 'Relationships',
                 children: this._buildNodeRelationshipMenuItems(
@@ -6745,21 +6974,12 @@ class WebAppClient {
     }
 
     _ctxToggleLabel(roi) {
-        if (!this.network) return;
-        const node = this.network.body.data.nodes.get(roi);
-        if (!node) return;
         if (this.hiddenLabels.has(roi)) {
             this.hiddenLabels.delete(roi);
-            this.network.body.data.nodes.update([
-                { id: roi, label: node._originalLabel || node.label || String(roi) },
-            ]);
         } else {
             this.hiddenLabels.add(roi);
-            const original = node._originalLabel || node.label || String(roi);
-            this.network.body.data.nodes.update([
-                { id: roi, _originalLabel: original, label: '' },
-            ]);
         }
+        this._updateNodeDisplay(roi);
     }
 
     _ctxToggleEdgeVisibility(edgeId) {
@@ -7990,6 +8210,9 @@ class WebAppClient {
         this.sortableInitScheduled = false;
         this.hiddenNodes.clear();
         this.hiddenLabels.clear();
+        this.hiddenHovers.clear();
+        this.nodeLabelFields.clear();
+        this.nodeHoverFields.clear();
         this.hiddenEdges.clear();
         this.highlightedEdges.clear();
         this.doubleLineEdges.clear();

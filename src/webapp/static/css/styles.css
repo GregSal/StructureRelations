@@ -1955,6 +1955,17 @@ tbody tr:hover {
     cursor: default;
 }
 
+.node-context-menu-item.has-checkbox {
+    justify-content: flex-start;
+    cursor: pointer;
+}
+
+.node-context-menu-item.has-checkbox input {
+    flex: none;
+    margin: 0;
+    cursor: pointer;
+}
+
 .node-context-menu-arrow {
     margin-left: 1rem;
     color: var(--text-secondary);

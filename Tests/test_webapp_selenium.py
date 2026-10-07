@@ -569,6 +569,33 @@ class TestWebAppWorkflow:
             'stage-results'
         )
         assert results_stage.is_displayed()
+        helper.switch_tab('diagram')
+        helper.wait.until(
+            lambda driver: driver.execute_script(
+                'return window.app?.structureItems?.length > 0;'
+            )
+        )
+        helper.driver.execute_script(
+            """
+            const app = window.app;
+            const roi = Number(app.structureItems[0].roi);
+            app.commitDiagramSelection(new Set([roi]));
+            """
+        )
+        diagram_node_count = WebDriverWait(helper.driver, 20).until(
+            lambda driver: driver.execute_script(
+                'return window.app?.network?.body?.data?.nodes'
+                    '?.getIds?.().length || 0;'
+            )
+        )
+        assert diagram_node_count > 0
+        assert helper.driver.execute_script(
+            """
+            const nodes = window.app.network.body.data.nodes;
+            return nodes.get(nodes.getIds()[0]).widthConstraint?.maximum
+                === 180;
+            """
+        )
 
     def test_matrix_display(
         self,
@@ -743,7 +770,7 @@ class TestDiagramRelationshipContextMenu:
                 'DICOM Type': 'EXTERNAL',
                 'Structure Code': '',
                 'Coding Scheme': '',
-                'Code Meaning': '',
+                'Code Meaning': 'Right lung',
                 'ROI Physical Property': '',
                 Density: '',
                 'Generation Method': '',
@@ -758,7 +785,10 @@ class TestDiagramRelationshipContextMenu:
                 'Hull Volume': '20000.00 cm³',
             };
             const node = {id: 1, info, font: {size: 22}};
-            app.network = {body: {data: {nodes: {get: () => node}}}};
+            app.network = {body: {data: {nodes: {
+                get: () => node,
+                update: updates => Object.assign(node, updates[0]),
+            }}}};
             app._showNodeContextMenu(1, {
                 clientX: window.innerWidth - 2,
                 clientY: window.innerHeight - 2,
@@ -776,10 +806,89 @@ class TestDiagramRelationshipContextMenu:
                 return {
                     label: label.trim(),
                     disabled: item.classList.contains('is-disabled'),
+                    checked: item.querySelector('input[type="checkbox"]')
+                        ?.checked,
                     children: submenu ? labels(submenu) : [],
                 };
             });
             const tree = labels(menu);
+            const getDirectItem = (parent, label) => Array.from(
+                parent.querySelectorAll(
+                    ':scope > .node-context-menu-item'
+                )
+            ).find(item => (
+                item.querySelector(':scope > span')?.textContent === label
+                || item.textContent.trim() === label
+            ));
+            const displaySubmenu = getDirectItem(menu, 'Display')
+                .querySelector(':scope > .node-context-submenu');
+            const labelSubmenu = getDirectItem(displaySubmenu, 'Label')
+                .querySelector(':scope > .node-context-submenu');
+            const hoverSubmenu = getDirectItem(displaySubmenu, 'Hover')
+                .querySelector(':scope > .node-context-submenu');
+            const labelIdCheckbox = getDirectItem(labelSubmenu, 'Structure ID')
+                .querySelector('input');
+            const labelTypeCheckbox = getDirectItem(labelSubmenu, 'DICOM Type')
+                .querySelector('input');
+            const hideLabelCheckbox = getDirectItem(labelSubmenu, 'Hide Label')
+                .querySelector('input');
+            const labelDefaults = {
+                id: labelIdCheckbox.checked,
+                type: labelTypeCheckbox.checked,
+                blankDensity: Boolean(getDirectItem(labelSubmenu, 'Density')),
+            };
+            labelTypeCheckbox.checked = true;
+            labelTypeCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const labelWithType = node.label;
+            hideLabelCheckbox.checked = true;
+            hideLabelCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const labelWhileHidden = node.label;
+            hideLabelCheckbox.checked = false;
+            hideLabelCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const labelAfterShow = node.label;
+
+            const hoverTypeCheckbox = getDirectItem(hoverSubmenu, 'DICOM Type')
+                .querySelector('input');
+            const hoverVolumeCheckbox = getDirectItem(
+                hoverSubmenu,
+                'Physical Volume',
+            ).querySelector('input');
+            const hoverRegionsCheckbox = getDirectItem(
+                hoverSubmenu,
+                'Region Count',
+            ).querySelector('input');
+            const hoverMeaningCheckbox = getDirectItem(
+                hoverSubmenu,
+                'Code Meaning',
+            ).querySelector('input');
+            const hideHoverCheckbox = getDirectItem(hoverSubmenu, 'Hide Hover')
+                .querySelector('input');
+            const hoverDefaults = {
+                type: hoverTypeCheckbox.checked,
+                volume: hoverVolumeCheckbox.checked,
+                regions: hoverRegionsCheckbox.checked,
+            };
+            hoverMeaningCheckbox.checked = true;
+            hoverMeaningCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const hoverWithMeaning = node.title;
+            hideHoverCheckbox.checked = true;
+            hideHoverCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const hoverWhileHidden = node.title;
+            hideHoverCheckbox.checked = false;
+            hideHoverCheckbox.dispatchEvent(new Event('change', {
+                bubbles: true,
+            }));
+            const hoverAfterShow = node.title;
             const infoMenu = Array.from(
                 menu.querySelectorAll('.node-context-menu-item')
             ).find(item => item.querySelector(':scope > span')?.textContent
@@ -855,7 +964,20 @@ class TestDiagramRelationshipContextMenu:
                 nonDicomInfo.querySelectorAll('.node-context-menu-item')
             ).map(item => item.textContent.trim());
             app._dismissContextMenu();
-            return {tree, menuStayedOpen, nonDicomLabels, scrollBehavior};
+            return {
+                tree,
+                menuStayedOpen,
+                nonDicomLabels,
+                scrollBehavior,
+                labelDefaults,
+                labelWithType,
+                labelWhileHidden,
+                labelAfterShow,
+                hoverDefaults,
+                hoverWithMeaning,
+                hoverWhileHidden,
+                hoverAfterShow,
+            };
             """
         )
 
@@ -863,18 +985,22 @@ class TestDiagramRelationshipContextMenu:
         labels = {item['label']: item for item in info_menu['children']}
         assert labels['Structure ID: BODY']['disabled'] is True
         assert labels['Structure Name:']['disabled'] is True
-        assert labels['ROINumber: 1']['disabled'] is True
+        assert labels['ROI Number: 1']['disabled'] is True
         assert labels['DICOM Type: EXTERNAL']['disabled'] is True
         for label in [
             'Structure Name:',
             'Structure Code:',
             'Coding Scheme:',
-            'Code Meaning:',
             'ROI Physical Property:',
             'Density:',
             'Generation Method:',
         ]:
             assert labels[label]['disabled'] is True
+        code_meaning_label = next(
+            label for label in labels
+            if label.startswith('Code Meaning:')
+        )
+        assert labels[code_meaning_label]['disabled'] is True
         description_label = next(
             label for label in labels
             if label.startswith('Generation Description:')
@@ -882,6 +1008,22 @@ class TestDiagramRelationshipContextMenu:
         assert labels[description_label]['disabled'] is True
         assert labels['Contour Count: 8']['disabled'] is True
         assert labels['Region Count: 1']['disabled'] is True
+        assert result['labelDefaults'] == {
+            'id': True,
+            'type': False,
+            'blankDensity': False,
+        }
+        assert result['labelWithType'] == 'BODY\n[EXTERNAL]'
+        assert result['labelWhileHidden'] == ''
+        assert result['labelAfterShow'] == 'BODY\n[EXTERNAL]'
+        assert result['hoverDefaults'] == {
+            'type': True,
+            'volume': True,
+            'regions': True,
+        }
+        assert 'Code Meaning: Right lung' in result['hoverWithMeaning']
+        assert result['hoverWhileHidden'] == ''
+        assert 'Code Meaning: Right lung' in result['hoverAfterShow']
         volume = labels['Volume']
         assert [item['label'] for item in volume['children']] == [
             'Physical Volume: 18730.01 cm³',
