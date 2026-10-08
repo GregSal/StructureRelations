@@ -48,6 +48,7 @@ class WebAppClient {
         this.hiddenNodes = new Set();    // ROI ids hidden via context menu
         this.hiddenLabels = new Set();   // ROI ids with label hidden
         this.hiddenHovers = new Set();   // ROI ids with hover popup hidden
+        this.nodeFormats = new Map();
         this.nodeLabelFields = new Map();
         this.nodeHoverFields = new Map();
         this.hiddenEdges = new Set();    // edge keys hidden via context menu
@@ -5504,6 +5505,10 @@ class WebAppClient {
         this.hiddenNodes = new Set(Array.from(this.hiddenNodes).filter(id => renderedNodeIds.has(Number(id))));
         this.hiddenLabels = new Set(Array.from(this.hiddenLabels).filter(id => renderedNodeIds.has(Number(id))));
         this.hiddenHovers = new Set(Array.from(this.hiddenHovers).filter(id => renderedNodeIds.has(Number(id))));
+        this.nodeFormats = new Map(
+            Array.from(this.nodeFormats.entries())
+                .filter(([id]) => renderedNodeIds.has(Number(id)))
+        );
         this.nodeLabelFields = new Map(
             Array.from(this.nodeLabelFields.entries())
                 .filter(([id]) => renderedNodeIds.has(Number(id)))
@@ -5661,6 +5666,18 @@ class WebAppClient {
             );
             const isPhysicsFixed = this.fixedNodes.has(roi)
                 || hasAnchorPosition;
+            const defaultColor = {
+                background: node.color,
+                border: this.darkenColor(node.color),
+                highlight: {
+                    background: node.color,
+                    border: this.darkenColor(node.color)
+                }
+            };
+            const formatOptions = this._getNodeFormatOptions(
+                defaultColor,
+                this.nodeFormats.get(roi),
+            );
             // Apply pre-layout position if available
             const preLayoutPos = preLayoutPositions?.[String(roi)];
 
@@ -5673,19 +5690,13 @@ class WebAppClient {
                 _layoutX: anchorPositions[String(roi)]?.x,
                 _layoutY: anchorPositions[String(roi)]?.y,
                 _originalLabel: originalLabel,
+                _defaultColor: defaultColor,
                 label: labelHidden
                     ? ''
                     : this._formatNodeDisplayLabel(roi, nodeDisplayData),
                 widthConstraint: {maximum: 180},
                 ...(preLayoutPos && { x: preLayoutPos.x, y: preLayoutPos.y }),
-            color: {
-                background: node.color,
-                border: this.darkenColor(node.color),
-                highlight: {
-                    background: node.color,
-                    border: this.darkenColor(node.color)
-                }
-            },
+            ...formatOptions,
             shape: node.shape,
             title: hoverHidden
                 ? ''
@@ -5696,7 +5707,6 @@ class WebAppClient {
                 size: Number(nodeFont.node_size || 14),
                 face: nodeFont.face || 'Arial'
             },
-                borderWidth: 2,
                 physics: isHidden ? false : !isPhysicsFixed,
                 hidden: isHidden
             };
@@ -6200,6 +6210,48 @@ class WebAppClient {
         }]);
     }
 
+    _getNodeFormatOptions(defaultColor, format) {
+        const isHighlight = format === 'highlight';
+        const color = isHighlight
+            ? {
+                ...defaultColor,
+                border: '#ffffff',
+                highlight: {
+                    ...defaultColor.highlight,
+                    border: '#ffffff',
+                },
+            }
+            : defaultColor;
+        return {
+            color,
+            opacity: format === 'fade' ? 0.75 : 1,
+            borderWidth: format ? 4 : 2,
+            shapeProperties: {
+                borderDashes: false,
+            },
+        };
+    }
+
+    _setNodeFormat(roi, format) {
+        const normalizedRoi = Number(roi);
+        const nodes = this.network?.body?.data?.nodes;
+        const node = nodes?.get(normalizedRoi);
+        if (!node) return;
+
+        const nextFormat = this.nodeFormats.get(normalizedRoi) === format
+            ? null
+            : format;
+        if (nextFormat) this.nodeFormats.set(normalizedRoi, nextFormat);
+        else this.nodeFormats.delete(normalizedRoi);
+        nodes.update([{
+            id: normalizedRoi,
+            ...this._getNodeFormatOptions(
+                node._defaultColor || node.color,
+                nextFormat,
+            ),
+        }]);
+    }
+
     _toggleNodeDisplayField(roi, mode, field, checked) {
         const selections = mode === 'label'
             ? this.nodeLabelFields
@@ -6323,6 +6375,36 @@ class WebAppClient {
                         label: 'Hover',
                         children: buildDisplayItems('hover'),
                         scrollable: true,
+                    },
+                ],
+            },
+            {
+                label: 'Format',
+                children: [
+                    {
+                        label: 'Fade',
+                        active: this.nodeFormats.get(normalizedRoi) === 'fade',
+                        action: () => this._setNodeFormat(
+                            normalizedRoi,
+                            'fade',
+                        ),
+                    },
+                    {
+                        label: 'Enhance',
+                        active: this.nodeFormats.get(normalizedRoi) === 'enhance',
+                        action: () => this._setNodeFormat(
+                            normalizedRoi,
+                            'enhance',
+                        ),
+                    },
+                    {
+                        label: 'Highlight',
+                        active: this.nodeFormats.get(normalizedRoi)
+                            === 'highlight',
+                        action: () => this._setNodeFormat(
+                            normalizedRoi,
+                            'highlight',
+                        ),
                     },
                 ],
             },

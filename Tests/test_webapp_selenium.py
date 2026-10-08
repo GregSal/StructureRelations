@@ -747,6 +747,126 @@ class TestWebAppWorkflow:
 class TestDiagramRelationshipContextMenu:
     """Test relationship grouping and actions in a structure context menu."""
 
+    def test_node_format_menu_applies_and_toggles_formats(
+        self,
+        chrome_headless_driver,
+    ):
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        helper.wait.until(
+            lambda driver: driver.execute_script('return Boolean(window.app);')
+        )
+
+        result = chrome_headless_driver.execute_script(
+            """
+            const app = window.app;
+            const defaultColor = {
+                background: '#336699',
+                border: '#2b577e',
+                highlight: {background: '#336699', border: '#2b577e'},
+            };
+            const node = {
+                id: 1,
+                info: {},
+                color: defaultColor,
+                _defaultColor: defaultColor,
+            };
+            const nodes = {
+                get: id => Number(id) === 1 ? node : null,
+                update: updates => Object.assign(node, updates[0]),
+            };
+            app.network = {body: {data: {nodes}}};
+            app.nodeFormats.delete(1);
+
+            const getItem = (parent, label) => Array.from(
+                parent.querySelectorAll(':scope > .node-context-menu-item')
+            ).find(item => {
+                const itemLabel = item.querySelector(':scope > span')
+                    ?.textContent || item.childNodes[0]?.textContent
+                    || item.textContent;
+                return itemLabel.trim() === label;
+            });
+            const openMenu = () => {
+                app._showNodeContextMenu(1, {clientX: 10, clientY: 10});
+                return app._contextMenu;
+            };
+            const getFormatOption = (label) => {
+                const menu = openMenu();
+                const format = getItem(menu, 'Format');
+                const submenu = format.querySelector(
+                    ':scope > .node-context-submenu'
+                );
+                return getItem(submenu, label);
+            };
+            const applyFormat = label => {
+                getFormatOption(label).dispatchEvent(new MouseEvent('mousedown', {
+                    bubbles: true,
+                }));
+                return {
+                    format: app.nodeFormats.get(1) || null,
+                    opacity: node.opacity,
+                    borderWidth: node.borderWidth,
+                    color: node.color,
+                    shapeProperties: node.shapeProperties,
+                };
+            };
+            const menu = openMenu();
+            const topLabels = Array.from(
+                menu.querySelectorAll(':scope > .node-context-menu-item')
+            ).map(item => item.querySelector(':scope > span')?.textContent
+                || item.childNodes[0]?.textContent?.trim());
+            const formatMenu = getItem(menu, 'Format').querySelector(
+                ':scope > .node-context-submenu'
+            );
+            const formatLabels = Array.from(
+                formatMenu.querySelectorAll(':scope > .node-context-menu-item')
+            ).map(item => item.textContent.trim());
+            app._dismissContextMenu();
+
+            const fade = applyFormat('Fade');
+            const fadeActive = getFormatOption('Fade').classList
+                .contains('is-active');
+            app._dismissContextMenu();
+            const enhance = applyFormat('Enhance');
+            const highlight = applyFormat('Highlight');
+            const normal = applyFormat('Highlight');
+            return {
+                topLabels,
+                formatLabels,
+                fade,
+                fadeActive,
+                enhance,
+                highlight,
+                normal,
+            };
+            """
+        )
+
+        assert result['topLabels'].index('Format') == (
+            result['topLabels'].index('Display') + 1
+        )
+        assert result['formatLabels'] == ['Fade', 'Enhance', 'Highlight']
+        assert result['fade']['format'] == 'fade'
+        assert result['fade']['opacity'] == 0.75
+        assert result['fade']['borderWidth'] == 4
+        assert result['fadeActive'] is True
+        assert result['enhance']['format'] == 'enhance'
+        assert result['enhance']['opacity'] == 1
+        assert result['enhance']['borderWidth'] == 4
+        assert result['enhance']['color']['border'] == '#2b577e'
+        assert result['highlight']['format'] == 'highlight'
+        assert result['highlight']['color']['border'] == '#ffffff'
+        assert result['highlight']['shapeProperties']['borderDashes'] is False
+        assert result['normal']['format'] is None
+        assert result['normal']['opacity'] == 1
+        assert result['normal']['borderWidth'] == 2
+        assert result['normal']['color'] == {
+            'background': '#336699',
+            'border': '#2b577e',
+            'highlight': {'background': '#336699', 'border': '#2b577e'},
+        }
+        assert result['normal']['shapeProperties']['borderDashes'] is False
+
     def test_node_info_menu_is_nested_and_non_actionable(
         self,
         chrome_headless_driver,
