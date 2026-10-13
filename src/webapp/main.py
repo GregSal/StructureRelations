@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
 
 
 # Initialize FastAPI app
-app = FastAPI(title='StructureRelations', version='1.0.3', lifespan=lifespan)
+app = FastAPI(title='StructureRelations', version='1.0.4', lifespan=lifespan)
 
 # Add middleware to log all requests
 @app.middleware("http")
@@ -230,6 +230,19 @@ class DiagramMetricOption(BaseModel):
     calculated: bool = False
 
 
+class DiagramMetricInfoValue(BaseModel):
+    label: str
+    value: str
+
+
+class DiagramMetricInfo(BaseModel):
+    category: str
+    field: str
+    label: str
+    value: Optional[str] = None
+    values: List[DiagramMetricInfoValue] = Field(default_factory=list)
+
+
 class DiagramMetricValue(BaseModel):
     label: str
     value: str
@@ -246,6 +259,7 @@ class DiagramEdgeMetricRequest(BaseModel):
 
 class DiagramEdgeMetricResponse(BaseModel):
     metrics: List[DiagramMetricOption] = Field(default_factory=list)
+    metric_info: List[DiagramMetricInfo] = Field(default_factory=list)
     metric_name: Optional[str] = None
     label: Optional[str] = None
     value: Optional[str] = None
@@ -267,6 +281,11 @@ class DiagramEdge(BaseModel):
     dashes: bool
     arrows: Optional[str] = None
     is_logical: bool = False
+    relationship_description: str = ''
+    intermediate_structures: List[str] = Field(default_factory=list)
+    is_symmetric: bool = False
+    is_transitive: bool = False
+    metric_info: List[DiagramMetricInfo] = Field(default_factory=list)
     metric_options: List[DiagramMetricOption] = Field(default_factory=list)
     layout_candidate: bool = True  # True if edge used for layout optimization, False if excluded
     edge_weight_for_crossing: float = 1.0  # 0.5 for OVERLAPS, 1.0 for others (used in crossing cost)
@@ -2327,6 +2346,224 @@ def _format_metric_value(value, precision: int, scale: float = 1.0) -> str:
     return f'{numeric_value:.{precision}f}'
 
 
+def _format_metric_info_value(
+    value,
+    precision: int,
+    unit: str = '',
+    scale: float = 1.0,
+) -> str:
+    formatted = _format_metric_value(value, precision, scale)
+    return f'{formatted} {unit}'.strip()
+
+
+def _build_diagram_metric_info(relationship, unit: str) -> List[DiagramMetricInfo]:
+    """Return display-ready details for metrics already stored on an edge."""
+    relationship_metrics = relationship.metrics
+    if relationship_metrics is None:
+        return []
+
+    config = get_metrics_config()
+    distance_precision = int(config.distance_precision)
+    ratio_precision = max(int(config.ratio_precision) - 2, 0)
+    direction_labels = (
+        config.anatomical_labels if config.use_anatomical_labels
+        else _AXIS_DIRECTION_LABELS
+    )
+    details: List[DiagramMetricInfo] = []
+
+    def add_scalar(
+        category: str,
+        field: str,
+        label: str,
+        value,
+        precision: int,
+        value_unit: str = '',
+        scale: float = 1.0,
+    ) -> None:
+        if value is None:
+            return
+        details.append(DiagramMetricInfo(
+            category=category,
+            field=field,
+            label=label,
+            value=_format_metric_info_value(
+                value, precision, value_unit, scale,
+            ),
+        ))
+
+    margin = getattr(relationship_metrics, 'margin', None)
+    if margin is not None:
+        margins = getattr(margin, 'orthogonal_margins', None)
+        if margins:
+            directions = config.orthogonal_directions or list(margins)
+            orthogonal_values = [
+                DiagramMetricInfoValue(
+                    label=direction_labels.get(direction, direction),
+                    value=_format_metric_info_value(
+                        margins[direction], distance_precision, unit,
+                    ),
+                )
+                for direction in directions
+                if direction in margins and margins[direction] is not None
+            ]
+            if orthogonal_values:
+                details.append(DiagramMetricInfo(
+                    category='MarginMetrics',
+                    field='orthogonal_margins',
+                    label='Orthogonal Margins',
+                    values=orthogonal_values,
+                ))
+        add_scalar(
+            'MarginMetrics', 'minimum_margin', 'Minimum Margin',
+            getattr(margin, 'minimum_margin', None), distance_precision, unit,
+        )
+        per_region_margins = getattr(
+            margin, 'per_region_orthogonal_margins', None,
+        )
+        if per_region_margins:
+            region_values = []
+            for region_pair, region_margins in (
+                per_region_margins.items()
+            ):
+                directions = config.orthogonal_directions or list(region_margins)
+                formatted = [
+                    f"{direction_labels.get(direction, direction)} "
+                    f"{_format_metric_info_value(value, distance_precision, unit)}"
+                    for direction in directions
+                    if (value := region_margins.get(direction)) is not None
+                ]
+                if formatted:
+                    region_values.append(DiagramMetricInfoValue(
+                        label=f'{region_pair[0]} / {region_pair[1]}',
+                        value='; '.join(formatted),
+                    ))
+            if region_values:
+                details.append(DiagramMetricInfo(
+                    category='MarginMetrics',
+                    field='per_region_orthogonal_margins',
+                    label='Per-region Orthogonal Margins',
+                    values=region_values,
+                ))
+        per_region_minimum = getattr(margin, 'per_region_minimum_margin', None)
+        if per_region_minimum:
+            region_values = [
+                DiagramMetricInfoValue(
+                    label=f'{region_pair[0]} / {region_pair[1]}',
+                    value=_format_metric_info_value(
+                        value, distance_precision, unit,
+                    ),
+                )
+                for region_pair, value in per_region_minimum.items()
+                if value is not None
+            ]
+            if region_values:
+                details.append(DiagramMetricInfo(
+                    category='MarginMetrics',
+                    field='per_region_minimum_margin',
+                    label='Per-region Minimum Margin',
+                    values=region_values,
+                ))
+
+    distance = getattr(relationship_metrics, 'distance', None)
+    if distance is not None:
+        add_scalar(
+            'DistanceMetrics', 'minimum_distance', 'Minimum Distance',
+            getattr(distance, 'minimum_distance', None),
+            distance_precision, unit,
+        )
+        per_region_distance = getattr(
+            distance, 'per_region_minimum_distance', None,
+        )
+        if per_region_distance:
+            region_values = [
+                DiagramMetricInfoValue(
+                    label=f'{region_pair[0]} / {region_pair[1]}',
+                    value=_format_metric_info_value(
+                        value, distance_precision, unit,
+                    ),
+                )
+                for region_pair, value in per_region_distance.items()
+                if value is not None
+            ]
+            if region_values:
+                details.append(DiagramMetricInfo(
+                    category='DistanceMetrics',
+                    field='per_region_minimum_distance',
+                    label='Per-region Minimum Distance',
+                    values=region_values,
+                ))
+        add_scalar(
+            'DistanceMetrics', 'z_distance', 'Z Distance',
+            getattr(distance, 'z_distance', None), distance_precision, unit,
+        )
+
+    volume_ratio = getattr(relationship_metrics, 'volume_ratio', None)
+    if volume_ratio is not None:
+        add_scalar(
+            'VolumeRatioMetrics', 'overlapping_ratio', 'Overlapping Ratio',
+            getattr(volume_ratio, 'overlapping_ratio', None),
+            ratio_precision, '%', 100.0,
+        )
+        add_scalar(
+            'VolumeRatioMetrics', 'non_overlapping_ratio',
+            'Non-overlapping Ratio',
+            getattr(volume_ratio, 'non_overlapping_ratio', None),
+            ratio_precision, '%', 100.0,
+        )
+        for field, label in (
+            ('per_region_overlapping_ratio', 'Per-region Overlapping Ratio'),
+            (
+                'per_region_non_overlapping_ratio',
+                'Per-region Non-overlapping Ratio',
+            ),
+        ):
+            region_ratios = getattr(volume_ratio, field, None)
+            if region_ratios:
+                region_values = [
+                    DiagramMetricInfoValue(
+                        label=f'{region_pair[0]} / {region_pair[1]}',
+                        value=_format_metric_info_value(
+                            value, ratio_precision, '%', 100.0,
+                        ),
+                    )
+                    for region_pair, value in region_ratios.items()
+                    if value is not None
+                ]
+                if region_values:
+                    details.append(DiagramMetricInfo(
+                        category='VolumeRatioMetrics',
+                        field=field,
+                        label=label,
+                        values=region_values,
+                    ))
+
+    return details
+
+
+def _build_diagram_relationship_info(relationship, structure_set) -> dict:
+    """Build metadata shared by rendered edges and the relationship catalog."""
+    structure_names = getattr(structure_set, 'structures', {})
+    intermediate_names = []
+    for roi in relationship.intermediate_structures or []:
+        structure = structure_names.get(roi)
+        if structure is None:
+            structure = structure_names.get(int(roi))
+        intermediate_names.append(
+            structure.name if structure is not None else f'ROI {roi}'
+        )
+
+    relationship_type = relationship.relationship_type
+    return {
+        'relationship_description': relationship_type.description or '',
+        'intermediate_structures': intermediate_names,
+        'is_symmetric': relationship_type.is_symmetric,
+        'is_transitive': relationship_type.is_transitive,
+        'metric_info': _build_diagram_metric_info(
+            relationship, getattr(structure_set, 'unit', 'cm'),
+        ),
+    }
+
+
 def _get_stored_metric_value(relationship, spec: DiagramMetricSpec):
     if relationship.metrics is None:
         return None
@@ -2378,7 +2615,12 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
 
     options = _get_applicable_diagram_metrics(relationship)
     if request.metric_name is None:
-        return DiagramEdgeMetricResponse(metrics=options)
+        return DiagramEdgeMetricResponse(
+            metrics=options,
+            metric_info=_build_diagram_metric_info(
+                relationship, getattr(structure_set, 'unit', 'cm'),
+            ),
+        )
 
     spec = _DIAGRAM_METRICS.get(request.metric_name)
     if spec is None:
@@ -2410,6 +2652,9 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
         directions = config.orthogonal_directions or list(value)
         return DiagramEdgeMetricResponse(
             metrics=options,
+            metric_info=_build_diagram_metric_info(
+                relationship, getattr(structure_set, 'unit', 'cm'),
+            ),
             metric_name=request.metric_name,
             label=spec.title,
             values=[
@@ -2426,6 +2671,9 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
     if spec.as_percent:
         return DiagramEdgeMetricResponse(
             metrics=options,
+            metric_info=_build_diagram_metric_info(
+                relationship, getattr(structure_set, 'unit', 'cm'),
+            ),
             metric_name=request.metric_name,
             label=spec.title,
             value=_format_metric_value(value, max(precision - 2, 0), 100.0),
@@ -2434,6 +2682,9 @@ async def get_diagram_edge_metric(request: DiagramEdgeMetricRequest):
 
     return DiagramEdgeMetricResponse(
         metrics=options,
+        metric_info=_build_diagram_metric_info(
+            relationship, getattr(structure_set, 'unit', 'cm'),
+        ),
         metric_name=request.metric_name,
         label=spec.title,
         value=_format_metric_value(value, precision),
@@ -2623,6 +2874,7 @@ async def get_diagram_data(request: MatrixRequest):
                 dashes=style['dashes'],
                 arrows=style.get('arrows'),
                 is_logical=relationship.is_logical,
+                **_build_diagram_relationship_info(relationship, structure_set),
                 layout_candidate=False,
             ))
 
@@ -2922,6 +3174,7 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        **_build_diagram_relationship_info(rel, structure_set),
                         metric_options=_get_applicable_diagram_metrics(rel),
                         layout_candidate=layout_candidate,
                         edge_weight_for_crossing=edge_weight,
@@ -3014,6 +3267,7 @@ async def get_diagram_data(request: MatrixRequest):
                         dashes=style['dashes'],
                         arrows=style['arrows'],
                         is_logical=rel.is_logical,
+                        **_build_diagram_relationship_info(rel, structure_set),
                         metric_options=_get_applicable_diagram_metrics(rel),
                         layout_candidate=layout_candidate,
                         edge_weight_for_crossing=edge_weight,

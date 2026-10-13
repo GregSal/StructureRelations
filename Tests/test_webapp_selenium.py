@@ -1204,15 +1204,34 @@ class TestDiagramRelationshipContextMenu:
                 get: () => edge,
                 update: update => Object.assign(edge, update),
             }}}};
-            const readWeights = () => Object.fromEntries(
-                Array.from(app._contextMenu.querySelectorAll(
-                    '.node-context-menu-item'
-                )).map(item => [
+            const getDirectItem = (parent, label) => Array.from(
+                parent.querySelectorAll(
+                    ':scope > .node-context-menu-item'
+                )
+            ).find(item => (
+                item.querySelector(':scope > span')?.textContent === label
+                || item.textContent.trim() === label
+            ));
+            const readWeights = () => {
+                const metricsItem = getDirectItem(app._contextMenu, 'Metrics');
+                const submenu = metricsItem.querySelector(
+                    ':scope > .node-context-submenu'
+                );
+                const weights = Object.fromEntries([
+                    metricsItem,
+                    ...submenu.querySelectorAll('.node-context-menu-item'),
+                ].map(item => [
                     item.querySelector(':scope > span')?.textContent
                         || item.textContent,
                     getComputedStyle(item).fontWeight,
-                ])
-            );
+                ]));
+                return {
+                    weights,
+                    formatWeight: getComputedStyle(
+                        getDirectItem(app._contextMenu, 'Format')
+                    ).fontWeight,
+                };
+            };
             (async () => {
                 await app._showEdgeContextMenu(edge.id, {clientX: 10, clientY: 10});
                 const before = readWeights();
@@ -1229,10 +1248,344 @@ class TestDiagramRelationshipContextMenu:
         )
         assert 'error' not in result
         for label in ['Metrics', 'Volume Ratio', 'Overlapping']:
-            assert result['before'][label] == '400'
-            assert result['after'][label] == '700'
-        for label in ['Non-overlapping', 'Margins', 'Minimum', 'Format']:
-            assert result['after'][label] == '400'
+            assert result['before']['weights'][label] == '400'
+            assert result['after']['weights'][label] == '700'
+        for label in ['Non-overlapping', 'Margins', 'Minimum']:
+            assert result['after']['weights'][label] == '400'
+        assert result['after']['formatWeight'] == '400'
+
+    def test_edge_info_and_display_menu_support_metric_labels(
+        self,
+        chrome_headless_driver,
+    ):
+        helper = WebAppTestHelper(chrome_headless_driver)
+        helper.navigate_home()
+        helper.wait.until(
+            lambda driver: driver.execute_script('return Boolean(window.app);')
+        )
+        result = chrome_headless_driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const app = window.app;
+            const originalFetch = window.fetch;
+            const metric = {
+                name: 'minimum_distance',
+                label: 'Minimum distance',
+                menu_path: ['Distance'],
+                calculated: false,
+            };
+            const sourceEdge = {
+                from_node: 1,
+                to_node: 2,
+                relation_type: 'CONTAINS',
+                label: '[Contains]',
+                is_logical: true,
+                relationship_description: (
+                    'Inside the outer structure with a deliberately long '
+                    + 'description that should wrap over multiple lines '
+                    + 'inside the narrower Info context menu.'
+                ),
+                intermediate_structures: ['Bridge'],
+                is_symmetric: false,
+                is_transitive: true,
+                metric_options: [metric],
+                metric_info: [{
+                    category: 'MarginMetrics',
+                    field: 'orthogonal_margins',
+                    label: 'Orthogonal Margins',
+                    value: null,
+                    values: [
+                        {label: '-X', value: '1.25 cm'},
+                        {label: '+X', value: '1.50 cm'},
+                        {label: '-Y', value: '1.75 cm'},
+                        {label: '+Y', value: '2.00 cm'},
+                        {label: '-Z', value: '2.25 cm'},
+                        {label: '+Z', value: '2.50 cm'},
+                    ],
+                }],
+            };
+            app.symbolConfig = {relationships: {
+                CONTAINS: {label: 'Contains'},
+            }};
+            app.sessionId = 'edge-menu-test';
+            app.latestDiagramData = {
+                nodes: [
+                    {id: 1, label: 'Alpha'},
+                    {id: 2, label: 'Beta'},
+                ],
+                edges: [sourceEdge],
+                relationship_catalog: [],
+            };
+            const edgeKey = app._buildEdgeKey(sourceEdge);
+            const edge = {
+                ...sourceEdge,
+                id: `${edgeKey}:1-main`,
+                from: 1,
+                to: 2,
+                _edgeKey: edgeKey,
+                originalLabel: '[Contains]',
+                relationship_label: '[Contains]',
+            };
+            app.network = {body: {data: {edges: {
+                get: () => edge,
+                update: update => Object.assign(edge, update),
+            }}}};
+            window.fetch = async () => ({
+                ok: true,
+                json: async () => ({
+                    metrics: [{...metric, calculated: true}],
+                    metric_info: [{
+                        category: 'DistanceMetrics',
+                        field: 'minimum_distance',
+                        label: 'Minimum Distance',
+                        value: '0.24 cm',
+                        values: [],
+                    }],
+                    metric_name: 'minimum_distance',
+                    value: '0.24',
+                    unit: 'cm',
+                }),
+            });
+            const getDirectItem = (parent, label) => Array.from(
+                parent.querySelectorAll(
+                    ':scope > .node-context-menu-item'
+                )
+            ).find(item => (
+                item.querySelector(':scope > span')?.textContent === label
+                || item.textContent.trim() === label
+            ));
+            const getSubmenu = item => item.querySelector(
+                ':scope > .node-context-submenu'
+            );
+            const openMenu = async () => {
+                await app._showEdgeContextMenu(edge.id, {
+                    clientX: 10,
+                    clientY: 10,
+                });
+            };
+            let stage = 'open menu';
+            (async () => {
+                await openMenu();
+                stage = 'read Info';
+                const root = app._contextMenu;
+                const info = getSubmenu(getDirectItem(root, 'Info'));
+                const descriptionItem = Array.from(
+                    info.querySelectorAll(
+                        ':scope > .node-context-menu-item'
+                    )
+                ).find(item => item.textContent.startsWith(
+                    'Relationship description:'
+                ));
+                info.style.display = 'block';
+                const infoRelation = info.querySelector(
+                    ':scope > .node-context-menu-item'
+                );
+                const display = getSubmenu(getDirectItem(root, 'Display'));
+                const labelItem = getDirectItem(display, 'Label');
+                const label = getSubmenu(labelItem);
+                const hover = getSubmenu(getDirectItem(display, 'Hover'));
+                const labelMetricsItem = getDirectItem(label, 'Metrics');
+                const labelMetrics = getSubmenu(labelMetricsItem);
+                const distanceItem = getDirectItem(labelMetrics, 'Distance');
+                const metricsHeader = getDirectItem(info, 'Metrics');
+                const orthogonalInfo = Array.from(
+                    info.querySelectorAll(
+                        ':scope > .node-context-menu-item'
+                    )
+                ).find(item => item.classList.contains(
+                    'edge-info-orthogonal-margins'
+                ));
+                const infoChildren = Array.from(info.children);
+                const metricsHeaderIndex = infoChildren.indexOf(metricsHeader);
+                const orthogonalInfoIndex = infoChildren.indexOf(orthogonalInfo);
+                const tooltipLines = app._formatEdgeHoverTitle(
+                    edge, edgeKey,
+                ).split('\\n');
+                const descriptionLineIndex = tooltipLines.findIndex(line => (
+                    line.startsWith('Relationship description:')
+                ));
+                const orthogonalMetric = {
+                    name: 'orthogonal_margins',
+                    label: 'Orthogonal Margins',
+                };
+                const orthogonalEdge = {
+                    ...edge,
+                    metric_options: [orthogonalMetric],
+                    metric_info: [sourceEdge.metric_info[0]],
+                };
+                app.edgeLabelFields.set('orthogonal-wrap-test', new Set([
+                    'relationship_label',
+                    'metric:orthogonal_margins',
+                ]));
+                const orthogonalEdgeLabel = app._formatEdgeDisplayLabel(
+                    orthogonalEdge, 'orthogonal-wrap-test',
+                );
+                app.edgeHoverFields.set(edgeKey, new Set([
+                    'relationship_label',
+                    'is_logical',
+                    'relationship_description',
+                    'metric:orthogonal_margins',
+                ]));
+                const edgeTooltip = app._buildEdgeHoverTooltip(edge, edgeKey);
+                const initial = {
+                    relation: infoRelation.textContent.trim(),
+                    relationDisabled: infoRelation.classList.contains(
+                        'is-disabled'
+                    ),
+                    hasMetricsInfo: Boolean(getDirectItem(info, 'Metrics')),
+                    infoMetricsAreFlat: (
+                        metricsHeader.classList.contains('is-disabled')
+                        && !metricsHeader.classList.contains('has-submenu')
+                        && orthogonalInfo.parentElement === info
+                    ),
+                    infoMetricsAreSeparated: (
+                        infoChildren[metricsHeaderIndex - 1]
+                            ?.classList.contains('node-context-menu-separator')
+                        && infoChildren[orthogonalInfoIndex + 1]
+                            ?.classList.contains('node-context-menu-separator')
+                    ),
+                    infoMenuWidth: info.getBoundingClientRect().width,
+                    descriptionWrapped: (
+                        descriptionItem.scrollHeight
+                        > parseFloat(getComputedStyle(descriptionItem).lineHeight)
+                    ),
+                    orthogonalMarginsWrapped: (
+                        orthogonalInfo.scrollHeight
+                        > parseFloat(getComputedStyle(orthogonalInfo).lineHeight)
+                    ),
+                    infoHasOrthogonalDiagram: Boolean(
+                        orthogonalInfo.querySelector(
+                            '.edge-metric-overlay-diagram'
+                        )
+                    ),
+                    tooltipHasOrthogonalDiagram: Boolean(
+                        edgeTooltip.querySelector(
+                            '.edge-metric-overlay-diagram'
+                        )
+                    ),
+                    tooltipDescriptionWrapped: (
+                        descriptionLineIndex >= 0
+                        && tooltipLines[descriptionLineIndex].length <= 80
+                        && Boolean(tooltipLines[descriptionLineIndex + 1])
+                    ),
+                    orthogonalEdgeLabelWrapped: (
+                        orthogonalEdgeLabel.split('\\n').length > 2
+                        && orthogonalEdgeLabel.split('\\n')
+                            .slice(1)
+                            .every(line => line.length <= 48)
+                    ),
+                    infoRowsReadOnly: [
+                        'Is logical?: Yes',
+                        'Intermediate structures in logical path: Bridge',
+                        'Relationship description: Inside the outer structure with a deliberately long description that should wrap over multiple lines inside the narrower Info context menu.',
+                        'Is symmetric?: No',
+                        'Is transitive?: Yes',
+                    ].every(label => getDirectItem(info, label)
+                        ?.classList.contains('is-disabled')),
+                    labelRelationshipChecked: getDirectItem(
+                        label, 'Relationship label'
+                    ).querySelector('input').checked,
+                    labelMetricFlyoutsNotScrollable: (
+                        !labelItem.classList.contains(
+                            'has-scrollable-submenu'
+                        )
+                        && !labelMetricsItem.classList.contains(
+                            'has-scrollable-submenu'
+                        )
+                        && !labelMetrics.classList.contains('is-scrollable')
+                        && !distanceItem.classList.contains(
+                            'has-scrollable-submenu'
+                        )
+                    ),
+                    hoverHasSymmetry: Boolean(getDirectItem(
+                        hover, 'Is symmetric?'
+                    )),
+                };
+                stage = 'select label metric';
+                const distance = getSubmenu(
+                    distanceItem
+                );
+                const metricCheckbox = getDirectItem(
+                    distance, 'Minimum distance'
+                ).querySelector('input');
+                metricCheckbox.checked = true;
+                metricCheckbox.dispatchEvent(new Event('change', {
+                    bubbles: true,
+                }));
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 2000;
+                    const poll = () => {
+                        if (edge.label.includes('Minimum distance: 0.24 cm')) {
+                            resolve();
+                        } else if (Date.now() > deadline) {
+                            reject(new Error('Metric label was not updated'));
+                        } else {
+                            setTimeout(poll, 10);
+                        }
+                    };
+                    poll();
+                });
+                stage = 'reopen menu';
+                await openMenu();
+                stage = 'read calculated metric';
+                const updatedRoot = app._contextMenu;
+                const updatedInfo = getSubmenu(
+                    getDirectItem(updatedRoot, 'Info')
+                );
+                const distanceInfo = getDirectItem(
+                    updatedInfo, 'Minimum Distance: 0.24 cm'
+                );
+                const displayAgain = getSubmenu(
+                    getDirectItem(updatedRoot, 'Display')
+                );
+                const hoverAgain = getSubmenu(
+                    getDirectItem(displayAgain, 'Hover')
+                );
+                const hoverMetric = getDirectItem(
+                    hoverAgain,
+                    'Distance Metrics / Minimum Distance',
+                );
+                hoverMetric.querySelector('input').checked = true;
+                hoverMetric.querySelector('input').dispatchEvent(
+                    new Event('change', {bubbles: true}),
+                );
+                const result = {
+                    ...initial,
+                    edgeLabel: edge.label,
+                    infoMetric: distanceInfo?.textContent.trim(),
+                    hoverMetric: edge.title.textContent.includes(
+                        'Distance Metrics / Minimum Distance: 0.24 cm'
+                    ),
+                };
+                app._dismissContextMenu();
+                window.fetch = originalFetch;
+                done(result);
+            })().catch(error => {
+                window.fetch = originalFetch;
+                done({error: `${stage}: ${error.message}`});
+            });
+            """
+        )
+        assert 'error' not in result
+        assert result['relation'] == 'Alpha [Contains] Beta'
+        assert result['relationDisabled'] is True
+        assert result['hasMetricsInfo'] is True
+        assert result['infoMenuWidth'] <= 280
+        assert result['descriptionWrapped'] is True
+        assert result['orthogonalMarginsWrapped'] is True
+        assert result['infoHasOrthogonalDiagram'] is True
+        assert result['tooltipHasOrthogonalDiagram'] is True
+        assert result['infoMetricsAreFlat'] is True
+        assert result['infoMetricsAreSeparated'] is True
+        assert result['orthogonalEdgeLabelWrapped'] is True
+        assert result['tooltipDescriptionWrapped'] is True
+        assert result['labelMetricFlyoutsNotScrollable'] is True
+        assert result['infoRowsReadOnly'] is True
+        assert result['labelRelationshipChecked'] is True
+        assert result['hoverHasSymmetry'] is True
+        assert result['edgeLabel'] == '[Contains]\nMinimum distance: 0.24 cm'
+        assert 'Minimum Distance: 0.24 cm' in result['infoMetric']
+        assert result['hoverMetric'] is True
 
     def test_relationships_are_grouped_sorted_and_actionable(
         self,

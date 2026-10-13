@@ -1992,6 +1992,42 @@ tbody tr:hover {
     overflow-wrap: anywhere;
 }
 
+.node-context-submenu.edge-info-submenu {
+    width: 280px;
+    max-width: calc(100vw - 16px);
+}
+
+.node-context-submenu.edge-info-submenu > .edge-info-description,
+.node-context-menu-item.edge-info-orthogonal-margins {
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.node-context-menu-item.edge-info-orthogonal-margins {
+    width: 248px;
+    max-width: calc(100vw - 48px);
+}
+
+.edge-info-orthogonal-margins .edge-metric-overlay-diagram,
+.edge-hover-tooltip-orthogonal .edge-metric-overlay-diagram {
+    margin: 0.25em auto 0;
+}
+
+.edge-hover-tooltip-content {
+    max-width: 320px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.edge-hover-tooltip-line {
+    white-space: pre-wrap;
+}
+
+.edge-hover-tooltip-orthogonal {
+    margin-top: 0.25em;
+}
+
 .node-context-submenu .node-context-submenu {
     font-size: inherit;
 }

@@ -58,6 +58,10 @@ class WebAppClient {
         this.edgeCurvatureOverrides = new Map();
         this.edgeCurvatureMaximum = 0.5;
         this.fadedEdgeOpacities = new Map();
+        this.edgeLabelFields = new Map();
+        this.edgeHoverFields = new Map();
+        this.hiddenEdgeLabels = new Set();
+        this.hiddenEdgeHovers = new Set();
         this.fixedNodes = new Set();     // ROI ids pinned via context menu
         this.manualLayoutActive = false;
         this._dragFrozen = [];
@@ -2379,6 +2383,9 @@ class WebAppClient {
             if (item.hasCalculatedMetrics) {
                 el.classList.add('has-calculated-metrics');
             }
+            if (item.className) {
+                el.classList.add(item.className);
+            }
 
             if (item.children?.length) {
                 el.classList.add('has-submenu');
@@ -2394,6 +2401,9 @@ class WebAppClient {
                 submenu.className = 'node-context-menu node-context-submenu';
                 if (item.scrollable) {
                     submenu.classList.add('is-scrollable');
+                }
+                if (item.submenuClassName) {
+                    submenu.classList.add(item.submenuClassName);
                 }
                 if (item.fontSize) {
                     submenu.style.fontSize = `${item.fontSize}px`;
@@ -2437,6 +2447,16 @@ class WebAppClient {
                 el.addEventListener('mousedown', (mouseEvent) => {
                     mouseEvent.stopPropagation();
                 });
+                menu.appendChild(el);
+                continue;
+            }
+
+            if (item.orthogonalValues) {
+                const label = document.createElement('span');
+                label.textContent = item.label;
+                el.append(label, this._buildOrthogonalMetricDiagram(
+                    item.orthogonalValues,
+                ));
                 menu.appendChild(el);
                 continue;
             }
@@ -5540,6 +5560,22 @@ class WebAppClient {
             Array.from(this.fadedEdgeOpacities.entries())
                 .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
         );
+        this.edgeLabelFields = new Map(
+            Array.from(this.edgeLabelFields.entries())
+                .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
+        );
+        this.edgeHoverFields = new Map(
+            Array.from(this.edgeHoverFields.entries())
+                .filter(([edgeKey]) => renderedEdgeKeys.has(edgeKey))
+        );
+        this.hiddenEdgeLabels = new Set(
+            Array.from(this.hiddenEdgeLabels)
+                .filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
+        this.hiddenEdgeHovers = new Set(
+            Array.from(this.hiddenEdgeHovers)
+                .filter(edgeKey => renderedEdgeKeys.has(edgeKey))
+        );
         this.manualLayoutActive = renderedNodeIds.size > 0
             && Array.from(renderedNodeIds).every(id => this.fixedNodes.has(Number(id)));
 
@@ -5730,7 +5766,9 @@ class WebAppClient {
             const displayLabel = edge.is_logical && baseLabel && !String(baseLabel).startsWith('[')
                 ? `[${baseLabel}]`
                 : baseLabel;
+            const displayEdge = {...edge, relationship_label: displayLabel};
             const edgeKey = this._buildEdgeKey(edge);
+            this._ensureEdgeDisplaySelections(edgeKey, displayEdge);
             const isHiddenByToggle = this.hiddenEdges.has(edgeKey);
             const isHighlighted = this.highlightedEdges.has(edgeKey);
             const hasDoubleLine = this.doubleLineEdges.has(edgeKey);
@@ -5751,10 +5789,18 @@ class WebAppClient {
             relationship_rank: edge.relationship_rank,
             has_calculated_metrics: edge.has_calculated_metrics,
             is_logical: edge.is_logical,
+            relationship_label: displayLabel,
+            relationship_description: edge.relationship_description || '',
+            intermediate_structures: edge.intermediate_structures || [],
+            is_symmetric: Boolean(edge.is_symmetric),
+            is_transitive: Boolean(edge.is_transitive),
+            metric_info: edge.metric_info || [],
             metric_options: edge.metric_options || [],
-            label: showLabels ? displayLabel : '',
+            label: showLabels
+                ? this._formatEdgeDisplayLabel(displayEdge, edgeKey)
+                : '',
             originalLabel: displayLabel,
-            title: this.buildEdgeTooltip(edge, data.nodes),
+            title: this._buildEdgeHoverTooltip(displayEdge, edgeKey),
             color: edgeColor,
             width: edge.width,
             dashes: edge.dashes,
@@ -6006,6 +6052,220 @@ class WebAppClient {
         return [fromNode, toNode, relationType, isLogical ? 1 : 0, label].join('|');
     }
 
+    _getEdgeRelationshipLabel(edge) {
+        const relationType = String(edge.relation_type || '').toUpperCase();
+        const relationConfig = this.symbolConfig?.relationships?.[relationType] || {};
+        const label = relationConfig.label
+            || String(edge.relationship_label || edge.originalLabel || edge.label || relationType)
+                .replace(/^\[|\]$/g, '');
+        return edge.is_logical ? `[${label}]` : label;
+    }
+
+    _formatEdgeMetricInfo(detail) {
+        if (detail.value !== null && detail.value !== undefined) {
+            return String(detail.value);
+        }
+        return (detail.values || [])
+            .map(item => `${item.label}: ${item.value}`)
+            .join('; ');
+    }
+
+    _getEdgeInfoFields(edge) {
+        const nodes = this.latestDiagramData?.nodes || [];
+        const nodeName = id => (
+            nodes.find(node => Number(node.id) === Number(id))?.label
+            || `ROI ${id}`
+        );
+        const relationshipLabel = this._getEdgeRelationshipLabel(edge);
+        const metricCategoryLabels = {
+            MarginMetrics: 'Margin Metrics',
+            DistanceMetrics: 'Distance Metrics',
+            VolumeRatioMetrics: 'Volume Ratio Metrics',
+        };
+        const fields = [
+            {
+                key: 'relationship_label',
+                label: 'Relationship',
+                value: `${nodeName(edge.from_node ?? edge.from)} `
+                    + `${relationshipLabel} `
+                    + `${nodeName(edge.to_node ?? edge.to)}`,
+            },
+            {
+                key: 'is_logical',
+                label: 'Is logical?',
+                value: edge.is_logical ? 'Yes' : 'No',
+            },
+            {
+                key: 'intermediate_structures',
+                label: 'Intermediate structures in logical path',
+                value: edge.intermediate_structures?.length
+                    ? edge.intermediate_structures.join(', ')
+                    : 'None',
+            },
+            {
+                key: 'relationship_description',
+                label: 'Relationship description',
+                value: edge.relationship_description || 'Not available',
+            },
+            {
+                key: 'is_symmetric',
+                label: 'Is symmetric?',
+                value: edge.is_symmetric ? 'Yes' : 'No',
+            },
+            {
+                key: 'is_transitive',
+                label: 'Is transitive?',
+                value: edge.is_transitive ? 'Yes' : 'No',
+            },
+        ];
+        (edge.metric_info || []).forEach(detail => {
+            fields.push({
+                key: `metric:${detail.field}`,
+                label: `${metricCategoryLabels[detail.category]
+                    || detail.category} / ${detail.label}`,
+                value: this._formatEdgeMetricInfo(detail),
+                metricInfo: detail,
+            });
+        });
+        return fields;
+    }
+
+    _ensureEdgeDisplaySelections(edgeKey, edge) {
+        const availableFields = new Set(
+            this._getEdgeInfoFields(edge).map(field => field.key),
+        );
+        if (!this.edgeLabelFields.has(edgeKey)) {
+            this.edgeLabelFields.set(edgeKey, new Set(['relationship_label']));
+        } else {
+            this.edgeLabelFields.set(
+                edgeKey,
+                new Set(Array.from(this.edgeLabelFields.get(edgeKey))
+                    .filter(field => field === 'relationship_label'
+                        || field.startsWith('metric:'))),
+            );
+        }
+        if (!this.edgeHoverFields.has(edgeKey)) {
+            this.edgeHoverFields.set(edgeKey, new Set([
+                'relationship_label',
+                'is_logical',
+                'relationship_description',
+            ]));
+        } else {
+            this.edgeHoverFields.set(
+                edgeKey,
+                new Set(Array.from(this.edgeHoverFields.get(edgeKey))
+                    .filter(field => availableFields.has(field))),
+            );
+        }
+    }
+
+    _formatEdgeDisplayLabel(edge, edgeKey) {
+        if (this.hiddenEdgeLabels.has(edgeKey)) return '';
+        this._ensureEdgeDisplaySelections(edgeKey, edge);
+        const selectedFields = this.edgeLabelFields.get(edgeKey);
+        const lines = [];
+        if (selectedFields.has('relationship_label')) {
+            lines.push(edge.relationship_label || this._getEdgeRelationshipLabel(edge));
+        }
+        const detailsByField = new Map(
+            (edge.metric_info || []).map(detail => [detail.field, detail]),
+        );
+        (edge.metric_options || []).forEach(metric => {
+            if (!selectedFields.has(`metric:${metric.name}`)) return;
+            const detail = detailsByField.get(metric.name);
+            if (!detail) return;
+            const value = this._formatEdgeMetricInfo(detail);
+            if (value) {
+                const metricLabel = `${metric.label}: ${value}`;
+                lines.push(metric.name === 'orthogonal_margins'
+                    ? this.wrapTooltipText(metricLabel, 48)
+                    : metricLabel);
+            }
+        });
+        return lines.join('\n');
+    }
+
+    _formatEdgeHoverTitle(edge, edgeKey) {
+        if (this.hiddenEdgeHovers.has(edgeKey)) return '';
+        this._ensureEdgeDisplaySelections(edgeKey, edge);
+        const selectedFields = this.edgeHoverFields.get(edgeKey);
+        return this._getEdgeInfoFields(edge)
+            .filter(field => selectedFields.has(field.key))
+            .map(field => {
+                const line = `${field.label}: ${field.value}`;
+                return field.key === 'relationship_description'
+                    ? this.wrapTooltipText(line, 80)
+                    : line;
+            })
+            .join('\n');
+    }
+
+    _buildEdgeHoverTooltip(edge, edgeKey) {
+        this._ensureEdgeDisplaySelections(edgeKey, edge);
+        const selectedFields = this.edgeHoverFields.get(edgeKey);
+        const tooltip = document.createElement('div');
+        tooltip.className = 'edge-hover-tooltip-content';
+
+        this._getEdgeInfoFields(edge)
+            .filter(field => selectedFields.has(field.key))
+            .forEach(field => {
+                if (field.key === 'metric:orthogonal_margins') {
+                    const section = document.createElement('div');
+                    section.className = 'edge-hover-tooltip-orthogonal';
+                    const heading = document.createElement('div');
+                    heading.textContent = field.label;
+                    section.append(
+                        heading,
+                        this._buildOrthogonalMetricDiagram(
+                            field.metricInfo.values,
+                        ),
+                    );
+                    tooltip.appendChild(section);
+                    return;
+                }
+
+                const line = document.createElement('div');
+                line.className = field.key === 'relationship_description'
+                    ? 'edge-hover-tooltip-line edge-hover-tooltip-description'
+                    : 'edge-hover-tooltip-line';
+                const text = `${field.label}: ${field.value}`;
+                line.textContent = field.key === 'relationship_description'
+                    ? this.wrapTooltipText(text, 80)
+                    : text;
+                tooltip.appendChild(line);
+            });
+
+        return tooltip;
+    }
+
+    _updateEdgeDisplay(edgeId) {
+        const edges = this.network?.body?.data?.edges;
+        const edge = edges?.get(edgeId);
+        if (!edge) return;
+        const sourceEdge = this._getEdgeSourceData(edge._edgeKey) || edge;
+        edges.update({
+            id: edgeId,
+            label: this.diagramShowLabelsApplied
+                ? this._formatEdgeDisplayLabel(sourceEdge, edge._edgeKey)
+                : '',
+            title: this._buildEdgeHoverTooltip(sourceEdge, edge._edgeKey),
+        });
+    }
+
+    _toggleEdgeDisplayField(edgeId, mode, field, checked) {
+        const edge = this.network?.body?.data?.edges?.get(edgeId);
+        if (!edge) return;
+        const edgeKey = edge._edgeKey;
+        const selections = mode === 'label'
+            ? this.edgeLabelFields
+            : this.edgeHoverFields;
+        const selectedFields = new Set(selections.get(edgeKey) || []);
+        if (checked) selectedFields.add(field);
+        else selectedFields.delete(field);
+        selections.set(edgeKey, selectedFields);
+        this._updateEdgeDisplay(edgeId);
+    }
+
     _getEdgeColorOpacity(color) {
         if (typeof color !== 'string') return 1;
         const match = color.match(
@@ -6037,7 +6297,7 @@ class WebAppClient {
         );
     }
 
-    _markEdgeMetricsCalculated(edgeId, metricOptions) {
+    _markEdgeMetricsCalculated(edgeId, metricOptions, metricInfo = null) {
         const edge = this.network?.body?.data?.edges?.get(edgeId);
         if (!edge) return;
 
@@ -6045,11 +6305,13 @@ class WebAppClient {
             id: edgeId,
             has_calculated_metrics: true,
             ...(metricOptions ? { metric_options: metricOptions } : {}),
+            ...(metricInfo ? { metric_info: metricInfo } : {}),
         });
         const sourceEdge = this._getEdgeSourceData(edge._edgeKey);
         if (sourceEdge) {
             sourceEdge.has_calculated_metrics = true;
             if (metricOptions) sourceEdge.metric_options = metricOptions;
+            if (metricInfo) sourceEdge.metric_info = metricInfo;
         }
         const catalogEdge = this.latestDiagramData?.relationship_catalog?.find(
             relationship => (
@@ -6063,6 +6325,7 @@ class WebAppClient {
         if (catalogEdge) {
             catalogEdge.has_calculated_metrics = true;
             if (metricOptions) catalogEdge.metric_options = metricOptions;
+            if (metricInfo) catalogEdge.metric_info = metricInfo;
         }
     }
 
@@ -6614,6 +6877,170 @@ class WebAppClient {
         return edgeId;
     }
 
+    _buildEdgeInfoMenuItems(edge) {
+        const fields = this._getEdgeInfoFields(edge);
+        const relationship = fields.find(
+            field => field.key === 'relationship_label',
+        );
+        const metricFields = fields.filter(field => (
+            field.key.startsWith('metric:')
+        ));
+        const metricItems = metricFields.map(field => {
+            const item = {
+                label: `${field.metricInfo.label}: ${field.value}`,
+                disabled: true,
+            };
+            if (field.key === 'metric:orthogonal_margins') {
+                item.label = field.metricInfo.label;
+                item.className = 'edge-info-orthogonal-margins';
+                item.orthogonalValues = field.metricInfo.values;
+            }
+            return item;
+        });
+        if (metricItems.length === 0) {
+            metricItems.push({label: 'No calculated metrics', disabled: true});
+        }
+
+        return [
+            {label: relationship?.value || 'Relationship unavailable', disabled: true},
+            {separator: true},
+            {label: 'Metrics', disabled: true, className: 'edge-info-section-label'},
+            ...metricItems,
+            {separator: true},
+            ...fields
+                .filter(field => field.key !== 'relationship_label'
+                    && !field.key.startsWith('metric:'))
+                .map(field => ({
+                    label: `${field.label}: ${field.value}`,
+                    disabled: true,
+                    ...(field.key === 'relationship_description'
+                        ? {className: 'edge-info-description'}
+                        : {}),
+                })),
+        ];
+    }
+
+    _buildEdgeLabelMetricItems(edgeId, edgeKey, edge, metricOptions) {
+        const root = [];
+        const selectedFields = this.edgeLabelFields.get(edgeKey) || new Set();
+        metricOptions.forEach(metric => {
+            const groupPath = metric.menu_path?.length === 1
+                ? metric.menu_path
+                : (metric.menu_path?.slice(0, -1) || []);
+            const path = [...groupPath, metric.label];
+            let level = root;
+            path.slice(0, -1).forEach(groupLabel => {
+                let group = level.find(item => (
+                    item.label === groupLabel && item.children
+                ));
+                if (!group) {
+                    group = {label: groupLabel, children: []};
+                    level.push(group);
+                }
+                level = group.children;
+            });
+            level.push({
+                label: path[path.length - 1],
+                checkbox: true,
+                checked: selectedFields.has(`metric:${metric.name}`),
+                action: checked => {
+                    this._toggleEdgeDisplayField(
+                        edgeId, 'label', `metric:${metric.name}`, checked,
+                    );
+                    if (checked) {
+                        this._loadEdgeLabelMetric(edgeId, edgeKey, edge, metric);
+                    }
+                },
+            });
+        });
+        return root;
+    }
+
+    _buildEdgeDisplayItems(edgeId, edgeKey, edge, mode, metricOptions) {
+        this._ensureEdgeDisplaySelections(edgeKey, edge);
+        const isLabel = mode === 'label';
+        const selections = isLabel
+            ? this.edgeLabelFields
+            : this.edgeHoverFields;
+        const selectedFields = selections.get(edgeKey);
+        const hiddenFields = isLabel
+            ? this.hiddenEdgeLabels
+            : this.hiddenEdgeHovers;
+        const hideLabel = isLabel ? 'Hide Label' : 'Hide Hover';
+        const items = [{
+            label: hideLabel,
+            checkbox: true,
+            checked: hiddenFields.has(edgeKey),
+            action: checked => {
+                if (checked) hiddenFields.add(edgeKey);
+                else hiddenFields.delete(edgeKey);
+                this._updateEdgeDisplay(edgeId);
+            },
+        }, {separator: true}];
+
+        if (isLabel) {
+            items.push({
+                label: 'Relationship label',
+                checkbox: true,
+                checked: selectedFields.has('relationship_label'),
+                action: checked => this._toggleEdgeDisplayField(
+                    edgeId, mode, 'relationship_label', checked,
+                ),
+            });
+            const metricItems = this._buildEdgeLabelMetricItems(
+                edgeId, edgeKey, edge, metricOptions,
+            );
+            items.push({separator: true});
+            items.push({
+                label: 'Metrics',
+                children: metricItems.length
+                    ? metricItems
+                    : [{label: 'No compatible metrics', disabled: true}],
+            });
+            return items;
+        }
+
+        return items.concat(this._getEdgeInfoFields(edge).map(field => ({
+            label: field.key === 'relationship_label'
+                ? 'Relationship label'
+                : field.label,
+            checkbox: true,
+            checked: selectedFields.has(field.key),
+            action: checked => this._toggleEdgeDisplayField(
+                edgeId, mode, field.key, checked,
+            ),
+        })));
+    }
+
+    async _loadEdgeLabelMetric(edgeId, edgeKey, edge, metric) {
+        if (!this.sessionId) return;
+        try {
+            const response = await fetch('/api/diagram/edge-metric', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    session_id: this.sessionId,
+                    from_node: Number(edge.from),
+                    to_node: Number(edge.to),
+                    relation_type: edge.relation_type,
+                    metric_name: metric.name,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Metric calculation failed');
+            }
+            this._markEdgeMetricsCalculated(
+                edgeId, data.metrics, data.metric_info,
+            );
+            this._updateEdgeDisplay(edgeId);
+        } catch (error) {
+            this.edgeLabelFields.get(edgeKey)?.delete(`metric:${metric.name}`);
+            this._updateEdgeDisplay(edgeId);
+            this.appendStatusLogLine('frontend', error.message);
+        }
+    }
+
     async _showEdgeContextMenu(edgeId, event, pointer) {
         if (!this.network) return;
         const edge = this.network.body.data.edges.get(edgeId);
@@ -6660,13 +7087,51 @@ class WebAppClient {
             ],
         }];
         let metricOptions = edge.metric_options || [];
+        const buildItems = (options, metricsMessage = '') => ([
+            visibilityItem,
+            {separator: true},
+            {
+                label: 'Display',
+                children: [
+                    {
+                        label: 'Label',
+                        children: this._buildEdgeDisplayItems(
+                            edgeId, edgeKey, edge, 'label', options,
+                        ),
+                    },
+                    {
+                        label: 'Hover',
+                        children: this._buildEdgeDisplayItems(
+                            edgeId, edgeKey, edge, 'hover', options,
+                        ),
+                        scrollable: true,
+                    },
+                ],
+            },
+            ...formattingItems,
+            ...(options.length > 0
+                ? [{
+                    label: 'Metrics',
+                    hasCalculatedMetrics: options.some(metric => metric.calculated),
+                    children: this._buildMetricMenuItems(edgeId, options, pointer),
+                }]
+                : [{
+                    label: metricsMessage || 'No compatible metrics',
+                    disabled: true,
+                }]),
+            {separator: true},
+            {
+                label: 'Info',
+                children: this._buildEdgeInfoMenuItems(edge),
+                scrollable: true,
+                submenuClassName: 'edge-info-submenu',
+            },
+        ]);
+
         if (metricOptions.length === 0 && this.sessionId) {
-            this._showSimpleContextMenu([
-                visibilityItem,
-                ...formattingItems,
-                { separator: true },
-                { label: 'Loading metrics...', disabled: true },
-            ], event);
+            this._showSimpleContextMenu(
+                buildItems([], 'Loading metrics...'), event,
+            );
             try {
                 const response = await fetch('/api/diagram/edge-metric', {
                     method: 'POST',
@@ -6683,37 +7148,29 @@ class WebAppClient {
                     throw new Error(data.detail || 'Unable to load metrics');
                 }
                 metricOptions = data.metrics || [];
+                edge.metric_info = data.metric_info || [];
                 this.network.body.data.edges.update({
                     id: edgeId,
                     metric_options: metricOptions,
+                    metric_info: edge.metric_info,
                 });
+                const sourceEdge = this._getEdgeSourceData(edgeKey);
+                if (sourceEdge) {
+                    sourceEdge.metric_options = metricOptions;
+                    sourceEdge.metric_info = edge.metric_info;
+                }
             } catch (error) {
                 this.appendStatusLogLine('frontend', error.message);
                 if (this._contextMenu) {
-                    this._showSimpleContextMenu([
-                        visibilityItem,
-                        ...formattingItems,
-                        { separator: true },
-                        { label: 'Metrics unavailable', disabled: true },
-                    ], event);
+                    this._showSimpleContextMenu(
+                        buildItems([], 'Metrics unavailable'), event,
+                    );
                 }
                 return;
             }
         }
 
-        const items = [visibilityItem, ...formattingItems, { separator: true }];
-        if (metricOptions.length > 0) {
-            items.push({
-                label: 'Metrics',
-                hasCalculatedMetrics: metricOptions.some(metric => metric.calculated),
-                children: this._buildMetricMenuItems(edgeId, metricOptions, pointer),
-            });
-        } else {
-            items.push({ label: 'No compatible metrics', disabled: true });
-        }
-        if (this._contextMenu || edge.metric_options?.length > 0) {
-            this._showSimpleContextMenu(items, event);
-        }
+        this._showSimpleContextMenu(buildItems(metricOptions), event);
     }
 
     _buildMetricMenuItems(edgeId, metricOptions, pointer) {
@@ -6812,7 +7269,9 @@ class WebAppClient {
             if (!response.ok) {
                 throw new Error(data.detail || 'Metric calculation failed');
             }
-            this._markEdgeMetricsCalculated(edgeId, data.metrics);
+            this._markEdgeMetricsCalculated(
+                edgeId, data.metrics, data.metric_info,
+            );
             if (this._metricOverlays.get(edgeId) !== state) return;
             this._renderMetricOverlayValue(value, data);
         } catch (error) {
@@ -8301,6 +8760,10 @@ class WebAppClient {
         this.straightLineEdges.clear();
         this.edgeCurvatureOverrides.clear();
         this.fadedEdgeOpacities.clear();
+        this.edgeLabelFields.clear();
+        this.edgeHoverFields.clear();
+        this.hiddenEdgeLabels.clear();
+        this.hiddenEdgeHovers.clear();
         this.fixedNodes.clear();
         this.summaryHiddenRows.clear();
         this.summaryRowOrder = [];

@@ -363,6 +363,7 @@ def test_diagram_endpoint_uses_human_relationship_label(monkeypatch, tmp_path):
     assert edge['label'] == 'Contains'
     assert edge['relationship_rank'] == 4
     assert edge['has_calculated_metrics'] is False
+    assert edge['metric_info'] == []
 
 
 def test_diagram_node_info_without_dicom_omits_dicom_fields(
@@ -512,6 +513,117 @@ def test_diagram_edge_exposes_equals_rank_and_calculated_metrics(
     assert edge['relation_type'] == 'EQUALS'
     assert edge['relationship_rank'] == 1
     assert edge['has_calculated_metrics'] is True
+
+
+def test_diagram_edge_includes_relationship_info_and_stored_metrics(
+    monkeypatch,
+    tmp_path,
+):
+    client, manager = _prepare_client(monkeypatch, tmp_path)
+    relationship = StructureRelationship(
+        de27im=None,
+        is_identical=False,
+        _override_type=RELATIONSHIP_TYPES['CONTAINS'],
+    )
+    relationship.is_logical = True
+    relationship.intermediate_structures = [3]
+    relationship.metrics = SimpleNamespace(
+        margin=SimpleNamespace(
+            orthogonal_margins={
+                'x_neg': 1.25,
+                'x_pos': 1.5,
+                'y_neg': 1.75,
+                'y_pos': 2.0,
+                'z_neg': 2.25,
+                'z_pos': 2.5,
+            },
+            minimum_margin=0.75,
+            per_region_orthogonal_margins={
+                ('region-a', 'region-b'): {'x_neg': 0.5},
+            },
+            per_region_minimum_margin={
+                ('region-a', 'region-b'): 0.5,
+            },
+        ),
+        distance=SimpleNamespace(
+            minimum_distance=0.625,
+            per_region_minimum_distance={(1, 2): 0.375},
+            z_distance=0.25,
+        ),
+        volume_ratio=SimpleNamespace(
+            overlapping_ratio=0.75,
+            non_overlapping_ratio=0.25,
+            per_region_overlapping_ratio={
+                ('intersection-a', 'union-a'): 0.5,
+            },
+            per_region_non_overlapping_ratio={
+                ('difference-a', 'union-a'): 0.125,
+            },
+        ),
+    )
+    manager.save_session(
+        'diagram-edge-info-metrics',
+        SessionData(
+            dicom_file_path='dummy.dcm',
+            structure_set=FakeDiagramStructureSet(relationship),
+        ),
+    )
+
+    response = client.post(
+        '/api/diagram',
+        json={
+            'session_id': 'diagram-edge-info-metrics',
+            'logical_relations_mode': 'show',
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    for edge in [payload['edges'][0], payload['relationship_catalog'][0]]:
+        assert edge['relationship_description'] == (
+            RELATIONSHIP_TYPES['CONTAINS'].description
+        )
+        assert edge['intermediate_structures'] == ['ROI 3']
+        assert edge['is_symmetric'] is False
+        assert edge['is_transitive'] == (
+            RELATIONSHIP_TYPES['CONTAINS'].is_transitive
+        )
+        metric_info = {
+            (item['category'], item['field']): item
+            for item in edge['metric_info']
+        }
+        expected_fields = {
+            ('MarginMetrics', 'orthogonal_margins'),
+            ('MarginMetrics', 'minimum_margin'),
+            ('MarginMetrics', 'per_region_orthogonal_margins'),
+            ('MarginMetrics', 'per_region_minimum_margin'),
+            ('DistanceMetrics', 'minimum_distance'),
+            ('DistanceMetrics', 'per_region_minimum_distance'),
+            ('DistanceMetrics', 'z_distance'),
+            ('VolumeRatioMetrics', 'overlapping_ratio'),
+            ('VolumeRatioMetrics', 'non_overlapping_ratio'),
+            ('VolumeRatioMetrics', 'per_region_overlapping_ratio'),
+            ('VolumeRatioMetrics', 'per_region_non_overlapping_ratio'),
+        }
+        assert expected_fields.issubset(metric_info)
+        metric_config = web_main.get_metrics_config()
+        expected_x_negative_label = (
+            metric_config.anatomical_labels.get('x_neg', 'x_neg')
+            if metric_config.use_anatomical_labels
+            else '-X'
+        )
+        assert metric_info[
+            ('MarginMetrics', 'orthogonal_margins')
+        ]['values'][0]['label'] == expected_x_negative_label
+        assert metric_info[
+            ('MarginMetrics', 'per_region_minimum_margin')
+        ]['values'][0]['label'] == 'region-a / region-b'
+        assert metric_info[
+            ('DistanceMetrics', 'per_region_minimum_distance')
+        ]['values'][0]['label'] == '1 / 2'
+        assert metric_info[
+            ('VolumeRatioMetrics', 'overlapping_ratio')
+        ]['value'].endswith('%')
 
 
 @pytest.mark.parametrize('relation_type', ['CONTAINS', 'DISJOINT', 'UNKNOWN'])
