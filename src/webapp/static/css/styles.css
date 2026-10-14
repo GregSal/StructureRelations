@@ -2009,6 +2009,15 @@ tbody tr:hover {
     max-width: calc(100vw - 48px);
 }
 
+.node-context-submenu.edge-info-submenu
+> .node-context-menu-item.edge-info-per-region-metric {
+    display: block;
+    width: 248px;
+    max-width: calc(100vw - 48px);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .edge-info-orthogonal-margins .edge-metric-overlay-diagram,
 .edge-hover-tooltip-orthogonal .edge-metric-overlay-diagram {
     margin: 0.25em auto 0;

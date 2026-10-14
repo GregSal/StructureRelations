@@ -1302,6 +1302,21 @@ class TestDiagramRelationshipContextMenu:
                         {label: '-Z', value: '2.25 cm'},
                         {label: '+Z', value: '2.50 cm'},
                     ],
+                }, {
+                    category: 'MarginMetrics',
+                    field: 'per_region_orthogonal_margins',
+                    label: 'Per-region Orthogonal Margins',
+                    value: null,
+                    values: [
+                        {
+                            label: 'Region A / Region B',
+                            value: 'R 1.25 cm; L 1.50 cm; A 1.75 cm',
+                        },
+                        {
+                            label: 'Region C / Region D',
+                            value: 'R 0.25 cm; L 0.50 cm',
+                        },
+                    ],
                 }],
             };
             app.symbolConfig = {relationships: {
@@ -1395,9 +1410,21 @@ class TestDiagramRelationshipContextMenu:
                 ).find(item => item.classList.contains(
                     'edge-info-orthogonal-margins'
                 ));
+                const perRegionInfo = Array.from(
+                    info.querySelectorAll(
+                        ':scope > .node-context-menu-item'
+                    )
+                ).find(item => item.classList.contains(
+                    'edge-info-per-region-metric'
+                ));
+                const perRegionInfoLines = perRegionInfo.textContent.split(
+                    String.fromCharCode(10)
+                );
                 const infoChildren = Array.from(info.children);
                 const metricsHeaderIndex = infoChildren.indexOf(metricsHeader);
-                const orthogonalInfoIndex = infoChildren.indexOf(orthogonalInfo);
+                const firstRelationshipInfoIndex = infoChildren.findIndex(
+                    item => item.textContent.startsWith('Is logical?')
+                );
                 const tooltipLines = app._formatEdgeHoverTitle(
                     edge, edgeKey,
                 ).split('\\n');
@@ -1425,8 +1452,15 @@ class TestDiagramRelationshipContextMenu:
                     'is_logical',
                     'relationship_description',
                     'metric:orthogonal_margins',
+                    'metric:per_region_orthogonal_margins',
                 ]));
                 const edgeTooltip = app._buildEdgeHoverTooltip(edge, edgeKey);
+                const perRegionTooltip = Array.from(
+                    edgeTooltip.querySelectorAll('.edge-hover-tooltip-line')
+                ).find(item => item.textContent.includes('Region A / Region B'));
+                const perRegionTooltipLines = perRegionTooltip.textContent.split(
+                    String.fromCharCode(10)
+                );
                 const initial = {
                     relation: infoRelation.textContent.trim(),
                     relationDisabled: infoRelation.classList.contains(
@@ -1441,7 +1475,7 @@ class TestDiagramRelationshipContextMenu:
                     infoMetricsAreSeparated: (
                         infoChildren[metricsHeaderIndex - 1]
                             ?.classList.contains('node-context-menu-separator')
-                        && infoChildren[orthogonalInfoIndex + 1]
+                        && infoChildren[firstRelationshipInfoIndex - 1]
                             ?.classList.contains('node-context-menu-separator')
                     ),
                     infoMenuWidth: info.getBoundingClientRect().width,
@@ -1469,10 +1503,28 @@ class TestDiagramRelationshipContextMenu:
                         && Boolean(tooltipLines[descriptionLineIndex + 1])
                     ),
                     orthogonalEdgeLabelWrapped: (
-                        orthogonalEdgeLabel.split('\\n').length > 2
-                        && orthogonalEdgeLabel.split('\\n')
-                            .slice(1)
-                            .every(line => line.length <= 48)
+                        orthogonalEdgeLabel.split(String.fromCharCode(10))
+                            .includes('-X: 1.25 cm')
+                        && orthogonalEdgeLabel.split(String.fromCharCode(10))
+                            .includes('+Z: 2.50 cm')
+                    ),
+                    perRegionInfoUsesSeparateLines: (
+                        getComputedStyle(perRegionInfo).whiteSpace === 'pre-wrap'
+                        && perRegionInfoLines.some(line => (
+                            line.includes('Region A / Region B:')
+                        ))
+                        && perRegionInfoLines.some(line => (
+                            line.includes('Region C / Region D:')
+                        ))
+                        && perRegionInfoLines.some(line => line === 'R 1.25 cm')
+                        && perRegionInfoLines.some(line => line === 'L 1.50 cm')
+                    ),
+                    perRegionTooltipUsesSeparateLines: (
+                        perRegionTooltipLines.some(line => (
+                            line.includes('Region A / Region B:')
+                        ))
+                        && perRegionTooltipLines.some(line => line === 'R 1.25 cm')
+                        && perRegionTooltipLines.some(line => line === 'L 1.50 cm')
                     ),
                     infoRowsReadOnly: [
                         'Is logical?: Yes',
@@ -1578,6 +1630,8 @@ class TestDiagramRelationshipContextMenu:
         assert result['infoMetricsAreFlat'] is True
         assert result['infoMetricsAreSeparated'] is True
         assert result['orthogonalEdgeLabelWrapped'] is True
+        assert result['perRegionInfoUsesSeparateLines'] is True
+        assert result['perRegionTooltipUsesSeparateLines'] is True
         assert result['tooltipDescriptionWrapped'] is True
         assert result['labelMetricFlyoutsNotScrollable'] is True
         assert result['infoRowsReadOnly'] is True

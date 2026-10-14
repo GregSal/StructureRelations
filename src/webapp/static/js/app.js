@@ -6065,9 +6065,21 @@ class WebAppClient {
         if (detail.value !== null && detail.value !== undefined) {
             return String(detail.value);
         }
-        return (detail.values || [])
+        const values = detail.values || [];
+        if (detail.field === 'orthogonal_margins') {
+            return values
+                .map(item => `${item.label}: ${item.value}`)
+                .join('\n');
+        }
+        if (detail.field === 'per_region_orthogonal_margins') {
+            return values.map(item => (
+                `${item.label}:\n${String(item.value).replace(/;\s*/g, '\n')}`
+            )).join('\n');
+        }
+        const separator = detail.field.startsWith('per_region_') ? '\n' : '; ';
+        return values
             .map(item => `${item.label}: ${item.value}`)
-            .join('; ');
+            .join(separator);
     }
 
     _getEdgeInfoFields(edge) {
@@ -6176,10 +6188,9 @@ class WebAppClient {
             if (!detail) return;
             const value = this._formatEdgeMetricInfo(detail);
             if (value) {
-                const metricLabel = `${metric.label}: ${value}`;
                 lines.push(metric.name === 'orthogonal_margins'
-                    ? this.wrapTooltipText(metricLabel, 48)
-                    : metricLabel);
+                    ? `${metric.label}:\n${value}`
+                    : `${metric.label}: ${value}`);
             }
         });
         return lines.join('\n');
@@ -6894,6 +6905,8 @@ class WebAppClient {
                 item.label = field.metricInfo.label;
                 item.className = 'edge-info-orthogonal-margins';
                 item.orthogonalValues = field.metricInfo.values;
+            } else if (field.metricInfo.field.startsWith('per_region_')) {
+                item.className = 'edge-info-per-region-metric';
             }
             return item;
         });
